@@ -1,4 +1,4 @@
-# Agent Note：提议、传输、校验 —— 并让中断的传输可以续传
+# Agent Note: Offer, stream, verify — and make an interrupted transfer resumable
 
 Status: implemented
 
