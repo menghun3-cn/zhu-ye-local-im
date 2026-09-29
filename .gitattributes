@@ -1,0 +1,27 @@
+# Normalize line endings on commit so blob hashes are stable across platforms.
+# The Agent Note i18n sidecars record git blob hashes of both language files,
+# so a line-ending flip would break verify-translation-pairs.ps1 on a fresh
+# checkout on another machine.
+* text=auto eol=lf
+
+# Windows-only files that genuinely need CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.keystore binary
+*.jks binary
+
+# Keep lockfiles out of diff noise
+pubspec.lock text eol=lf
