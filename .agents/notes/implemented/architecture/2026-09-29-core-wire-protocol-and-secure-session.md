@@ -41,8 +41,20 @@ sockets, in `lib/core/`:
 Every frame is `u32 length | u8 kind | payload`, with `length` counting the kind
 byte plus the payload so a reader always knows how many further bytes to wait
 for. Three kinds exist: `control` (`0x01`, a UTF-8 JSON object), `chunk`
-(`0x02`, a transfer id, a `u64` offset and raw bytes) and `sealed` (`0x03`, a
-12-byte nonce followed by ciphertext and its 16-byte Poly1305 tag).
+(`0x02`, a transfer id, an item id, a `u64` offset and raw bytes) and `sealed`
+(`0x03`, a 12-byte nonce followed by ciphertext and its 16-byte Poly1305 tag).
+Both chunk ids are length-prefixed strings, bounded to 255 bytes each so the
+length byte can hold them.
+
+A chunk carries an item id as well as a transfer id because one Transfer may
+name several items, each with its own byte stream and its own offsets. With only
+the transfer id, a receiver holding a three-file Transfer could not tell which
+file a slice at offset zero belonged to, and would have to infer that from the
+order slices happened to arrive in. Adding the field later would have meant
+changing a format that had already shipped; the transfer layer
+([transfer-engine-over-a-session](2026-09-29-transfer-engine-over-a-session.md))
+is what found this, and it is the reason the frame layer was still free to
+change.
 
 The length prefix is attacker-controlled, so a frame is rejected above
 `maxFrameBytes` (16 MiB) on both encode and decode — without that ceiling nine
