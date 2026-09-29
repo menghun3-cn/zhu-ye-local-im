@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Raised when a byte stream does not conform to the wire framing rules.
+/// Raised when wire data does not conform to the rules this build expects.
+///
+/// Shared by the framing layer and by discovery: both read bytes from whoever
+/// happens to be on the link, and both want a single error type meaning "this
+/// was not usable" rather than a different one per layer.
 final class ProtocolException implements Exception {
   const ProtocolException(this.message);
 
