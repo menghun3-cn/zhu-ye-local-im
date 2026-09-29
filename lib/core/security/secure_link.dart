@@ -236,11 +236,13 @@ final class SecureLink {
   /// Sends a slice of bulk payload to the peer.
   Future<void> sendChunk({
     required String transferId,
+    required String itemId,
     required int offset,
     required List<int> data,
   }) => _seal(
     ChunkFrame(
       transferId: transferId,
+      itemId: itemId,
       offset: offset,
       data: Uint8List.fromList(data),
     ),
@@ -285,7 +287,16 @@ final class SecureLink {
   Future<void> _runPump() async {
     try {
       while (await _iterator.moveNext()) {
+        // A link closed underneath this loop has nothing left to deliver to:
+        // close() tears the transport down and finishes both streams at once,
+        // and frames already queued behind the teardown belong to a Session
+        // nobody is listening to any more.
+        if (_closed) return;
         final frame = await _open(_iterator.current);
+        // Checked again after the await: close() can land while a record is
+        // being decrypted, and adding to a finished controller is a crash
+        // rather than a lost message.
+        if (_closed) return;
         switch (frame) {
           case ControlFrame():
             _messages.add(WireMessage.decode(frame.json));
@@ -299,6 +310,12 @@ final class SecureLink {
       }
       _closeControllers();
     } on Object catch (error, stack) {
+      // Whatever went wrong, reporting it needs live streams. A closed link has
+      // none, and the failure is then the teardown itself rather than news.
+      if (_closed) {
+        _closeControllers();
+        return;
+      }
       _messages.addError(error, stack);
       _chunks.addError(error, stack);
       _closeControllers();

@@ -80,27 +80,37 @@ final class ControlFrame extends Frame {
 
 /// A slice of bulk payload bytes.
 ///
-/// [offset] is the byte offset of [data] within the payload named by
-/// [transferId], which is what makes a transfer resumable: the receiver can
-/// persist what it has and ask for the remainder rather than the whole file.
+/// [offset] is the byte offset of [data] within the item named by [itemId],
+/// which is what makes a transfer resumable: the receiver can persist what it
+/// has and ask for the remainder rather than the whole file.
+///
+/// Both ids are on the wire because one Transfer may name several items, each
+/// with its own byte stream and its own offsets. Without [itemId] a receiver
+/// holding a three-file Transfer could not tell which file a slice at offset
+/// zero belongs to, and would have to infer it from the order slices arrived.
 final class ChunkFrame extends Frame {
   ChunkFrame({
     required this.transferId,
+    required this.itemId,
     required this.offset,
     required this.data,
   });
 
-  /// Identifies the transfer this slice belongs to.
+  /// Identifies the Transfer this slice belongs to.
   final String transferId;
 
-  /// Byte offset of [data] within the payload.
+  /// Identifies the item inside [transferId] that [data] belongs to.
+  final String itemId;
+
+  /// Byte offset of [data] within the item's byte stream.
   final int offset;
 
   /// The payload bytes.
   final Uint8List data;
 
   @override
-  String toString() => 'ChunkFrame($transferId @$offset, ${data.length} bytes)';
+  String toString() =>
+      'ChunkFrame($transferId/$itemId @$offset, ${data.length} bytes)';
 }
 
 /// An encrypted record: a nonce, then ciphertext with its Poly1305 tag.
@@ -140,9 +150,17 @@ Uint8List encodeFrame(Frame frame) {
           'transfer id is ${idBytes.length} bytes, limit is 255',
         );
       }
+      final itemBytes = utf8.encode(frame.itemId);
+      if (itemBytes.length > 0xff) {
+        throw ProtocolException(
+          'item id is ${itemBytes.length} bytes, limit is 255',
+        );
+      }
       final builder = BytesBuilder(copy: false)
         ..addByte(idBytes.length)
         ..add(idBytes)
+        ..addByte(itemBytes.length)
+        ..add(itemBytes)
         ..add(_uint64(frame.offset))
         ..add(frame.data);
       payload = builder.takeBytes();
@@ -272,23 +290,31 @@ final class FrameDecoder {
     if (payload.isEmpty) {
       throw const ProtocolException('chunk payload is empty');
     }
-    final idLength = payload[0];
-    final headerLength = 1 + idLength + 8;
+    final transferIdLength = payload[0];
+    var cursor = 1 + transferIdLength;
+    if (payload.length <= cursor) {
+      throw ProtocolException(
+        'chunk payload of ${payload.length} bytes ends inside its transfer id',
+      );
+    }
+    final itemIdLength = payload[cursor];
+    final itemIdStart = cursor + 1;
+    cursor = itemIdStart + itemIdLength;
+    final headerLength = cursor + 8;
     if (payload.length < headerLength) {
       throw ProtocolException(
         'chunk payload of ${payload.length} bytes is shorter than its '
         '$headerLength byte header',
       );
     }
-    final transferId = utf8.decode(payload.sublist(1, 1 + idLength));
-    final offset = ByteData.sublistView(
-      payload,
-      1 + idLength,
-      headerLength,
-    ).getUint64(0, Endian.big);
     return ChunkFrame(
-      transferId: transferId,
-      offset: offset,
+      transferId: _utf8Id(payload.sublist(1, 1 + transferIdLength), 'id'),
+      itemId: _utf8Id(payload.sublist(itemIdStart, cursor), 'item id'),
+      offset: ByteData.sublistView(
+        payload,
+        cursor,
+        headerLength,
+      ).getUint64(0, Endian.big),
       data: Uint8List.sublistView(payload, headerLength),
     );
   }
@@ -343,4 +369,14 @@ Uint8List _uint64(int value) {
   final bytes = Uint8List(8);
   ByteData.sublistView(bytes).setUint64(0, value, Endian.big);
   return bytes;
+}
+
+/// Decodes a length-prefixed identifier, reporting bad UTF-8 as a protocol
+/// error rather than letting a decoder-level [FormatException] escape.
+String _utf8Id(Uint8List bytes, String what) {
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    throw ProtocolException('the chunk $what is not valid UTF-8');
+  }
 }
