@@ -7,6 +7,10 @@
 library;
 
 export 'clipboard/clipboard_capability.dart';
+export 'clipboard/clipboard_channel.dart';
+export 'clipboard/clipboard_entry.dart';
+export 'clipboard/clipboard_mirror.dart';
+export 'clipboard/system_clipboard.dart';
 export 'discovery/beacon.dart';
 export 'discovery/beacon_transport.dart';
 export 'discovery/discovery_service.dart';
@@ -14,11 +18,13 @@ export 'discovery/peer_registry.dart';
 export 'discovery/udp_beacon_transport.dart';
 export 'identity/device_descriptor.dart';
 export 'identity/fingerprint.dart';
+export 'identity/owner_group.dart';
 export 'identity/pairing_secret.dart';
 export 'protocol/frame.dart';
 export 'protocol/messages.dart';
 export 'security/hkdf.dart';
 export 'security/secure_link.dart';
+export 'session/session_hub.dart';
 export 'transfer/byte_source.dart';
 export 'transfer/incoming_transfer.dart';
 export 'transfer/outgoing_transfer.dart';
