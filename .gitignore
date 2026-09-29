@@ -34,3 +34,6 @@ Desktop.ini
 *.key
 .env
 .env.*
+
+# Local agent workspace — session logs and notes, never part of the shipped project
+.workbuddy/
