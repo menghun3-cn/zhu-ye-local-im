@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-29-v1-scope-windows-and-android.md
+#   git hash-object 2026-09-29-v1-scope-windows-and-android.zh.md
+2026-09-29-v1-scope-windows-and-android.md: c672c46b303b007e1246ba9593dfedaf960c82cc
+2026-09-29-v1-scope-windows-and-android.zh.md: 948d844c01d93b2f03b8b5eec9ad8879f4766b8c
