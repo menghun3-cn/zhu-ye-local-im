@@ -22,7 +22,9 @@ Status: implemented
 
 ## The frame layer
 
-每个帧都是 `u32 length | u8 kind | payload`，其中 `length` 计入 kind 字节与 payload，于是读取方总能知道还要等多少字节。帧有三种：`control`（`0x01`，UTF-8 JSON 对象）、`chunk`（`0x02`，传输 id、`u64` offset 与原始字节）、`sealed`（`0x03`，12 字节 nonce，后接密文及其 16 字节 Poly1305 tag）。
+每个帧都是 `u32 length | u8 kind | payload`，其中 `length` 计入 kind 字节与 payload，于是读取方总能知道还要等多少字节。帧有三种：`control`（`0x01`，UTF-8 JSON 对象）、`chunk`（`0x02`，传输 id、条目 id、`u64` offset 与原始字节）、`sealed`（`0x03`，12 字节 nonce，后接密文及其 16 字节 Poly1305 tag）。chunk 的两个 id 都是带长度前缀的字符串，各自以 255 字节为上限，好让长度字节装得下。
+
+chunk 除了传输 id 还携带条目 id，因为一次 Transfer 可以列出多个条目，每个条目有自己的字节流和自己的 offset。只带传输 id 时，持有「三文件一次传输」的接收方无法分辨 offset 为零的切片属于哪个文件，只能从切片恰好到达的顺序去猜。若等格式上线后再补这个字段，就是一次已经发布过的格式变更；发现这一点的是传输层（见 [transfer-engine-over-a-session](2026-09-29-transfer-engine-over-a-session.zh.md)），也正是分帧层当时还有余量改动的理由。
 
 length 前缀由攻击者控制，因此编码与解码两侧都在 `maxFrameBytes`（16 MiB）之上拒收 —— 没有这个上限，线上的九个字节就能让解码器去分配 4 GiB。解码器是增量的，并做惰性压缩：TCP 交付的是字节区间而不是消息，且小帧连成的流不应在每帧都 memmove 活的尾部。流在帧中途结束会抛 `ProtocolException`，而不是看起来像一次干净的通话结束。
 
