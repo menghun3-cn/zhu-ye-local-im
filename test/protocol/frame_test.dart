@@ -70,22 +70,45 @@ void main() {
   });
 
   group('chunk frames', () {
-    test('round-trip carries id, offset and bytes intact', () {
+    test('round-trip carries id, item, offset and bytes intact', () {
       final frame = ChunkFrame(
         transferId: 't-1',
+        itemId: 'item-7',
         offset: 4096,
         data: _bytes([0, 1, 2, 250, 255]),
       );
       final decoder = FrameDecoder()..add(encodeFrame(frame));
       final result = decoder.next()! as ChunkFrame;
       expect(result.transferId, 't-1');
+      expect(result.itemId, 'item-7');
       expect(result.offset, 4096);
       expect(result.data, [0, 1, 2, 250, 255]);
+    });
+
+    test('keeps two items of one transfer apart', () {
+      final first = ChunkFrame(
+        transferId: 't-9',
+        itemId: 'a',
+        offset: 0,
+        data: _bytes([1]),
+      );
+      final second = ChunkFrame(
+        transferId: 't-9',
+        itemId: 'b',
+        offset: 0,
+        data: _bytes([2]),
+      );
+      final decoder = FrameDecoder()
+        ..add(encodeFrame(first))
+        ..add(encodeFrame(second));
+      expect((decoder.next()! as ChunkFrame).itemId, 'a');
+      expect((decoder.next()! as ChunkFrame).itemId, 'b');
     });
 
     test('round-trips a large offset without truncation', () {
       final frame = ChunkFrame(
         transferId: 'big',
+        itemId: 'i',
         offset: 0x1FFFFFFFF,
         data: _bytes([9]),
       );
@@ -96,7 +119,12 @@ void main() {
     test('refuses a negative offset', () {
       expect(
         () => encodeFrame(
-          ChunkFrame(transferId: 't', offset: -1, data: _bytes([1])),
+          ChunkFrame(
+            transferId: 't',
+            itemId: 'i',
+            offset: -1,
+            data: _bytes([1]),
+          ),
         ),
         throwsA(isA<ProtocolException>()),
       );
@@ -105,7 +133,26 @@ void main() {
     test('refuses a transfer id too long for its length byte', () {
       expect(
         () => encodeFrame(
-          ChunkFrame(transferId: 'x' * 256, offset: 0, data: _bytes([1])),
+          ChunkFrame(
+            transferId: 'x' * 256,
+            itemId: 'i',
+            offset: 0,
+            data: _bytes([1]),
+          ),
+        ),
+        throwsA(isA<ProtocolException>()),
+      );
+    });
+
+    test('refuses an item id too long for its length byte', () {
+      expect(
+        () => encodeFrame(
+          ChunkFrame(
+            transferId: 't',
+            itemId: 'y' * 256,
+            offset: 0,
+            data: _bytes([1]),
+          ),
         ),
         throwsA(isA<ProtocolException>()),
       );
@@ -119,6 +166,43 @@ void main() {
       frame.setRange(5, frame.length, payload);
       final decoder = FrameDecoder()..add(frame);
       expect(decoder.next, throwsA(isA<ProtocolException>()));
+    });
+
+    test('rejects a payload that ends before its item id byte', () {
+      // one id byte ("t"), then nothing where the item id length belongs.
+      final payload = _bytes([1, 0x74]);
+      final frame = Uint8List(4 + 1 + payload.length);
+      ByteData.sublistView(frame).setUint32(0, 1 + payload.length, Endian.big);
+      frame[4] = FrameKind.chunk.code;
+      frame.setRange(5, frame.length, payload);
+      final decoder = FrameDecoder()..add(frame);
+      expect(decoder.next, throwsA(isA<ProtocolException>()));
+    });
+
+    test('reports an id that is not UTF-8 as a protocol error', () {
+      // A well-formed header whose item id byte is a lone 0xff, which is not
+      // valid UTF-8: transferId "t", item id 0xff, offset 0, one data byte.
+      final payload = _bytes([
+        1, 0x74, // transfer id: 1 byte, 't'
+        1, 0xff, // item id: 1 byte, invalid UTF-8
+        0, 0, 0, 0, 0, 0, 0, 0, // offset
+        0x07, // data
+      ]);
+      final frame = Uint8List(4 + 1 + payload.length);
+      ByteData.sublistView(frame).setUint32(0, 1 + payload.length, Endian.big);
+      frame[4] = FrameKind.chunk.code;
+      frame.setRange(5, frame.length, payload);
+      final decoder = FrameDecoder()..add(frame);
+      expect(
+        decoder.next,
+        throwsA(
+          isA<ProtocolException>().having(
+            (error) => error.message,
+            'message',
+            contains('UTF-8'),
+          ),
+        ),
+      );
     });
   });
 
@@ -197,7 +281,12 @@ void main() {
       final stream = Stream<List<int>>.fromIterable([
         encodeFrame(ControlFrame({'t': 'one'})),
         ...encodeFrame(
-          ChunkFrame(transferId: 't', offset: 0, data: _bytes([7])),
+          ChunkFrame(
+            transferId: 't',
+            itemId: 'i',
+            offset: 0,
+            data: _bytes([7]),
+          ),
         ).splitEvery(3),
       ]);
       final frames = await decodeFrames(stream).toList();

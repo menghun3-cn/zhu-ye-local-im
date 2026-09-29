@@ -201,9 +201,15 @@ void main() {
         List<int>.generate(3000, (i) => (i * 31 + 7) % 256),
       );
 
-      await links.a.sendChunk(transferId: 't-2', offset: 0, data: payload);
+      await links.a.sendChunk(
+        transferId: 't-2',
+        itemId: 'i-1',
+        offset: 0,
+        data: payload,
+      );
       await until(() => atB.chunks.isNotEmpty, description: 'B收到 chunk');
       expect(atB.chunks.first.transferId, 't-2');
+      expect(atB.chunks.first.itemId, 'i-1');
       expect(atB.chunks.first.offset, 0);
       expect(atB.chunks.first.data, payload);
 
@@ -217,7 +223,12 @@ void main() {
         List<int>.generate(256 * 1024, (i) => (i * 131 + 17) % 256),
       );
 
-      await links.a.sendChunk(transferId: 't-3', offset: 0, data: payload);
+      await links.a.sendChunk(
+        transferId: 't-3',
+        itemId: 'i-1',
+        offset: 0,
+        data: payload,
+      );
       await until(
         () => atB.chunks.isNotEmpty,
         description: 'B收到 256 KiB chunk',
@@ -404,9 +415,15 @@ void main() {
       final half = Uint8List.fromList(
         List<int>.generate(512 * 1024, (i) => (i * 97 + 3) % 256),
       );
-      await initiator.sendChunk(transferId: 'tcp-1', offset: 0, data: half);
       await initiator.sendChunk(
         transferId: 'tcp-1',
+        itemId: 'i1',
+        offset: 0,
+        data: half,
+      );
+      await initiator.sendChunk(
+        transferId: 'tcp-1',
+        itemId: 'i1',
         offset: half.length,
         data: half,
       );
