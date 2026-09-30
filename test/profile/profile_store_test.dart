@@ -128,6 +128,31 @@ void main() {
       },
     );
 
+    test('a first save makes the directory it writes into', () async {
+      // `profile_location.dart` decides where a profile goes and says out
+      // loud that the store is what makes that place exist. On a first
+      // launch it is not there yet: neither `%APPDATA%/LocalTransfer` on
+      // Windows nor Android's `.../incoming` is created by anybody else. A
+      // store that cannot make its own directory cannot mint a first
+      // identity, so this is the difference between an app that starts and
+      // one that throws before its window is drawn.
+      final nested = FileProfileStore(
+        '${sandbox.path}${Platform.pathSeparator}LocalTransfer'
+        '${Platform.pathSeparator}profile.json',
+      );
+      await nested.save({'v': 1});
+      expect(await nested.load(), {'v': 1});
+    });
+
+    test('a first save creates every missing level, not just one', () async {
+      final nested = FileProfileStore(
+        '${sandbox.path}${Platform.pathSeparator}a'
+        '${Platform.pathSeparator}b${Platform.pathSeparator}profile.json',
+      );
+      await nested.save({'v': 1});
+      expect(await nested.load(), {'v': 1});
+    });
+
     test('a JSON array where an object belongs is corruption too', () async {
       final path = '${sandbox.path}${Platform.pathSeparator}profile.json';
       await File(path).writeAsString('[1, 2, 3]');
