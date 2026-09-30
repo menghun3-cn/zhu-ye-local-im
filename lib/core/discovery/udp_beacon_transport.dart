@@ -1,9 +1,28 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../protocol/frame.dart';
 import 'beacon.dart';
 import 'beacon_transport.dart';
+
+/// How long to wait before offering the socket a datagram it refused.
+///
+/// The window in which `send` returns 0 is the time an overlapped write takes
+/// to complete, which measures in tens of microseconds. A millisecond is two
+/// orders of magnitude clearer than that and costs nothing when the socket is
+/// free, because then no wait happens at all.
+const Duration _sendRetryDelay = Duration(milliseconds: 1);
+
+/// One datagram waiting for the socket to accept it.
+final class _PendingDatagram {
+  _PendingDatagram(this.bytes, this.address, this.port);
+
+  final Uint8List bytes;
+  final InternetAddress address;
+  final int port;
+}
 
 /// The limited broadcast address, which reaches the local link without a
 /// netmask being known.
@@ -105,6 +124,18 @@ final class UdpBeaconTransport implements BeaconTransport {
   final StreamController<BeaconDatagram> _received =
       StreamController<BeaconDatagram>();
 
+  /// Datagrams the socket has not taken yet, oldest first.
+  ///
+  /// A `RawDatagramSocket` accepts **one** datagram at a time: a `send` issued
+  /// while another write is still in flight returns 0 and the datagram is
+  /// discarded — no error, and no completion callback to wait on. Sending
+  /// straight to the socket therefore loses beacons whenever two go out in the
+  /// same tick, which is exactly what `broadcast` does for every target after
+  /// the first. Everything goes through this queue instead, and the queue only
+  /// moves on once the socket has reported taking the datagram.
+  final Queue<_PendingDatagram> _outbox = Queue<_PendingDatagram>();
+  bool _sending = false;
+
   late final StreamSubscription<RawSocketEvent> _subscription;
   List<InternetAddress> _cachedTargets = const [];
   DateTime? _lastRefresh;
@@ -153,20 +184,57 @@ final class UdpBeaconTransport implements BeaconTransport {
     List<int> datagram, {
     required InternetAddress address,
     required int port,
-  }) {
-    if (_closed) return;
-    _socket.send(datagram, address, port);
-  }
+  }) => _post(datagram, address, port);
 
   @override
   void broadcast(List<int> datagram) {
     if (_closed) return;
     for (final target in _cachedTargets) {
-      _socket.send(datagram, target, _broadcastPort);
+      _post(datagram, target, _broadcastPort);
     }
     // Keep the subnet list warm so a Device that joins a new network is reached
     // on the next announce without the caller having to schedule a refresh.
     unawaited(_refreshTargets());
+  }
+
+  /// Queues one datagram, copying it so a caller may reuse its buffer.
+  void _post(List<int> datagram, InternetAddress address, int port) {
+    if (_closed) return;
+    _outbox.add(_PendingDatagram(Uint8List.fromList(datagram), address, port));
+    if (!_sending) unawaited(_drainOutbox());
+  }
+
+  /// Hands queued datagrams to the socket, one at a time, in order.
+  ///
+  /// A refusal is not an error to report: the socket is still busy with the
+  /// datagram before this one, so the same datagram is simply offered again
+  /// shortly. Order is preserved, which is all a caller can reasonably ask of a
+  /// transport sitting on an unordered protocol.
+  Future<void> _drainOutbox() async {
+    _sending = true;
+    try {
+      while (!_closed && _outbox.isNotEmpty) {
+        final pending = _outbox.first;
+        final int sent;
+        try {
+          sent = _socket.send(pending.bytes, pending.address, pending.port);
+        } on SocketException {
+          // The socket is gone underneath us: an interface was removed, or the
+          // stack refused the datagram outright. There is no caller left to
+          // report to — `send` returned long ago — and retrying would spin, so
+          // drop what is queued. `close()` still tears the socket down.
+          _outbox.clear();
+          return;
+        }
+        if (sent == pending.bytes.length) {
+          _outbox.removeFirst();
+          continue;
+        }
+        await Future<void>.delayed(_sendRetryDelay);
+      }
+    } finally {
+      _sending = false;
+    }
   }
 
   Future<void> _refreshTargets() async {
@@ -186,6 +254,7 @@ final class UdpBeaconTransport implements BeaconTransport {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _outbox.clear();
     await _subscription.cancel();
     _socket.close();
     if (!_received.isClosed) unawaited(_received.close());
