@@ -203,6 +203,8 @@ sealed class WireMessage {
       'cancel' => CancelMessage.fromJson(json),
       'clipboard' => ClipboardMessage.fromJson(json),
       'confirm' => SessionConfirmMessage.fromJson(json),
+      'pairAdmit' => PairAdmitMessage.fromJson(json),
+      'pairConfirmed' => PairConfirmedMessage.fromJson(json),
       'error' => ErrorMessage.fromJson(json),
       _ => throw FormatException('unknown message type "$type"'),
     };
@@ -516,6 +518,110 @@ final class SessionConfirmMessage extends WireMessage {
       const SessionConfirmMessage();
 }
 
+/// Carries a Device's Owner public key into a Pairing, signed, along with the
+/// group secret and roster when the sender already belongs to a group.
+///
+/// This is what turns the Fingerprint in a handshake from a claim into a fact:
+/// the receiver hashes [publicKey] and requires it to equal the Fingerprint the
+/// peer announced, then verifies [signature] over the Pairing context — which
+/// only a Device holding that private key, inside *this* Pairing session, could
+/// have produced.
+final class PairAdmitMessage extends WireMessage {
+  const PairAdmitMessage({
+    required this.publicKey,
+    required this.alias,
+    required this.signature,
+    this.groupSecret,
+    this.members = const [],
+  });
+
+  /// The sender's Ed25519 public key, raw bytes.
+  final Uint8List publicKey;
+
+  /// The Alias the sender wants to be known by. Untrusted: sanitise on use.
+  final String alias;
+
+  /// Ed25519 signature over the Pairing context.
+  final Uint8List signature;
+
+  /// The session secret of the group the sender belongs to, when it has one.
+  ///
+  /// Null for the Device that is forming a group: two Devices pairing for the
+  /// first time each derive the same secret from the Pairing code, so nothing
+  /// has to travel. A Device *joining* an existing group adopts whatever the
+  /// group's owner sends here — sealed by the handshake, so it never crosses
+  /// the network in the clear.
+  final Uint8List? groupSecret;
+
+  /// The Devices the sender's Owner Group contains, apart from the sender.
+  ///
+  /// Sent so a Device joining an established group learns the whole group and
+  /// not only the Device it paired with. Without this, the third Device in a
+  /// group would refuse Mirror entries from the second, because the gate that
+  /// decides who may mirror reads the group and the group would name only the
+  /// Device it paired with.
+  ///
+  /// A claim like everything else here, but not a *deciding* one: the sender
+  /// signs it, and the group secret is the same either way — this only decides
+  /// who the receiver knows about, not who can reach it.
+  final List<Fingerprint> members;
+
+  /// The Fingerprint this message's key must hash to.
+  Fingerprint get fingerprint => Fingerprint.ofPublicKey(publicKey);
+
+  @override
+  String get type => 'pairAdmit';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'key': toBase64Url(publicKey),
+    'alias': alias,
+    'sig': toBase64Url(signature),
+    if (groupSecret != null) 'group': toBase64Url(groupSecret!),
+    if (members.isNotEmpty)
+      'members': [for (final member in members) member.hex],
+  };
+
+  static PairAdmitMessage fromJson(Map<String, Object?> json) {
+    final rawSecret = _optionalString(json, 'group');
+    return PairAdmitMessage(
+      publicKey: fromBase64Url(_string(json, 'key')),
+      alias: _string(json, 'alias'),
+      signature: fromBase64Url(_string(json, 'sig')),
+      groupSecret: rawSecret == null ? null : fromBase64Url(rawSecret),
+      members: _optionalFingerprints(json, 'members'),
+    );
+  }
+
+  @override
+  String toString() =>
+      'PairAdmitMessage(${fingerprint.short()}, "$alias", '
+      'group: ${groupSecret != null}, ${members.length} members)';
+}
+
+/// Confirms that a Pairing's short authentication string was accepted.
+///
+/// Sent once by each side, only after its user confirmed that the six digits
+/// on the two screens match. Nothing is written to either profile until this
+/// has been both sent and received, so a user who confirms on one Device and
+/// then cancels on the other leaves no half-paired state behind.
+///
+/// It carries nothing, and does not need to: the record is sealed with keys
+/// derived from the Pairing Secret, so receiving one proves the peer completed
+/// the same handshake this Device did.
+final class PairConfirmedMessage extends WireMessage {
+  const PairConfirmedMessage();
+
+  @override
+  String get type => 'pairConfirmed';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static PairConfirmedMessage fromJson(Map<String, Object?> json) =>
+      const PairConfirmedMessage();
+}
+
 /// Reports a protocol-level problem that has no more specific message.
 final class ErrorMessage extends WireMessage {
   const ErrorMessage({required this.code, required this.message});
@@ -607,6 +713,18 @@ Map<String, String> _optionalStringMap(Map<String, Object?> json, String key) {
     }
     return MapEntry(name, digest);
   });
+}
+
+/// Decodes a list of Fingerprints, or an empty list when absent.
+List<Fingerprint> _optionalFingerprints(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) return const [];
+  if (value is! List) {
+    throw FormatException(
+      '"$key" must be a list when present, got ${value.runtimeType}',
+    );
+  }
+  return [for (final entry in value) Fingerprint(_asString(entry, '$key[]'))];
 }
 
 DateTime _dateTime(Map<String, Object?> json, String key) {

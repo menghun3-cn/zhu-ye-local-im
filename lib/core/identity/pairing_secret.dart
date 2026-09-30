@@ -14,9 +14,11 @@ import '../util/crockford_base32.dart';
 ///   because a QR code can transport arbitrary bytes.
 /// * [fromCode] derives the secret from a short human-typed code. The code is
 ///   50 bits, so it is a fallback for when a camera is unavailable, not the
-///   preferred path: an attacker who observes a handshake can test code
-///   guesses offline against the authentication tag. That is why the code path
-///   is paired with short-authentication-string comparison in the UI.
+///   preferred path: an attacker who records a handshake can test code guesses
+///   offline against the authentication tag. The short-authentication-string
+///   step in the UI does not raise that ceiling — a peer that knows the code
+///   derives the same digits — it is there so both users confirm, with the
+///   peer's identity in front of them, that this is the exchange they meant.
 final class PairingSecret {
   PairingSecret._(this._bytes, this.entropyBits);
 
