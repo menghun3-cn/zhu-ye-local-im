@@ -6,6 +6,7 @@ import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../feedback.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../widgets.dart';
 
@@ -52,6 +53,7 @@ class _ClipboardPageState extends State<ClipboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
     final capability = controller.self.capability;
     final staged = controller.stagedEntries;
@@ -59,7 +61,7 @@ class _ClipboardPageState extends State<ClipboardPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const SectionHeader(title: 'Clipboard sync'),
+        SectionHeader(title: l10n.clipboardSyncHeader),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -71,7 +73,7 @@ class _ClipboardPageState extends State<ClipboardPage> {
                     for (final mode in ClipboardMode.values)
                       ButtonSegment<ClipboardMode>(
                         value: mode,
-                        label: Text(labelForClipboardMode(mode)),
+                        label: Text(labelForClipboardMode(mode, l10n)),
                         // A mode this platform cannot honour is shown and
                         // disabled rather than hidden: "why can I not mirror"
                         // is answered by the mode being visible and grey.
@@ -83,10 +85,10 @@ class _ClipboardPageState extends State<ClipboardPage> {
                       controller.setClipboardMode(selection.first),
                 ),
                 const SizedBox(height: 12),
-                Text(describeClipboardMode(controller.clipboardMode)),
+                Text(describeClipboardMode(controller.clipboardMode, l10n)),
                 const SizedBox(height: 8),
                 Text(
-                  _capabilityNote(capability),
+                  _capabilityNote(capability, l10n),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -95,22 +97,19 @@ class _ClipboardPageState extends State<ClipboardPage> {
         ),
         if (!controller.isPaired) ...[
           const SizedBox(height: 12),
-          const HintText(
-            'Clipboard sync happens inside an Owner Group, and this Device is '
-            'not in one yet. Pairing is on the Devices surface.',
-          ),
+          HintText(l10n.clipboardNeedsGroup),
         ],
         const SizedBox(height: 20),
-        const SectionHeader(title: 'Waiting for you'),
+        SectionHeader(title: l10n.clipboardWaitingHeader),
         if (staged.isEmpty)
-          const HintText('Nothing is waiting to be applied.')
+          HintText(l10n.clipboardNothingStaged)
         else
           for (final entry in staged)
             _EntryCard(entry: entry, controller: controller),
         const SizedBox(height: 20),
-        const SectionHeader(title: 'Put on this clipboard'),
+        SectionHeader(title: l10n.clipboardAppliedHeader),
         if (_applied.isEmpty)
-          const HintText('Nothing has reached this clipboard yet.')
+          HintText(l10n.clipboardNothingApplied)
         else
           for (final entry in _applied)
             _EntryCard(entry: entry, controller: null),
@@ -129,22 +128,18 @@ class _ClipboardPageState extends State<ClipboardPage> {
       };
 
   /// What this platform lets the clipboard do, in a sentence.
-  static String _capabilityNote(ClipboardCapability capability) {
+  static String _capabilityNote(
+    ClipboardCapability capability,
+    AppLocalizations l10n,
+  ) {
     if (capability.canOriginate && capability.canApply) {
-      return 'Copies made here travel to the group, and copies from the group '
-          'replace this clipboard.';
+      return l10n.clipboardNoteBoth;
     }
     if (!capability.canOriginate && capability.canApply) {
-      return 'This platform only lets an app read its clipboard while its '
-          'window is on screen, so copies made here travel only while this '
-          'window is focused. Copies from the group are applied at any time.';
+      return l10n.clipboardNoteApplyOnly;
     }
-    if (capability.canOriginate) {
-      return 'Copies made here travel to the group. This platform cannot '
-          'apply a copy that arrives.';
-    }
-    return 'This platform lets this app do nothing with its clipboard, in '
-        'either direction.';
+    if (capability.canOriginate) return l10n.clipboardNoteOriginateOnly;
+    return l10n.clipboardNoteNone;
   }
 }
 
@@ -160,6 +155,7 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final controller = this.controller;
     return Card(
@@ -170,7 +166,10 @@ class _EntryCard extends StatelessWidget {
         ),
         title: Text(_preview(entry.text)),
         subtitle: Text(
-          'from ${entry.origin.short()} · ${describeLastSeen(entry.capturedAt)}',
+          l10n.entryFrom(
+            entry.origin.short(),
+            describeLastSeen(entry.capturedAt, l10n),
+          ),
           style: theme.textTheme.bodySmall,
         ),
         isThreeLine: true,
@@ -180,7 +179,7 @@ class _EntryCard extends StatelessWidget {
                 onPressed: () => unawaited(
                   guarded(context, () => controller.applyStaged(entry)),
                 ),
-                child: const Text('Apply'),
+                child: Text(l10n.apply),
               ),
       ),
     );

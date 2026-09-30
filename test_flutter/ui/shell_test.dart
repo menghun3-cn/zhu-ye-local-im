@@ -21,16 +21,16 @@ void main() {
       );
       expect(windowA.within(find.byType(NavigationBar)), findsNothing);
 
-      await openTab(tester, 'Transfers', window: windowA);
+      await openTab(tester, l10n.tabTransfers, window: windowA);
       expect(selectedSurface(tester, window: windowA), transfersSurface);
 
-      await openTab(tester, 'Clipboard', window: windowA);
+      await openTab(tester, l10n.tabClipboard, window: windowA);
       expect(selectedSurface(tester, window: windowA), clipboardSurface);
 
-      await openTab(tester, 'Settings', window: windowA);
+      await openTab(tester, l10n.tabSettings, window: windowA);
       expect(selectedSurface(tester, window: windowA), settingsSurface);
 
-      await openTab(tester, 'Devices', window: windowA);
+      await openTab(tester, l10n.tabDevices, window: windowA);
       expect(selectedSurface(tester, window: windowA), devicesSurface);
 
       await shutdown(tester, [device]);
@@ -50,7 +50,13 @@ void main() {
       expect(windowA.within(find.byType(NavigationRail)), findsNothing);
 
       final bar = windowA.within(find.byType(NavigationBar));
-      for (final label in ['Devices', 'Transfers', 'Clipboard', 'Settings']) {
+      final labels = [
+        l10n.tabDevices,
+        l10n.tabTransfers,
+        l10n.tabClipboard,
+        l10n.tabSettings,
+      ];
+      for (final label in labels) {
         expect(
           find.descendant(of: bar, matching: find.text(label)),
           findsOneWidget,
@@ -58,7 +64,7 @@ void main() {
         );
       }
 
-      await openTab(tester, 'Settings', window: windowA);
+      await openTab(tester, l10n.tabSettings, window: windowA);
       expect(selectedSurface(tester, window: windowA), settingsSurface);
 
       await shutdown(tester, [device]);
@@ -68,13 +74,10 @@ void main() {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
 
-      expect(windowA.within(find.text('Local Transfer')), findsOneWidget);
+      expect(windowA.within(find.text(l10n.appTitle)), findsOneWidget);
       expect(windowA.within(find.text('Alice')), findsWidgets);
       // The unpaired marker is what tells a user why nothing is reachable.
-      expect(
-        windowA.within(find.byTooltip('Not paired with any Device yet')),
-        findsOneWidget,
-      );
+      expect(windowA.within(find.byTooltip(l10n.notPairedYet)), findsOneWidget);
 
       // Renaming publishes a new descriptor and re-saves the profile, both of
       // which go through the real event loop, so this waits like the rest.
