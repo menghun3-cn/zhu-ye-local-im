@@ -28,11 +28,12 @@ void main() {
       // Device showing a code does in the shipped configuration. Bob is a
       // guest and can take any free port.
       final alice = await startUiDevice(
+        tester,
         hub.a,
         'Alice',
         pairingPort: defaultPairingPort,
       );
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
 
       await pairThroughWindows(
@@ -76,6 +77,15 @@ void main() {
 
       // Send it from Alice's window, through the menu a user would use.
       await openTab(tester, 'Devices', window: windowA);
+      // The Session is up at the controller, but the peer card is a rendering
+      // of it and the frame that opened the tab does not have to be the one
+      // that carries it. Waiting for the card to offer Send is what a user
+      // does — they look at the panel until the button is there.
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.byTooltip('Send')).evaluate().isNotEmpty,
+        description: 'the connected peer card to offer Send',
+      );
       await tester.tap(windowA.within(find.byTooltip('Send')));
       await settleRoute(tester);
       await tester.tap(windowA.within(find.text('Send a file')));
@@ -145,11 +155,12 @@ void main() {
     ) async {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(
+        tester,
         hub.a,
         'Alice',
         pairingPort: defaultPairingPort,
       );
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
 
       await pairThroughWindows(
@@ -205,15 +216,16 @@ void main() {
       // the Manual Address path gives up, since nothing was discovered to pin —
       // so the handshake is what has to turn her away.
       final alice = await startUiDevice(
+        tester,
         MemoryBeaconHub().a,
         'Alice',
         pairingPort: defaultPairingPort,
       );
-      final bob = await startUiDevice(MemoryBeaconHub().a, 'Bob');
-      await pairDevices(alice, bob);
-      final carol = await startUiDevice(MemoryBeaconHub().a, 'Carol');
-      final dave = await startUiDevice(MemoryBeaconHub().a, 'Dave');
-      await pairDevices(carol, dave);
+      final bob = await startUiDevice(tester, MemoryBeaconHub().a, 'Bob');
+      await pairDevices(tester, alice, bob);
+      final carol = await startUiDevice(tester, MemoryBeaconHub().a, 'Carol');
+      final dave = await startUiDevice(tester, MemoryBeaconHub().a, 'Dave');
+      await pairDevices(tester, carol, dave);
 
       await pumpWindow(tester, carol);
       await openTab(tester, 'Devices', window: windowA);

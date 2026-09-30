@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -74,7 +75,17 @@ final class UiDevice {
 /// The exception is the Device being *joined* in a two-window test: the join
 /// dialog offers the default pairing port as its starting value, so the Device
 /// showing a code has to be listening where that dialog looks.
+///
+/// ## Why this takes a [WidgetTester]
+///
+/// `controller.start()` binds a real `ServerSocket`, and a `testWidgets` body
+/// runs on a fake clock: the real event loop does not run while that body is
+/// suspended on a real socket, so awaiting one is a deadlock rather than a
+/// wait. `tester.runAsync` is the only door out to the real event loop, and
+/// everything below that touches a socket goes through it. Without this the
+/// suite does not fail — it hangs at `+0` forever.
 Future<UiDevice> startUiDevice(
+  WidgetTester tester,
   BeaconTransport transport,
   String alias, {
   int sessionListenPort = 0,
@@ -84,37 +95,50 @@ Future<UiDevice> startUiDevice(
   String? defaultIncomingDirectory,
   DevicePlatform platform = DevicePlatform.windows,
 }) async {
-  final store = MemoryProfileStore();
-  final clipboard = MemorySystemClipboard();
-  final controller = LocalTransferController(
-    store: store,
-    beaconTransport: transport,
-    clipboard: clipboard,
-    alias: alias,
-    sessionListenPort: sessionListenPort,
-    pairingPort: pairingPort,
-    clipboardMode: clipboardMode,
-  );
-  await controller.start();
-  addTearDown(controller.close);
-
-  final device = UiDevice(
-    controller: controller,
-    clipboard: clipboard,
-    store: store,
-    // The same objects the controller was built on, plus the two facts the
-    // pages need but the controller does not carry.
-    seams: PlatformSeams(
+  late final UiDevice device;
+  await tester.runAsync(() async {
+    final store = MemoryProfileStore();
+    final clipboard = MemorySystemClipboard();
+    final controller = LocalTransferController(
       store: store,
-      profilePath: profilePath,
-      beacon: transport,
+      beaconTransport: transport,
       clipboard: clipboard,
-      platform: platform,
-      defaultIncomingDirectory: defaultIncomingDirectory,
-    ),
-  );
-  // Recorded here the way a screen would, by rendering them.
-  controller.incoming.listen(device.offers.add);
+      alias: alias,
+      sessionListenPort: sessionListenPort,
+      pairingPort: pairingPort,
+      clipboardMode: clipboardMode,
+    );
+    await controller.start();
+    device = UiDevice(
+      controller: controller,
+      clipboard: clipboard,
+      store: store,
+      // The same objects the controller was built on, plus the two facts the
+      // pages need but the controller does not carry.
+      seams: PlatformSeams(
+        store: store,
+        profilePath: profilePath,
+        beacon: transport,
+        clipboard: clipboard,
+        platform: platform,
+        defaultIncomingDirectory: defaultIncomingDirectory,
+      ),
+    );
+    // Recorded here the way a screen would, by rendering them.
+    controller.incoming.listen(device.offers.add);
+  });
+  addTearDown(() async {
+    // `shutdown` has normally closed this already, and the call is a no-op by
+    // then. When a test failed before reaching `shutdown`, the close is issued
+    // here, outside the fake clock — where a close that needs the fake clock
+    // cannot finish. Bounded rather than awaited forever: a leaked controller
+    // shows up as a port still in use, which is a far better failure than a
+    // suite that never ends.
+    await device.controller.close().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {},
+    );
+  });
   return device;
 }
 
@@ -273,6 +297,11 @@ Future<void> pumpTwoWindows(
 /// Sockets and streams are real here, so a check has to yield to the real event
 /// loop (`runAsync`) *and* advance the fake clock (`pump` with a non-zero
 /// duration). Doing only one of the two waits forever.
+///
+/// Reports what it is still waiting for once a second. A wait that ends in a
+/// timeout should say which one it was without the reader having to bisect the
+/// test, and a wait that is *stuck* — as opposed to slow — is the one case
+/// where a test suite produces no output at all and nothing to go on.
 Future<void> pumpUntil(
   WidgetTester tester,
   bool Function() done, {
@@ -280,7 +309,13 @@ Future<void> pumpUntil(
   String description = 'condition',
 }) async {
   final watch = Stopwatch()..start();
+  var reported = 0;
   while (!done()) {
+    final seconds = watch.elapsed.inSeconds;
+    if (seconds > reported) {
+      reported = seconds;
+      debugPrint('pumpUntil: still waiting for $description (${seconds}s)');
+    }
     if (watch.elapsed > timeout) {
       fail('timed out after $timeout waiting for $description');
     }
@@ -314,9 +349,34 @@ Future<void> drainTimers(WidgetTester tester) async {
 /// pending timer — which `flutter_test` fails it for. Closing first is what
 /// makes the difference: pumping alone would only fire the timers and have them
 /// reschedule themselves.
+///
+/// ## Why this pumps instead of merely awaiting
+///
+/// In a widget test the work a close has to do is spread across two clocks. The
+/// controller was built inside [startUiDevice]'s `runAsync`, so *its* objects
+/// live on the real event loop — but a Session opened by a *tap* was opened
+/// from the fake zone, and the socket carrying it completes its futures on the
+/// fake microtask queue. Closing that socket therefore needs the fake clock to
+/// advance as well as the real one. Awaiting the closes with `runAsync` alone
+/// waits on a clock nothing is advancing, and the suite hangs — not fails —
+/// with no output at all. Driving both is what makes teardown finish.
 Future<void> shutdown(WidgetTester tester, List<UiDevice> devices) async {
-  for (final device in devices) {
-    await device.controller.close();
+  final closings = <Future<void>>[
+    for (final device in devices) device.controller.close(),
+  ];
+  var open = closings.length;
+  for (final closing in closings) {
+    unawaited(closing.whenComplete(() => open--));
+  }
+  final watch = Stopwatch()..start();
+  while (open > 0) {
+    if (watch.elapsed > const Duration(seconds: 15)) {
+      fail('$open controller(s) did not finish closing');
+    }
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pump(const Duration(milliseconds: 16));
   }
   await tester.pumpWidget(const SizedBox.shrink());
   await drainTimers(tester);
@@ -420,6 +480,10 @@ Directory tempDirectory(String prefix) {
 }
 
 /// Waits for [condition] on the real event loop, with no widget tree involved.
+///
+/// Has to be called from inside `tester.runAsync` (as [pairDevices] and
+/// [connectDevices] do): it waits by yielding to the real event loop, and a
+/// `testWidgets` body outside `runAsync` has no real event loop to yield to.
 Future<void> untilTrue(
   bool Function() condition,
   String description, {
@@ -440,40 +504,56 @@ Future<void> untilTrue(
 /// — two windows, a code read off one screen and typed into the other — is what
 /// the two-window test covers. Every other test would otherwise pay for that
 /// whole flow just to reach a paired Device.
-Future<void> pairDevices(UiDevice host, UiDevice guest) async {
-  final invitation = await host.controller.invite();
-  final guestAttempt = await guest.controller.join(
-    host: InternetAddress.loopbackIPv4.address,
-    code: invitation.code,
-    port: invitation.port,
-  );
-  final hostAttempt = await invitation.attempt;
-  expect(
-    hostAttempt.sas,
-    guestAttempt.sas,
-    reason: 'both Devices must derive the same digits to compare',
-  );
-  await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
-  await untilTrue(
-    () => host.controller.isServing && guest.controller.isServing,
-    'both Devices to serve Sessions',
-  );
+///
+/// Inviting, dialling and confirming are all real sockets, so the whole exchange
+/// runs on the real event loop — see [startUiDevice] for why that is not
+/// optional.
+Future<void> pairDevices(
+  WidgetTester tester,
+  UiDevice host,
+  UiDevice guest,
+) async {
+  await tester.runAsync(() async {
+    final invitation = await host.controller.invite();
+    final guestAttempt = await guest.controller.join(
+      host: InternetAddress.loopbackIPv4.address,
+      code: invitation.code,
+      port: invitation.port,
+    );
+    final hostAttempt = await invitation.attempt;
+    expect(
+      hostAttempt.sas,
+      guestAttempt.sas,
+      reason: 'both Devices must derive the same digits to compare',
+    );
+    await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
+    await untilTrue(
+      () => host.controller.isServing && guest.controller.isServing,
+      'both Devices to serve Sessions',
+    );
+  });
 }
 
 /// Opens a Session from [from] to [to] over a real loopback socket.
-Future<void> connectDevices(UiDevice from, UiDevice to) async {
-  final port = to.controller.listenPort;
-  expect(port, isNotNull, reason: 'a paired Device listens');
-  await from.controller.connectTo(
-    address: InternetAddress.loopbackIPv4.address,
-    port: port,
-  );
-  await untilTrue(
-    () =>
-        from.controller.sessions.isNotEmpty &&
-        to.controller.sessions.isNotEmpty,
-    'the Session to come up on both Devices',
-  );
+Future<void> connectDevices(
+  WidgetTester tester,
+  UiDevice from,
+  UiDevice to,
+) async {
+  await tester.runAsync(() async {
+    final port = to.controller.listenPort;
+    expect(port, isNotNull, reason: 'a paired Device listens');
+    await from.controller.connectTo(
+      address: InternetAddress.loopbackIPv4.address,
+      port: port,
+    );
+    await untilTrue(
+      () =>
+          from.controller.sessions.isNotEmpty &&
+          to.controller.sessions.isNotEmpty,
+      'the Session to come up on both Devices',
+    );
+  });
 }
 
 /// Runs the typed-code Pairing between two windows, as two people would.
