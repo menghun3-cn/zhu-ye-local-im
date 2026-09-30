@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-staged-clipboard-entry-never-reaches-the-screen.md
+#   git hash-object 2026-09-30-staged-clipboard-entry-never-reaches-the-screen.zh.md
+2026-09-30-staged-clipboard-entry-never-reaches-the-screen.md: 7818793e57742f231180aa788284c5022d1a6cd8
+2026-09-30-staged-clipboard-entry-never-reaches-the-screen.zh.md: e1897f18fa58ff0efd38df55aee333e36c1384ad
