@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../clipboard/clipboard_capability.dart';
 import '../identity/device_descriptor.dart';
@@ -34,14 +35,48 @@ final class ProfileCorruptedException implements Exception {
 /// They travel together because they are persisted together and loaded
 /// together: a profile without its identity cannot prove anything, and an
 /// identity without a profile has no alias to announce.
+///
+/// Secrets live here rather than on [DeviceProfile]: a profile is state a UI
+/// renders and a test builds by hand, and cryptographic material has no place
+/// in either.
 final class LocalProfile {
-  const LocalProfile({required this.identity, required this.profile});
+  const LocalProfile({
+    required this.identity,
+    required this.profile,
+    this.groupSecret,
+  });
 
   /// The Owner's key pair.
   final OwnerIdentity identity;
 
   /// The Device's self-knowledge and peer history.
   final DeviceProfile profile;
+
+  /// The secret every Session inside this Device's Owner Group is
+  /// authenticated with, or null when this Device belongs to no group yet.
+  ///
+  /// One secret per group rather than one per peer: a Session's responder has
+  /// to authenticate before it knows who is dialling, so a per-peer secret
+  /// could not be selected. Two Devices pairing for the first time derive the
+  /// same value from the Pairing code; anything joining an existing group is
+  /// handed this one, sealed by the Pairing session.
+  final Uint8List? groupSecret;
+
+  /// A copy with [profile] or [groupSecret] replaced.
+  LocalProfile copyWith({DeviceProfile? profile, Uint8List? groupSecret}) =>
+      LocalProfile(
+        identity: identity,
+        profile: profile ?? this.profile,
+        groupSecret: groupSecret ?? this.groupSecret,
+      );
+
+  /// Whether this Device has been paired with anybody.
+  bool get hasGroupSecret => groupSecret != null;
+
+  @override
+  String toString() =>
+      'LocalProfile(${profile.self.short()}, "$profile.alias", '
+      'group: ${profile.group.length}, secret: $hasGroupSecret)';
 }
 
 /// Where a [LocalProfile] lives.
@@ -194,21 +229,31 @@ Future<LocalProfile?> loadLocalProfile(ProfileStore store) async {
       'identity ${identity.fingerprint.short()}',
     );
   }
-  return LocalProfile(identity: identity, profile: profile);
+  return LocalProfile(
+    identity: identity,
+    profile: profile,
+    groupSecret: _groupSecretOf(json),
+  );
 }
 
-/// Persists [local] — identity seed included — through [store].
+/// Persists [local] — identity seed and group secret included — through
+/// [store].
 ///
-/// The seed is the private half of the Owner key pair. It is stored because a
-/// Device that forgot it after every restart would be a new Device every
-/// time, which defeats the identity the key pair exists to provide. It stays
-/// inside the store it was loaded from; nothing sends it over the wire.
+/// The seed is the private half of the Owner key pair, and the group secret is
+/// what authenticates every Session inside the Owner Group. Both are stored
+/// because a Device that forgot either would have to be re-paired after every
+/// restart. Both stay inside the store they were loaded from; nothing sends
+/// them anywhere except a Pairing session, sealed by the handshake.
 Future<void> saveLocalProfile(LocalProfile local, ProfileStore store) async {
   await store.save({
     'version': 1,
     'identity': {
       'kind': 'ed25519-seed',
       'seed': toBase64Url(await local.identity.exportSeed()),
+    },
+    'session': {
+      if (local.groupSecret != null)
+        'groupSecret': toBase64Url(local.groupSecret!),
     },
     'profile': local.profile.toJson(),
   });
@@ -228,6 +273,20 @@ List<int> _seedOf(Map<String, Object?> json) {
     throw const FormatException('"identity.seed" must be a string');
   }
   return fromBase64Url(seed);
+}
+
+Uint8List? _groupSecretOf(Map<String, Object?> json) {
+  final session = json['session'];
+  if (session == null) return null;
+  if (session is! Map) {
+    throw const FormatException('"session" must be an object when present');
+  }
+  final secret = session['groupSecret'];
+  if (secret == null) return null;
+  if (secret is! String) {
+    throw const FormatException('"session.groupSecret" must be a string');
+  }
+  return fromBase64Url(secret);
 }
 
 Map<String, Object?> _profileOf(Map<String, Object?> json) {
