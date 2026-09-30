@@ -65,16 +65,41 @@ void main() {
     });
 
     test(
-      'a different pairing secret derives a different short string',
+      'a different pairing secret is refused during the handshake',
       () async {
-        final links = await _connectedPair(
+        // Both sides hold a secret, but not the same one. Nothing about the
+        // link is trustworthy, so the handshake must not produce a link at
+        // all — there is nothing left to compare short strings over.
+        final results = await _establishBoth(
           aSecret: _secret(1),
           bSecret: _secret(2),
+          timeout: const Duration(seconds: 2),
         );
-        expect(
-          links.a.shortAuthenticationString,
-          isNot(links.b.shortAuthenticationString),
+        expect(results.whereType<SecureLink>(), isEmpty);
+        expect(results.whereType<HandshakeException>(), hasLength(2));
+      },
+    );
+
+    test(
+      'an established link never carries the confirmation to a consumer',
+      () async {
+        final links = await _connectedPair();
+        final atA = MessageLog(links.a);
+        final atB = MessageLog(links.b);
+        await links.a.send(
+          const OfferMessage(
+            transferId: 't',
+            kind: PayloadKind.text,
+            items: [],
+            text: 'after the handshake',
+          ),
         );
+        await until(() => atB.messages.isNotEmpty, description: 'B收到了消息');
+        // The confirmation is handshake traffic: it was consumed by the
+        // handshake, so no consumer above ever sees one.
+        expect(atA.messages.whereType<SessionConfirmMessage>(), isEmpty);
+        expect(atB.messages.whereType<SessionConfirmMessage>(), isEmpty);
+        expect(atB.messages.single, isA<OfferMessage>());
         await links.close();
       },
     );
@@ -256,28 +281,27 @@ void main() {
 
   group('authentication', () {
     test(
-      'a peer that does not know the pairing secret cannot be understood',
+      'a peer that does not know the pairing secret never yields a Session',
       () async {
-        final links = await _connectedPair(
+        final results = await _establishBoth(
           aSecret: _secret(1),
           bSecret: _secret(2),
+          timeout: const Duration(seconds: 2),
         );
-        final atB = MessageLog(links.b);
-
-        await links.a.send(
-          const OfferMessage(
-            transferId: 't',
-            kind: PayloadKind.text,
-            items: [],
-            text: 'should not be readable',
+        // Every failure is a handshake failure, and no link exists: a caller
+        // cannot mistake this for a network fault, and there is no link whose
+        // first message would fail later. At least one side names the secret
+        // outright; the other sees the connection go away, because the side
+        // that noticed closes it rather than waiting out its timeout.
+        final failures = results.whereType<HandshakeException>().toList();
+        expect(failures, hasLength(2));
+        expect(
+          failures.where(
+            (failure) => failure.message.contains('Pairing Secret'),
           ),
+          isNotEmpty,
         );
-
-        await until(() => atB.errors.isNotEmpty, description: 'B报告认证失败');
-        expect(atB.errors.first, isA<ProtocolException>());
-        expect(atB.messages, isEmpty);
-
-        await links.close();
+        expect(results.whereType<SecureLink>(), isEmpty);
       },
     );
 
@@ -446,39 +470,38 @@ void main() {
       await responder.close();
     });
 
-    test('a wrong pairing secret fails over a real socket too', () async {
+    test('a wrong pairing secret is refused over a real socket too', () async {
       final responderFuture = server.first.then(
         (socket) => SecureLink.establish(
           transport: SocketByteTransport.fromSocket(socket),
           role: LinkRole.responder,
           local: _deviceB,
           secret: _secret(9),
+          timeout: const Duration(seconds: 2),
         ),
       );
 
-      final initiator = await SecureLink.establish(
-        transport: await SocketByteTransport.connect('127.0.0.1', server.port),
-        role: LinkRole.initiator,
-        local: _deviceA,
-        secret: _secret(3),
-      );
-      final responder = await responderFuture;
-      final atResponder = MessageLog(responder);
+      final initiatorFuture =
+          SocketByteTransport.connect('127.0.0.1', server.port).then(
+            (transport) => SecureLink.establish(
+              transport: transport,
+              role: LinkRole.initiator,
+              local: _deviceA,
+              secret: _secret(3),
+              timeout: const Duration(seconds: 2),
+            ),
+          );
 
-      await initiator.send(
-        const OfferMessage(
-          transferId: 't',
-          kind: PayloadKind.text,
-          items: [],
-          text: 'secret',
-        ),
-      );
-
-      await until(() => atResponder.errors.isNotEmpty, description: '认证失败');
-      expect(atResponder.messages, isEmpty);
-
-      await initiator.close();
-      await responder.close();
+      final results = await Future.wait([
+        initiatorFuture
+            .then<Object?>((link) => link)
+            .catchError((Object e) => e),
+        responderFuture
+            .then<Object?>((link) => link)
+            .catchError((Object e) => e),
+      ]);
+      expect(results.whereType<SecureLink>(), isEmpty);
+      expect(results.whereType<HandshakeException>(), isNotEmpty);
     });
   });
 }
@@ -516,6 +539,42 @@ Future<_ConnectedPair> _connectedPair({
     ),
   ]);
   return _ConnectedPair(links[0], links[1]);
+}
+
+/// Runs both halves of a handshake and returns whatever each produced: a
+/// [SecureLink] or the error it failed with.
+///
+/// Used for the cases where a link is *not* supposed to exist, so a test can
+/// assert on both sides failing rather than on one side throwing and the other
+/// hanging.
+Future<List<Object>> _establishBoth({
+  required PairingSecret aSecret,
+  required PairingSecret bSecret,
+  required Duration timeout,
+}) async {
+  final pair = MemoryTransportPair();
+  Future<Object> settle(Future<SecureLink> attempt) =>
+      attempt.then<Object>((link) => link).catchError((Object error) => error);
+  return Future.wait([
+    settle(
+      SecureLink.establish(
+        transport: pair.a,
+        role: LinkRole.initiator,
+        local: _deviceA,
+        secret: aSecret,
+        timeout: timeout,
+      ),
+    ),
+    settle(
+      SecureLink.establish(
+        transport: pair.b,
+        role: LinkRole.responder,
+        local: _deviceB,
+        secret: bSecret,
+        timeout: timeout,
+      ),
+    ),
+  ]);
 }
 
 /// Flips one bit of the next outbound write, to model a man in the middle.

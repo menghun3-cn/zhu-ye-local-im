@@ -218,7 +218,7 @@ final class SecureLink {
         ? responderToInitiator
         : initiatorToResponder;
 
-    return SecureLink._(
+    final link = SecureLink._(
       channel,
       iterator,
       SecretKey(sendBytes),
@@ -227,6 +227,94 @@ final class SecureLink {
       role: role,
       shortAuthenticationString: _shortAuthenticationString(prk),
     );
+    // Nothing above may see a Session that has not been shown to work: the
+    // confirmation is what turns "the keys were derived" into "the peer holds
+    // the same Pairing Secret".
+    try {
+      await link._confirm(iterator, timeout, role);
+    } on HandshakeException {
+      // Tear the transport down rather than leaving it open: a peer whose keys
+      // do not match ours has no reason to keep waiting, and a half-dead
+      // socket that nobody will ever read is worse than a closed one.
+      await link.close();
+      rethrow;
+    }
+    return link;
+  }
+
+  /// Proves both sides hold the same Pairing Secret before the link is handed
+  /// out.
+  ///
+  /// Each side sends one record sealed with the keys the handshake derived and
+  /// requires the peer's in return. A peer that derived different keys — a
+  /// different Pairing Secret, or a handshake that was tampered with — cannot
+  /// produce a record that authenticates, so the exchange fails here rather
+  /// than at the first Transfer, which is what a caller has to be able to
+  /// rely on: an established link either works or was never established.
+  ///
+  /// Both records are read through the same iterator the pump will later use;
+  /// the pump only starts when somebody subscribes, which cannot happen until
+  /// [establish] has returned.
+  Future<void> _confirm(
+    StreamIterator<Frame> iterator,
+    Duration timeout,
+    LinkRole role,
+  ) async {
+    if (role == LinkRole.initiator) {
+      await send(const SessionConfirmMessage());
+    }
+    await _awaitConfirm(iterator, timeout);
+    if (role == LinkRole.responder) {
+      await send(const SessionConfirmMessage());
+    }
+  }
+
+  Future<void> _awaitConfirm(
+    StreamIterator<Frame> iterator,
+    Duration timeout,
+  ) async {
+    final bool hasNext;
+    try {
+      hasNext = await iterator.moveNext().timeout(timeout);
+    } on TimeoutException {
+      throw HandshakeException(
+        'the peer never confirmed the Session within ${timeout.inSeconds}s',
+      );
+    }
+    if (!hasNext) {
+      throw HandshakeException(
+        'the peer closed the connection before confirming the Session',
+      );
+    }
+    final Frame frame;
+    try {
+      frame = await _open(iterator.current);
+    } on ProtocolException catch (error) {
+      // Decryption failing here is the whole point of the step: it means the
+      // peer's keys differ from ours, which means its Pairing Secret does.
+      throw HandshakeException(
+        'the peer does not hold the same Pairing Secret (${error.message})',
+      );
+    }
+    if (frame is! ControlFrame) {
+      throw const HandshakeException(
+        'the peer confirmed the Session with something other than a control '
+        'message',
+      );
+    }
+    final WireMessage message;
+    try {
+      message = WireMessage.decode(frame.json);
+    } on FormatException catch (error) {
+      throw HandshakeException(
+        'the Session confirmation did not decode: ${error.message}',
+      );
+    }
+    if (message is! SessionConfirmMessage) {
+      throw HandshakeException(
+        'expected a Session confirmation, got "${message.type}"',
+      );
+    }
   }
 
   /// Sends a control message to the peer.
