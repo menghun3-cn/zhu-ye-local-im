@@ -143,24 +143,19 @@ class _PairingCard extends StatelessWidget {
                   ? 'Devices in one Owner Group can open Sessions with each '
                         'other. Pairing adds one, and is also what lets a '
                         'clipboard be shared.'
-                  : 'A Device with no Owner Group has no secret to prove '
-                        'itself with, so it accepts no Sessions and can reach '
-                        'nobody. Pairing is what changes that — it is not a '
-                        'setting on top of something that already works.',
+                  : 'Pairing takes two taps and no code to retype: tap '
+                        'Receive a connection here, and on the other Device '
+                        'tap Pair beside this one in its list. Both screens '
+                        'then show the same six digits to confirm.',
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               children: [
                 FilledButton.icon(
-                  onPressed: () => showInvitationDialog(context, controller),
-                  icon: const Icon(Icons.qr_code_2),
-                  label: const Text('Show a code'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => showJoinDialog(context, controller),
-                  icon: const Icon(Icons.keyboard),
-                  label: const Text('Enter a code'),
+                  onPressed: () => showReceiveDialog(context, controller),
+                  icon: const Icon(Icons.phonelink_ring),
+                  label: const Text('Receive a connection'),
                 ),
               ],
             ),
@@ -184,8 +179,10 @@ class _PeerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // Dialling needs both an address to dial and a peer in the group: a Device
     // from somebody else's group would fail the handshake, so offering the
-    // button would be offering a failure.
+    // button would be offering a failure. Pairing needs only an address — the
+    // whole point of it is to bring a Device that is not in the group in.
     final canConnect = peer.isDiallable && peer.isInGroup;
+    final canPair = !peer.isInGroup && peer.address != null;
     final facts = <String>[
       if (peer.alias == null) 'name not announced yet',
       describePeerAddress(peer),
@@ -229,17 +226,21 @@ class _PeerCard extends StatelessWidget {
             : Tooltip(
                 message: canConnect
                     ? 'Open a Session'
+                    : canPair
+                    ? 'Pair with this Device'
                     : peer.isInGroup
                     ? 'Nothing to dial yet: this Device has not been seen'
-                    : 'This Device is not in your Owner Group',
+                    : 'Nothing known about where this Device is',
                 child: TextButton(
                   onPressed: canConnect
                       ? () => guarded(
                           context,
                           () => controller.connect(peer.fingerprint),
                         )
+                      : canPair
+                      ? () => showPairWithPeerDialog(context, controller, peer)
                       : null,
-                  child: const Text('Connect'),
+                  child: Text(canPair && !canConnect ? 'Pair' : 'Connect'),
                 ),
               ),
       ),

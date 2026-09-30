@@ -72,9 +72,9 @@ final class UiDevice {
 ///
 /// Port 0 for both listeners unless the test asks otherwise, so several Devices
 /// run on one host and one test file never fights another over a fixed port.
-/// The exception is the Device being *joined* in a two-window test: the join
-/// dialog offers the default pairing port as its starting value, so the Device
-/// showing a code has to be listening where that dialog looks.
+/// The exception is the Device that *receives* a click-to-pair Pairing in a
+/// two-window test: the guest dials the default pairing port, so the receiver
+/// has to be listening where that dial looks.
 ///
 /// ## Why this takes a [WidgetTester]
 ///
@@ -317,7 +317,18 @@ Future<void> pumpUntil(
       debugPrint('pumpUntil: still waiting for $description (${seconds}s)');
     }
     if (watch.elapsed > timeout) {
-      fail('timed out after $timeout waiting for $description');
+      // The screen is the evidence: a wait that times out is almost always a
+      // dialog showing an error instead of the step that was expected, and
+      // failing with the visible text turns a bisect into a read.
+      final visible = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? '')
+          .where((text) => text.trim().isNotEmpty)
+          .join(' | ');
+      fail(
+        'timed out after $timeout waiting for $description; '
+        'visible text: $visible',
+      );
     }
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
@@ -416,14 +427,15 @@ Future<void> tapButton(
   await settleRoute(tester);
 }
 
-/// The pairing code currently shown in [window]'s dialog.
+/// The six digits currently shown in [window]'s dialog, or null when the
+/// window is not at the comparison step.
 ///
-/// Read off the screen rather than out of the controller, because reading it
-/// off the screen is what a person does: the code is the only thing that
-/// crosses between the two windows.
-String shownPairingCode(WidgetTester tester, {required TestWindow window}) {
-  // Crockford base32, ten symbols — the alphabet has no I, L, O or U.
-  final pattern = RegExp(r'^[0-9A-HJKMNP-TV-Z]{10}$');
+/// Read off the screen rather than out of the controller, because reading
+/// them off the screen is what a person does: the digits are derived on each
+/// Device and never sent, so the only way they cross between windows is
+/// through the user's eyes.
+String? shownSas(WidgetTester tester, {required TestWindow window}) {
+  final pattern = RegExp(r'^[0-9]{6}$');
   final texts = tester.widgetList<SelectableText>(
     window.within(find.byType(SelectableText)),
   );
@@ -431,7 +443,7 @@ String shownPairingCode(WidgetTester tester, {required TestWindow window}) {
     final data = widget.data;
     if (data != null && pattern.hasMatch(data)) return data;
   }
-  fail('no pairing code is on screen');
+  return null;
 }
 
 /// Whether [window] is showing an open dialog.
@@ -556,11 +568,13 @@ Future<void> connectDevices(
   });
 }
 
-/// Runs the typed-code Pairing between two windows, as two people would.
+/// Pairs two windows by clicking, the way two people now do it.
 ///
-/// One window shows a code, the other types it in, then both compare the digits
-/// and confirm. Nothing is passed between the two except the code, which is
-/// read off the first window's screen.
+/// One window receives: its user taps Receive a connection and waits. The
+/// other's user taps Pair on the card of the Device they want, which dials the
+/// receiver's open Pairing. Nothing is typed anywhere — the digits both
+/// screens show are derived on each Device and never sent, so the test reads
+/// them off both screens only to assert they agree.
 Future<void> pairThroughWindows(
   WidgetTester tester,
   TestWindow host,
@@ -569,59 +583,69 @@ Future<void> pairThroughWindows(
   required UiDevice guestDevice,
 }) async {
   await openTab(tester, 'Devices', window: host);
-  await tapButton(tester, 'Show a code', window: host);
+  await tapButton(tester, 'Receive a connection', window: host);
   await pumpUntil(
     tester,
     () => dialogIsOpen(host),
-    description: 'the host to open its code dialog',
+    description: 'the host to open its receive dialog',
   );
-  await pumpUntil(tester, () {
-    try {
-      shownPairingCode(tester, window: host);
-      return true;
-    } on Object {
-      return false;
-    }
-  }, description: 'the host to display a code');
-  final code = shownPairingCode(tester, window: host);
+  await pumpUntil(
+    tester,
+    () => windowHostListening(tester, host),
+    description: 'the host to be listening for a connection',
+  );
 
   await openTab(tester, 'Devices', window: guest);
-  await tapButton(tester, 'Enter a code', window: guest);
   await pumpUntil(
     tester,
-    () => dialogIsOpen(guest),
-    description: 'the guest to open its join dialog',
+    () => hasButton(tester, 'Pair', window: guest),
+    description: 'the guest to discover the host and offer Pair',
   );
-  await fillField(
-    tester,
-    'Address',
-    InternetAddress.loopbackIPv4.address,
-    window: guest,
-  );
-  await fillField(tester, 'Code', code, window: guest);
-  await tapDialogButton(tester, 'Connect', window: guest);
+  await tapButton(tester, 'Pair', window: guest);
 
   // Both sides now hold an attempt and show the digits to compare.
-  await pumpUntil(
-    tester,
-    () => hasButton(tester, 'They match', window: host),
-    description: 'the host to reach the comparison step',
-  );
   await pumpUntil(
     tester,
     () => hasButton(tester, 'They match', window: guest),
     description: 'the guest to reach the comparison step',
   );
+  await pumpUntil(
+    tester,
+    () => hasButton(tester, 'They match', window: host),
+    description: 'the host to reach the comparison step',
+  );
+  final guestSas = shownSas(tester, window: guest);
+  final hostSas = shownSas(tester, window: host);
+  expect(guestSas, isNotNull, reason: 'the guest to show six digits');
+  expect(hostSas, isNotNull, reason: 'the host to show six digits');
+  expect(guestSas, hostSas, reason: 'both screens show the same digits');
 
-  await tapDialogButton(tester, 'They match', window: host);
   await tapDialogButton(tester, 'They match', window: guest);
+  await tapDialogButton(tester, 'They match', window: host);
 
   await pumpUntil(
     tester,
     () => hostDevice.controller.isServing && guestDevice.controller.isServing,
     description: 'both Devices to serve Sessions',
   );
+  // The guest opens the Session itself once the Pairing is committed; that is
+  // what lands the user on a Device they can send to, and it is the
+  // user-visible proof the flow is complete.
+  await pumpUntil(
+    tester,
+    () =>
+        hostDevice.controller.sessions.isNotEmpty &&
+        guestDevice.controller.sessions.isNotEmpty,
+    description: 'the Session the guest opens to come up on both Devices',
+  );
 }
+
+/// Whether [window]'s receive dialog is past opening the invitation, i.e.
+/// whether the listener the guest will dial is actually up.
+bool windowHostListening(WidgetTester tester, TestWindow window) => window
+    .within(find.textContaining('Waiting for a Device'))
+    .evaluate()
+    .isNotEmpty;
 
 /// Whether [window] currently has a button labelled [label].
 bool hasButton(
@@ -629,39 +653,3 @@ bool hasButton(
   String label, {
   required TestWindow window,
 }) => window.button(label).evaluate().isNotEmpty;
-
-/// Opens a Session from [from] to [to] through the Manual Address dialog.
-Future<void> connectThroughWindows(
-  WidgetTester tester,
-  TestWindow from,
-  TestWindow to, {
-  required UiDevice fromDevice,
-  required UiDevice toDevice,
-}) async {
-  final port = toDevice.controller.listenPort;
-  expect(port, isNotNull, reason: 'a paired Device has to be listening');
-
-  await openTab(tester, 'Devices', window: from);
-  await tapButton(tester, 'By address', window: from);
-  await pumpUntil(
-    tester,
-    () => dialogIsOpen(from),
-    description: 'the address dialog to open',
-  );
-  await fillField(
-    tester,
-    'Address',
-    InternetAddress.loopbackIPv4.address,
-    window: from,
-  );
-  await fillField(tester, 'Port', '$port', window: from);
-  await tapDialogButton(tester, 'Connect', window: from);
-
-  await pumpUntil(
-    tester,
-    () =>
-        fromDevice.controller.sessions.isNotEmpty &&
-        toDevice.controller.sessions.isNotEmpty,
-    description: 'the Session to come up on both Devices',
-  );
-}

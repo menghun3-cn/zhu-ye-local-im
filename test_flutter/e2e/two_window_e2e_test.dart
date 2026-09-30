@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
-import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
 
 import '../support/ui_harness.dart';
@@ -20,13 +19,11 @@ import '../support/ui_harness.dart';
 /// "these two Devices know about each other" is the shipping code path.
 void main() {
   group('two windows on one machine', () {
-    testWidgets('pair by a typed code, then move a file across', (
-      tester,
-    ) async {
+    testWidgets('pair by clicking, then move a file across', (tester) async {
       final hub = MemoryBeaconHub();
-      // Alice listens where the join dialog looks by default, which is what a
-      // Device showing a code does in the shipped configuration. Bob is a
-      // guest and can take any free port.
+      // Alice receives, so she listens where the guest's Pair tap dials by
+      // default, which is what a receiving Device does in the shipped
+      // configuration. Bob is a guest and can take any free port.
       final alice = await startUiDevice(
         tester,
         hub.a,
@@ -45,26 +42,9 @@ void main() {
       );
 
       // Both windows now say they are in a group, which is the user-visible
-      // proof that the typed code did what it promised.
-      for (final window in [windowA, windowB]) {
-        await pumpUntil(
-          tester,
-          () => onPage(
-            window,
-            DevicesPage,
-            find.text('Pair another Device'),
-          ).evaluate().isNotEmpty,
-          description: 'the pairing card to show a group in place',
-        );
-      }
-
-      await connectThroughWindows(
-        tester,
-        windowA,
-        windowB,
-        fromDevice: alice,
-        toDevice: bob,
-      );
+      // proof that the two clicks did what they promised — and the Session the
+      // guest opened after confirming is already up on both sides, so there is
+      // nothing to dial by hand before sending.
 
       // A file big enough to cross several chunks, so framing and reassembly
       // are on the path rather than one message that happens to fit.
@@ -170,15 +150,8 @@ void main() {
         hostDevice: alice,
         guestDevice: bob,
       );
-      await connectThroughWindows(
-        tester,
-        windowA,
-        windowB,
-        fromDevice: alice,
-        toDevice: bob,
-      );
-
-      // Both users turn Mirroring on from the Clipboard surface.
+      // The Session the guest opened after confirming is already up on both
+      // sides, so there is nothing to dial by hand before mirroring.
       for (final window in [windowA, windowB]) {
         await openTab(tester, 'Clipboard', window: window);
         await tester.tap(onPage(window, ClipboardPage, find.text('Mirror')));

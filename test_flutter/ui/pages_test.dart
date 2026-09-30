@@ -42,8 +42,9 @@ void main() {
         findsOneWidget,
         reason: 'an unpaired Device is alone in its group',
       );
-      // All three ways to pair, or to reach a Device without pairing.
-      for (final label in ['Show a code', 'Enter a code', 'By address']) {
+      // Both ways to pair — receiving, and reaching a Device without pairing.
+      // There is no code to type anywhere: pairing is two taps.
+      for (final label in ['Receive a connection', 'By address']) {
         expect(
           onPage(windowA, DevicesPage, find.text(label)),
           findsOneWidget,

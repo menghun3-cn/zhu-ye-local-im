@@ -309,6 +309,14 @@ final class LocalTransferController {
   Future<PairingInvitation> invite() =>
       _requirePairing().invite(port: _pairingPort);
 
+  /// Opens a no-code invitation and waits for a Device to connect to it.
+  ///
+  /// This is the receiving side of the click-to-pair flow: the user of the
+  /// other Device taps this Device's name in a list, and both users then
+  /// compare the six digits their screens show.
+  Future<PairingInvitation> inviteOpen() =>
+      _requirePairing().inviteOpen(port: _pairingPort);
+
   /// Joins a Device showing [code] at [host].
   ///
   /// [port] defaults to this controller's pairing port, which is where a Device
@@ -325,6 +333,50 @@ final class LocalTransferController {
     code: code,
     port: port ?? _pairingPort,
   );
+
+  /// Pairs with a Device that is receiving at [host], without a code.
+  ///
+  /// The initiating side of the click-to-pair flow: [host] is the address
+  /// Discovery saw the receiving Device at, and the exchange ends at the same
+  /// six-digit comparison a typed Pairing ends at. [port] defaults to the
+  /// well-known pairing port, which is where a receiving Device listens — the
+  /// port to dial is the *peer's*, not this Device's own binding, which is
+  /// why it is not read from this controller's configuration.
+  Future<PairingAttempt> joinOpen({required String host, int? port}) =>
+      _requirePairing().joinOpen(host: host, port: port ?? defaultPairingPort);
+
+  /// Opens a Session with [peer] right after a Pairing has completed.
+  ///
+  /// The peer brings its own Session layer up as its Pairing commits, and its
+  /// beacon only re-announces the port that layer listens on on its next
+  /// cycle — meanwhile this Device's own discovery has restarted to carry the
+  /// new port, with an empty registry until then. So the first dial can
+  /// arrive too early in two ways: nothing listening there yet, or no
+  /// address known for the peer at all. A dial that fails for either reason
+  /// is retried with a bound, re-resolving the target each time, rather than
+  /// left to the user to click again on a race they did not cause. A Session
+  /// that is already open is returned as it stands.
+  Future<ManagedSession> connectAfterPairing(Fingerprint peer) async {
+    if (_manager == null) await _syncLayersInTurn();
+    Object? failure;
+    for (var tries = 0; tries < 24; tries++) {
+      final existing = _wired[peer.hex]?.session;
+      if (existing != null) return existing;
+      try {
+        return await connect(peer);
+      } on HandshakeException catch (error) {
+        failure = error;
+      } on SocketException catch (error) {
+        failure = error;
+      } on AppStateException catch (error) {
+        // Discovery has not re-learnt where the peer listens yet; the next
+        // announce fixes that, which is what waiting is for.
+        failure = error;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    throw failure!;
+  }
 
   /// Changes the Alias this Device announces.
   ///
@@ -587,10 +639,24 @@ final class LocalTransferController {
 
   Future<void> _syncLayersSafely() async {
     try {
-      await _syncLayers();
+      await _syncLayersInTurn();
     } on Object catch (error) {
       _notice('the session layer could not be brought up: $error');
     }
+  }
+
+  Future<void> _syncChain = Future<void>.value();
+
+  /// Runs [_syncLayers] after the run before it has finished.
+  ///
+  /// Two triggers can arrive together — a Pairing committing, which rebuilds
+  /// the session layer on its own, and the caller that then wants a Session
+  /// over that layer. Serialized like this, the second run sees the layer the
+  /// first built instead of tearing it down mid-build.
+  Future<void> _syncLayersInTurn() {
+    final run = _syncChain.catchError((Object _) {}).then((_) => _syncLayers());
+    _syncChain = run;
+    return run;
   }
 
   void _onLinkEvent(LinkEvent event) {
@@ -732,14 +798,19 @@ final class LocalTransferController {
   ({String address, int port})? _dialTargetFor(Fingerprint peer) {
     for (final discovered in _discovered) {
       if (discovered.fingerprint != peer) continue;
-      final port = discovered.sessionPort;
-      if (port == null) continue;
-      return (address: discovered.address.address, port: port);
+      // A port the peer advertised is the one to dial. When it has none — a
+      // beacon seen before the peer came up serving — the well-known Session
+      // port is the honest guess: the dial pins the peer's Fingerprint, so a
+      // wrong Device on that port fails the handshake rather than receiving
+      // somebody else's file.
+      return (
+        address: discovered.address.address,
+        port: discovered.sessionPort ?? defaultSessionPort,
+      );
     }
     // A Known Device remembers the address it was reached at but not the port
     // it listens on, so a redial falls back to the well-known session port.
-    // Safe to guess: the dial pins the peer's Fingerprint, so a wrong Device on
-    // that port fails the handshake rather than receiving somebody else's file.
+    // Safe to guess for the same reason as above.
     final address = _local?.profile.known(peer)?.lastAddress;
     if (address == null) return null;
     return (address: address, port: defaultSessionPort);
