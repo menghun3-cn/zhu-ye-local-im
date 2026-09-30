@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-frame-decoder-payload-aliasing.md
+#   git hash-object 2026-09-30-frame-decoder-payload-aliasing.zh.md
+2026-09-30-frame-decoder-payload-aliasing.md: 0bab6f5e9ecea3c9cf740732bdbbe7393d139856
+2026-09-30-frame-decoder-payload-aliasing.zh.md: 98034c63328f79d37ad54eb16986aeb865ffa19e
