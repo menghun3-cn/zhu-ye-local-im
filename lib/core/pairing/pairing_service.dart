@@ -104,9 +104,17 @@ abstract interface class PairingAttempt {
   Future<void> cancel();
 }
 
-/// A Pairing this Device is hosting: it shows a code and waits.
+/// A Pairing this Device is hosting: it shows a code and waits — or, on an
+/// open Pairing, waits with no code on screen at all.
 final class PairingInvitation {
-  PairingInvitation._(this._service, {required this.code, required this.port}) {
+  PairingInvitation._(
+    this._service, {
+    required String? code,
+    required this.port,
+  })
+    // A named parameter cannot be a private field, so each is assigned here.
+    // ignore: prefer_initializing_formals
+    : _code = code {
     // A failure is delivered to whoever is waiting on [attempt]. A caller that
     // is *not* waiting — a screen the user navigated away from, a test that
     // only cancels — must not have it surface as an unhandled error, which Dart
@@ -117,8 +125,24 @@ final class PairingInvitation {
 
   final PairingService _service;
 
+  final String? _code;
+
   /// The code the other Device's user types. Ten Crockford base32 symbols.
-  final String code;
+  ///
+  /// Reading this on an open Pairing — one that asked for no code — is a
+  /// [StateError] rather than an empty string: an invitation either shows a
+  /// code or it does not, and a blank that looks like a code would be a bug
+  /// wearing a value.
+  String get code {
+    final value = _code;
+    if (value == null) {
+      throw StateError('an open Pairing shows no code');
+    }
+    return value;
+  }
+
+  /// Whether this invitation is waiting for a Device that will type a code.
+  bool get showsCode => _code != null;
 
   /// The port the invitation listens on.
   final int port;
@@ -277,14 +301,37 @@ final class PairingService {
   /// guesses an attacker could combine. [port] defaults to
   /// [defaultPairingPort]; pass 0 for any free port, which is what a test
   /// wants.
-  Future<PairingInvitation> invite({int port = defaultPairingPort}) async {
+  Future<PairingInvitation> invite({int port = defaultPairingPort}) =>
+      _listen(code: PairingSecret.generateCode(), port: port);
+
+  /// Opens an invitation that asks for no code, and waits.
+  ///
+  /// This is the receiving side of the click-to-pair flow: the user of the
+  /// other Device picks this Device from a list, so nothing has to be read
+  /// off one screen and keyed into another. What stands in place of the code
+  /// is the six digits both screens show once the peer arrives — the
+  /// comparison step is not optional here, because a well-known handshake
+  /// secret means any Device on the link can start a Pairing, and the digits
+  /// plus the two confirmations are what keep admission a human decision.
+  ///
+  /// When both Devices are forming a fresh group, this Device mints the group
+  /// secret and hands it to the peer inside the sealed link, so nothing about
+  /// the Pairing's outcome is derivable from the well-known constant.
+  Future<PairingInvitation> inviteOpen({int? port}) =>
+      _listen(code: null, port: port ?? defaultPairingPort);
+
+  Future<PairingInvitation> _listen({
+    required String? code,
+    required int port,
+  }) async {
     if (_closed) throw StateError('this PairingService is closed');
     final open = _invitation;
     if (open != null) {
       throw StateError('an invitation is already open on ${open.port}');
     }
-    final code = PairingSecret.generateCode();
-    final secret = PairingSecret.fromCode(code);
+    final secret = code == null
+        ? PairingSecret.openPairing()
+        : PairingSecret.fromCode(code);
     final ServerSocket server;
     try {
       server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
@@ -331,13 +378,37 @@ final class PairingService {
     required String code,
     int port = defaultPairingPort,
   }) async {
-    if (_closed) throw StateError('this PairingService is closed');
     final PairingSecret secret;
     try {
       secret = PairingSecret.fromCode(code);
     } on FormatException catch (error) {
       throw PairingException('that is not a Pairing code: ${error.message}');
     }
+    return _dial(secret: secret, host: host, port: port, openPairing: false);
+  }
+
+  /// Pairs with a Device that is receiving at [host], without typing a code.
+  ///
+  /// This is the initiating side of the click-to-pair flow: [host] is a Device
+  /// whose user tapped Receive a connection, at the address Discovery saw it
+  /// at. See [inviteOpen] for what stands in place of the code.
+  Future<PairingAttempt> joinOpen({
+    required String host,
+    int port = defaultPairingPort,
+  }) => _dial(
+    secret: PairingSecret.openPairing(),
+    host: host,
+    port: port,
+    openPairing: true,
+  );
+
+  Future<PairingAttempt> _dial({
+    required PairingSecret secret,
+    required String host,
+    required int port,
+    required bool openPairing,
+  }) async {
+    if (_closed) throw StateError('this PairingService is closed');
     final SocketByteTransport transport;
     try {
       transport = await SocketByteTransport.connect(host, port);
@@ -358,7 +429,12 @@ final class PairingService {
         'the other Device did not accept the code: ${error.message}',
       );
     }
-    return _negotiate(link: link, role: LinkRole.initiator, secret: secret);
+    return _negotiate(
+      link: link,
+      role: LinkRole.initiator,
+      secret: secret,
+      openPairing: openPairing,
+    );
   }
 
   /// Closes the service: the invitation, any attempt still in flight, and the
@@ -379,6 +455,7 @@ final class PairingService {
     PairingSecret secret,
     PairingInvitation invitation,
   ) async {
+    final openPairing = invitation._code == null;
     try {
       final socket = await invitation._connected.future;
       final link = await SecureLink.establish(
@@ -392,6 +469,7 @@ final class PairingService {
         link: link,
         role: LinkRole.responder,
         secret: secret,
+        openPairing: openPairing,
       );
       if (!invitation._attempt.isCompleted) {
         invitation._attempt.complete(attempt);
@@ -419,10 +497,28 @@ final class PairingService {
   }
 
   /// Runs the admission exchange and returns the attempt a user decides on.
+  ///
+  /// What each side sends depends on its role as well as its state. The
+  /// initiator speaks first, offering whatever group secret it has. The
+  /// responder reads first, because on an open Pairing what it offers depends
+  /// on what the peer brought:
+  ///
+  /// * already in a group — offer its own secret, whatever the peer did;
+  /// * fresh, and the peer brought one — offer nothing, and adopt the peer's
+  ///   (a fresh Device joining an established group);
+  /// * fresh, and the peer brought nothing — mint a fresh secret and offer
+  ///   *that*, so the group the two Devices form does not rest on the
+  ///   well-known open-Pairing constant. Two unrelated Pairings then share
+  ///   nothing, where a constant-derived secret would put every fresh pair
+  ///   worldwide in one implicit group.
+  ///
+  /// On a typed-code Pairing the both-fresh case keeps deriving the secret
+  /// from the code, exactly as before.
   Future<PairingAttempt> _negotiate({
     required SecureLink link,
     required LinkRole role,
     required PairingSecret secret,
+    required bool openPairing,
   }) async {
     final peerClaim = link.peer.device;
     final sas = link.shortAuthenticationString;
@@ -432,20 +528,25 @@ final class PairingService {
       sas,
     );
 
-    final mine = PairAdmitMessage(
-      publicKey: await local.identity.publicKey(),
-      alias: local.profile.alias,
-      signature: await local.identity.sign(context),
-      groupSecret: local.groupSecret,
-      members: local.profile.group.members,
-    );
-
-    // The read is started before the send, and not awaited until after it:
-    // both sides send one admission and want one, so neither can be waiting
-    // for the other to speak first.
+    // The read is started before anything is sent. The initiator sends right
+    // away; the responder waits to read first — see the doc above for why.
     final incoming = StreamIterator<WireMessage>(link.messages);
     final theirs = _readAdmission(link, incoming);
-    await link.send(mine);
+
+    final Uint8List? mineSecret;
+    if (role == LinkRole.initiator) {
+      mineSecret = local.groupSecret;
+      await link.send(await _admission(context, mineSecret));
+    } else {
+      final peerAdmit = await theirs;
+      final brought = peerAdmit.groupSecret;
+      mineSecret =
+          local.groupSecret ??
+          ((brought == null && openPairing)
+              ? randomBytes(PairingSecret.keyBytes)
+              : null);
+      await link.send(await _admission(context, mineSecret));
+    }
     final admit = await theirs;
 
     if (admit.fingerprint != peerClaim.fingerprint) {
@@ -466,11 +567,10 @@ final class PairingService {
       );
     }
 
-    final mineSecret = local.groupSecret;
-    final theirsSecret = admit.groupSecret;
+    final theirSecret = admit.groupSecret;
     if (mineSecret != null &&
-        theirsSecret != null &&
-        !constantTimeEquals(mineSecret, theirsSecret)) {
+        theirSecret != null &&
+        !constantTimeEquals(mineSecret, theirSecret)) {
       await link.close();
       throw const PairingException(
         'both Devices already belong to different groups',
@@ -491,11 +591,25 @@ final class PairingService {
         platform: peerClaim.platform,
       ),
       peerMembers: admit.members,
-      sessionSecret: mineSecret ?? theirsSecret ?? _deriveGroupSecret(secret),
+      sessionSecret: mineSecret ?? theirSecret ?? _deriveGroupSecret(secret),
     );
     _attempts.add(attempt);
     return attempt;
   }
+
+  /// The admission this Device sends, signing over [context] and offering
+  /// [groupSecret] — which is null exactly when this Device is forming a
+  /// fresh group and the peer is to bring, or has brought, the secret.
+  Future<PairAdmitMessage> _admission(
+    List<int> context,
+    Uint8List? groupSecret,
+  ) async => PairAdmitMessage(
+    publicKey: await local.identity.publicKey(),
+    alias: local.profile.alias,
+    signature: await local.identity.sign(context),
+    groupSecret: groupSecret,
+    members: local.profile.group.members,
+  );
 
   /// Admits the peer into the group, stores the secret, and persists.
   ///

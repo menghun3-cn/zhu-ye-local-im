@@ -66,6 +66,34 @@ final class PairingSecret {
     );
   }
 
+  /// The secret the no-typing Pairing path runs on.
+  ///
+  /// There is nothing user-chosen to derive here: both Devices run the
+  /// handshake over the same well-known constant, and what makes the Pairing
+  /// safe is everything layered on top — the handshake authenticates the two
+  /// sides to each other, and the six digits the users compare are what rules
+  /// out a third Device standing in the middle. That is a weaker guarantee
+  /// than a typed code gives — any Device on the link can *start* an open
+  /// Pairing — which is exactly why admission stays a human decision on both
+  /// screens.
+  ///
+  /// What this constant deliberately does *not* produce is the group secret a
+  /// fresh Pairing agrees on: the receiving Device mints a fresh one and
+  /// hands it over inside the sealed link, so two unrelated Pairings never
+  /// share key material. This constant protects the handshake alone.
+  factory PairingSecret.openPairing() => _openPairing ??= PairingSecret._(
+    HkdfSha256.deriveKey(
+      ikm: utf8.encode('local-transfer open pairing'),
+      salt: utf8.encode('local-transfer pairing v1'),
+      info: utf8.encode('open pairing secret'),
+      length: keyBytes,
+    ),
+    // Public by construction: the honest entropy figure for a constant.
+    0,
+  );
+
+  static PairingSecret? _openPairing;
+
   /// Decodes a secret carried by a QR code or another byte channel.
   factory PairingSecret.fromTransportString(String value) {
     final decoded = base64Url.decode(value);

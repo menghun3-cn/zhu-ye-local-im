@@ -222,6 +222,105 @@ void main() {
     });
   });
 
+  group('Pairing without a code', () {
+    test(
+      'an open Pairing needs no code and gives both Devices one fresh secret',
+      () async {
+        final host = await TestDevice.start('alice-laptop');
+        final joiner = await TestDevice.start('bob-phone');
+        addTearDown(host.close);
+        addTearDown(joiner.close);
+
+        final invitation = await host.service.inviteOpen(port: 0);
+        expect(invitation.showsCode, isFalse);
+        expect(() => invitation.code, throwsStateError);
+
+        final joinerAttempt = await joiner.service.joinOpen(
+          host: '127.0.0.1',
+          port: invitation.port,
+        );
+        final hostAttempt = await invitation.attempt;
+        // The digits are derived, never sent — both sides still hold the same
+        // ones, and the human comparison step still stands.
+        expect(hostAttempt.sas, joinerAttempt.sas);
+        expect(hostAttempt.sas, hasLength(6));
+        await Future.wait([hostAttempt.confirm(), joinerAttempt.confirm()]);
+
+        expect(host.secret, isNotNull);
+        expect(joiner.secret, isNotNull);
+        expect(host.secret, joiner.secret);
+        expect(host.group.contains(joiner.fingerprint), isTrue);
+        expect(joiner.group.contains(host.fingerprint), isTrue);
+      },
+    );
+
+    test('two open Pairings do not share the secret they agree on', () async {
+      // The well-known constant the handshake runs on must not leak into the
+      // group secret: two pairs that never met would otherwise hold the same
+      // key material without ever having exchanged anything.
+      final first = await TestDevice.start('alice-laptop');
+      final second = await TestDevice.start('bob-phone');
+      final third = await TestDevice.start('carol-laptop');
+      final fourth = await TestDevice.start('dave-phone');
+      addTearDown(first.close);
+      addTearDown(second.close);
+      addTearDown(third.close);
+      addTearDown(fourth.close);
+
+      final invitation = await first.service.inviteOpen(port: 0);
+      final joinerAttempt = await second.service.joinOpen(
+        host: '127.0.0.1',
+        port: invitation.port,
+      );
+      final hostAttempt = await invitation.attempt;
+      await Future.wait([hostAttempt.confirm(), joinerAttempt.confirm()]);
+
+      final otherInvitation = await third.service.inviteOpen(port: 0);
+      final otherJoiner = await fourth.service.joinOpen(
+        host: '127.0.0.1',
+        port: otherInvitation.port,
+      );
+      final otherHost = await otherInvitation.attempt;
+      await Future.wait([otherHost.confirm(), otherJoiner.confirm()]);
+
+      expect(first.secret, isNotNull);
+      expect(third.secret, isNotNull);
+      expect(first.secret, isNot(third.secret));
+    });
+
+    test(
+      'a fresh Device joining an open Pairing adopts the paired side',
+      () async {
+        final host = await TestDevice.start('alice-laptop');
+        final joiner = await TestDevice.start('bob-phone');
+        addTearDown(host.close);
+        addTearDown(joiner.close);
+
+        // The host is already in a group when the open Pairing starts.
+        final (hostOutcome, _) = await pairUp(host, joiner);
+        final established = hostOutcome.sessionSecret;
+
+        final newcomer = await TestDevice.start('carol-phone');
+        addTearDown(newcomer.close);
+
+        final invitation = await newcomer.service.inviteOpen(port: 0);
+        final hostAttempt = await host.service.joinOpen(
+          host: '127.0.0.1',
+          port: invitation.port,
+        );
+        final newcomerAttempt = await invitation.attempt;
+        await Future.wait([hostAttempt.confirm(), newcomerAttempt.confirm()]);
+
+        // The fresh Device took the established group's secret, not the other
+        // way round, and the group grew to hold all three.
+        expect(newcomer.secret, established);
+        expect(host.secret, established);
+        expect(newcomer.members, containsAll(host.members));
+        expect(host.group.contains(newcomer.fingerprint), isTrue);
+      },
+    );
+  });
+
   group('Pairing that must not succeed', () {
     test('a wrong code leaves both Devices unpaired', () async {
       final alice = await TestDevice.start('alice-laptop');
