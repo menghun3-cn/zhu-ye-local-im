@@ -1,15 +1,13 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
-import '../dialogs.dart';
-import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
+import '../transfer_actions.dart';
 import '../widgets.dart';
 
 /// Everything this Device has sent or been offered, newest first.
@@ -141,12 +139,19 @@ class _TransferCard extends StatelessWidget {
                   spacing: 8,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => unawaited(_accept(context)),
+                      onPressed: () => unawaited(
+                        acceptOffer(
+                          context,
+                          controller,
+                          view,
+                          defaultDirectory: defaultIncomingDirectory,
+                        ),
+                      ),
                       icon: const Icon(Icons.download),
                       label: Text(l10n.accept),
                     ),
                     TextButton.icon(
-                      onPressed: () => _reject(context),
+                      onPressed: () => rejectOffer(context, controller, view),
                       icon: const Icon(Icons.block),
                       label: Text(l10n.refuse),
                     ),
@@ -157,34 +162,5 @@ class _TransferCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _accept(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
-    final offer = view.offer;
-    if (offer == null) return;
-    final path = await askForDirectory(
-      context,
-      title: view.kind == PayloadKind.file
-          ? l10n.whereShouldFilesLand
-          : l10n.whereShouldThisArrive,
-      initial: defaultIncomingDirectory,
-    );
-    if (path == null) return;
-    // The dialog is gone by now, and so may be the page.
-    if (!context.mounted) return;
-    await guarded(context, () async {
-      final directory = Directory(path);
-      // A folder the user typed may not exist yet; creating it here rather
-      // than failing the Transfer is what makes the field usable.
-      directory.createSync(recursive: true);
-      await controller.acceptInto(offer, directory);
-    });
-  }
-
-  void _reject(BuildContext context) {
-    final offer = view.offer;
-    if (offer == null) return;
-    unawaited(guarded(context, () => controller.reject(offer)));
   }
 }

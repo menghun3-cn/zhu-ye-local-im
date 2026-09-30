@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-09-30-pairing-requests-instead-of-a-window.md
 #   git hash-object 2026-09-30-pairing-requests-instead-of-a-window.zh.md
-2026-09-30-pairing-requests-instead-of-a-window.md: d07abfd6d0f237424d092078a3639f822462a361
-2026-09-30-pairing-requests-instead-of-a-window.zh.md: d3137988e16e6b31243218fe85a7b44ebe2a94af
+2026-09-30-pairing-requests-instead-of-a-window.md: 2784bd5c6616ffbad82cf52bac535d35fc5a629e
+2026-09-30-pairing-requests-instead-of-a-window.zh.md: 5b2b313551dff45a37892c8e58efad865fa00852

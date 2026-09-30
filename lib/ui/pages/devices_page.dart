@@ -9,11 +9,15 @@ import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../widgets.dart';
+import 'conversation_page.dart';
 
 /// Who this Device is, who is around, and how to reach them.
 class DevicesPage extends StatelessWidget {
   /// Builds the Devices surface.
-  const DevicesPage({super.key});
+  const DevicesPage({super.key, this.defaultIncomingDirectory});
+
+  /// Where a file received from a conversation lands by default.
+  final String? defaultIncomingDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +43,11 @@ class DevicesPage extends StatelessWidget {
           HintText(l10n.devicesEmptyHint)
         else
           for (final peer in peers)
-            _PeerCard(peer: peer, controller: controller),
+            _PeerCard(
+              peer: peer,
+              controller: controller,
+              defaultIncomingDirectory: defaultIncomingDirectory,
+            ),
       ],
     );
   }
@@ -170,14 +178,22 @@ class _PairingCard extends StatelessWidget {
   }
 }
 
-enum _PeerAction { sendText, sendFile, favorite }
-
 /// One Device in the list, with what can be done with it.
+///
+/// A Device this one holds a Session with is a Device to talk to, so the whole
+/// card opens the conversation and the column beside the name says so. The
+/// other two states are single actions — Pair, or open a Session — and stay as
+/// the button they always were.
 class _PeerCard extends StatelessWidget {
-  const _PeerCard({required this.peer, required this.controller});
+  const _PeerCard({
+    required this.peer,
+    required this.controller,
+    required this.defaultIncomingDirectory,
+  });
 
   final PeerView peer;
   final LocalTransferController controller;
+  final String? defaultIncomingDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -188,9 +204,13 @@ class _PeerCard extends StatelessWidget {
     // whole point of it is to bring a Device that is not in the group in.
     final canConnect = peer.isDiallable && peer.isInGroup;
     final canPair = !peer.isInGroup && peer.address != null;
+    final conversation = peer.isConnected
+        ? () => _openConversation(context)
+        : null;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: conversation,
         leading: CircleAvatar(child: Icon(iconForPlatform(peer.platform))),
         title: Text(peer.displayName),
         subtitle: Text(
@@ -198,27 +218,10 @@ class _PeerCard extends StatelessWidget {
         ),
         isThreeLine: true,
         trailing: peer.isConnected
-            ? PopupMenuButton<_PeerAction>(
-                tooltip: l10n.send,
-                onSelected: (action) => _act(context, action),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: _PeerAction.sendText,
-                    child: Text(l10n.menuSendText),
-                  ),
-                  PopupMenuItem(
-                    value: _PeerAction.sendFile,
-                    child: Text(l10n.menuSendFile),
-                  ),
-                  PopupMenuItem(
-                    value: _PeerAction.favorite,
-                    child: Text(
-                      peer.isFavorite
-                          ? l10n.stopTrustingDevice
-                          : l10n.trustDevice,
-                    ),
-                  ),
-                ],
+            ? FilledButton.tonalIcon(
+                onPressed: conversation,
+                icon: const Icon(Icons.forum_outlined, size: 18),
+                label: Text(l10n.openConversation),
               )
             : Tooltip(
                 message: canConnect
@@ -246,14 +249,16 @@ class _PeerCard extends StatelessWidget {
     );
   }
 
-  void _act(BuildContext context, _PeerAction action) {
-    switch (action) {
-      case _PeerAction.sendText:
-        unawaited(showSendTextDialog(context, controller, peer));
-      case _PeerAction.sendFile:
-        unawaited(showSendFileDialog(context, controller, peer));
-      case _PeerAction.favorite:
-        controller.setFavorite(peer.fingerprint, value: !peer.isFavorite);
-    }
+  void _openConversation(BuildContext context) {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ConversationPage(
+            peer: peer.fingerprint,
+            defaultIncomingDirectory: defaultIncomingDirectory,
+          ),
+        ),
+      ),
+    );
   }
 }

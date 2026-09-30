@@ -33,6 +33,7 @@ void main() {
       transferredBytes: moved,
       totalBytes: total,
       names: const ['a.bin'],
+      text: null,
       offer: null,
     );
 

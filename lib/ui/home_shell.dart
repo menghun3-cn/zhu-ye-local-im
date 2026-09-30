@@ -73,7 +73,9 @@ class _HomeShellState extends State<HomeShell> {
         .length;
 
     final pages = <Widget>[
-      const DevicesPage(),
+      DevicesPage(
+        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+      ),
       TransfersPage(
         defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
       ),

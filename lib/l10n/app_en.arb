@@ -127,7 +127,7 @@
   "pairingCardPairedTitle": "Pair another Device",
   "pairingCardUnpairedTitle": "Pair this Device to send anything",
   "pairingCardPairedBody": "Devices in one Owner Group can open Sessions with each other. Pairing adds one, and is also what lets a clipboard be shared.",
-  "pairingCardUnpairedBody": "Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to confirm. Both screens then show the same six digits. After that, sending files and messages needs nothing further.",
+  "pairingCardUnpairedBody": "Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.",
   "acceptPairingRequests": "Answer pairing requests",
   "pairingListening": "Answering requests from other Devices",
   "pairingNotListening": "Not answering requests",
@@ -142,7 +142,6 @@
   "notInOwnerGroup": "not in this Owner Group",
   "trusted": "trusted",
 
-  "menuSendText": "Send text",
   "menuSendFile": "Send a file",
   "trustDevice": "Trust this Device",
   "stopTrustingDevice": "Stop trusting this Device",
@@ -214,38 +213,29 @@
   "aliasHelper": "What other Devices show for this one",
   "cancel": "Cancel",
   "save": "Save",
-  "compareDigits": "Compare these digits with {peer}. If the two screens disagree, cancel.",
-  "@compareDigits": {
-    "placeholders": { "peer": { "type": "String" } }
-  },
-  "theyMatch": "They match",
   "pairingRequestTitle": "Pairing request",
   "pairingRequestFrom": "{alias} wants to pair with this Device.",
   "@pairingRequestFrom": {
     "placeholders": { "alias": { "type": "String" } }
   },
   "pairingRequestUnnamed": "a Device with no name yet",
-  "pairingRequestClaimHint": "That name is the caller's own claim and nothing has checked it. What checks it is the six digits both screens show next.",
-  "pairingPreparing": "Preparing the digits to compare…",
-  "continuePairing": "Continue",
-  "cancelThisPairing": "Cancel this Pairing",
+  "pairingRequestClaimHint": "The name is the caller's own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.",
+  "pairingCompleting": "Finishing the Pairing…",
+  "acceptPairing": "Allow",
   "connectToPeerTitle": "Connect to {peer}",
   "@connectToPeerTitle": {
     "placeholders": { "peer": { "type": "String" } }
   },
-  "reachingOtherDevice": "Reaching the other Device…",
+  "reachingOtherDevice": "Reaching the other Device, waiting for its user to allow it…",
   "manualAddressTitle": "Reach a Device by address",
   "fieldAddress": "Address",
   "addressHelper": "For a Device Discovery cannot find",
   "fieldPort": "Port",
   "portIsANumber": "A port is a number.",
   "manualAddressNote": "Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.",
-  "sendTextTitle": "Send text to {peer}",
-  "@sendTextTitle": {
-    "placeholders": { "peer": { "type": "String" } }
-  },
-  "fieldText": "Text",
-  "textHelper": "It arrives as a Transfer the Device has to accept",
+  "openConversation": "Open conversation",
+  "conversationEmpty": "Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.",
+  "messageHint": "Type a message",
   "send": "Send",
   "sendFileTitle": "Send a file to {peer}",
   "@sendFileTitle": {

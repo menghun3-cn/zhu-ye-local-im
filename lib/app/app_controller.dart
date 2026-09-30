@@ -228,7 +228,12 @@ final class LocalTransferController {
       entry
         ..alias = session.handshake.device.alias
         ..platform = session.handshake.device.platform
-        ..address ??= session.address?.address
+        // The address the Session is actually running on, which is the one
+        // piece of knowledge here that is not a memory: Discovery may have
+        // restarted and a Known Device record may never have been written, but
+        // a live Session is where the peer demonstrably is. Falling back to
+        // what is already known keeps the record rather than blanking it.
+        ..address = session.address?.address ?? entry.address
         ..sessionPort = session.handshake.device.listenPort ?? entry.sessionPort
         ..connected = true
         ..lastSeen = _clock().toUtc();
@@ -358,11 +363,12 @@ final class LocalTransferController {
   /// Pairs with a Device that is answering requests at [host], without a code.
   ///
   /// The initiating side of the click-to-pair flow: [host] is the address
-  /// Discovery saw the Device at, and the exchange ends at the same six-digit
-  /// comparison a typed Pairing ends at. [port] defaults to the well-known
-  /// Pairing port, which is where a Device answers requests — the port to dial
-  /// is the *peer's*, not this Device's own binding, which is why it is not
-  /// read from this controller's configuration.
+  /// Discovery saw the Device at, and the exchange ends wherever the other
+  /// user's answer leaves it — refused, or resolved to an attempt this side
+  /// then confirms. [port] defaults to the well-known Pairing port, which is
+  /// where a Device answers requests — the port to dial is the *peer's*, not
+  /// this Device's own binding, which is why it is not read from this
+  /// controller's configuration.
   ///
   /// Resolving is not being paired: it waits for the other user to allow the
   /// request, and throws [PairingException] if they refuse or never answer.
@@ -814,6 +820,7 @@ final class LocalTransferController {
       transferredBytes: transfer.transferredBytes,
       totalBytes: transfer.totalBytes,
       names: [for (final item in transfer.items) item.name],
+      text: transfer.text,
       offer: transfer is IncomingTransfer && transfer.isDecidable
           ? transfer
           : null,

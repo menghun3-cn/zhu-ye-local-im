@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-09-30-pairing-by-typed-code.md
 #   git hash-object 2026-09-30-pairing-by-typed-code.zh.md
-2026-09-30-pairing-by-typed-code.md: a596e48a9b3d0f95c35d42d138e7bee585305c03
-2026-09-30-pairing-by-typed-code.zh.md: 9faf57bed6251dbbb005119fe8e64958f4411097
+2026-09-30-pairing-by-typed-code.md: a88c898cc6a3bcea873e8c5e6b20ff89b3d7bf50
+2026-09-30-pairing-by-typed-code.zh.md: 2aa8a3a1825d3d4259e6a122e33a703b62dea6aa

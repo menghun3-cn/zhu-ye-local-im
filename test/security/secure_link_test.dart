@@ -69,7 +69,7 @@ void main() {
       () async {
         // Both sides hold a secret, but not the same one. Nothing about the
         // link is trustworthy, so the handshake must not produce a link at
-        // all — there is nothing left to compare short strings over.
+        // all — there is nothing to derive a short authentication string from.
         final results = await _establishBoth(
           aSecret: _secret(1),
           bSecret: _secret(2),
