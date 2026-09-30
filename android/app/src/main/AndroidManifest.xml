@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Sockets are the whole product: Discovery is a UDP broadcast, a Session
+         is a TCP connection, and Pairing listens on a TCP port. Without this
+         the app can open none of them, so it is declared for release builds
+         too — the debug manifest's copy exists for the Flutter tool, not for
+         the application. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="local_transfer"
         android:name="${applicationName}"

@@ -427,4 +427,111 @@ void main() {
       expect(bob.controller.stagedEntries, isEmpty);
     });
   });
+
+  group('reaching a Device by Manual Address', () {
+    test(
+      'dials a Device Discovery never placed, and a Transfer lands',
+      () async {
+        // Two separate beacon networks: neither Device can discover the other,
+        // which is the case a Manual Address exists for.
+        final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
+        final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+        await pairUp(alice, bob);
+
+        expect(
+          alice.controller.peers.any((peer) => peer.isDiallable),
+          isFalse,
+          reason: 'nothing has been discovered to dial',
+        );
+        await expectLater(
+          alice.controller.connect(bob.fingerprint),
+          throwsA(isA<AppStateException>()),
+        );
+
+        final port = bob.controller.listenPort;
+        expect(port, isNotNull);
+        await alice.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+          port: port,
+        );
+        await until(
+          () =>
+              alice.controller.sessions.isNotEmpty &&
+              bob.controller.sessions.isNotEmpty,
+          description: 'the Session to come up on both Devices',
+        );
+        expect(
+          alice.controller.peers
+              .firstWhere((peer) => peer.isConnected)
+              .fingerprint,
+          bob.fingerprint,
+          reason: 'the Device on the other end is the one that was dialled',
+        );
+
+        await alice.controller.sendText('over a typed address');
+        await until(
+          () => bob.offers.isNotEmpty,
+          description: 'Bob to be offered the text',
+        );
+        expect(bob.offers.single.text, 'over a typed address');
+      },
+    );
+
+    test('refuses an address to dial when there is none', () async {
+      final solo = await startDevice(MemoryBeaconHub().a, 'Solo');
+      await expectLater(
+        solo.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+        ),
+        throwsA(isA<AppStateException>()),
+        reason: 'an unpaired Device has no secret, so it dials on none',
+      );
+
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+
+      await expectLater(
+        alice.controller.connectTo(address: '   '),
+        throwsA(isA<AppStateException>()),
+      );
+      await expectLater(
+        alice.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+          port: 0,
+        ),
+        throwsA(isA<AppStateException>()),
+      );
+      await expectLater(
+        alice.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+          port: 70000,
+        ),
+        throwsA(isA<AppStateException>()),
+      );
+    });
+
+    test('still refuses a Device that holds no other group secret', () async {
+      // Two Owner Groups on one host. Carol typed Bob's address — which is the
+      // only thing a Manual Address gives up, since nothing is pinned — so the
+      // handshake is what has to refuse her.
+      final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
+      final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+      await pairUp(alice, bob);
+      final carol = await startDevice(MemoryBeaconHub().a, 'Carol');
+      final dave = await startDevice(MemoryBeaconHub().a, 'Dave');
+      await pairUp(carol, dave);
+
+      await expectLater(
+        carol.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+          port: bob.controller.listenPort,
+        ),
+        throwsA(isA<HandshakeException>()),
+      );
+      expect(carol.controller.sessions, isEmpty);
+      expect(bob.controller.sessions, isEmpty);
+    });
+  });
 }
