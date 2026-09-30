@@ -48,6 +48,12 @@ abstract interface class BeaconTransport {
   Stream<BeaconDatagram> get received;
 
   /// Sends [datagram] to one Device directly, to answer its probe.
+  ///
+  /// Delivery is asynchronous, and an implementation is expected to *deliver*.
+  /// A socket can refuse a datagram outright, and a dropped one is not a
+  /// failure any caller could notice — it just looks like a Device that did not
+  /// answer. An implementation that hands the datagram to a socket must
+  /// therefore deal with refusal rather than ignore it.
   void send(
     List<int> datagram, {
     required InternetAddress address,
@@ -55,6 +61,9 @@ abstract interface class BeaconTransport {
   });
 
   /// Sends [datagram] to every Device on the local link.
+  ///
+  /// One send per target, and every one of them is expected to arrive:
+  /// "every Device" is not satisfied by the target that happened to go first.
   void broadcast(List<int> datagram);
 
   /// Releases the socket. Idempotent.
