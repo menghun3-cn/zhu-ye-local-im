@@ -6,6 +6,7 @@ import '../../app/app.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
 import '../feedback.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../widgets.dart';
 
@@ -16,6 +17,7 @@ class DevicesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
     final peers = controller.peers;
     return ListView(
@@ -26,19 +28,15 @@ class DevicesPage extends StatelessWidget {
         _PairingCard(controller: controller),
         const SizedBox(height: 20),
         SectionHeader(
-          title: 'Devices',
+          title: l10n.tabDevices,
           trailing: TextButton.icon(
             onPressed: () => showManualAddressDialog(context, controller),
             icon: const Icon(Icons.cable, size: 18),
-            label: const Text('By address'),
+            label: Text(l10n.byAddress),
           ),
         ),
         if (peers.isEmpty)
-          const HintText(
-            'Nothing has been discovered yet. Devices running this app on the '
-            'same network appear here; one Discovery cannot reach can still be '
-            'dialled by address.',
-          )
+          HintText(l10n.devicesEmptyHint)
         else
           for (final peer in peers)
             _PeerCard(peer: peer, controller: controller),
@@ -55,6 +53,7 @@ class _SelfCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final self = controller.self;
     final port = controller.listenPort;
@@ -82,24 +81,23 @@ class _SelfCard extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () => showRenameDialog(context, controller),
-                  child: const Text('Rename'),
+                  child: Text(l10n.rename),
                 ),
               ],
             ),
             const Divider(height: 24),
-            FactLine('Platform', self.platform.displayName),
+            FactLine(l10n.factPlatform, self.platform.displayName),
             FactLine(
-              'Clipboard',
-              'can originate: ${self.capability.canOriginate ? 'yes' : 'no'} · '
-                  'can apply: ${self.capability.canApply ? 'yes' : 'no'}',
+              l10n.tabClipboard,
+              describeClipboardFacts(self.capability, l10n),
             ),
-            FactLine('Owner Group', '${self.groupLength} Device(s)'),
-            FactLine('Sessions', '${self.openSessions} open'),
+            FactLine(l10n.factOwnerGroup, l10n.groupDevices(self.groupLength)),
+            FactLine(l10n.factSessions, l10n.sessionsOpen(self.openSessions)),
             FactLine(
-              'Listening',
+              l10n.factListening,
               // The port is the honest answer to "can anything reach me": an
               // unpaired Device binds none, and says so.
-              port == null ? 'not accepting Sessions' : 'on port $port',
+              port == null ? l10n.notAcceptingSessions : l10n.onPort(port),
             ),
           ],
         ),
@@ -116,6 +114,7 @@ class _PairingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final paired = controller.isPaired;
     return Card(
       child: Padding(
@@ -130,8 +129,8 @@ class _PairingCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     paired
-                        ? 'Pair another Device'
-                        : 'Pair this Device to send anything',
+                        ? l10n.pairingCardPairedTitle
+                        : l10n.pairingCardUnpairedTitle,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
@@ -140,13 +139,8 @@ class _PairingCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               paired
-                  ? 'Devices in one Owner Group can open Sessions with each '
-                        'other. Pairing adds one, and is also what lets a '
-                        'clipboard be shared.'
-                  : 'Pairing takes two taps and no code to retype: tap '
-                        'Receive a connection here, and on the other Device '
-                        'tap Pair beside this one in its list. Both screens '
-                        'then show the same six digits to confirm.',
+                  ? l10n.pairingCardPairedBody
+                  : l10n.pairingCardUnpairedBody,
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -155,7 +149,7 @@ class _PairingCard extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () => showReceiveDialog(context, controller),
                   icon: const Icon(Icons.phonelink_ring),
-                  label: const Text('Receive a connection'),
+                  label: Text(l10n.receiveAConnection),
                 ),
               ],
             ),
@@ -177,60 +171,53 @@ class _PeerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Dialling needs both an address to dial and a peer in the group: a Device
     // from somebody else's group would fail the handshake, so offering the
     // button would be offering a failure. Pairing needs only an address — the
     // whole point of it is to bring a Device that is not in the group in.
     final canConnect = peer.isDiallable && peer.isInGroup;
     final canPair = !peer.isInGroup && peer.address != null;
-    final facts = <String>[
-      if (peer.alias == null) 'name not announced yet',
-      describePeerAddress(peer),
-      if (peer.isConnected)
-        'Session open'
-      else
-        'last seen ${describeLastSeen(peer.lastSeen)}',
-      if (!peer.isInGroup) 'not in this Owner Group',
-      if (peer.isFavorite) 'trusted',
-    ];
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(child: Icon(iconForPlatform(peer.platform))),
         title: Text(peer.displayName),
-        subtitle: Text('${peer.shortFingerprint} · ${facts.join(' · ')}'),
+        subtitle: Text(
+          '${peer.shortFingerprint} · ${describePeerFacts(peer, l10n)}',
+        ),
         isThreeLine: true,
         trailing: peer.isConnected
             ? PopupMenuButton<_PeerAction>(
-                tooltip: 'Send',
+                tooltip: l10n.send,
                 onSelected: (action) => _act(context, action),
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: _PeerAction.sendText,
-                    child: Text('Send text'),
+                    child: Text(l10n.menuSendText),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: _PeerAction.sendFile,
-                    child: Text('Send a file'),
+                    child: Text(l10n.menuSendFile),
                   ),
                   PopupMenuItem(
                     value: _PeerAction.favorite,
                     child: Text(
                       peer.isFavorite
-                          ? 'Stop trusting this Device'
-                          : 'Trust this Device',
+                          ? l10n.stopTrustingDevice
+                          : l10n.trustDevice,
                     ),
                   ),
                 ],
               )
             : Tooltip(
                 message: canConnect
-                    ? 'Open a Session'
+                    ? l10n.openSession
                     : canPair
-                    ? 'Pair with this Device'
+                    ? l10n.pairWithThisDevice
                     : peer.isInGroup
-                    ? 'Nothing to dial yet: this Device has not been seen'
-                    : 'Nothing known about where this Device is',
+                    ? l10n.nothingToDialYet
+                    : l10n.nothingKnownAboutPeer,
                 child: TextButton(
                   onPressed: canConnect
                       ? () => guarded(
@@ -240,7 +227,9 @@ class _PeerCard extends StatelessWidget {
                       : canPair
                       ? () => showPairWithPeerDialog(context, controller, peer)
                       : null,
-                  child: Text(canPair && !canConnect ? 'Pair' : 'Connect'),
+                  child: Text(
+                    canPair && !canConnect ? l10n.pair : l10n.connect,
+                  ),
                 ),
               ),
       ),

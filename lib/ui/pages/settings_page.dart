@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller_scope.dart';
 import '../dialogs.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
 import '../widgets.dart';
 
@@ -15,6 +16,7 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final controller = ControllerScope.of(context);
     final self = controller.self;
@@ -25,37 +27,43 @@ class SettingsPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const SectionHeader(title: 'This Device'),
+        SectionHeader(title: l10n.settingsThisDevice),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FactLine('Alias', self.alias),
+                FactLine(l10n.factAlias, self.alias),
                 // The whole Fingerprint, selectable: it is the one thing a
                 // user can read out loud to tell two Devices apart, and the
                 // short form is for lists, not for this.
-                FactLine('Fingerprint', self.fingerprint.hex),
-                FactLine('Platform', self.platform.displayName),
-                FactLine('Owner Group', '${self.groupLength} Device(s)'),
-                FactLine('Sessions', '${self.openSessions} open'),
+                FactLine(l10n.factFingerprint, self.fingerprint.hex),
+                FactLine(l10n.factPlatform, self.platform.displayName),
                 FactLine(
-                  'Listening',
-                  port == null ? 'not accepting Sessions' : 'on port $port',
+                  l10n.factOwnerGroup,
+                  l10n.groupDevices(self.groupLength),
+                ),
+                FactLine(
+                  l10n.factSessions,
+                  l10n.sessionsOpen(self.openSessions),
+                ),
+                FactLine(
+                  l10n.factListening,
+                  port == null ? l10n.notAcceptingSessions : l10n.onPort(port),
                 ),
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () => showRenameDialog(context, controller),
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Rename this Device'),
+                  label: Text(l10n.renameThisDevice),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 20),
-        const SectionHeader(title: 'Where things go'),
+        SectionHeader(title: l10n.settingsWhereThingsGo),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -63,27 +71,22 @@ class SettingsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 FactLine(
-                  'Identity',
-                  profilePath ?? 'not stored on this Device',
+                  l10n.factIdentity,
+                  profilePath ?? l10n.notStoredOnThisDevice,
                 ),
-                if (profilePath == null)
-                  const HintText(
-                    'This Device has nowhere to keep its identity, so it runs '
-                    'in memory: it works, and it has to be paired again after '
-                    'every restart.',
-                  ),
+                if (profilePath == null) HintText(l10n.noIdentityHint),
                 FactLine(
-                  'Received files',
-                  seams.defaultIncomingDirectory ?? 'no default folder',
+                  l10n.factReceivedFiles,
+                  seams.defaultIncomingDirectory ?? l10n.noDefaultFolder,
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 20),
-        const SectionHeader(title: 'Notices'),
+        SectionHeader(title: l10n.settingsNotices),
         if (notices.isEmpty)
-          const HintText('Nothing has gone wrong.')
+          HintText(l10n.nothingWentWrong)
         else
           Card(
             child: Column(
@@ -101,9 +104,7 @@ class SettingsPage extends StatelessWidget {
           ),
         const SizedBox(height: 24),
         Text(
-          'Local Transfer moves text, files and clipboard entries between your '
-          'own Devices over the local network. There is no server, no account '
-          'and no cloud: everything above stays inside this network.',
+          l10n.settingsAbout,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

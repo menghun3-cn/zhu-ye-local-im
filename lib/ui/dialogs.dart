@@ -6,10 +6,11 @@ import 'package:flutter/material.dart';
 import '../app/app.dart';
 import '../core/core.dart';
 import 'feedback.dart';
+import 'l10n/generated/app_localizations.dart';
 
 /// The dialogs the surfaces open.
 ///
-/// Each one is a step of a flow that talks to a peer — showing a Pairing code,
+/// Each one is a step of a flow that talks to a peer — receiving a connection,
 /// comparing six digits, typing an address — so each is a `StatefulWidget` with
 /// its own error line rather than a `showDialog` with a closure: a flow that
 /// waits for another Device to answer has to show what it is waiting for, and
@@ -86,12 +87,15 @@ Future<String?> askForDirectory(
   BuildContext context, {
   required String title,
   String? initial,
-  String confirmLabel = 'Accept into this folder',
+  String? confirmLabel,
 }) => showDialog<String>(
   context: context,
   builder: (_) => _DirectoryDialog(
     title: title,
     initial: initial ?? '',
+    // Resolved inside the dialog rather than defaulted here: a default argument
+    // cannot be a lookup, and the string has to come from the language on
+    // screen.
     confirmLabel: confirmLabel,
   ),
 );
@@ -131,15 +135,22 @@ class _BigCode extends StatelessWidget {
 }
 
 /// A failure, where the flow happened.
+///
+/// [failure] is either an exception the layers below raised — described at
+/// render time, so the sentence is in the language the window is showing — or a
+/// sentence this dialog made up about its own fields, which is text already.
 class _ErrorLine extends StatelessWidget {
-  const _ErrorLine(this.message);
+  const _ErrorLine(this.failure);
 
-  final String? message;
+  final Object? failure;
 
   @override
   Widget build(BuildContext context) {
-    final message = this.message;
-    if (message == null) return const SizedBox.shrink();
+    final failure = this.failure;
+    if (failure == null) return const SizedBox.shrink();
+    final message = failure is String
+        ? failure
+        : describeFailure(failure, AppLocalizations.of(context));
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Row(
@@ -160,9 +171,9 @@ class _ErrorLine extends StatelessWidget {
 
 /// The six digits both screens have to be showing.
 ///
-/// The step exists because the code alone proves only that both sides used the
-/// same code — not that no third Device is in the middle. Reading digits aloud
-/// is the only check that does.
+/// The step exists because the handshake alone proves only that both sides used
+/// the same secret — not that no third Device is in the middle. Reading digits
+/// aloud is the only check that does.
 class _Confirmation extends StatelessWidget {
   const _Confirmation({
     required this.attempt,
@@ -176,21 +187,17 @@ class _Confirmation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final peer = attempt.peer;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _BigCode(
-          value: attempt.sas,
-          caption:
-              'Compare these digits with ${peer.alias}. '
-              'If the two screens disagree, cancel.',
-        ),
+        _BigCode(value: attempt.sas, caption: l10n.compareDigits(peer.alias)),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: busy ? null : onConfirm,
           icon: const Icon(Icons.check),
-          label: const Text('They match'),
+          label: Text(l10n.theyMatch),
         ),
       ],
     );
@@ -212,7 +219,7 @@ class _RenameDialogState extends State<_RenameDialog> {
   late final TextEditingController _alias = TextEditingController(
     text: widget.controller.self.alias,
   );
-  String? _error;
+  Object? _failure;
   bool _busy = false;
 
   @override
@@ -224,7 +231,7 @@ class _RenameDialogState extends State<_RenameDialog> {
   Future<void> _save() async {
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await widget.controller.rename(_alias.text);
@@ -233,7 +240,7 @@ class _RenameDialogState extends State<_RenameDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -241,8 +248,9 @@ class _RenameDialogState extends State<_RenameDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('Rename this Device'),
+      title: Text(l10n.renameThisDevice),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,25 +258,25 @@ class _RenameDialogState extends State<_RenameDialog> {
           TextField(
             controller: _alias,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Alias',
-              helperText: 'What other Devices show for this one',
+            decoration: InputDecoration(
+              labelText: l10n.factAlias,
+              helperText: l10n.aliasHelper,
             ),
             onSubmitted: (_) {
               if (!_busy) unawaited(_save());
             },
           ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : () => unawaited(_save()),
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -291,7 +299,7 @@ class _ReceiveDialog extends StatefulWidget {
 class _ReceiveDialogState extends State<_ReceiveDialog> {
   PairingInvitation? _invitation;
   PairingAttempt? _attempt;
-  String? _error;
+  Object? _failure;
   bool _busy = false;
   bool _confirmed = false;
 
@@ -329,7 +337,7 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
       }
       setState(() => _attempt = attempt);
     } on Object catch (error) {
-      if (mounted) setState(() => _error = describeFailure(error));
+      if (mounted) setState(() => _failure = error);
     }
   }
 
@@ -338,7 +346,7 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
     if (attempt == null) return;
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await attempt.confirm();
@@ -348,7 +356,7 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -356,14 +364,15 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final invitation = _invitation;
     final attempt = _attempt;
     return AlertDialog(
-      title: const Text('Receive a connection'),
+      title: Text(l10n.receiveAConnection),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (invitation == null && _error == null)
+          if (invitation == null && _failure == null)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: CircularProgressIndicator(),
@@ -371,11 +380,7 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
           if (invitation != null && attempt == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Waiting for a Device to connect. On the other Device, tap '
-                'Pair beside this one. Both screens will then show the same '
-                'six digits to compare.',
-              ),
+              child: Text(l10n.receiveWaiting),
             ),
           if (attempt != null)
             _Confirmation(
@@ -383,13 +388,13 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
               busy: _busy,
               onConfirm: () => unawaited(_confirm()),
             ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(attempt == null ? 'Cancel' : 'Cancel this Pairing'),
+          child: Text(attempt == null ? l10n.cancel : l10n.cancelThisPairing),
         ),
       ],
     );
@@ -412,7 +417,7 @@ class _PairWithPeerDialog extends StatefulWidget {
 
 class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
   PairingAttempt? _attempt;
-  String? _error;
+  Object? _failure;
   bool _busy = false;
   bool _confirmed = false;
 
@@ -431,10 +436,12 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
   Future<void> _join() async {
     final address = widget.peer.address;
     if (address == null) {
+      // The same sentence the app layer's refusal carries, because it is the
+      // same fact: nothing here knows where that Device is.
       setState(
-        () => _error =
-            'Nothing is known about where ${widget.peer.displayName} is. '
-            'Wait until this Device has discovered it, then try again.',
+        () =>
+            _failure = AppLocalizations.of(context)
+                .refusalPeerAddressUnknown(widget.peer.displayName),
       );
       return;
     }
@@ -446,7 +453,7 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
       }
       setState(() => _attempt = attempt);
     } on Object catch (error) {
-      if (mounted) setState(() => _error = describeFailure(error));
+      if (mounted) setState(() => _failure = error);
     }
   }
 
@@ -455,7 +462,7 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
     if (attempt == null) return;
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await attempt.confirm();
@@ -474,7 +481,7 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -482,21 +489,22 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final attempt = _attempt;
     return AlertDialog(
-      title: Text('Connect to ${widget.peer.displayName}'),
+      title: Text(l10n.connectToPeerTitle(widget.peer.displayName)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (attempt == null && _error == null)
+          if (attempt == null && _failure == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Reaching the other Device…'),
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(l10n.reachingOtherDevice),
                 ],
               ),
             ),
@@ -506,13 +514,13 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
               busy: _busy,
               onConfirm: () => unawaited(_confirm()),
             ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(attempt == null ? 'Cancel' : 'Cancel this Pairing'),
+          child: Text(attempt == null ? l10n.cancel : l10n.cancelThisPairing),
         ),
       ],
     );
@@ -535,7 +543,7 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
   late final TextEditingController _port = TextEditingController(
     text: '$defaultSessionPort',
   );
-  String? _error;
+  Object? _failure;
   bool _busy = false;
 
   @override
@@ -548,12 +556,12 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
   Future<void> _connect() async {
     final port = int.tryParse(_port.text.trim());
     if (port == null) {
-      setState(() => _error = 'A port is a number.');
+      setState(() => _failure = AppLocalizations.of(context).portIsANumber);
       return;
     }
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await widget.controller.connectTo(
@@ -565,7 +573,7 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -573,46 +581,43 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('Reach a Device by address'),
+      title: Text(l10n.manualAddressTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _address,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Address',
-              helperText: 'For a Device Discovery cannot find',
+            decoration: InputDecoration(
+              labelText: l10n.fieldAddress,
+              helperText: l10n.addressHelper,
             ),
           ),
           TextField(
             controller: _port,
-            decoration: const InputDecoration(labelText: 'Port'),
+            decoration: InputDecoration(labelText: l10n.fieldPort),
             keyboardType: TextInputType.number,
             onSubmitted: (_) {
               if (!_busy) unawaited(_connect());
             },
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              'Nothing is known about this Device beforehand, so the Session '
-              'is what proves it belongs in your Owner Group. A Device in a '
-              'different group is refused.',
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(l10n.manualAddressNote),
           ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : () => unawaited(_connect()),
-          child: const Text('Connect'),
+          child: Text(l10n.connect),
         ),
       ],
     );
@@ -633,7 +638,7 @@ class _SendTextDialog extends StatefulWidget {
 
 class _SendTextDialogState extends State<_SendTextDialog> {
   final TextEditingController _text = TextEditingController();
-  String? _error;
+  Object? _failure;
   bool _busy = false;
 
   @override
@@ -645,7 +650,7 @@ class _SendTextDialogState extends State<_SendTextDialog> {
   Future<void> _send() async {
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await widget.controller.sendText(_text.text, to: widget.peer.fingerprint);
@@ -654,7 +659,7 @@ class _SendTextDialogState extends State<_SendTextDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -662,8 +667,9 @@ class _SendTextDialogState extends State<_SendTextDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text('Send text to ${widget.peer.displayName}'),
+      title: Text(l10n.sendTextTitle(widget.peer.displayName)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -672,22 +678,22 @@ class _SendTextDialogState extends State<_SendTextDialog> {
             autofocus: true,
             maxLines: 6,
             minLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Text',
-              helperText: 'It arrives as a Transfer the Device has to accept',
+            decoration: InputDecoration(
+              labelText: l10n.fieldText,
+              helperText: l10n.textHelper,
             ),
           ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : () => unawaited(_send()),
-          child: const Text('Send'),
+          child: Text(l10n.send),
         ),
       ],
     );
@@ -706,7 +712,7 @@ class _SendFileDialog extends StatefulWidget {
 
 class _SendFileDialogState extends State<_SendFileDialog> {
   final TextEditingController _path = TextEditingController();
-  String? _error;
+  Object? _failure;
   bool _busy = false;
 
   @override
@@ -716,15 +722,16 @@ class _SendFileDialogState extends State<_SendFileDialog> {
   }
 
   Future<void> _send() async {
+    final l10n = AppLocalizations.of(context);
     final path = _path.text.trim();
     final file = File(path);
     if (path.isEmpty || !file.existsSync()) {
-      setState(() => _error = 'There is no file at "$path".');
+      setState(() => _failure = l10n.noSuchFile(path));
       return;
     }
     setState(() {
       _busy = true;
-      _error = null;
+      _failure = null;
     });
     try {
       await widget.controller.sendFile(file, to: widget.peer.fingerprint);
@@ -733,7 +740,7 @@ class _SendFileDialogState extends State<_SendFileDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = describeFailure(error);
+          _failure = error;
         });
       }
     }
@@ -741,43 +748,40 @@ class _SendFileDialogState extends State<_SendFileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text('Send a file to ${widget.peer.displayName}'),
+      title: Text(l10n.sendFileTitle(widget.peer.displayName)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _path,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Path',
-              helperText: 'Copy a path, or type one',
+            decoration: InputDecoration(
+              labelText: l10n.fieldPath,
+              helperText: l10n.pathHelper,
             ),
             onSubmitted: (_) {
               if (!_busy) unawaited(_send());
             },
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              // Said plainly because the alternative — an empty field with no
-              // explanation — reads as a broken Browse button.
-              'This build has no file browser: it ships no plugins, and a '
-              'native dialog for each platform is its own change. A path is '
-              'what it takes for now.',
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            // Said plainly because the alternative — an empty field with no
+            // explanation — reads as a broken Browse button.
+            child: Text(l10n.noFileBrowserNote),
           ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : () => unawaited(_send()),
-          child: const Text('Send'),
+          child: Text(l10n.send),
         ),
       ],
     );
@@ -795,7 +799,9 @@ class _DirectoryDialog extends StatefulWidget {
 
   final String title;
   final String initial;
-  final String confirmLabel;
+
+  /// What the confirm button says, or null to use the standard wording.
+  final String? confirmLabel;
 
   @override
   State<_DirectoryDialog> createState() => _DirectoryDialogState();
@@ -805,7 +811,7 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
   late final TextEditingController _path = TextEditingController(
     text: widget.initial,
   );
-  String? _error;
+  Object? _failure;
 
   @override
   void dispose() {
@@ -816,11 +822,7 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
   void _accept() {
     final path = _path.text.trim();
     if (path.isEmpty) {
-      setState(
-        () => _error =
-            'A folder is needed: a name from the peer must '
-            'not be allowed to choose one.',
-      );
+      setState(() => _failure = AppLocalizations.of(context).folderRequired);
       return;
     }
     Navigator.of(context).pop(path);
@@ -828,6 +830,7 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
@@ -836,28 +839,28 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
           TextField(
             controller: _path,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Folder',
-              helperText: 'Created if it does not exist',
+            decoration: InputDecoration(
+              labelText: l10n.fieldFolder,
+              helperText: l10n.folderHelper,
             ),
             onSubmitted: (_) => _accept(),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              'A name that arrives with the Transfer is untrusted: it can '
-              'name a file inside this folder and nothing else.',
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(l10n.folderNote),
           ),
-          _ErrorLine(_error),
+          _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
-        FilledButton(onPressed: _accept, child: Text(widget.confirmLabel)),
+        FilledButton(
+          onPressed: _accept,
+          child: Text(widget.confirmLabel ?? l10n.acceptIntoFolder),
+        ),
       ],
     );
   }

@@ -6,7 +6,28 @@ import '../app/app.dart';
 import 'controller_scope.dart';
 import 'feedback.dart';
 import 'home_shell.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'seams.dart';
+
+/// The languages this application speaks, in **fallback order**.
+///
+/// The order is [appLocale] first so that the fallback and the default agree:
+/// Flutter falls back to the *first* entry of this list when the platform asks
+/// for a language that is in neither, and the generated
+/// [AppLocalizations.supportedLocales] is alphabetical (en, zh) — relying on it
+/// would make the fallback English.
+const List<Locale> appLocales = [Locale('zh'), Locale('en')];
+
+/// The language this build opens in.
+///
+/// Chinese, fixed rather than resolved from the platform. There is no language
+/// setting on screen to change it with, so following the platform would make
+/// the language depend on a Windows setting nobody chose for this app — and
+/// English strings are kept complete and generated, so the alternative stays
+/// real. Setting this to null is the one-line change that hands the decision
+/// back to the platform, at which point [appLocales]' order is what decides
+/// the default.
+const Locale appLocale = Locale('zh');
 
 /// The application: one controller over the platform seams, and the shell.
 ///
@@ -69,16 +90,24 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Local Transfer',
+      // The window and task-switcher title is a string like any other, so it is
+      // read from the localizations rather than fixed here.
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
+      locale: appLocale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: appLocales,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: _screen(),
+      // A `Builder`, because this widget's own context sits *above* the
+      // MaterialApp and therefore above the localizations it installs:
+      // everything below reads its strings off this inner context instead.
+      home: Builder(builder: _screen),
     );
   }
 
-  Widget _screen() {
+  Widget _screen(BuildContext context) {
     final controller = _controller;
     if (controller != null) {
       return ControllerScope(
@@ -88,9 +117,10 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     }
     final failure = _failure;
     if (failure != null) {
+      final l10n = AppLocalizations.of(context);
       return StartupFailureScreen(
-        title: 'Local Transfer could not start',
-        message: describeFailure(failure),
+        title: l10n.startupFailureTitle,
+        message: describeFailure(failure, l10n),
       );
     }
     return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -106,20 +136,27 @@ class StartupFailureApp extends StatelessWidget {
   /// Shows [message] instead of the application.
   const StartupFailureApp({super.key, required this.message});
 
-  /// What went wrong, as a sentence.
+  /// What went wrong, as a sentence. Already text rather than an exception:
+  /// this screen is built from `main`, which has no localized context to read
+  /// a refusal off, and the failure it reports is a platform channel's own.
   final String message;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Local Transfer',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
+      locale: appLocale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: appLocales,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: StartupFailureScreen(
-        title: 'Local Transfer could not start',
-        message: message,
+      home: Builder(
+        builder: (context) => StartupFailureScreen(
+          title: AppLocalizations.of(context).startupFailureTitle,
+          message: message,
+        ),
       ),
     );
   }

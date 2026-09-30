@@ -243,7 +243,46 @@ File incomingPathFor(Directory directory, String name) {
     );
     if (!candidate.existsSync()) return candidate;
   }
-  throw AppStateException('cannot find a free name for "$safe"');
+  throw AppStateException(AppRefusal.noFreeFileName, safe);
+}
+
+/// The kinds of thing the app layer refuses.
+///
+/// A refusal is a closed set — "you asked to send with no Session open" — so it
+/// is *named* here rather than written out as a sentence. That is what lets the
+/// reason reach a screen in the user's language: `lib/app` may not import
+/// Flutter (see `app.dart`), so it cannot translate anything itself, and a name
+/// is the only kind of answer the UI can act on.
+enum AppRefusal {
+  /// A Session was asked for with a peer already wired up.
+  sessionAlreadyOpen,
+
+  /// A peer was dialled that Discovery has never placed.
+  peerAddressUnknown,
+
+  /// An address was dialled with nothing in the address field.
+  noAddressGiven,
+
+  /// A port outside `1..65535`.
+  portNotAPort,
+
+  /// An offer that has already been accepted or refused.
+  offerAlreadyAnswered,
+
+  /// A send was attempted with nothing connected.
+  noPeerConnected,
+
+  /// A send named a peer with no Session to it.
+  noSessionOpen,
+
+  /// A send named no peer while several were connected.
+  severalPeersConnected,
+
+  /// Something that needs the Session layer was asked for before pairing.
+  notPaired,
+
+  /// Every candidate name in the destination folder is taken.
+  noFreeFileName,
 }
 
 /// Raised when the app layer is asked for something its current state does not
@@ -251,12 +290,21 @@ File incomingPathFor(Directory directory, String name) {
 ///
 /// Distinct from the core layers' exceptions on purpose: those say what the
 /// protocol did, this says what the *caller* asked for and did not get.
+///
+/// [detail] carries the data the refusal is about and never prose: a
+/// Fingerprint, a port number, a file name. Making the sentence belongs to the
+/// UI, which is the only layer that knows what language the user reads.
 final class AppStateException implements Exception {
-  const AppStateException(this.message);
+  const AppStateException(this.refusal, [this.detail]);
 
-  /// What was refused, and why.
-  final String message;
+  /// What was refused.
+  final AppRefusal refusal;
+
+  /// What it was refused about, when the refusal names something.
+  final String? detail;
 
   @override
-  String toString() => 'AppStateException: $message';
+  String toString() => detail == null
+      ? 'AppStateException: $refusal'
+      : 'AppStateException: $refusal ($detail)';
 }

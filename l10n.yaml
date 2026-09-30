@@ -1,0 +1,22 @@
+# How the application's words are generated from the ARB files.
+#
+# `app_en.arb` is the template — every key has to exist there first, with the
+# placeholder types spelled out — and `app_zh.arb` is the translation. Chinese
+# is the default the application resolves to (see `lib/ui/app.dart`), which is
+# why the template is English but the fallback is not: the template only has to
+# be the one that declares the shape.
+#
+# Generated into `lib/ui/l10n/generated` and committed rather than kept in a
+# synthetic package, so `flutter analyze` and `dart format` see the same files
+# the build does.
+#
+# The output is under `lib/ui` on purpose, while the ARB files are not: the ARB
+# is data and imports nothing, and the class generated from it imports Flutter.
+# Keeping the two apart is what lets `test/app/plain_dart_test.dart` keep
+# asserting, without an exception, that Flutter is confined to `lib/ui`.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+output-dir: lib/ui/l10n/generated
+nullable-getter: false
