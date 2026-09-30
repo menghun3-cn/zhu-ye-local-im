@@ -9,6 +9,7 @@ import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
+import 'package:local_transfer/ui/pages/conversation_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/seams.dart';
 
@@ -451,25 +452,6 @@ Future<void> tapButton(
   await settleRoute(tester);
 }
 
-/// The six digits currently shown in [window]'s dialog, or null when the
-/// window is not at the comparison step.
-///
-/// Read off the screen rather than out of the controller, because reading
-/// them off the screen is what a person does: the digits are derived on each
-/// Device and never sent, so the only way they cross between windows is
-/// through the user's eyes.
-String? shownSas(WidgetTester tester, {required TestWindow window}) {
-  final pattern = RegExp(r'^[0-9]{6}$');
-  final texts = tester.widgetList<SelectableText>(
-    window.within(find.byType(SelectableText)),
-  );
-  for (final widget in texts) {
-    final data = widget.data;
-    if (data != null && pattern.hasMatch(data)) return data;
-  }
-  return null;
-}
-
 /// Whether [window] is showing an open dialog.
 bool dialogIsOpen(TestWindow window) =>
     window.within(find.byType(AlertDialog)).evaluate().isNotEmpty;
@@ -588,7 +570,7 @@ Future<void> pairDevices(
     expect(
       hostAttempt.sas,
       guestAttempt.sas,
-      reason: 'both Devices must derive the same digits to compare',
+      reason: 'both Devices must derive the same digits to sign over',
     );
     await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
     await untilTrue(
@@ -637,10 +619,9 @@ Future<void> connectDevices(
 ///
 /// The host does nothing to prepare: it answers requests for as long as it is
 /// running, so the guest simply taps Pair on its card. What the host's user is
-/// asked is *one question* — whether to talk to the Device that dialled — and
-/// only then do the two screens show the digits to compare. Nothing is typed
-/// anywhere; the digits are derived on each Device and never sent, so the test
-/// reads them off both screens only to assert they agree.
+/// asked is *one question* — whether to let the Device that dialled in — and
+/// allowing it is the whole of the Pairing. Nothing is typed and nothing is
+/// compared: both Devices confirm on their own once the question is answered.
 Future<void> pairThroughWindows(
   WidgetTester tester,
   TestWindow host,
@@ -668,31 +649,16 @@ Future<void> pairThroughWindows(
   // until it is answered.
   await pumpUntil(
     tester,
-    () => hasButton(tester, l10n.continuePairing, window: host),
+    () => hasButton(tester, l10n.acceptPairing, window: host),
     description: 'the host to be asked about the request',
   );
-  await tapDialogButton(tester, l10n.continuePairing, window: host);
+  await tapDialogButton(tester, l10n.acceptPairing, window: host);
 
-  // Both sides now hold an attempt and show the digits to compare.
   await pumpUntil(
     tester,
-    () => hasButton(tester, l10n.theyMatch, window: guest),
-    description: 'the guest to reach the comparison step',
+    () => hostDevice.controller.isPaired && guestDevice.controller.isPaired,
+    description: 'allowing the request to pair both Devices',
   );
-  await pumpUntil(
-    tester,
-    () => hasButton(tester, l10n.theyMatch, window: host),
-    description: 'the host to reach the comparison step',
-  );
-  final guestSas = shownSas(tester, window: guest);
-  final hostSas = shownSas(tester, window: host);
-  expect(guestSas, isNotNull, reason: 'the guest to show six digits');
-  expect(hostSas, isNotNull, reason: 'the host to show six digits');
-  expect(guestSas, hostSas, reason: 'both screens show the same digits');
-
-  await tapDialogButton(tester, l10n.theyMatch, window: guest);
-  await tapDialogButton(tester, l10n.theyMatch, window: host);
-
   await pumpUntil(
     tester,
     () => hostDevice.controller.isServing && guestDevice.controller.isServing,
@@ -709,6 +675,49 @@ Future<void> pairThroughWindows(
     description: 'the Session the guest opens to come up on both Devices',
   );
 }
+
+/// Opens [window]'s conversation with the Device shown as [name].
+///
+/// By the card, because the card is what a user has: the whole row is the tap
+/// target for a Device that is connected, which is the discoverability the
+/// conversation is there to give.
+Future<void> openConversation(
+  WidgetTester tester,
+  TestWindow window, {
+  required String name,
+}) async {
+  await tester.tap(
+    onPage(window, DevicesPage, find.widgetWithText(ListTile, name)),
+  );
+  await settleRoute(tester);
+}
+
+/// Whether [window]'s Devices surface is offering a conversation with [name].
+///
+/// The signal is the card's own button rather than the row merely being drawn:
+/// every known peer is a row, but only a Device with a live Session has
+/// somewhere to send to, and tapping the row of one that is not connected does
+/// nothing at all. Naming the peer keeps a second connected Device on the same
+/// surface from answering for this one.
+bool conversationOffered(TestWindow window, String name) => onPage(
+  window,
+  DevicesPage,
+  find.descendant(
+    of: find.widgetWithText(ListTile, name),
+    matching: find.text(l10n.openConversation),
+  ),
+).evaluate().isNotEmpty;
+
+/// [matching], restricted to the conversation [window] has open.
+///
+/// `descendant` rather than `ancestor`: the ancestor form collapses to the
+/// `ConversationPage` widget itself, so a tap aimed through it lands in the
+/// middle of the message list rather than on the control the finder named. This
+/// form answers the same question for an assertion — is this inside the
+/// conversation — and is also the thing to tap.
+Finder onConversation(TestWindow window, Finder matching) => window.within(
+  find.descendant(of: find.byType(ConversationPage), matching: matching),
+);
 
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///

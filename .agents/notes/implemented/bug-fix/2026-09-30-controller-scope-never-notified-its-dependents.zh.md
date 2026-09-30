@@ -17,7 +17,7 @@ bool updateShouldNotify(_ControllerProvider oldWidget) =>
 
 这套安排里也没有别的东西能替它把通知带下去。交给 `_ControllerProvider` 的 `child`，是 state 在 `pumpWidget` 那一刻拿到的那一个 widget 实例 —— 它从不改变 —— 而 Flutter 的 `updateChild` 会跳过一个 widget 实例相同的子树。于是 scope 重建了，却谁也够不到。每个读了 controller 的页面，都停在它第一次 build 的样子。
 
-这个症状只有在 widget 套件终于能跑起来之后才看得见。在双窗口端到端测试里，配对是成功的：两侧都确认了数字，两个 controller 都报告 `isServing`。比对对话框能往下走，因为对话框的步进是它自己的局部状态。但 Devices 页面始终没有重绘成「已配对」的文案 —— `Pair another Device` 一直没出现，测试就卡在等一个永远不会变的屏幕上。断言是对的，是屏幕冻结了。
+这个症状只有在 widget 套件终于能跑起来之后才看得见。在双窗口端到端测试里，配对是成功的：两侧都放行了，两个 controller 都报告 `isServing`。对话框能往下走，因为对话框的步进是它自己的局部状态。但 Devices 页面始终没有重绘成「已配对」的文案 —— `Pair another Device` 一直没出现，测试就卡在等一个永远不会变的屏幕上。断言是对的，是屏幕冻结了。
 
 此前没有任何东西抓到它，原因有两个，彼此独立。纯 Dart 套件直接驱动 `LocalTransferController`，不建任何 widget 树，所以它对「树会不会重建」无话可说。而 `flutter analyze` 查的是类型，不是某个 `InheritedWidget` 到底有没有真的触发过。
 

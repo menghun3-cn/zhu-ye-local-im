@@ -60,20 +60,31 @@ void main() {
       );
       source.writeAsBytesSync(bytes);
 
-      // Send it from Alice's window, through the menu a user would use.
+      // Send it from Alice's conversation with Bob. The card is the way in —
+      // tapping a connected Device's row opens its thread — and the attach
+      // button beside the composer is where a file is picked.
       await openTab(tester, l10n.tabDevices, window: windowA);
       // The Session is up at the controller, but the peer card is a rendering
       // of it and the frame that opened the tab does not have to be the one
-      // that carries it. Waiting for the card to offer Send is what a user
-      // does — they look at the panel until the button is there.
+      // that carries it. Waiting for the card to offer the conversation is what
+      // a user does — they look at the panel until it is there.
       await pumpUntil(
         tester,
-        () => windowA.within(find.byTooltip(l10n.send)).evaluate().isNotEmpty,
-        description: 'the connected peer card to offer Send',
+        () => conversationOffered(windowA, 'Bob'),
+        description: 'the connected peer card to offer its conversation',
       );
-      await tester.tap(windowA.within(find.byTooltip(l10n.send)));
-      await settleRoute(tester);
-      await tester.tap(windowA.within(find.text(l10n.menuSendFile)));
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.byTooltip(l10n.menuSendFile),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to offer its attach button',
+      );
+      await tester.tap(
+        onConversation(windowA, find.byTooltip(l10n.menuSendFile)),
+      );
       await settleRoute(tester);
       await pumpUntil(
         tester,
@@ -82,6 +93,18 @@ void main() {
       );
       await fillField(tester, l10n.fieldPath, source.path, window: windowA);
       await tapDialogButton(tester, l10n.send, window: windowA);
+
+      // Alice's own thread carries what she sent: the file is a message in the
+      // conversation she sent it from, not a row that appeared on another
+      // surface.
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('payload.bin'),
+        ).evaluate().isNotEmpty,
+        description: 'the file to appear in Alice\u2019s conversation',
+      );
 
       // Bob is offered it, and has to answer.
       await pumpUntil(

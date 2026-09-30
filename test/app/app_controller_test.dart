@@ -72,7 +72,7 @@ Future<void> pairUp(TestDevice host, TestDevice guest) async {
   expect(
     hostAttempt.sas,
     guestAttempt.sas,
-    reason: 'both Devices must derive the same digits to compare',
+    reason: 'both Devices must derive the same digits to sign over',
   );
   await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
   await until(

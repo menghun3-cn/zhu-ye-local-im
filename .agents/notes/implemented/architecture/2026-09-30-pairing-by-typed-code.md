@@ -130,8 +130,8 @@ first connects anyway.
 ## Consequences
 
 - An app layer can pair from `PairingService` alone: `invite` and show the code,
-  `join` with a typed code, show both peers the digits, `confirm`. It never holds
-  a `Socket` or a `SecureLink`.
+  `join` with a typed code, `confirm` on the attempt each side gets back. It never
+  holds a `Socket` or a `SecureLink`.
 - A successful Pairing changes the group secret, which invalidates any
   `LinkManager` or beacon built from the old one. `changes` is how a caller
   notices — the emitted `LocalProfile` and `PairingOutcome.sessionSecret` are the

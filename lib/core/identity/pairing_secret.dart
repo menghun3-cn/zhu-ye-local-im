@@ -69,13 +69,11 @@ final class PairingSecret {
   /// The secret the no-typing Pairing path runs on.
   ///
   /// There is nothing user-chosen to derive here: both Devices run the
-  /// handshake over the same well-known constant, and what makes the Pairing
-  /// safe is everything layered on top — the handshake authenticates the two
-  /// sides to each other, and the six digits the users compare are what rules
-  /// out a third Device standing in the middle. That is a weaker guarantee
+  /// handshake over the same well-known constant. That is a weaker guarantee
   /// than a typed code gives — any Device on the link can *start* an open
-  /// Pairing — which is exactly why admission stays a human decision on both
-  /// screens.
+  /// Pairing, and a completed handshake here proves only that the peer knows
+  /// this constant — which is exactly why admission stays a human decision:
+  /// the answering user is shown who claims to be asking, and answers.
   ///
   /// What this constant deliberately does *not* produce is the group secret a
   /// fresh Pairing agrees on: the receiving Device mints a fresh one and

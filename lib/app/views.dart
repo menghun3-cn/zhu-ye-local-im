@@ -115,6 +115,7 @@ final class TransferView {
     required this.transferredBytes,
     required this.totalBytes,
     required this.names,
+    required this.text,
     required this.offer,
   });
 
@@ -141,6 +142,13 @@ final class TransferView {
 
   /// The names of the items, in the order the sender listed them.
   final List<String> names;
+
+  /// The body of a text Payload, as it was offered.
+  ///
+  /// Carried separately from [names] because a text item is named after its
+  /// kind on the wire — the body is in the Offer, not in an item name — so a
+  /// screen that wants to show what somebody said has to read it here.
+  final String? text;
 
   /// The live offer while one is waiting to be answered, else null.
   ///

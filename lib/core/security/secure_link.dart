@@ -69,9 +69,12 @@ final class SecureLink {
 
   /// Six digits both Devices can derive from the same key material.
   ///
-  /// Users compare these out of band to detect a peer that knows the Pairing
-  /// Secret but is not the Device it claims to be — the case the secret alone
-  /// cannot rule out.
+  /// No screen shows them. What they are for is binding: a Pairing signs its
+  /// admission over a context built from this value, so the signature belongs
+  /// to *this* handshake and cannot be carried into another one. They are not
+  /// a check on who dialled — both Devices derive the same digits whatever
+  /// peer connected, since the Fingerprint a caller announces is a claim — and
+  /// nothing here pretends otherwise.
   final String shortAuthenticationString;
 
   final _FrameChannel _channel;
