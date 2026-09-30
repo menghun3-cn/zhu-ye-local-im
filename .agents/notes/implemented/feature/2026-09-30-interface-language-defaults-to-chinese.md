@@ -65,6 +65,15 @@ opens in.
   localized frame — "无法连接到该设备：{detail}". What follows the colon is a
   fact about the network, often the operating system's own `SocketException`
   text; rewriting it would make it harder to act on rather than easier.
+* One core failure gets a second frame, and gets it by *kind* rather than by
+  matching its text. A `PairingException` raised because a dial never landed
+  carries `unreachable: true`, and `describeFailure` answers that with
+  `failureCannotReach` — the verbatim detail followed by what to check, because
+  a dial that never arrived is a Device that is not running, is on another
+  network, or is behind a firewall, and none of that is something this
+  application can fix or infer from the operating system's word for it. The flag
+  is what keeps that decision away from a phrase to match, which would break
+  silently the first time the operating system reworded its own message.
 
 ## Alternatives considered
 

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
@@ -34,15 +37,23 @@ void main() {
         findsOneWidget,
         reason: 'an unpaired Device is alone in its group',
       );
-      // Both ways to pair — receiving, and reaching a Device without pairing.
-      // There is no code to type anywhere: pairing is two taps.
-      for (final label in [l10n.receiveAConnection, l10n.byAddress]) {
+      // Both ways to pair: answering requests, which is a standing state rather
+      // than a step, and reaching a Device without pairing. There is no code to
+      // type anywhere.
+      for (final label in [l10n.acceptPairingRequests, l10n.byAddress]) {
         expect(
           onPage(windowA, DevicesPage, find.text(label)),
           findsOneWidget,
           reason: '$label has to be offered',
         );
       }
+      // An unpaired Device that answers requests is already listening, and says
+      // so: it is the answer to "can the other Device pair with me right now",
+      // and it no longer depends on anybody opening a window.
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.pairingListening)),
+        findsOneWidget,
+      );
 
       await shutdown(tester, [device]);
     });
@@ -53,17 +64,15 @@ void main() {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
       final bob = await startUiDevice(tester, hub.b, 'Bob');
-      await pumpWindow(tester, alice);
+      // Paired before either window exists: see [pairDevices], which answers the
+      // request through the controller and would otherwise leave the question
+      // sitting on Alice's screen.
       await pairDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
 
-      await pumpUntil(
-        tester,
-        () => onPage(
-          windowA,
-          DevicesPage,
-          find.text(l10n.pairingCardPairedTitle),
-        ).evaluate().isNotEmpty,
-        description: 'the pairing card to flip to its paired wording',
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.pairingCardPairedTitle)),
+        findsOneWidget,
       );
       final port = alice.controller.listenPort!;
       expect(
@@ -98,9 +107,12 @@ void main() {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
       final bob = await startUiDevice(tester, hub.b, 'Bob');
-      await pumpWindow(tester, alice);
+      // Set up before the window exists, so the request the Pairing starts is
+      // answered by this test rather than left on Alice's screen; see
+      // [pairDevices].
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
 
       await pumpUntil(
         tester,
@@ -120,6 +132,121 @@ void main() {
         onPage(windowA, DevicesPage, find.byTooltip(l10n.send)),
         findsOneWidget,
       );
+
+      await shutdown(tester, [alice, bob]);
+    });
+  });
+
+  group('answering Pairing requests', () {
+    testWidgets('the switch takes the listener down and brings it back', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+
+      // On from the moment the Device comes up: answering is a standing state,
+      // not a step, so there is nothing to open.
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          DevicesPage,
+          find.text(l10n.pairingListening),
+        ).evaluate().isNotEmpty,
+        description: 'the card to report the listener',
+      );
+      final firstPort = device.controller.pairingPort;
+      expect(firstPort, isNotNull);
+
+      final switchTile = onPage(
+        windowA,
+        DevicesPage,
+        find.byType(SwitchListTile),
+      );
+      await tester.tap(switchTile);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          DevicesPage,
+          find.text(l10n.pairingNotListening),
+        ).evaluate().isNotEmpty,
+        description: 'the card to report the listener going away',
+      );
+      // The port is what the other Device dials, so "off" has to mean gone
+      // rather than merely unadvertised.
+      expect(device.controller.acceptsPairingRequests, isFalse);
+      expect(device.controller.pairingPort, isNull);
+
+      await tester.tap(switchTile);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          DevicesPage,
+          find.text(l10n.pairingListening),
+        ).evaluate().isNotEmpty,
+        description: 'the card to report the listener coming back',
+      );
+      expect(device.controller.acceptsPairingRequests, isTrue);
+      expect(device.controller.pairingPort, isNotNull);
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the digits are not shown until the request is allowed', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pumpWindow(tester, alice);
+
+      // The dial is setup, so it goes through the controller — what is under
+      // test is Alice's screen. It dials the port Alice actually bound rather
+      // than the well-known one: a window's Pair button can only reach the
+      // default port, and binding that here would collide with the other test
+      // file that does, which `flutter test` runs alongside this one.
+      late final Future<Object?> bobSaw;
+      await tester.runAsync(() async {
+        await untilTrue(
+          () => alice.controller.isAcceptingPairings,
+          'Alice to answer Pairing requests',
+        );
+        bobSaw = bob.controller
+            .pairWith(
+              host: InternetAddress.loopbackIPv4.address,
+              port: alice.controller.pairingPort,
+            )
+            // Settled into a value here so the failure this test is waiting for
+            // is never an unhandled error in the meantime.
+            .then<Object?>((_) => null, onError: (Object error) => error);
+      });
+
+      // Alice is asked, and the question is the only thing she is shown: the
+      // comparison is behind it, which is what keeps an unattended Device from
+      // handing its group secret to whoever dialled it.
+      await pumpUntil(
+        tester,
+        () => hasButton(tester, l10n.continuePairing, window: windowA),
+        description: 'Alice to be asked about the request',
+      );
+      expect(
+        hasButton(tester, l10n.theyMatch, window: windowA),
+        isFalse,
+        reason: 'the digits are behind the question',
+      );
+
+      await tapDialogButton(tester, l10n.refuse, window: windowA);
+
+      await tester.runAsync(() async {
+        expect(await bobSaw, isA<PairingException>());
+      });
+      expect(alice.controller.isPaired, isFalse);
+      expect(bob.controller.isPaired, isFalse);
+      // And Alice is still answering: refusing one request is not the same as
+      // turning the listener off.
+      expect(alice.controller.isAcceptingPairings, isTrue);
 
       await shutdown(tester, [alice, bob]);
     });
@@ -145,9 +272,10 @@ void main() {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
       final bob = await startUiDevice(tester, hub.b, 'Bob');
-      await pumpWindow(tester, alice);
+      // Set up before the window exists; see [pairDevices].
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
 
       // Sending writes to a real socket, so it waits on the real event loop.
       await tester.runAsync(

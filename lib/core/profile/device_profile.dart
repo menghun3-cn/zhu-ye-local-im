@@ -109,8 +109,16 @@ final class KnownDevice {
 ///
 /// * `alias` and `platform` — what this Device announces about itself;
 /// * `group` — the Owner Group, which decides who may receive Mirrors;
-/// * `favorites` — peers Transfers to skip per-transfer confirmation for,
-///   deliberately a weaker grant than group membership;
+/// * `favorites` — peers the user has marked as trusted. A marker the UI shows
+///   and nothing more: per-Transfer confirmation is asked of every offer, from
+///   every peer, favorited or not (`LocalTransferController` never answers one
+///   on the user's behalf). Deliberately weaker than group membership, and
+///   deliberately not a way to skip a prompt — see
+///   `2026-09-30-pairing-requests-instead-of-a-window.md`;
+/// * `acceptsPairingRequests` — whether this Device answers Pairing requests at
+///   all. On by default, because a Device that cannot be paired *with* is a
+///   Device the user of the other one cannot add; off is what a user who does
+///   not want to be asked wants;
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -125,6 +133,7 @@ final class DeviceProfile {
     OwnerGroup? group,
     Set<Fingerprint> favorites = const {},
     Map<String, KnownDevice> known = const {},
+    this.acceptsPairingRequests = true,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
@@ -148,6 +157,13 @@ final class DeviceProfile {
 
   /// The Owner Group this Device belongs to. Always contains [self].
   OwnerGroup group;
+
+  /// Whether this Device answers Pairing requests at all.
+  ///
+  /// The one part of a Pairing a user can turn off. Turning it off stops this
+  /// Device listening on the Pairing port, so it can still pair with somebody
+  /// else — it just cannot be picked out of a list.
+  bool acceptsPairingRequests;
 
   final Set<Fingerprint> _favorites;
   final Map<String, KnownDevice> _known;
@@ -198,6 +214,7 @@ final class DeviceProfile {
     'alias': alias,
     'platform': platform.wireName,
     'group': group.toJson(),
+    'acceptPairingRequests': acceptsPairingRequests,
     'favorites': [for (final favorite in favorites) favorite.hex],
     'known': [for (final device in knownDevices) device.toJson()],
   };
@@ -206,6 +223,7 @@ final class DeviceProfile {
     final rawGroup = json['group'];
     final rawFavorites = json['favorites'];
     final rawKnown = json['known'];
+    final rawAccepts = json['acceptPairingRequests'];
     final platform = DevicePlatform.fromWireName(_string(json, 'platform'));
     final self = Fingerprint(_string(json, 'self'));
     final group = rawGroup == null
@@ -234,6 +252,10 @@ final class DeviceProfile {
       group: group,
       favorites: favorites,
       known: known,
+      // A profile written before this key existed answers requests: the
+      // listener is the flow, and a Device that silently stopped being
+      // diallable after an upgrade would be a Device nobody can add.
+      acceptsPairingRequests: rawAccepts is bool ? rawAccepts : true,
     );
   }
 
@@ -241,7 +263,8 @@ final class DeviceProfile {
   String toString() =>
       'DeviceProfile(${self.short()}, "$alias", '
       '${group.length} group, ${_favorites.length} favorites, '
-      '${_known.length} known)';
+      '${_known.length} known, '
+      '${acceptsPairingRequests ? 'answering requests' : 'not answering'})';
 
   /// Delegated to [DeviceDescriptor.sanitiseAlias], so a name is sanitised
   /// identically wherever it enters the system: a name typed into this

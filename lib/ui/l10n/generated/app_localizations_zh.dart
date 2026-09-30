@@ -41,6 +41,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String failureCannotReach(String detail) {
+    return '连不上对方设备：$detail。请确认对方程序正在运行、两台机器在同一网络，并在对方的防火墙里允许本程序接受连接（默认入站 TCP 47656）。';
+  }
+
+  @override
   String refusalSessionAlreadyOpen(String peer) {
     return '与 $peer 的连接已经打开了。';
   }
@@ -244,10 +249,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pairingCardUnpairedBody =>
-      '配对只需要点两下，不用抄写任何配对码：先在本机点「接收连接」，再到另一台设备的列表里点本机旁边的「配对」。两边会显示同样的 6 位数字，核对一致即可。';
+      '配对只做一次：在另一台设备上点本机旁边的「配对」，本机就会弹出请求；确认后两边核对同样的 6 位数字。完成之后，互相发文件、发消息都不再需要任何操作。';
 
   @override
-  String get receiveAConnection => '接收连接';
+  String get acceptPairingRequests => '应答配对请求';
+
+  @override
+  String get pairingListening => '正在应答其他设备的配对请求';
+
+  @override
+  String get pairingNotListening => '不再应答配对请求';
+
+  @override
+  String get factPairingRequests => '配对请求';
 
   @override
   String get peerNameNotAnnounced => '对方还没广播名称';
@@ -433,8 +447,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get theyMatch => '两边一致';
 
   @override
-  String get receiveWaiting =>
-      '正在等待设备连接。请在另一台设备的列表里点本机旁边的「配对」，两边会显示同样的 6 位数字供核对。';
+  String get pairingRequestTitle => '配对请求';
+
+  @override
+  String pairingRequestFrom(String alias) {
+    return '$alias 想与这台设备配对。';
+  }
+
+  @override
+  String get pairingRequestUnnamed => '一台还没报上名字的设备';
+
+  @override
+  String get pairingRequestClaimHint =>
+      '上面的名字是对方自称的，没有任何核实。真正的核实靠下一步两边显示的 6 位数字。';
+
+  @override
+  String get pairingPreparing => '正在准备比对数字…';
+
+  @override
+  String get continuePairing => '继续';
 
   @override
   String get cancelThisPairing => '取消这次配对';

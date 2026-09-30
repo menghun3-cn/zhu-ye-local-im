@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -12,14 +13,24 @@ import '../support/harness.dart';
 final class TestDevice {
   TestDevice._(this.service, this.store);
 
-  static Future<TestDevice> start(String alias) async {
+  static Future<TestDevice> start(
+    String alias, {
+    Duration requestTimeout = const Duration(minutes: 2),
+  }) async {
     final store = MemoryProfileStore();
     final local = await loadOrGenerateLocalProfile(
       store,
       platform: DevicePlatform.windows,
       alias: alias,
     );
-    return TestDevice._(PairingService(local: local, store: store), store);
+    return TestDevice._(
+      PairingService(
+        local: local,
+        store: store,
+        requestTimeout: requestTimeout,
+      ),
+      store,
+    );
   }
 
   final PairingService service;
@@ -64,6 +75,38 @@ Future<(PairingOutcome, PairingOutcome)> pairUp(
   ]);
   expect(hostAttempt.isOpen, isFalse);
   expect(joinerAttempt.isOpen, isFalse);
+  return (outcomes[0], outcomes[1]);
+}
+
+/// Runs a Pairing the way two people do it now: one Device answers requests,
+/// the other picks it out of a list.
+///
+/// Neither half is awaited before the other has started, because the joiner's
+/// call does not resolve until the answering user allows it — and waiting for
+/// that to happen before asking is waiting for the step under test.
+Future<(PairingOutcome, PairingOutcome)> pairByRequest(
+  TestDevice answering,
+  TestDevice joiner, {
+  int port = 0,
+}) async {
+  await answering.service.receive(port: port);
+  final request = answering.service.requests.first;
+  final joinFuture = joiner.service.joinOpen(
+    host: '127.0.0.1',
+    port: answering.service.receivingPort!,
+  );
+  final asking = await request;
+  final answeringAttempt = await asking.admit();
+  final joinerAttempt = await joinFuture;
+  expect(
+    answeringAttempt.sas,
+    joinerAttempt.sas,
+    reason: 'both Devices derive the digits from the same session',
+  );
+  final outcomes = await Future.wait([
+    answeringAttempt.confirm(),
+    joinerAttempt.confirm(),
+  ]);
   return (outcomes[0], outcomes[1]);
 }
 
@@ -125,6 +168,25 @@ final class HostilePeer {
 /// The failure a future completed with, or null if it succeeded.
 Future<Object?> failureOf(Future<Object?> future) =>
     future.then<Object?>((value) => null, onError: (Object error) => error);
+
+/// Whether [future] has settled by now, after giving the event loop a turn.
+///
+/// The turn is what makes this usable as a negative: by the time a Pairing
+/// request has been emitted, everything up to the comparison has already
+/// happened, so a call that *should* be blocked resolves within microseconds if
+/// it is going to resolve at all. A device that has been holding out for 100ms
+/// is holding out.
+Future<bool> hasSettled(Future<Object?> future) async {
+  var settled = false;
+  unawaited(
+    future.then<Object?>(
+      (value) => settled = true,
+      onError: (Object error) => settled = true,
+    ),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 100));
+  return settled;
+}
 
 /// A Fingerprint derived the way a real Device's is, for a Device that is not
 /// here.
@@ -223,36 +285,35 @@ void main() {
   });
 
   group('Pairing without a code', () {
-    test(
-      'an open Pairing needs no code and gives both Devices one fresh secret',
-      () async {
-        final host = await TestDevice.start('alice-laptop');
-        final joiner = await TestDevice.start('bob-phone');
-        addTearDown(host.close);
-        addTearDown(joiner.close);
+    test('a Device that answers requests pairs with one that taps it, with no code', () async {
+      final host = await TestDevice.start('alice-laptop');
+      final joiner = await TestDevice.start('bob-phone');
+      addTearDown(host.close);
+      addTearDown(joiner.close);
 
-        final invitation = await host.service.inviteOpen(port: 0);
-        expect(invitation.showsCode, isFalse);
-        expect(() => invitation.code, throwsStateError);
+      await host.service.receive(port: 0);
+      final request = host.service.requests.first;
+      final joinFuture = joiner.service.joinOpen(
+        host: '127.0.0.1',
+        port: host.service.receivingPort!,
+      );
 
-        final joinerAttempt = await joiner.service.joinOpen(
-          host: '127.0.0.1',
-          port: invitation.port,
-        );
-        final hostAttempt = await invitation.attempt;
-        // The digits are derived, never sent — both sides still hold the same
-        // ones, and the human comparison step still stands.
-        expect(hostAttempt.sas, joinerAttempt.sas);
-        expect(hostAttempt.sas, hasLength(6));
-        await Future.wait([hostAttempt.confirm(), joinerAttempt.confirm()]);
+      final asking = await request;
+      // The name on the prompt is the caller's own claim — the digits are the
+      // part that gets checked, and they are derived rather than sent.
+      expect(asking.caller.alias, joiner.alias);
+      final hostAttempt = await asking.admit();
+      final joinerAttempt = await joinFuture;
+      expect(hostAttempt.sas, joinerAttempt.sas);
+      expect(hostAttempt.sas, hasLength(6));
+      await Future.wait([hostAttempt.confirm(), joinerAttempt.confirm()]);
 
-        expect(host.secret, isNotNull);
-        expect(joiner.secret, isNotNull);
-        expect(host.secret, joiner.secret);
-        expect(host.group.contains(joiner.fingerprint), isTrue);
-        expect(joiner.group.contains(host.fingerprint), isTrue);
-      },
-    );
+      expect(host.secret, isNotNull);
+      expect(joiner.secret, isNotNull);
+      expect(host.secret, joiner.secret);
+      expect(host.group.contains(joiner.fingerprint), isTrue);
+      expect(joiner.group.contains(host.fingerprint), isTrue);
+    });
 
     test('two open Pairings do not share the secret they agree on', () async {
       // The well-known constant the handshake runs on must not leak into the
@@ -267,21 +328,8 @@ void main() {
       addTearDown(third.close);
       addTearDown(fourth.close);
 
-      final invitation = await first.service.inviteOpen(port: 0);
-      final joinerAttempt = await second.service.joinOpen(
-        host: '127.0.0.1',
-        port: invitation.port,
-      );
-      final hostAttempt = await invitation.attempt;
-      await Future.wait([hostAttempt.confirm(), joinerAttempt.confirm()]);
-
-      final otherInvitation = await third.service.inviteOpen(port: 0);
-      final otherJoiner = await fourth.service.joinOpen(
-        host: '127.0.0.1',
-        port: otherInvitation.port,
-      );
-      final otherHost = await otherInvitation.attempt;
-      await Future.wait([otherHost.confirm(), otherJoiner.confirm()]);
+      await pairByRequest(first, second);
+      await pairByRequest(third, fourth);
 
       expect(first.secret, isNotNull);
       expect(third.secret, isNotNull);
@@ -303,12 +351,17 @@ void main() {
         final newcomer = await TestDevice.start('carol-phone');
         addTearDown(newcomer.close);
 
-        final invitation = await newcomer.service.inviteOpen(port: 0);
-        final hostAttempt = await host.service.joinOpen(
+        // The *newcomer* answers and the host dials it, so the established
+        // Device is the one making the request here.
+        await newcomer.service.receive(port: 0);
+        final request = newcomer.service.requests.first;
+        final hostJoin = host.service.joinOpen(
           host: '127.0.0.1',
-          port: invitation.port,
+          port: newcomer.service.receivingPort!,
         );
-        final newcomerAttempt = await invitation.attempt;
+        final asking = await request;
+        final newcomerAttempt = await asking.admit();
+        final hostAttempt = await hostJoin;
         await Future.wait([hostAttempt.confirm(), newcomerAttempt.confirm()]);
 
         // The fresh Device took the established group's secret, not the other
@@ -317,6 +370,213 @@ void main() {
         expect(host.secret, established);
         expect(newcomer.members, containsAll(host.members));
         expect(host.group.contains(newcomer.fingerprint), isTrue);
+      },
+    );
+  });
+
+  group('What a Pairing request must never do', () {
+    test('a caller is given nothing until its request is allowed', () async {
+      // The handshake an open Pairing runs on stands on a secret that is a
+      // published constant, so *any* Device on the link can complete it. What
+      // such a caller must not be able to reach is the group secret, and the
+      // only thing standing between the two is that a person has to allow the
+      // request. This asserts the ordering that makes that true.
+      final host = await TestDevice.start('alice-laptop');
+      final joiner = await TestDevice.start('bob-phone');
+      addTearDown(host.close);
+      addTearDown(joiner.close);
+
+      await host.service.receive(port: 0);
+      final request = host.service.requests.first;
+      final joinFuture = joiner.service.joinOpen(
+        host: '127.0.0.1',
+        port: host.service.receivingPort!,
+      );
+
+      final asking = await request;
+      expect(asking.caller.alias, joiner.alias);
+
+      // The caller is on hold, and holds nothing: if the comparison had run
+      // before anybody was asked, this future would already have resolved.
+      expect(
+        await hasSettled(joinFuture),
+        isFalse,
+        reason: 'the caller waits for its answer instead of being let in',
+      );
+      expect(host.secret, isNull, reason: 'nothing was committed');
+      expect(joiner.secret, isNull, reason: 'nothing was offered');
+
+      // Refusing settles it with a failure, not with an attempt to confirm —
+      // and the failure is an *answer*: the caller has to be able to read that
+      // the other Device declined, rather than infer it from a dropped link.
+      final refused = failureOf(joinFuture);
+      await asking.refuse();
+
+      final error = await refused;
+      expect(error, isA<PairingException>());
+      expect(
+        (error! as PairingException).message,
+        contains('did not allow'),
+        reason: 'a refusal is reported as a refusal',
+      );
+      expect(host.secret, isNull);
+      expect(joiner.secret, isNull);
+      expect(host.group.isAlone, isTrue);
+      expect(joiner.group.isAlone, isTrue);
+    });
+
+    test(
+      'a second caller while the first is on screen is turned away',
+      () async {
+        final host = await TestDevice.start('alice-laptop');
+        final first = await TestDevice.start('bob-phone');
+        final second = await TestDevice.start('carol-tablet');
+        addTearDown(host.close);
+        addTearDown(first.close);
+        addTearDown(second.close);
+
+        await host.service.receive(port: 0);
+        final port = host.service.receivingPort!;
+        final request = host.service.requests.first;
+        final firstJoin = first.service.joinOpen(host: '127.0.0.1', port: port);
+        final asking = await request;
+
+        // Two Pairings in flight would both commit to the same profile, and the
+        // rosters they wrote would each be missing the other's Device, so the
+        // second caller is refused rather than queued behind the first.
+        final secondJoin = second.service.joinOpen(
+          host: '127.0.0.1',
+          port: port,
+        );
+        expect(await failureOf(secondJoin), isA<PairingException>());
+        expect(second.secret, isNull);
+        expect(
+          await hasSettled(firstJoin),
+          isFalse,
+          reason: 'the first caller is unaffected by the gatecrasher',
+        );
+
+        // And the one already on screen can still be let through.
+        final hostAttempt = await asking.admit();
+        final firstAttempt = await firstJoin;
+        final outcomes = await Future.wait([
+          hostAttempt.confirm(),
+          firstAttempt.confirm(),
+        ]);
+        expect(outcomes[0].peer.fingerprint, first.fingerprint);
+        expect(host.group.contains(second.fingerprint), isFalse);
+      },
+    );
+
+    test('a request nobody answers is refused once it expires', () async {
+      // The caller is *waiting*, so an unanswered request cannot stand open:
+      // the other user would otherwise watch a spinner until the process died.
+      final host = await TestDevice.start(
+        'alice-laptop',
+        requestTimeout: const Duration(milliseconds: 120),
+      );
+      final joiner = await TestDevice.start('bob-phone');
+      addTearDown(host.close);
+      addTearDown(joiner.close);
+
+      await host.service.receive(port: 0);
+      final request = host.service.requests.first;
+      final joinFuture = joiner.service.joinOpen(
+        host: '127.0.0.1',
+        port: host.service.receivingPort!,
+      );
+
+      final asking = await request;
+
+      // Nobody taps through, and the caller is let go rather than left holding
+      // a link that no screen is going to look at.
+      expect(await failureOf(joinFuture), isA<PairingException>());
+      expect(joiner.secret, isNull);
+
+      // The request is settled by the expiry, so allowing it afterwards is a
+      // mistake rather than a late admission.
+      await expectLater(asking.admit(), throwsStateError);
+    });
+
+    test('the listener and the code path are mutually exclusive', () async {
+      final host = await TestDevice.start('alice-laptop');
+      addTearDown(host.close);
+
+      await host.service.receive(port: 0);
+      await expectLater(host.service.invite(port: 0), throwsStateError);
+
+      await host.service.stopReceiving();
+      expect(host.service.isReceiving, isFalse);
+      expect(host.service.receivingPort, isNull);
+
+      final invitation = await host.service.invite(port: 0);
+      addTearDown(invitation.cancel);
+      await expectLater(host.service.receive(port: 0), throwsStateError);
+    });
+
+    test('turning the listener off takes the port away', () async {
+      final host = await TestDevice.start('alice-laptop');
+      final joiner = await TestDevice.start('bob-phone');
+      addTearDown(host.close);
+      addTearDown(joiner.close);
+
+      await host.service.receive(port: 0);
+      final port = host.service.receivingPort!;
+      expect(host.service.isReceiving, isTrue);
+
+      await host.service.stopReceiving();
+
+      // The port is gone, so a Device that was told about it cannot dial in —
+      // which is what turning the switch off is supposed to mean.
+      await expectLater(
+        joiner.service.joinOpen(host: '127.0.0.1', port: port),
+        throwsA(isA<PairingException>()),
+      );
+      expect(joiner.secret, isNull);
+    });
+
+    test(
+      'answering a request leaves the listener up for the next Device',
+      () async {
+        // The point of a listener rather than a window: adding a third Device
+        // asks nothing new of the Device being added to, and needs nobody to
+        // reopen anything.
+        final host = await TestDevice.start('alice-laptop');
+        final second = await TestDevice.start('bob-phone');
+        final third = await TestDevice.start('carol-tablet');
+        addTearDown(host.close);
+        addTearDown(second.close);
+        addTearDown(third.close);
+
+        await host.service.receive(port: 0);
+        final port = host.service.receivingPort!;
+
+        final firstRequest = host.service.requests.first;
+        final secondJoin = second.service.joinOpen(
+          host: '127.0.0.1',
+          port: port,
+        );
+        final firstAsking = await firstRequest;
+        final hostFirst = await firstAsking.admit();
+        final secondAttempt = await secondJoin;
+        await Future.wait([hostFirst.confirm(), secondAttempt.confirm()]);
+
+        expect(host.service.isReceiving, isTrue, reason: 'still answering');
+        expect(host.service.receivingPort, port);
+
+        // No reopening: the next Device is answered on the same listener.
+        final nextRequest = host.service.requests.first;
+        final thirdJoin = third.service.joinOpen(host: '127.0.0.1', port: port);
+        final nextAsking = await nextRequest;
+        final hostSecond = await nextAsking.admit();
+        final thirdAttempt = await thirdJoin;
+        await Future.wait([hostSecond.confirm(), thirdAttempt.confirm()]);
+
+        // All three share one group and one secret, and the roster came along.
+        expect(third.secret, host.secret);
+        expect(second.secret, host.secret);
+        expect(host.group.contains(third.fingerprint), isTrue);
+        expect(third.group.contains(second.fingerprint), isTrue);
       },
     );
   });
@@ -471,15 +731,39 @@ void main() {
       final deadPort = probe.port;
       await probe.close();
 
-      await expectLater(
+      final error = await failureOf(
         bob.service.join(
           host: '127.0.0.1',
           code: PairingSecret.generateCode(),
           port: deadPort,
         ),
-        throwsA(isA<PairingException>()),
       );
+      expect(error, isA<PairingException>());
+      // Flagged as a dial that never landed rather than left as an opaque
+      // protocol failure: this is the one Pairing failure a user can fix, and
+      // the fix is outside this application — the other Device is not running,
+      // or its firewall drops incoming connections.
+      expect((error! as PairingException).unreachable, isTrue);
       expect(bob.secret, isNull);
+    });
+
+    test('a caller that cannot reach its host is told so', () async {
+      final joiner = await TestDevice.start('bob-phone');
+      addTearDown(joiner.close);
+
+      final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = probe.port;
+      await probe.close();
+
+      final error = await failureOf(
+        joiner.service.joinOpen(host: '127.0.0.1', port: deadPort),
+      );
+      expect(error, isA<PairingException>());
+      expect(
+        (error! as PairingException).unreachable,
+        isTrue,
+        reason: 'the request path flags an unreachable host the same way',
+      );
     });
   });
 
