@@ -132,7 +132,35 @@ final class TestWindow {
   /// [matching], restricted to this window.
   Finder within(Finder matching) =>
       find.descendant(of: finder, matching: matching);
+
+  /// The button showing [label], anywhere in this window.
+  Finder button(String label) => _buttonShowing(finder, label);
+
+  /// The button showing [label] inside this window's open dialog.
+  ///
+  /// Scoped to the dialog on purpose. The Devices page shows a `Connect`
+  /// button on every peer row that has not been dialled yet, and the Manual
+  /// Address dialog's own confirm button carries the same label — so a finder
+  /// that searched the whole window would match two and tap neither.
+  Finder dialogButton(String label) =>
+      _buttonShowing(within(find.byType(AlertDialog)), label);
 }
+
+/// The button showing [label], as a finder rooted at [scope].
+///
+/// `find.widgetWithText(ButtonStyleButton, label)` finds nothing, and the
+/// reason is worth writing down: `find.byType` matches an exact `runtimeType`,
+/// and no widget in this app *is* a `ButtonStyleButton` — the tree holds
+/// `FilledButton`s, `TextButton`s and `OutlinedButton`s, which are subclasses
+/// of it, plus whatever the `.icon` factories build. `bySubtype` is the matcher
+/// that means what was intended.
+Finder _buttonShowing(Finder scope, String label) => find.descendant(
+  of: scope,
+  matching: find.ancestor(
+    of: find.text(label),
+    matching: find.bySubtype<ButtonStyleButton>(),
+  ),
+);
 
 /// The first window.
 TestWindow get windowA => TestWindow(find.byKey(windowAKey));
@@ -324,9 +352,7 @@ Future<void> tapButton(
   String label, {
   required TestWindow window,
 }) async {
-  await tester.tap(
-    window.within(find.widgetWithText(ButtonStyleButton, label)),
-  );
+  await tester.tap(window.button(label));
   await settleRoute(tester);
 }
 
@@ -371,9 +397,7 @@ Future<void> tapDialogButton(
   String label, {
   required TestWindow window,
 }) async {
-  await tester.tap(
-    window.within(find.widgetWithText(ButtonStyleButton, label)),
-  );
+  await tester.tap(window.dialogButton(label));
   await settleRoute(tester);
 }
 
@@ -524,10 +548,7 @@ bool hasButton(
   WidgetTester tester,
   String label, {
   required TestWindow window,
-}) => window
-    .within(find.widgetWithText(ButtonStyleButton, label))
-    .evaluate()
-    .isNotEmpty;
+}) => window.button(label).evaluate().isNotEmpty;
 
 /// Opens a Session from [from] to [to] through the Manual Address dialog.
 Future<void> connectThroughWindows(
