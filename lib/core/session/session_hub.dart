@@ -87,8 +87,12 @@ final class SessionHub {
       case HelloMessage():
       case HelloAckMessage():
       case SessionConfirmMessage():
+      case PairAdmitMessage():
+      case PairConfirmedMessage():
         // The handshake is history by the time a hub exists: both sides sent
-        // theirs before the link was returned.
+        // theirs before the link was returned. The Pairing messages travel on
+        // a Pairing's own temporary link rather than through a Session, so
+        // they never appear here either.
         break;
       default:
         _transferMessages.add(message);

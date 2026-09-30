@@ -286,6 +286,8 @@ final class TransferEngine {
       case HelloMessage():
       case HelloAckMessage():
       case SessionConfirmMessage():
+      case PairAdmitMessage():
+      case PairConfirmedMessage():
       case ClipboardMessage():
       case ErrorMessage():
         // Not the transfer layer's business: the handshake is history by the
