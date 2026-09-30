@@ -21,6 +21,7 @@ export 'identity/fingerprint.dart';
 export 'identity/owner_group.dart';
 export 'identity/owner_identity.dart';
 export 'identity/pairing_secret.dart';
+export 'pairing/pairing_service.dart';
 export 'profile/device_profile.dart';
 export 'profile/profile_store.dart';
 export 'protocol/frame.dart';
