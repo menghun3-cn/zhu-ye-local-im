@@ -1,0 +1,251 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Local Transfer",
+  "startupFailureTitle": "Local Transfer could not start",
+
+  "tabDevices": "Devices",
+  "tabTransfers": "Transfers",
+  "tabClipboard": "Clipboard",
+  "tabSettings": "Settings",
+  "notPairedYet": "Not paired with any Device yet",
+
+  "failureUnreachable": "Could not reach the Device: {detail}",
+  "@failureUnreachable": {
+    "placeholders": { "detail": { "type": "String" } }
+  },
+  "failurePairing": "Pairing failed: {detail}",
+  "@failurePairing": {
+    "placeholders": { "detail": { "type": "String" } }
+  },
+
+  "refusalSessionAlreadyOpen": "A Session with {peer} is already open.",
+  "@refusalSessionAlreadyOpen": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "refusalPeerAddressUnknown": "Nothing is known about where {peer} is. Wait until this Device has discovered it, then try again.",
+  "@refusalPeerAddressUnknown": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "refusalNoAddressGiven": "No address was given.",
+  "refusalPortNotAPort": "{value} is not a port.",
+  "@refusalPortNotAPort": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "refusalOfferAlreadyAnswered": "This offer has already been answered.",
+  "refusalNoPeerConnected": "No Device is connected.",
+  "refusalNoSessionOpen": "No Session is open with {peer}.",
+  "@refusalNoSessionOpen": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "refusalSeveralPeersConnected": "More than one Device is connected; name the one to send to.",
+  "refusalNotPaired": "This Device is not paired, so it accepts no Sessions.",
+  "refusalNoFreeFileName": "No free name is left for \"{name}\" in that folder.",
+  "@refusalNoFreeFileName": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "kindText": "Text",
+  "kindFiles": "Files",
+  "kindClipboard": "Clipboard",
+
+  "stateAwaitingDecision": "Waiting for an answer",
+  "stateTransferring": "Transferring",
+  "stateVerifying": "Checking",
+  "stateCompleted": "Done",
+  "stateRejected": "Refused",
+  "stateCancelled": "Cancelled",
+  "stateFailed": "Failed",
+
+  "clipboardModeOff": "Off",
+  "clipboardModeStage": "Ask me",
+  "clipboardModeMirror": "Mirror",
+  "clipboardModeOffMeans": "Nothing is captured, and nothing arrives.",
+  "clipboardModeStageMeans": "A copy here travels to the group. Incoming copies wait for you.",
+  "clipboardModeMirrorMeans": "A copy here travels to the group, and incoming copies replace this clipboard on their own.",
+
+  "yes": "yes",
+  "no": "no",
+
+  "neverSeen": "Never seen",
+  "peerNotAccepting": "{address}, not accepting Sessions",
+  "@peerNotAccepting": {
+    "placeholders": { "address": { "type": "String" } }
+  },
+
+  "timeNever": "never",
+  "timeJustNow": "just now",
+  "timeAMinuteAgo": "a minute ago",
+  "timeMinutesAgo": "{count} minutes ago",
+  "@timeMinutesAgo": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "timeAnHourAgo": "an hour ago",
+  "timeHoursAgo": "{count} hours ago",
+  "@timeHoursAgo": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "timeYesterday": "yesterday",
+  "timeDaysAgo": "{count} days ago",
+  "@timeDaysAgo": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "byAddress": "By address",
+  "devicesEmptyHint": "Nothing has been discovered yet. Devices running this app on the same network appear here; one Discovery cannot reach can still be dialled by address.",
+  "rename": "Rename",
+  "factPlatform": "Platform",
+  "factOwnerGroup": "Owner Group",
+  "factSessions": "Sessions",
+  "factListening": "Listening",
+  "clipboardCanOriginate": "can originate: {value}",
+  "@clipboardCanOriginate": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "clipboardCanApply": "can apply: {value}",
+  "@clipboardCanApply": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "groupDevices": "{count, plural, =1{1 Device} other{{count} Devices}}",
+  "@groupDevices": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "sessionsOpen": "{count, plural, =1{1 open} other{{count} open}}",
+  "@sessionsOpen": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "notAcceptingSessions": "not accepting Sessions",
+  "onPort": "on port {port}",
+  "@onPort": {
+    "placeholders": { "port": { "type": "int" } }
+  },
+
+  "pairingCardPairedTitle": "Pair another Device",
+  "pairingCardUnpairedTitle": "Pair this Device to send anything",
+  "pairingCardPairedBody": "Devices in one Owner Group can open Sessions with each other. Pairing adds one, and is also what lets a clipboard be shared.",
+  "pairingCardUnpairedBody": "Pairing takes two taps and no code to retype: tap Receive a connection here, and on the other Device tap Pair beside this one in its list. Both screens then show the same six digits to confirm.",
+  "receiveAConnection": "Receive a connection",
+
+  "peerNameNotAnnounced": "name not announced yet",
+  "sessionOpen": "Session open",
+  "lastSeen": "last seen {when}",
+  "@lastSeen": {
+    "placeholders": { "when": { "type": "String" } }
+  },
+  "notInOwnerGroup": "not in this Owner Group",
+  "trusted": "trusted",
+
+  "menuSendText": "Send text",
+  "menuSendFile": "Send a file",
+  "trustDevice": "Trust this Device",
+  "stopTrustingDevice": "Stop trusting this Device",
+  "openSession": "Open a Session",
+  "pairWithThisDevice": "Pair with this Device",
+  "nothingToDialYet": "Nothing to dial yet: this Device has not been seen",
+  "nothingKnownAboutPeer": "Nothing known about where this Device is",
+  "pair": "Pair",
+  "connect": "Connect",
+
+  "transfersEmptyHint": "Nothing has been sent or received yet.",
+  "transferTo": "To {peer}",
+  "@transferTo": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "transferFrom": "From {peer}",
+  "@transferFrom": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "andMore": "{count, plural, =1{and 1 more} other{and {count} more}}",
+  "@andMore": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "bytesOf": "{transferred} of {total}",
+  "@bytesOf": {
+    "placeholders": {
+      "transferred": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "accept": "Accept",
+  "refuse": "Refuse",
+  "whereShouldFilesLand": "Where should these files land?",
+  "whereShouldThisArrive": "Where should this arrive?",
+
+  "clipboardSyncHeader": "Clipboard sync",
+  "clipboardWaitingHeader": "Waiting for you",
+  "clipboardAppliedHeader": "Put on this clipboard",
+  "clipboardNothingStaged": "Nothing is waiting to be applied.",
+  "clipboardNothingApplied": "Nothing has reached this clipboard yet.",
+  "clipboardNeedsGroup": "Clipboard sync happens inside an Owner Group, and this Device is not in one yet. Pairing is on the Devices surface.",
+  "clipboardNoteBoth": "Copies made here travel to the group, and copies from the group replace this clipboard.",
+  "clipboardNoteApplyOnly": "This platform only lets an app read its clipboard while its window is on screen, so copies made here travel only while this window is focused. Copies from the group are applied at any time.",
+  "clipboardNoteOriginateOnly": "Copies made here travel to the group. This platform cannot apply a copy that arrives.",
+  "clipboardNoteNone": "This platform lets this app do nothing with its clipboard, in either direction.",
+  "entryFrom": "from {origin} · {when}",
+  "@entryFrom": {
+    "placeholders": {
+      "origin": { "type": "String" },
+      "when": { "type": "String" }
+    }
+  },
+  "apply": "Apply",
+
+  "settingsThisDevice": "This Device",
+  "settingsWhereThingsGo": "Where things go",
+  "settingsNotices": "Notices",
+  "factAlias": "Alias",
+  "factFingerprint": "Fingerprint",
+  "renameThisDevice": "Rename this Device",
+  "factIdentity": "Identity",
+  "notStoredOnThisDevice": "not stored on this Device",
+  "noIdentityHint": "This Device has nowhere to keep its identity, so it runs in memory: it works, and it has to be paired again after every restart.",
+  "factReceivedFiles": "Received files",
+  "noDefaultFolder": "no default folder",
+  "nothingWentWrong": "Nothing has gone wrong.",
+  "settingsAbout": "Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.",
+
+  "aliasHelper": "What other Devices show for this one",
+  "cancel": "Cancel",
+  "save": "Save",
+  "compareDigits": "Compare these digits with {peer}. If the two screens disagree, cancel.",
+  "@compareDigits": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "theyMatch": "They match",
+  "receiveWaiting": "Waiting for a Device to connect. On the other Device, tap Pair beside this one. Both screens will then show the same six digits to compare.",
+  "cancelThisPairing": "Cancel this Pairing",
+  "connectToPeerTitle": "Connect to {peer}",
+  "@connectToPeerTitle": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "reachingOtherDevice": "Reaching the other Device…",
+  "manualAddressTitle": "Reach a Device by address",
+  "fieldAddress": "Address",
+  "addressHelper": "For a Device Discovery cannot find",
+  "fieldPort": "Port",
+  "portIsANumber": "A port is a number.",
+  "manualAddressNote": "Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.",
+  "sendTextTitle": "Send text to {peer}",
+  "@sendTextTitle": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "fieldText": "Text",
+  "textHelper": "It arrives as a Transfer the Device has to accept",
+  "send": "Send",
+  "sendFileTitle": "Send a file to {peer}",
+  "@sendFileTitle": {
+    "placeholders": { "peer": { "type": "String" } }
+  },
+  "fieldPath": "Path",
+  "pathHelper": "Copy a path, or type one",
+  "noFileBrowserNote": "This build has no file browser: it ships no plugins, and a native dialog for each platform is its own change. A path is what it takes for now.",
+  "noSuchFile": "There is no file at \"{path}\".",
+  "@noSuchFile": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "fieldFolder": "Folder",
+  "folderHelper": "Created if it does not exist",
+  "folderRequired": "A folder is needed: a name from the peer must not be allowed to choose one.",
+  "folderNote": "A name that arrives with the Transfer is untrusted: it can name a file inside this folder and nothing else.",
+  "acceptIntoFolder": "Accept into this folder"
+}

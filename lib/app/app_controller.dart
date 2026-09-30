@@ -408,15 +408,12 @@ final class LocalTransferController {
   /// [HandshakeException] when the dial fails.
   Future<ManagedSession> connect(Fingerprint peer) async {
     if (_wired.containsKey(peer.hex)) {
-      throw AppStateException('a Session with ${peer.short()} is already open');
+      throw AppStateException(AppRefusal.sessionAlreadyOpen, peer.short());
     }
     final manager = _requireManager();
     final target = _dialTargetFor(peer);
     if (target == null) {
-      throw AppStateException(
-        'no address is known for ${peer.short()}; '
-        'it has to be discovered before it can be dialled',
-      );
+      throw AppStateException(AppRefusal.peerAddressUnknown, peer.short());
     }
     return manager.connect(
       target.address,
@@ -443,11 +440,11 @@ final class LocalTransferController {
     final manager = _requireManager();
     final host = address.trim();
     if (host.isEmpty) {
-      throw const AppStateException('no address was given to dial');
+      throw const AppStateException(AppRefusal.noAddressGiven);
     }
     final target = port ?? defaultSessionPort;
     if (target <= 0 || target > 65535) {
-      throw AppStateException('$target is not a port');
+      throw AppStateException(AppRefusal.portNotAPort, '$target');
     }
     return manager.connect(host, target);
   }
@@ -502,7 +499,7 @@ final class LocalTransferController {
     Directory directory,
   ) async {
     if (!transfer.isDecidable) {
-      throw const AppStateException('this offer has already been answered');
+      throw const AppStateException(AppRefusal.offerAlreadyAnswered);
     }
     final sinks = <String, PayloadSink>{};
     var accepted = false;
@@ -772,14 +769,14 @@ final class LocalTransferController {
   /// The Session to send on, resolved from an optional peer.
   ({Fingerprint peer, TransferEngine engine}) _target(Fingerprint? to) {
     if (_wired.isEmpty) {
-      throw const AppStateException('no peer is connected');
+      throw const AppStateException(AppRefusal.noPeerConnected);
     }
     final _WiredSession wired;
     final Fingerprint peer;
     if (to != null) {
       final found = _wired[to.hex];
       if (found == null) {
-        throw AppStateException('no Session is open with ${to.short()}');
+        throw AppStateException(AppRefusal.noSessionOpen, to.short());
       }
       wired = found;
       peer = to;
@@ -788,9 +785,7 @@ final class LocalTransferController {
       wired = entry.value;
       peer = wired.session.peer;
     } else {
-      throw const AppStateException(
-        'more than one peer is connected; the one to send to has to be named',
-      );
+      throw const AppStateException(AppRefusal.severalPeersConnected);
     }
     return (peer: peer, engine: wired.engine);
   }
@@ -869,9 +864,7 @@ final class LocalTransferController {
   LinkManager _requireManager() {
     final manager = _manager;
     if (manager == null) {
-      throw const AppStateException(
-        'this Device is not paired, so it serves no Sessions',
-      );
+      throw const AppStateException(AppRefusal.notPaired);
     }
     return manager;
   }

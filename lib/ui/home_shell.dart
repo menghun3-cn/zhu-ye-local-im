@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'controller_scope.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
 import 'pages/clipboard_page.dart';
 import 'pages/devices_page.dart';
@@ -26,6 +27,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
     final self = controller.self;
     // A Transfer that is waiting for this Device is the one thing worth
@@ -43,10 +45,10 @@ class _HomeShellState extends State<HomeShell> {
       SettingsPage(seams: widget.seams),
     ];
     final destinations = <NavigationDestination>[
-      const NavigationDestination(
-        icon: Icon(Icons.devices_outlined),
-        selectedIcon: Icon(Icons.devices),
-        label: 'Devices',
+      NavigationDestination(
+        icon: const Icon(Icons.devices_outlined),
+        selectedIcon: const Icon(Icons.devices),
+        label: l10n.tabDevices,
       ),
       NavigationDestination(
         icon: Badge.count(
@@ -59,17 +61,17 @@ class _HomeShellState extends State<HomeShell> {
           isLabelVisible: waiting > 0,
           child: const Icon(Icons.swap_horiz),
         ),
-        label: 'Transfers',
+        label: l10n.tabTransfers,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.content_paste_outlined),
-        selectedIcon: Icon(Icons.content_paste),
-        label: 'Clipboard',
+      NavigationDestination(
+        icon: const Icon(Icons.content_paste_outlined),
+        selectedIcon: const Icon(Icons.content_paste),
+        label: l10n.tabClipboard,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.settings_outlined),
-        selectedIcon: Icon(Icons.settings),
-        label: 'Settings',
+      NavigationDestination(
+        icon: const Icon(Icons.settings_outlined),
+        selectedIcon: const Icon(Icons.settings),
+        label: l10n.tabSettings,
       ),
     ];
 
@@ -80,7 +82,7 @@ class _HomeShellState extends State<HomeShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Local Transfer'),
+        title: Text(l10n.appTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -91,9 +93,9 @@ class _HomeShellState extends State<HomeShell> {
                 Text(self.alias),
                 if (!self.isPaired) ...[
                   const SizedBox(width: 8),
-                  const Tooltip(
-                    message: 'Not paired with any Device yet',
-                    child: Icon(Icons.link_off, size: 18),
+                  Tooltip(
+                    message: l10n.notPairedYet,
+                    child: const Icon(Icons.link_off, size: 18),
                   ),
                 ],
               ],
