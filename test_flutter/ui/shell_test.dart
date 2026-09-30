@@ -9,7 +9,7 @@ void main() {
     testWidgets('a wide window offers the four surfaces and switches', (
       tester,
     ) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
 
       // The window branch is a real decision the shell makes from its width,
@@ -39,7 +39,7 @@ void main() {
     testWidgets('a narrow window offers the same four as a bottom bar', (
       tester,
     ) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device, size: narrowWindow);
 
       expect(
@@ -65,7 +65,7 @@ void main() {
     });
 
     testWidgets('names this Device and says it is unpaired', (tester) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
 
       expect(windowA.within(find.text('Local Transfer')), findsOneWidget);
@@ -76,7 +76,9 @@ void main() {
         findsOneWidget,
       );
 
-      await device.controller.rename('Alice the laptop');
+      // Renaming publishes a new descriptor and re-saves the profile, both of
+      // which go through the real event loop, so this waits like the rest.
+      await tester.runAsync(() => device.controller.rename('Alice the laptop'));
       await pumpUntil(
         tester,
         () =>

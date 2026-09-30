@@ -12,7 +12,7 @@ void main() {
     testWidgets('tells an unpaired Device why it can reach nobody', (
       tester,
     ) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
 
       expect(
@@ -58,10 +58,10 @@ void main() {
       tester,
     ) async {
       final hub = MemoryBeaconHub();
-      final alice = await startUiDevice(hub.a, 'Alice');
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpWindow(tester, alice);
-      await pairDevices(alice, bob);
+      await pairDevices(tester, alice, bob);
 
       await pumpUntil(
         tester,
@@ -103,11 +103,11 @@ void main() {
       tester,
     ) async {
       final hub = MemoryBeaconHub();
-      final alice = await startUiDevice(hub.a, 'Alice');
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpWindow(tester, alice);
-      await pairDevices(alice, bob);
-      await connectDevices(alice, bob);
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
 
       await pumpUntil(
         tester,
@@ -134,7 +134,7 @@ void main() {
 
   group('the Transfers surface', () {
     testWidgets('says nothing has moved yet', (tester) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
       await openTab(tester, 'Transfers', window: windowA);
 
@@ -154,13 +154,16 @@ void main() {
       tester,
     ) async {
       final hub = MemoryBeaconHub();
-      final alice = await startUiDevice(hub.a, 'Alice');
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpWindow(tester, alice);
-      await pairDevices(alice, bob);
-      await connectDevices(alice, bob);
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
 
-      await alice.controller.sendText('hello from Alice');
+      // Sending writes to a real socket, so it waits on the real event loop.
+      await tester.runAsync(
+        () => alice.controller.sendText('hello from Alice'),
+      );
       await openTab(tester, 'Transfers', window: windowA);
       await pumpUntil(
         tester,
@@ -185,14 +188,14 @@ void main() {
       tester,
     ) async {
       final hub = MemoryBeaconHub();
-      final alice = await startUiDevice(hub.a, 'Alice');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
       // The window is Bob's: he is the one who has to answer.
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpWindow(tester, bob);
-      await pairDevices(alice, bob);
-      await connectDevices(alice, bob);
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
 
-      await alice.controller.sendText('answer me');
+      await tester.runAsync(() => alice.controller.sendText('answer me'));
       await pumpUntil(
         tester,
         () => bob.offers.isNotEmpty,
@@ -252,7 +255,7 @@ void main() {
     testWidgets('offers the three modes and follows the choice', (
       tester,
     ) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
       await openTab(tester, 'Clipboard', window: windowA);
 
@@ -289,12 +292,12 @@ void main() {
       tester,
     ) async {
       final hub = MemoryBeaconHub();
-      final alice = await startUiDevice(hub.a, 'Alice');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
       // The window is Bob's: staging is what he has to answer.
-      final bob = await startUiDevice(hub.b, 'Bob');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpWindow(tester, bob);
-      await pairDevices(alice, bob);
-      await connectDevices(alice, bob);
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
       await openTab(tester, 'Clipboard', window: windowA);
@@ -341,6 +344,7 @@ void main() {
       tester,
     ) async {
       final device = await startUiDevice(
+        tester,
         MemoryBeaconHub().a,
         'Alice',
         profilePath: 'C:/profiles/alice/profile.json',
@@ -387,7 +391,7 @@ void main() {
     testWidgets('says so when there is nowhere to keep an identity', (
       tester,
     ) async {
-      final device = await startUiDevice(MemoryBeaconHub().a, 'Alice');
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
       await openTab(tester, 'Settings', window: windowA);
 
