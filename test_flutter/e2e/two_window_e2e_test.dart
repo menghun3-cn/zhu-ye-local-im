@@ -17,6 +17,11 @@ import '../support/ui_harness.dart';
 /// UDP broadcast port, which is a property of the machine rather than of the
 /// product, so the beacon pair is an in-process hub. Everything downstream of
 /// "these two Devices know about each other" is the shipping code path.
+///
+/// Every label a window is driven through comes from [l10n] rather than from a
+/// literal in this file: these tests are the only place the two Devices' whole
+/// flows are driven the way a person drives them, so they are also the place
+/// that would notice the UI coming up in a language nobody asked for.
 void main() {
   group('two windows on one machine', () {
     testWidgets('pair by clicking, then move a file across', (tester) async {
@@ -56,27 +61,27 @@ void main() {
       source.writeAsBytesSync(bytes);
 
       // Send it from Alice's window, through the menu a user would use.
-      await openTab(tester, 'Devices', window: windowA);
+      await openTab(tester, l10n.tabDevices, window: windowA);
       // The Session is up at the controller, but the peer card is a rendering
       // of it and the frame that opened the tab does not have to be the one
       // that carries it. Waiting for the card to offer Send is what a user
       // does — they look at the panel until the button is there.
       await pumpUntil(
         tester,
-        () => windowA.within(find.byTooltip('Send')).evaluate().isNotEmpty,
+        () => windowA.within(find.byTooltip(l10n.send)).evaluate().isNotEmpty,
         description: 'the connected peer card to offer Send',
       );
-      await tester.tap(windowA.within(find.byTooltip('Send')));
+      await tester.tap(windowA.within(find.byTooltip(l10n.send)));
       await settleRoute(tester);
-      await tester.tap(windowA.within(find.text('Send a file')));
+      await tester.tap(windowA.within(find.text(l10n.menuSendFile)));
       await settleRoute(tester);
       await pumpUntil(
         tester,
         () => dialogIsOpen(windowA),
         description: 'the send-a-file dialog to open',
       );
-      await fillField(tester, 'Path', source.path, window: windowA);
-      await tapDialogButton(tester, 'Send', window: windowA);
+      await fillField(tester, l10n.fieldPath, source.path, window: windowA);
+      await tapDialogButton(tester, l10n.send, window: windowA);
 
       // Bob is offered it, and has to answer.
       await pumpUntil(
@@ -84,25 +89,25 @@ void main() {
         () => bob.offers.isNotEmpty,
         description: 'Bob to be offered the file',
       );
-      await openTab(tester, 'Transfers', window: windowB);
+      await openTab(tester, l10n.tabTransfers, window: windowB);
       await pumpUntil(
         tester,
         () => onPage(
           windowB,
           TransfersPage,
-          find.text('Accept'),
+          find.text(l10n.accept),
         ).evaluate().isNotEmpty,
         description: 'the offer to reach Bob\u2019s window',
       );
-      await tapButton(tester, 'Accept', window: windowB);
+      await tapButton(tester, l10n.accept, window: windowB);
       await pumpUntil(
         tester,
         () => dialogIsOpen(windowB),
         description: 'the folder dialog to open',
       );
       final incoming = tempDirectory('local-transfer-ui-in-');
-      await fillField(tester, 'Folder', incoming.path, window: windowB);
-      await tapDialogButton(tester, 'Accept into this folder', window: windowB);
+      await fillField(tester, l10n.fieldFolder, incoming.path, window: windowB);
+      await tapDialogButton(tester, l10n.acceptIntoFolder, window: windowB);
 
       await pumpUntil(
         tester,
@@ -114,7 +119,7 @@ void main() {
         () => onPage(
           windowB,
           TransfersPage,
-          find.text('Done'),
+          find.text(l10n.stateCompleted),
         ).evaluate().isNotEmpty,
         description: 'Bob\u2019s row to settle as done',
       );
@@ -153,8 +158,10 @@ void main() {
       // The Session the guest opened after confirming is already up on both
       // sides, so there is nothing to dial by hand before mirroring.
       for (final window in [windowA, windowB]) {
-        await openTab(tester, 'Clipboard', window: window);
-        await tester.tap(onPage(window, ClipboardPage, find.text('Mirror')));
+        await openTab(tester, l10n.tabClipboard, window: window);
+        await tester.tap(
+          onPage(window, ClipboardPage, find.text(l10n.clipboardModeMirror)),
+        );
         await tester.pump();
       }
       expect(alice.controller.clipboardMode, ClipboardMode.mirror);
@@ -201,8 +208,8 @@ void main() {
       await pairDevices(tester, carol, dave);
 
       await pumpWindow(tester, carol);
-      await openTab(tester, 'Devices', window: windowA);
-      await tapButton(tester, 'By address', window: windowA);
+      await openTab(tester, l10n.tabDevices, window: windowA);
+      await tapButton(tester, l10n.byAddress, window: windowA);
       await pumpUntil(
         tester,
         () => dialogIsOpen(windowA),
@@ -210,24 +217,26 @@ void main() {
       );
       await fillField(
         tester,
-        'Address',
+        l10n.fieldAddress,
         InternetAddress.loopbackIPv4.address,
         window: windowA,
       );
       await fillField(
         tester,
-        'Port',
+        l10n.fieldPort,
         '${bob.controller.listenPort}',
         window: windowA,
       );
-      await tapDialogButton(tester, 'Connect', window: windowA);
+      await tapDialogButton(tester, l10n.connect, window: windowA);
 
       // The refusal is reported in the dialog rather than swallowed, and no
-      // Session is opened on either side.
+      // Session is opened on either side. Matched on the sentence's frame
+      // rather than in full: what follows the colon is the network's own
+      // message, which is the operating system's word and not this app's.
       await pumpUntil(
         tester,
         () => windowA
-            .within(find.textContaining('Could not reach the Device'))
+            .within(find.textContaining(l10n.failureUnreachable('')))
             .evaluate()
             .isNotEmpty,
         description: 'the refusal to be shown to Carol',

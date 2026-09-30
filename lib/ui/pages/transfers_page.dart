@@ -8,6 +8,7 @@ import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
 import '../feedback.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../widgets.dart';
 
@@ -22,12 +23,13 @@ class TransfersPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
     final transfers = controller.transfers;
     if (transfers.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: HintText('Nothing has been sent or received yet.'),
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: HintText(l10n.transfersEmptyHint),
       );
     }
     return ListView.builder(
@@ -74,10 +76,11 @@ class _TransferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final outgoing = view.direction == TransferDirection.outgoing;
     final title = view.names.isEmpty
-        ? labelForKind(view.kind)
+        ? labelForKind(view.kind, l10n)
         : view.names.first;
     final alsoNamed = view.names.length - 1;
 
@@ -105,7 +108,7 @@ class _TransferCard extends StatelessWidget {
                 ),
                 Chip(
                   avatar: Icon(iconForState(view.state), size: 16),
-                  label: Text(labelForState(view.state)),
+                  label: Text(labelForState(view.state, l10n)),
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -113,12 +116,16 @@ class _TransferCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               [
-                '${outgoing ? 'To' : 'From'} $peerName',
-                labelForKind(view.kind),
-                if (alsoNamed > 0) 'and $alsoNamed more',
+                outgoing
+                    ? l10n.transferTo(peerName)
+                    : l10n.transferFrom(peerName),
+                labelForKind(view.kind, l10n),
+                if (alsoNamed > 0) l10n.andMore(alsoNamed),
                 if (view.kind == PayloadKind.file)
-                  '${formatBytes(view.transferredBytes)} of '
-                      '${formatBytes(view.totalBytes)}',
+                  l10n.bytesOf(
+                    formatBytes(view.transferredBytes),
+                    formatBytes(view.totalBytes),
+                  ),
               ].join(' · '),
               style: theme.textTheme.bodySmall,
             ),
@@ -136,12 +143,12 @@ class _TransferCard extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: () => unawaited(_accept(context)),
                       icon: const Icon(Icons.download),
-                      label: const Text('Accept'),
+                      label: Text(l10n.accept),
                     ),
                     TextButton.icon(
                       onPressed: () => _reject(context),
                       icon: const Icon(Icons.block),
-                      label: const Text('Refuse'),
+                      label: Text(l10n.refuse),
                     ),
                   ],
                 ),
@@ -153,13 +160,14 @@ class _TransferCard extends StatelessWidget {
   }
 
   Future<void> _accept(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final offer = view.offer;
     if (offer == null) return;
     final path = await askForDirectory(
       context,
       title: view.kind == PayloadKind.file
-          ? 'Where should these files land?'
-          : 'Where should this arrive?',
+          ? l10n.whereShouldFilesLand
+          : l10n.whereShouldThisArrive,
       initial: defaultIncomingDirectory,
     );
     if (path == null) return;

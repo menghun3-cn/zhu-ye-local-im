@@ -16,35 +16,27 @@ void main() {
       await pumpWindow(tester, device);
 
       expect(
-        onPage(
-          windowA,
-          DevicesPage,
-          find.text('Pair this Device to send anything'),
-        ),
+        onPage(windowA, DevicesPage, find.text(l10n.pairingCardUnpairedTitle)),
         findsOneWidget,
       );
       expect(
-        onPage(
-          windowA,
-          DevicesPage,
-          find.textContaining('Nothing has been discovered yet'),
-        ),
+        onPage(windowA, DevicesPage, find.text(l10n.devicesEmptyHint)),
         findsOneWidget,
       );
       // The listening fact is the honest answer to "can anything reach me":
       // an unpaired Device binds no port and says so.
       expect(
-        onPage(windowA, DevicesPage, find.text('not accepting Sessions')),
+        onPage(windowA, DevicesPage, find.text(l10n.notAcceptingSessions)),
         findsOneWidget,
       );
       expect(
-        onPage(windowA, DevicesPage, find.text('1 Device(s)')),
+        onPage(windowA, DevicesPage, find.text(l10n.groupDevices(1))),
         findsOneWidget,
         reason: 'an unpaired Device is alone in its group',
       );
       // Both ways to pair — receiving, and reaching a Device without pairing.
       // There is no code to type anywhere: pairing is two taps.
-      for (final label in ['Receive a connection', 'By address']) {
+      for (final label in [l10n.receiveAConnection, l10n.byAddress]) {
         expect(
           onPage(windowA, DevicesPage, find.text(label)),
           findsOneWidget,
@@ -69,13 +61,13 @@ void main() {
         () => onPage(
           windowA,
           DevicesPage,
-          find.text('Pair another Device'),
+          find.text(l10n.pairingCardPairedTitle),
         ).evaluate().isNotEmpty,
         description: 'the pairing card to flip to its paired wording',
       );
       final port = alice.controller.listenPort!;
       expect(
-        onPage(windowA, DevicesPage, find.text('on port $port')),
+        onPage(windowA, DevicesPage, find.text(l10n.onPort(port))),
         findsOneWidget,
       );
 
@@ -86,13 +78,13 @@ void main() {
         () => onPage(
           windowA,
           DevicesPage,
-          find.text('Connect'),
+          find.text(l10n.connect),
         ).evaluate().isNotEmpty,
         description: 'Bob to be offered as diallable',
       );
       expect(onPage(windowA, DevicesPage, find.text('Bob')), findsOneWidget);
       expect(
-        onPage(windowA, DevicesPage, find.textContaining('Session open')),
+        onPage(windowA, DevicesPage, find.textContaining(l10n.sessionOpen)),
         findsNothing,
         reason: 'nothing is connected yet',
       );
@@ -115,17 +107,17 @@ void main() {
         () => onPage(
           windowA,
           DevicesPage,
-          find.textContaining('Session open'),
+          find.textContaining(l10n.sessionOpen),
         ).evaluate().isNotEmpty,
         description: 'the open Session to show on the peer card',
       );
       expect(
-        onPage(windowA, DevicesPage, find.text('Connect')),
+        onPage(windowA, DevicesPage, find.text(l10n.connect)),
         findsNothing,
         reason: 'there is nothing left to connect',
       );
       expect(
-        onPage(windowA, DevicesPage, find.byTooltip('Send')),
+        onPage(windowA, DevicesPage, find.byTooltip(l10n.send)),
         findsOneWidget,
       );
 
@@ -137,14 +129,10 @@ void main() {
     testWidgets('says nothing has moved yet', (tester) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, 'Transfers', window: windowA);
+      await openTab(tester, l10n.tabTransfers, window: windowA);
 
       expect(
-        onPage(
-          windowA,
-          TransfersPage,
-          find.text('Nothing has been sent or received yet.'),
-        ),
+        onPage(windowA, TransfersPage, find.text(l10n.transfersEmptyHint)),
         findsOneWidget,
       );
 
@@ -165,20 +153,24 @@ void main() {
       await tester.runAsync(
         () => alice.controller.sendText('hello from Alice'),
       );
-      await openTab(tester, 'Transfers', window: windowA);
+      await openTab(tester, l10n.tabTransfers, window: windowA);
       await pumpUntil(
         tester,
         () => onPage(
           windowA,
           TransfersPage,
-          find.text('Waiting for an answer'),
+          find.text(l10n.stateAwaitingDecision),
         ).evaluate().isNotEmpty,
         description: 'the Transfer to render with its state',
       );
       // Nothing has answered it, and the row says both what it is and who it
       // is with.
       expect(
-        onPage(windowA, TransfersPage, find.text('To Bob · Text')),
+        onPage(
+          windowA,
+          TransfersPage,
+          find.text('${l10n.transferTo('Bob')} · ${l10n.kindText}'),
+        ),
         findsOneWidget,
       );
 
@@ -202,22 +194,22 @@ void main() {
         () => bob.offers.isNotEmpty,
         description: 'Bob to be offered the text',
       );
-      await openTab(tester, 'Transfers', window: windowA);
+      await openTab(tester, l10n.tabTransfers, window: windowA);
       await pumpUntil(
         tester,
         () => onPage(
           windowA,
           TransfersPage,
-          find.text('Accept'),
+          find.text(l10n.accept),
         ).evaluate().isNotEmpty,
         description: 'the offer to render with its two answers',
       );
       expect(
-        onPage(windowA, TransfersPage, find.text('Refuse')),
+        onPage(windowA, TransfersPage, find.text(l10n.refuse)),
         findsOneWidget,
       );
 
-      await tapButton(tester, 'Accept', window: windowA);
+      await tapButton(tester, l10n.accept, window: windowA);
       // Accepting is not enough on its own: the folder has to be chosen.
       await pumpUntil(
         tester,
@@ -225,8 +217,8 @@ void main() {
         description: 'the folder dialog to open',
       );
       final incoming = tempDirectory('local-transfer-ui-in-');
-      await fillField(tester, 'Folder', incoming.path, window: windowA);
-      await tapDialogButton(tester, 'Accept into this folder', window: windowA);
+      await fillField(tester, l10n.fieldFolder, incoming.path, window: windowA);
+      await tapDialogButton(tester, l10n.acceptIntoFolder, window: windowA);
 
       await pumpUntil(
         tester,
@@ -238,12 +230,12 @@ void main() {
         () => onPage(
           windowA,
           TransfersPage,
-          find.text('Done'),
+          find.text(l10n.stateCompleted),
         ).evaluate().isNotEmpty,
         description: 'the row to settle as done',
       );
       expect(
-        onPage(windowA, TransfersPage, find.text('Accept')),
+        onPage(windowA, TransfersPage, find.text(l10n.accept)),
         findsNothing,
         reason: 'an answered offer offers its answers once',
       );
@@ -258,9 +250,14 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, 'Clipboard', window: windowA);
+      await openTab(tester, l10n.tabClipboard, window: windowA);
 
-      for (final label in ['Off', 'Ask me', 'Mirror']) {
+      final modes = [
+        l10n.clipboardModeOff,
+        l10n.clipboardModeStage,
+        l10n.clipboardModeMirror,
+      ];
+      for (final label in modes) {
         expect(
           onPage(windowA, ClipboardPage, find.text(label)),
           findsOneWidget,
@@ -269,18 +266,20 @@ void main() {
       }
       // An unpaired Device is told where to go rather than left guessing.
       expect(
-        onPage(windowA, ClipboardPage, find.textContaining('not in one yet')),
+        onPage(windowA, ClipboardPage, find.text(l10n.clipboardNeedsGroup)),
         findsOneWidget,
       );
 
-      await tester.tap(onPage(windowA, ClipboardPage, find.text('Mirror')));
+      await tester.tap(
+        onPage(windowA, ClipboardPage, find.text(l10n.clipboardModeMirror)),
+      );
       await tester.pump();
       expect(device.controller.clipboardMode, ClipboardMode.mirror);
       expect(
         onPage(
           windowA,
           ClipboardPage,
-          find.textContaining('replace this clipboard on their own'),
+          find.text(l10n.clipboardModeMirrorMeans),
         ),
         findsOneWidget,
         reason: 'the line under the choice has to describe the new one',
@@ -301,14 +300,10 @@ void main() {
       await connectDevices(tester, alice, bob);
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
-      await openTab(tester, 'Clipboard', window: windowA);
+      await openTab(tester, l10n.tabClipboard, window: windowA);
 
       expect(
-        onPage(
-          windowA,
-          ClipboardPage,
-          find.text('Nothing is waiting to be applied.'),
-        ),
+        onPage(windowA, ClipboardPage, find.text(l10n.clipboardNothingStaged)),
         findsOneWidget,
       );
 
@@ -325,11 +320,11 @@ void main() {
         description: 'the staged entry to appear unaided',
       );
       expect(
-        onPage(windowA, ClipboardPage, find.text('Apply')),
+        onPage(windowA, ClipboardPage, find.text(l10n.apply)),
         findsOneWidget,
       );
 
-      await tester.tap(onPage(windowA, ClipboardPage, find.text('Apply')));
+      await tester.tap(onPage(windowA, ClipboardPage, find.text(l10n.apply)));
       await pumpUntil(
         tester,
         () => bob.clipboard.applied.contains('review me'),
@@ -352,10 +347,10 @@ void main() {
         defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
       );
       await pumpWindow(tester, device);
-      await openTab(tester, 'Settings', window: windowA);
+      await openTab(tester, l10n.tabSettings, window: windowA);
 
       expect(
-        onPage(windowA, SettingsPage, find.text('This Device')),
+        onPage(windowA, SettingsPage, find.text(l10n.settingsThisDevice)),
         findsOneWidget,
       );
       expect(onPage(windowA, SettingsPage, find.text('Alice')), findsOneWidget);
@@ -382,7 +377,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        onPage(windowA, SettingsPage, find.text('Nothing has gone wrong.')),
+        onPage(windowA, SettingsPage, find.text(l10n.nothingWentWrong)),
         findsOneWidget,
       );
 
@@ -394,24 +389,20 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, 'Settings', window: windowA);
+      await openTab(tester, l10n.tabSettings, window: windowA);
 
       expect(
-        onPage(windowA, SettingsPage, find.text('not stored on this Device')),
+        onPage(windowA, SettingsPage, find.text(l10n.notStoredOnThisDevice)),
         findsOneWidget,
       );
       // A Device that will forget its pairing on restart has to say so, rather
       // than let the user find out the hard way.
       expect(
-        onPage(
-          windowA,
-          SettingsPage,
-          find.textContaining('nowhere to keep its identity'),
-        ),
+        onPage(windowA, SettingsPage, find.text(l10n.noIdentityHint)),
         findsOneWidget,
       );
       expect(
-        onPage(windowA, SettingsPage, find.text('no default folder')),
+        onPage(windowA, SettingsPage, find.text(l10n.noDefaultFolder)),
         findsOneWidget,
       );
 

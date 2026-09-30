@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/app/app.dart';
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/home_shell.dart';
+import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/seams.dart';
 
 /// Shared scaffolding for the tests that need a widget tree.
@@ -31,6 +33,18 @@ const int devicesSurface = 0;
 const int transfersSurface = 1;
 const int clipboardSurface = 2;
 const int settingsSurface = 3;
+
+/// The strings the windows under test are showing.
+///
+/// Looked up from the same generated class the application reads, for the same
+/// [appLocale] the panes below are built with — so a test that taps "配对" is
+/// asserting the label a user of this build actually sees, rather than a
+/// translation the test made up and the UI would have to keep matching.
+///
+/// `lookupAppLocalizations` rather than the delegate's `load`: the delegate is
+/// asynchronous by contract, and a test that had to await it before it could
+/// name a tab would need a `tester` it does not have.
+final AppLocalizations l10n = lookupAppLocalizations(appLocale);
 
 /// A Device under test: the controller, and the seams it was handed.
 ///
@@ -223,6 +237,12 @@ const _instantTheme = PageTransitionsTheme(
 /// root navigator's overlay, which is a sibling of `home` rather than a
 /// descendant of it — a scope around `home` would be invisible to every dialog
 /// this app opens, and the dialog is where pairing happens.
+///
+/// The `MaterialApp` here is configured the way the real one is — same locale,
+/// same delegates, same supported list — because the point of these tests is
+/// the shipping tree. Without the delegates every `AppLocalizations.of` below
+/// throws, and a window built with the platform's locale instead would show a
+/// different language from the window a user gets.
 Widget _pane(Key key, UiDevice device, Size size) {
   return SizedBox(
     key: key,
@@ -232,6 +252,9 @@ Widget _pane(Key key, UiDevice device, Size size) {
         controller: device.controller,
         child: MaterialApp(
           debugShowCheckedModeBanner: false,
+          locale: appLocale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: appLocales,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
             pageTransitionsTheme: _instantTheme,
@@ -582,8 +605,8 @@ Future<void> pairThroughWindows(
   required UiDevice hostDevice,
   required UiDevice guestDevice,
 }) async {
-  await openTab(tester, 'Devices', window: host);
-  await tapButton(tester, 'Receive a connection', window: host);
+  await openTab(tester, l10n.tabDevices, window: host);
+  await tapButton(tester, l10n.receiveAConnection, window: host);
   await pumpUntil(
     tester,
     () => dialogIsOpen(host),
@@ -595,23 +618,23 @@ Future<void> pairThroughWindows(
     description: 'the host to be listening for a connection',
   );
 
-  await openTab(tester, 'Devices', window: guest);
+  await openTab(tester, l10n.tabDevices, window: guest);
   await pumpUntil(
     tester,
-    () => hasButton(tester, 'Pair', window: guest),
+    () => hasButton(tester, l10n.pair, window: guest),
     description: 'the guest to discover the host and offer Pair',
   );
-  await tapButton(tester, 'Pair', window: guest);
+  await tapButton(tester, l10n.pair, window: guest);
 
   // Both sides now hold an attempt and show the digits to compare.
   await pumpUntil(
     tester,
-    () => hasButton(tester, 'They match', window: guest),
+    () => hasButton(tester, l10n.theyMatch, window: guest),
     description: 'the guest to reach the comparison step',
   );
   await pumpUntil(
     tester,
-    () => hasButton(tester, 'They match', window: host),
+    () => hasButton(tester, l10n.theyMatch, window: host),
     description: 'the host to reach the comparison step',
   );
   final guestSas = shownSas(tester, window: guest);
@@ -620,8 +643,8 @@ Future<void> pairThroughWindows(
   expect(hostSas, isNotNull, reason: 'the host to show six digits');
   expect(guestSas, hostSas, reason: 'both screens show the same digits');
 
-  await tapDialogButton(tester, 'They match', window: guest);
-  await tapDialogButton(tester, 'They match', window: host);
+  await tapDialogButton(tester, l10n.theyMatch, window: guest);
+  await tapDialogButton(tester, l10n.theyMatch, window: host);
 
   await pumpUntil(
     tester,
@@ -642,10 +665,8 @@ Future<void> pairThroughWindows(
 
 /// Whether [window]'s receive dialog is past opening the invitation, i.e.
 /// whether the listener the guest will dial is actually up.
-bool windowHostListening(WidgetTester tester, TestWindow window) => window
-    .within(find.textContaining('Waiting for a Device'))
-    .evaluate()
-    .isNotEmpty;
+bool windowHostListening(WidgetTester tester, TestWindow window) =>
+    window.within(find.text(l10n.receiveWaiting)).evaluate().isNotEmpty;
 
 /// Whether [window] currently has a button labelled [label].
 bool hasButton(
