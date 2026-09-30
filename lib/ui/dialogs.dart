@@ -59,24 +59,20 @@ Future<void> showManualAddressDialog(
   builder: (_) => _ManualAddressDialog(controller: controller),
 );
 
-/// Asks for text to send to [peer].
-Future<void> showSendTextDialog(
-  BuildContext context,
-  LocalTransferController controller,
-  PeerView peer,
-) => showDialog<void>(
-  context: context,
-  builder: (_) => _SendTextDialog(controller: controller, peer: peer),
-);
-
-/// Asks for the path of a file to send to [peer].
+/// Asks for the path of a file to send to [name], the Device at [to].
+///
+/// An address rather than a [PeerView] because a conversation is opened with a
+/// Fingerprint and outlives the peer list: a Device that is still connected but
+/// no longer being announced is something a user can send to, and the dialog
+/// has no business refusing on the grounds that a list somewhere forgot it.
 Future<void> showSendFileDialog(
   BuildContext context,
-  LocalTransferController controller,
-  PeerView peer,
-) => showDialog<void>(
+  LocalTransferController controller, {
+  required Fingerprint to,
+  required String name,
+}) => showDialog<void>(
   context: context,
-  builder: (_) => _SendFileDialog(controller: controller, peer: peer),
+  builder: (_) => _SendFileDialog(controller: controller, to: to, name: name),
 );
 
 /// Asks where a Transfer should land.
@@ -103,38 +99,6 @@ Future<String?> askForDirectory(
 );
 
 // -------------------------------------------------------------------- pieces
-
-/// A code or six digits, big enough to read across a desk.
-class _BigCode extends StatelessWidget {
-  const _BigCode({required this.value, this.caption});
-
-  final String value;
-  final String? caption;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final caption = this.caption;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SelectableText(
-          value,
-          style: theme.textTheme.displaySmall?.copyWith(letterSpacing: 4),
-        ),
-        if (caption != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              caption,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 /// A failure, where the flow happened.
 ///
@@ -167,41 +131,6 @@ class _ErrorLine extends StatelessWidget {
           Expanded(child: Text(message)),
         ],
       ),
-    );
-  }
-}
-
-/// The six digits both screens have to be showing.
-///
-/// The step exists because the handshake alone proves only that both sides used
-/// the same secret — not that no third Device is in the middle. Reading digits
-/// aloud is the only check that does.
-class _Confirmation extends StatelessWidget {
-  const _Confirmation({
-    required this.attempt,
-    required this.busy,
-    required this.onConfirm,
-  });
-
-  final PairingAttempt attempt;
-  final bool busy;
-  final VoidCallback onConfirm;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final peer = attempt.peer;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _BigCode(value: attempt.sas, caption: l10n.compareDigits(peer.alias)),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: busy ? null : onConfirm,
-          icon: const Icon(Icons.check),
-          label: Text(l10n.theyMatch),
-        ),
-      ],
     );
   }
 }
@@ -290,10 +219,10 @@ class _RenameDialogState extends State<_RenameDialog> {
 /// The answering side of the click-to-pair flow: a Device dialled this one and
 /// is waiting to hear whether it may pair.
 ///
-/// Two questions in one window, in the order they have to be asked. First
-/// whether to talk to this caller at all — the name above is its own claim, so
-/// the point of the step is that a person decides to spend the next two taps on
-/// it. Then the six digits, which is the part that actually checks the claim.
+/// One question, and the answer is the whole decision. The name above is the
+/// caller's own claim, so what this window asks is whether a person wants to
+/// let this Device into their group; saying yes pairs the two and nothing else
+/// is asked afterwards.
 class _PairingRequestDialog extends StatefulWidget {
   const _PairingRequestDialog({required this.request});
 
@@ -307,7 +236,7 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
   PairingAttempt? _attempt;
   Object? _failure;
   bool _busy = false;
-  bool _confirmed = false;
+  bool _settled = false;
 
   @override
   void dispose() {
@@ -316,7 +245,7 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
     // attempt left open keeps the next caller out. Refusing an admitted request
     // is a no-op and cancelling its attempt is the real abandonment, so both
     // are issued rather than tracking which one applies.
-    if (!_confirmed) {
+    if (!_settled) {
       unawaited(widget.request.refuse());
       final attempt = _attempt;
       if (attempt != null) unawaited(attempt.cancel());
@@ -324,21 +253,21 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
     super.dispose();
   }
 
-  Future<void> _admit() async {
+  /// Lets the caller in, and finishes the Pairing.
+  ///
+  /// One tap is the whole decision: the handshake still derives its short
+  /// authentication string and both Devices still confirm over it — that is
+  /// what stops a half-paired state where one side believes in a group the
+  /// other knows nothing about — but nobody is asked to read six digits off a
+  /// screen, so the two confirmations happen back to back here.
+  Future<void> _accept() async {
     setState(() {
       _busy = true;
       _failure = null;
     });
+    final PairingAttempt attempt;
     try {
-      final attempt = await widget.request.admit();
-      if (!mounted) {
-        unawaited(attempt.cancel());
-        return;
-      }
-      setState(() {
-        _attempt = attempt;
-        _busy = false;
-      });
+      attempt = await widget.request.admit();
     } on Object catch (error) {
       if (mounted) {
         setState(() {
@@ -346,25 +275,16 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
           _failure = error;
         });
       }
+      return;
     }
-  }
-
-  Future<void> _refuse() async {
-    setState(() => _busy = true);
-    await widget.request.refuse();
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  Future<void> _confirm() async {
-    final attempt = _attempt;
-    if (attempt == null) return;
-    setState(() {
-      _busy = true;
-      _failure = null;
-    });
+    if (!mounted) {
+      unawaited(attempt.cancel());
+      return;
+    }
+    _attempt = attempt;
     try {
       await attempt.confirm();
-      _confirmed = true;
+      _settled = true;
       // No Session is opened from this side: the Device that dialled opens it,
       // and a Session dialled from both ends at once would have each end refuse
       // the other's as a second one.
@@ -379,11 +299,17 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
     }
   }
 
+  Future<void> _refuse() async {
+    setState(() => _busy = true);
+    _settled = true;
+    await widget.request.refuse();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final attempt = _attempt;
     final caller = widget.request.caller;
     // An empty name is what a Device that answered Discovery without announcing
     // one looks like; saying so beats a blank where a name should be.
@@ -396,51 +322,37 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (attempt == null) Text(l10n.pairingRequestFrom(name)),
-          if (attempt == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                l10n.pairingRequestClaimHint,
-                style: theme.textTheme.bodySmall,
-              ),
+          Text(l10n.pairingRequestFrom(name)),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              l10n.pairingRequestClaimHint,
+              style: theme.textTheme.bodySmall,
             ),
-          if (attempt == null && _busy)
+          ),
+          if (_busy)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Column(
                 children: [
                   const CircularProgressIndicator(),
                   const SizedBox(height: 12),
-                  Text(l10n.pairingPreparing),
+                  Text(l10n.pairingCompleting),
                 ],
               ),
-            ),
-          if (attempt != null)
-            _Confirmation(
-              attempt: attempt,
-              busy: _busy,
-              onConfirm: () => unawaited(_confirm()),
             ),
           _ErrorLine(_failure),
         ],
       ),
       actions: [
-        if (attempt == null)
-          TextButton(
-            onPressed: _busy ? null : () => unawaited(_refuse()),
-            child: Text(l10n.refuse),
-          )
-        else
-          TextButton(
-            onPressed: _busy ? null : () => Navigator.of(context).pop(),
-            child: Text(l10n.cancelThisPairing),
-          ),
-        if (attempt == null)
-          FilledButton(
-            onPressed: _busy ? null : () => unawaited(_admit()),
-            child: Text(l10n.continuePairing),
-          ),
+        TextButton(
+          onPressed: _busy ? null : () => unawaited(_refuse()),
+          child: Text(l10n.refuse),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : () => unawaited(_accept()),
+          child: Text(l10n.acceptPairing),
+        ),
       ],
     );
   }
@@ -449,7 +361,11 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
 // -------------------------------------------------------------- pair by click
 
 /// The initiating side of the click-to-pair flow: dial a Device the user
-/// picked from the discovered list, then confirm the digits.
+/// picked from the discovered list, and wait for its user to let this one in.
+///
+/// The window is a progress report rather than a question. Everything the user
+/// had to decide they decided by tapping Pair; the only thing left is the other
+/// Device's answer, and this side finishes on its own as soon as it arrives.
 class _PairWithPeerDialog extends StatefulWidget {
   const _PairWithPeerDialog({required this.controller, required this.peer});
 
@@ -463,8 +379,7 @@ class _PairWithPeerDialog extends StatefulWidget {
 class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
   PairingAttempt? _attempt;
   Object? _failure;
-  bool _busy = false;
-  bool _confirmed = false;
+  bool _settled = false;
 
   @override
   void initState() {
@@ -474,10 +389,22 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
 
   @override
   void dispose() {
-    if (!_confirmed) unawaited(_attempt?.cancel());
+    // Closing the window while the other user is still deciding leaves the
+    // dial running — there is no handle to call it off — but nothing is
+    // written on either side: this Device never confirms, so the peer's own
+    // confirmation times out and its half of the Pairing is abandoned. The
+    // attempt is cancelled the moment it turns up, which closes the link
+    // immediately rather than waiting for that timeout.
+    if (!_settled) unawaited(_attempt?.cancel());
     super.dispose();
   }
 
+  /// Dials, then finishes the Pairing without asking for anything.
+  ///
+  /// Nothing else is left for the user to do: the other Device's user is the
+  /// one with a question on screen, and this side confirms as soon as that
+  /// question is answered, because waiting for a second tap on a comparison
+  /// nobody needs would be a step that only exists to be clicked through.
   Future<void> _join() async {
     final address = widget.peer.address;
     if (address == null) {
@@ -490,28 +417,21 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
       );
       return;
     }
+    final PairingAttempt attempt;
     try {
-      final attempt = await widget.controller.pairWith(host: address);
-      if (!mounted) {
-        unawaited(attempt.cancel());
-        return;
-      }
-      setState(() => _attempt = attempt);
+      attempt = await widget.controller.pairWith(host: address);
     } on Object catch (error) {
       if (mounted) setState(() => _failure = error);
+      return;
     }
-  }
-
-  Future<void> _confirm() async {
-    final attempt = _attempt;
-    if (attempt == null) return;
-    setState(() {
-      _busy = true;
-      _failure = null;
-    });
+    if (!mounted) {
+      unawaited(attempt.cancel());
+      return;
+    }
+    _attempt = attempt;
     try {
       await attempt.confirm();
-      _confirmed = true;
+      _settled = true;
       // The Session is what the user is here for, so it is opened now, while
       // the Pairing that allows it is the thing on screen. A Session that
       // fails to follow is a tap away on the peer card, and reporting it here
@@ -523,25 +443,19 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
       }
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _failure = error;
-        });
-      }
+      if (mounted) setState(() => _failure = error);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final attempt = _attempt;
     return AlertDialog(
       title: Text(l10n.connectToPeerTitle(widget.peer.displayName)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (attempt == null && _failure == null)
+          if (_failure == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
@@ -553,19 +467,13 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
                 ],
               ),
             ),
-          if (attempt != null)
-            _Confirmation(
-              attempt: attempt,
-              busy: _busy,
-              onConfirm: () => unawaited(_confirm()),
-            ),
           _ErrorLine(_failure),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(attempt == null ? l10n.cancel : l10n.cancelThisPairing),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
         ),
       ],
     );
@@ -671,85 +579,25 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
 
 // ------------------------------------------------------------------ sending
 
-class _SendTextDialog extends StatefulWidget {
-  const _SendTextDialog({required this.controller, required this.peer});
-
-  final LocalTransferController controller;
-  final PeerView peer;
-
-  @override
-  State<_SendTextDialog> createState() => _SendTextDialogState();
-}
-
-class _SendTextDialogState extends State<_SendTextDialog> {
-  final TextEditingController _text = TextEditingController();
-  Object? _failure;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    setState(() {
-      _busy = true;
-      _failure = null;
-    });
-    try {
-      await widget.controller.sendText(_text.text, to: widget.peer.fingerprint);
-      if (mounted) Navigator.of(context).pop();
-    } on Object catch (error) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _failure = error;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l10n.sendTextTitle(widget.peer.displayName)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _text,
-            autofocus: true,
-            maxLines: 6,
-            minLines: 3,
-            decoration: InputDecoration(
-              labelText: l10n.fieldText,
-              helperText: l10n.textHelper,
-            ),
-          ),
-          _ErrorLine(_failure),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : () => unawaited(_send()),
-          child: Text(l10n.send),
-        ),
-      ],
-    );
-  }
-}
-
+/// Asks for the path of a file, then offers it to [to].
+///
+/// A path rather than a picker: this build ships no plugins, and a native file
+/// dialog per platform is a different piece of work — so the field says so
+/// instead of looking like a Browse button that does nothing.
 class _SendFileDialog extends StatefulWidget {
-  const _SendFileDialog({required this.controller, required this.peer});
+  const _SendFileDialog({
+    required this.controller,
+    required this.to,
+    required this.name,
+  });
 
   final LocalTransferController controller;
-  final PeerView peer;
+
+  /// The Device the file is for.
+  final Fingerprint to;
+
+  /// What to call that Device in the title.
+  final String name;
 
   @override
   State<_SendFileDialog> createState() => _SendFileDialogState();
@@ -779,7 +627,7 @@ class _SendFileDialogState extends State<_SendFileDialog> {
       _failure = null;
     });
     try {
-      await widget.controller.sendFile(file, to: widget.peer.fingerprint);
+      await widget.controller.sendFile(file, to: widget.to);
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (mounted) {
@@ -795,7 +643,7 @@ class _SendFileDialogState extends State<_SendFileDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text(l10n.sendFileTitle(widget.peer.displayName)),
+      title: Text(l10n.sendFileTitle(widget.name)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

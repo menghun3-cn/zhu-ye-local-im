@@ -133,7 +133,7 @@ void main() {
       expect(inbound.peer, alice.fingerprint);
 
       // Both sides derived the same short authentication string from the
-      // established link — the value users compare out of band.
+      // established link — the value a Pairing signs its admission over.
       expect(
         inbound.hub.link.shortAuthenticationString,
         session.hub.link.shortAuthenticationString,

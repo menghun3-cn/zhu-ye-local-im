@@ -34,8 +34,8 @@ An open Pairing runs its handshake on `PairingSecret.openPairing()`, which is a
 **published constant**. Any Device on the link can therefore complete that
 handshake. The window bounded that exposure in time: while it was open, any
 Device could dial; when it closed, nobody could. So the window was not the check
-that admitted the caller — the six digits were — it was the thing that limited
-*when* a stranger could try.
+that admitted the caller — the user's answer to the question is — it was the
+thing that limited *when* a stranger could try.
 
 ## Decision
 
@@ -166,8 +166,9 @@ back.
   path are mutually exclusive, turning the listener off takes the port away, and
   answering one request leaves the listener up for the next Device.
 - `test/app/app_controller_test.dart` covers the switch at the app layer, and
-  `test_flutter` covers it on screen — including that the digits are behind the
-  question, which is the user-visible form of the invariant above.
+  `test_flutter` covers it on screen — including that allowing the request is the
+  whole of the Pairing and that refusing pairs nobody, which is the user-visible
+  form of the invariants above.
 - The test harness changed with the flow. `pairDevices` now starts the dial,
   answers the request through the controller and confirms, standing in for the
   host's user; because it answers underneath the screen rather than through it,

@@ -257,7 +257,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairingCardUnpairedBody =>
-      'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to confirm. Both screens then show the same six digits. After that, sending files and messages needs nothing further.';
+      'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.';
 
   @override
   String get acceptPairingRequests => 'Answer pairing requests';
@@ -287,9 +287,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trusted => 'trusted';
-
-  @override
-  String get menuSendText => 'Send text';
 
   @override
   String get menuSendFile => 'Send a file';
@@ -456,14 +453,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
-  String compareDigits(String peer) {
-    return 'Compare these digits with $peer. If the two screens disagree, cancel.';
-  }
-
-  @override
-  String get theyMatch => 'They match';
-
-  @override
   String get pairingRequestTitle => 'Pairing request';
 
   @override
@@ -476,16 +465,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairingRequestClaimHint =>
-      'That name is the caller\'s own claim and nothing has checked it. What checks it is the six digits both screens show next.';
+      'The name is the caller\'s own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.';
 
   @override
-  String get pairingPreparing => 'Preparing the digits to compare…';
+  String get pairingCompleting => 'Finishing the Pairing…';
 
   @override
-  String get continuePairing => 'Continue';
-
-  @override
-  String get cancelThisPairing => 'Cancel this Pairing';
+  String get acceptPairing => 'Allow';
 
   @override
   String connectToPeerTitle(String peer) {
@@ -493,7 +479,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get reachingOtherDevice => 'Reaching the other Device…';
+  String get reachingOtherDevice =>
+      'Reaching the other Device, waiting for its user to allow it…';
 
   @override
   String get manualAddressTitle => 'Reach a Device by address';
@@ -515,15 +502,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.';
 
   @override
-  String sendTextTitle(String peer) {
-    return 'Send text to $peer';
-  }
+  String get openConversation => 'Open conversation';
 
   @override
-  String get fieldText => 'Text';
+  String get conversationEmpty =>
+      'Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.';
 
   @override
-  String get textHelper => 'It arrives as a Transfer the Device has to accept';
+  String get messageHint => 'Type a message';
 
   @override
   String get send => 'Send';

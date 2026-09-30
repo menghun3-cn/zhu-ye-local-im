@@ -14,9 +14,8 @@ import 'fingerprint.dart';
 /// Fingerprint is something a Device can prove it holds.
 ///
 /// This is the model, not the flow. How a Device *joins* a group — a scanned QR
-/// code, a typed code with short-authentication-string comparison, and the
-/// persistence that survives a restart — is a separate concern, and a separate
-/// increment.
+/// code, a typed code, a request the other Device answers, and the persistence
+/// that survives a restart — is a separate concern, and a separate increment.
 final class OwnerGroup {
   /// A group owned by [self], optionally already containing [members].
   ///

@@ -96,11 +96,15 @@ meanings.
 
 The same PRK yields a six-digit short authentication string — four bytes of
 `HKDF-Expand` under the label `sas`, taken modulo one million — that both
-Devices display. Completing the handshake proves the peer knows the Pairing
-Secret; it does **not** prove *which* Device is on the other end, because any
-Device holding the same secret authenticates identically. The SAS is what closes
-that gap: the user compares it out of band, and a mismatched peer is
-disconnected.
+Devices derive and neither displays. Completing the handshake proves the peer
+knows the Pairing Secret; it does **not** prove *which* Device is on the other
+end, because any Device holding the same secret authenticates identically. The
+SAS does not close that gap and never did: it is derived from the handshake and
+from the two Fingerprints, so both sides agree on it *whatever* peer connected,
+and the Fingerprint a caller announces is a claim. What it is for now is
+binding — a Pairing signs its admission over a context built from this value, so
+a signature cannot be carried from one handshake into another. Which Device gets
+admitted is decided by the person being asked, not by comparing screens.
 
 Every way the handshake can fail — a timeout, a peer that hung up, a transport
 that died mid-exchange — surfaces as `HandshakeException`, so a caller decides
