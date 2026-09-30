@@ -196,6 +196,10 @@ Uint8List encodeFrame(Frame frame) {
 ///
 /// TCP delivers byte ranges, not messages, so every frame boundary has to be
 /// reassembled by the reader. Instances are stateful and single-use.
+///
+/// A returned frame owns its bytes: [next] copies a frame's payload out of the
+/// internal read buffer, so whatever the decoder does to that buffer afterwards
+/// — appending, growing, compacting — cannot change a frame already handed out.
 final class FrameDecoder {
   Uint8List _buffer = Uint8List(1024);
   int _start = 0;
@@ -231,11 +235,14 @@ final class FrameDecoder {
     if (_end - _start < 4 + length) return null;
 
     final kind = FrameKind.fromCode(_buffer[_start + 4]);
-    final payload = Uint8List.sublistView(
-      _buffer,
-      _start + 5,
-      _start + 4 + length,
-    );
+    // Copied out of the read buffer rather than viewed into it. The buffer is
+    // reused: [add] appends at its end and [_compact] shifts the live tail
+    // down over the bytes a frame just came from, so a frame holding a view
+    // would have its own payload rewritten under it the moment the next frame
+    // is decoded. That is not hypothetical — a 512 KiB record sharing one read
+    // with the first bytes of the following frame came back with its nonce
+    // overwritten and failed authentication for no visible reason.
+    final payload = _buffer.sublist(_start + 5, _start + 4 + length);
     final frame = switch (kind) {
       FrameKind.control => _decodeControl(payload),
       FrameKind.chunk => _decodeChunk(payload),
