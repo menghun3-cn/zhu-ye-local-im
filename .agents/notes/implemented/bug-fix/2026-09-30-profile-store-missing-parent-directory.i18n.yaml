@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-profile-store-missing-parent-directory.md
+#   git hash-object 2026-09-30-profile-store-missing-parent-directory.zh.md
+2026-09-30-profile-store-missing-parent-directory.md: d4ef9c583c5f8838dd46de6cef5b61f854805d65
+2026-09-30-profile-store-missing-parent-directory.zh.md: eac3e42270ae0b0dd38268c498a6cd5786e664af
