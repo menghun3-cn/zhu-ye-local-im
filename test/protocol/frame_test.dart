@@ -229,6 +229,50 @@ void main() {
     });
   });
 
+  group('decoder buffer reuse', () {
+    // Regression: next() used to hand out payloads that were views into the
+    // decoder's own read buffer, which _compact() then rewrote in place once a
+    // frame was long enough to make the dead prefix worth reclaiming. A large
+    // record that shared one read with the following frame came back with its
+    // leading bytes overwritten, so it failed authentication for no reason a
+    // reader of the ciphertext could see.
+    test('a large sealed frame survives the next frame being buffered', () {
+      final nonce = _bytes(List.generate(12, (i) => i + 1));
+      final cipherText = _bytes(List.generate(512 * 1024, (i) => i % 251));
+      final following = encodeFrame(
+        ControlFrame({'t': 'after', 'pad': 'x' * 120}),
+      );
+
+      final decoder = FrameDecoder()
+        ..add(encodeFrame(SealedFrame(nonce: nonce, cipherText: cipherText)))
+        // Enough of the next frame that compaction has bytes to shift, which
+        // is what used to land on top of the frame decoded just before it.
+        ..add(following.sublist(0, 64));
+
+      final frame = decoder.next()! as SealedFrame;
+      expect(frame.nonce, nonce);
+      expect(frame.cipherText, cipherText);
+    });
+
+    test('a large chunk frame survives the next frame being buffered', () {
+      final data = _bytes(List.generate(512 * 1024, (i) => i % 251));
+      final following = encodeFrame(
+        ControlFrame({'t': 'after', 'pad': 'x' * 120}),
+      );
+
+      final decoder = FrameDecoder()
+        ..add(
+          encodeFrame(
+            ChunkFrame(transferId: 't', itemId: 'i', offset: 0, data: data),
+          ),
+        )
+        ..add(following.sublist(0, 64));
+
+      final frame = decoder.next()! as ChunkFrame;
+      expect(frame.data, data);
+    });
+  });
+
   group('decoder limits', () {
     test('rejects a length that exceeds the ceiling before allocating', () {
       final header = Uint8List(4);
