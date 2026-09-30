@@ -52,6 +52,12 @@ class SettingsPage extends StatelessWidget {
                   l10n.factListening,
                   port == null ? l10n.notAcceptingSessions : l10n.onPort(port),
                 ),
+                FactLine(
+                  l10n.factPairingRequests,
+                  controller.isAcceptingPairings
+                      ? l10n.pairingListening
+                      : l10n.pairingNotListening,
+                ),
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () => showRenameDialog(context, controller),

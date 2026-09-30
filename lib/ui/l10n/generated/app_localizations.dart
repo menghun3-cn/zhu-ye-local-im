@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Pairing failed: {detail}'**
   String failurePairing(String detail);
 
+  /// No description provided for @failureCannotReach.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the other Device: {detail}. Check that it is running, that both machines are on the same network, and that its firewall allows incoming TCP 47656.'**
+  String failureCannotReach(String detail);
+
   /// No description provided for @refusalSessionAlreadyOpen.
   ///
   /// In en, this message translates to:
@@ -479,14 +485,32 @@ abstract class AppLocalizations {
   /// No description provided for @pairingCardUnpairedBody.
   ///
   /// In en, this message translates to:
-  /// **'Pairing takes two taps and no code to retype: tap Receive a connection here, and on the other Device tap Pair beside this one in its list. Both screens then show the same six digits to confirm.'**
+  /// **'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to confirm. Both screens then show the same six digits. After that, sending files and messages needs nothing further.'**
   String get pairingCardUnpairedBody;
 
-  /// No description provided for @receiveAConnection.
+  /// No description provided for @acceptPairingRequests.
   ///
   /// In en, this message translates to:
-  /// **'Receive a connection'**
-  String get receiveAConnection;
+  /// **'Answer pairing requests'**
+  String get acceptPairingRequests;
+
+  /// No description provided for @pairingListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering requests from other Devices'**
+  String get pairingListening;
+
+  /// No description provided for @pairingNotListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Not answering requests'**
+  String get pairingNotListening;
+
+  /// No description provided for @factPairingRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing requests'**
+  String get factPairingRequests;
 
   /// No description provided for @peerNameNotAnnounced.
   ///
@@ -812,11 +836,41 @@ abstract class AppLocalizations {
   /// **'They match'**
   String get theyMatch;
 
-  /// No description provided for @receiveWaiting.
+  /// No description provided for @pairingRequestTitle.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for a Device to connect. On the other Device, tap Pair beside this one. Both screens will then show the same six digits to compare.'**
-  String get receiveWaiting;
+  /// **'Pairing request'**
+  String get pairingRequestTitle;
+
+  /// No description provided for @pairingRequestFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'{alias} wants to pair with this Device.'**
+  String pairingRequestFrom(String alias);
+
+  /// No description provided for @pairingRequestUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'a Device with no name yet'**
+  String get pairingRequestUnnamed;
+
+  /// No description provided for @pairingRequestClaimHint.
+  ///
+  /// In en, this message translates to:
+  /// **'That name is the caller\'s own claim and nothing has checked it. What checks it is the six digits both screens show next.'**
+  String get pairingRequestClaimHint;
+
+  /// No description provided for @pairingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the digits to compare…'**
+  String get pairingPreparing;
+
+  /// No description provided for @continuePairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get continuePairing;
 
   /// No description provided for @cancelThisPairing.
   ///

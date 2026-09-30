@@ -143,15 +143,25 @@ class _PairingCard extends StatelessWidget {
                   : l10n.pairingCardUnpairedBody,
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => showReceiveDialog(context, controller),
-                  icon: const Icon(Icons.phonelink_ring),
-                  label: Text(l10n.receiveAConnection),
-                ),
-              ],
+            // A switch rather than a button: this Device answers requests for as
+            // long as it is on, so it is a standing state rather than a step the
+            // user takes. The subtitle reports the listener rather than the
+            // preference, because the two can disagree — a port already taken by
+            // a second copy of the app is the case — and the switch promising
+            // something that is not happening would be the lie.
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: controller.acceptsPairingRequests,
+              onChanged: (value) => guarded(
+                context,
+                () => controller.setAcceptsPairingRequests(value),
+              ),
+              title: Text(l10n.acceptPairingRequests),
+              subtitle: Text(
+                controller.isAcceptingPairings
+                    ? l10n.pairingListening
+                    : l10n.pairingNotListening,
+              ),
             ),
           ],
         ),

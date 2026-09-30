@@ -25,16 +25,18 @@ Future<void> showRenameDialog(
   builder: (_) => _RenameDialog(controller: controller),
 );
 
-/// Opens an open Pairing and waits for another Device to connect to it.
-Future<void> showReceiveDialog(
+/// Asks whether the Device that dialled this one may pair with it.
+///
+/// Raised by the application rather than by a button, and that is the point:
+/// anything on the link may dial this Device, so the dialog *is* the admission
+/// step. Closing it without answering refuses the request — a Device nobody is
+/// looking at is not a Device that said yes.
+Future<void> showPairingRequestDialog(
   BuildContext context,
-  LocalTransferController controller,
+  PairingRequest request,
 ) => showDialog<void>(
   context: context,
-  // Not dismissible by tapping outside: withdrawing the invitation by
-  // accident mid-Pairing is not a "cancel" a user means.
-  barrierDismissible: false,
-  builder: (_) => _ReceiveDialog(controller: controller),
+  builder: (_) => _PairingRequestDialog(request: request),
 );
 
 /// Pairs with a discovered [peer] that is receiving, without typing a code.
@@ -283,62 +285,74 @@ class _RenameDialogState extends State<_RenameDialog> {
   }
 }
 
-// ------------------------------------------------------------------ receive
+// --------------------------------------------------------- pairing requests
 
-/// The receiving side of the click-to-pair flow: this Device waits, the user
-/// of the other Device taps its name in a list.
-class _ReceiveDialog extends StatefulWidget {
-  const _ReceiveDialog({required this.controller});
+/// The answering side of the click-to-pair flow: a Device dialled this one and
+/// is waiting to hear whether it may pair.
+///
+/// Two questions in one window, in the order they have to be asked. First
+/// whether to talk to this caller at all — the name above is its own claim, so
+/// the point of the step is that a person decides to spend the next two taps on
+/// it. Then the six digits, which is the part that actually checks the claim.
+class _PairingRequestDialog extends StatefulWidget {
+  const _PairingRequestDialog({required this.request});
 
-  final LocalTransferController controller;
+  final PairingRequest request;
 
   @override
-  State<_ReceiveDialog> createState() => _ReceiveDialogState();
+  State<_PairingRequestDialog> createState() => _PairingRequestDialogState();
 }
 
-class _ReceiveDialogState extends State<_ReceiveDialog> {
-  PairingInvitation? _invitation;
+class _PairingRequestDialogState extends State<_PairingRequestDialog> {
   PairingAttempt? _attempt;
   Object? _failure;
   bool _busy = false;
   bool _confirmed = false;
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(_open());
-  }
-
-  @override
   void dispose() {
-    // Closing the dialog withdraws the invitation: a listener still open
-    // after the window is gone would admit a Device nobody is watching.
+    // However this window goes away, nobody is left waiting behind it: a
+    // request left unanswered keeps the other Device on a spinner, and an
+    // attempt left open keeps the next caller out. Refusing an admitted request
+    // is a no-op and cancelling its attempt is the real abandonment, so both
+    // are issued rather than tracking which one applies.
     if (!_confirmed) {
-      unawaited(_attempt?.cancel());
-      unawaited(_invitation?.cancel());
+      unawaited(widget.request.refuse());
+      final attempt = _attempt;
+      if (attempt != null) unawaited(attempt.cancel());
     }
     super.dispose();
   }
 
-  Future<void> _open() async {
+  Future<void> _admit() async {
+    setState(() {
+      _busy = true;
+      _failure = null;
+    });
     try {
-      final invitation = await widget.controller.inviteOpen();
-      if (!mounted) {
-        unawaited(invitation.cancel());
-        return;
-      }
-      setState(() => _invitation = invitation);
-      // This is the step that waits: it completes when a Device connects, not
-      // when the user does anything.
-      final attempt = await invitation.attempt;
+      final attempt = await widget.request.admit();
       if (!mounted) {
         unawaited(attempt.cancel());
         return;
       }
-      setState(() => _attempt = attempt);
+      setState(() {
+        _attempt = attempt;
+        _busy = false;
+      });
     } on Object catch (error) {
-      if (mounted) setState(() => _failure = error);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _failure = error;
+        });
+      }
     }
+  }
+
+  Future<void> _refuse() async {
+    setState(() => _busy = true);
+    await widget.request.refuse();
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _confirm() async {
@@ -351,6 +365,9 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
     try {
       await attempt.confirm();
       _confirmed = true;
+      // No Session is opened from this side: the Device that dialled opens it,
+      // and a Session dialled from both ends at once would have each end refuse
+      // the other's as a second one.
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (mounted) {
@@ -365,22 +382,39 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final invitation = _invitation;
+    final theme = Theme.of(context);
     final attempt = _attempt;
+    final caller = widget.request.caller;
+    // An empty name is what a Device that answered Discovery without announcing
+    // one looks like; saying so beats a blank where a name should be.
+    final name = caller.alias.isEmpty
+        ? l10n.pairingRequestUnnamed
+        : caller.alias;
     return AlertDialog(
-      title: Text(l10n.receiveAConnection),
+      title: Text(l10n.pairingRequestTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (invitation == null && _failure == null)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(),
-            ),
-          if (invitation != null && attempt == null)
+          if (attempt == null) Text(l10n.pairingRequestFrom(name)),
+          if (attempt == null)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(l10n.receiveWaiting),
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                l10n.pairingRequestClaimHint,
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          if (attempt == null && _busy)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(l10n.pairingPreparing),
+                ],
+              ),
             ),
           if (attempt != null)
             _Confirmation(
@@ -392,10 +426,21 @@ class _ReceiveDialogState extends State<_ReceiveDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(attempt == null ? l10n.cancel : l10n.cancelThisPairing),
-        ),
+        if (attempt == null)
+          TextButton(
+            onPressed: _busy ? null : () => unawaited(_refuse()),
+            child: Text(l10n.refuse),
+          )
+        else
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l10n.cancelThisPairing),
+          ),
+        if (attempt == null)
+          FilledButton(
+            onPressed: _busy ? null : () => unawaited(_admit()),
+            child: Text(l10n.continuePairing),
+          ),
       ],
     );
   }
@@ -446,7 +491,7 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
       return;
     }
     try {
-      final attempt = await widget.controller.joinOpen(host: address);
+      final attempt = await widget.controller.pairWith(host: address);
       if (!mounted) {
         unawaited(attempt.cancel());
         return;
