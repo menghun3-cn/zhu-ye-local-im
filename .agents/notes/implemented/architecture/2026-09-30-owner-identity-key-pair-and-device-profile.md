@@ -43,6 +43,12 @@ one unit through a `ProfileStore`:
   tag, and loading refuses a profile whose `self` fingerprint disagrees with
   the seed's key: that combination is not a Device, it is a contradiction,
   and it fails loudly rather than silently becoming a different Device.
+- A `session` section sits beside the identity and carries the group secret
+  (`LocalProfile.groupSecret`, absent until a Pairing produces one), because a
+  Device that forgot it would have to be re-paired after every restart. It
+  lives on `LocalProfile` rather than on `DeviceProfile`: a profile is state a
+  UI renders and a test builds by hand, and key material has no place in
+  either.
 
 Trust stays split exactly as the vocabulary demands: Owner Group membership
 is the Mirroring grant, Favorites are the weaker "skip per-transfer
@@ -83,6 +89,9 @@ damaged file aside and reporting it keeps the user in control.
 - The private key sits in a JSON file on local disk. Anyone who can read that
   file can *be* this Device — the same trust boundary as the rest of the
   on-disk state, and deliberately no stronger.
+- The group secret shares that boundary, and it is the stronger of the two in
+  effect: the key proves identity, but the group secret is what opens Sessions
+  inside the Owner Group at all.
 - `lib/core/` remains Flutter-free: the platform is a parameter of
   `loadOrGenerateLocalProfile`, not something the core detects, so the
   `dart test` gate still covers everything here.
