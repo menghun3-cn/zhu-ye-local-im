@@ -39,6 +39,14 @@ Future<void> guarded(
 /// detail is kept verbatim: it is a fact about the network, not prose this
 /// application wrote, and translating it would make it harder to act on rather
 /// than easier.
+///
+/// The one core failure that gets more than its own detail is a dial that never
+/// landed. Its cause is almost always outside this application — the other
+/// Device is not running, is on another network, or is behind a firewall — so
+/// the sentence names what to check instead of leaving the user with the
+/// operating system's word for it. That is why [PairingException] carries
+/// `unreachable` rather than making this function read tea leaves out of the
+/// message.
 String describeFailure(Object error, AppLocalizations l10n) => switch (error) {
   AppStateException(:final refusal, :final detail) => describeRefusal(
     refusal,
@@ -46,6 +54,8 @@ String describeFailure(Object error, AppLocalizations l10n) => switch (error) {
     l10n,
   ),
   HandshakeException(:final message) => l10n.failureUnreachable(message),
+  PairingException(:final message, unreachable: true) =>
+    l10n.failureCannotReach(message),
   PairingException(:final message) => l10n.failurePairing(message),
   _ => '$error',
 };

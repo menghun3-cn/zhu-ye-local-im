@@ -9,6 +9,7 @@ import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
+import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/seams.dart';
 
 /// Shared scaffolding for the tests that need a widget tree.
@@ -536,26 +537,54 @@ Future<void> untilTrue(
 /// Pairs two Devices through the controller, with no window in the way.
 ///
 /// This is state setup, not the subject under test: pairing as a *user* does it
-/// — two windows, a code read off one screen and typed into the other — is what
-/// the two-window test covers. Every other test would otherwise pay for that
-/// whole flow just to reach a paired Device.
+/// — two windows, a request answered on one and a tap on the other — is what
+/// [pairThroughWindows] covers, and every other test would otherwise pay for
+/// that whole flow just to reach a paired Device.
 ///
-/// Inviting, dialling and confirming are all real sockets, so the whole exchange
-/// runs on the real event loop — see [startUiDevice] for why that is not
-/// optional.
+/// ## The host must have no window yet
+///
+/// A request reaches a screen as a dialog. This helper answers it through the
+/// controller instead, so if the host's window is already in the tree the
+/// dialog is left open — and a modal dialog swallows every later tap, which
+/// fails a test somewhere else entirely. Pair first, then pump. The guard at
+/// the end of this function says so out loud rather than leaving the next
+/// reader to work it out from a timeout.
+///
+/// The exchange is real sockets, so the whole thing runs on the real event
+/// loop — see [startUiDevice] for why that is not optional. Allowing the
+/// request here is the test standing in for the tap on the host's screen; it is
+/// *not* optional, which is the property the flow is built on, so there is no
+/// path through this helper that skips it.
 Future<void> pairDevices(
   WidgetTester tester,
   UiDevice host,
   UiDevice guest,
 ) async {
   await tester.runAsync(() async {
-    final invitation = await host.controller.invite();
-    final guestAttempt = await guest.controller.join(
-      host: InternetAddress.loopbackIPv4.address,
-      code: invitation.code,
-      port: invitation.port,
+    // A Device answers requests as a standing state, so the host came up
+    // listening and the guest has somewhere to dial without anybody opening
+    // anything.
+    await untilTrue(
+      () => host.controller.isAcceptingPairings,
+      'the host to answer Pairing requests',
     );
-    final hostAttempt = await invitation.attempt;
+    final port = host.controller.pairingPort;
+    expect(port, isNotNull, reason: 'an answering Device bound a port');
+
+    final request = host.controller.pairingRequests.first;
+    // Deliberately not awaited yet: this call does not return until the host
+    // has answered, so waiting for it here would be waiting for a step the next
+    // line is about to perform.
+    final guestJoin = guest.controller.pairWith(
+      host: InternetAddress.loopbackIPv4.address,
+      port: port,
+    );
+    final asking = await request.timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => fail('the host was never asked about the guest'),
+    );
+    final hostAttempt = await asking.admit();
+    final guestAttempt = await guestJoin;
     expect(
       hostAttempt.sas,
       guestAttempt.sas,
@@ -567,6 +596,19 @@ Future<void> pairDevices(
       'both Devices to serve Sessions',
     );
   });
+  // See the note above: a host window in the tree means the question went
+  // somewhere this helper does not answer.
+  await tester.pump();
+  for (final window in [windowA, windowB]) {
+    expect(
+      window.within(find.text(l10n.pairingRequestTitle)).evaluate(),
+      isEmpty,
+      reason:
+          'pair the Devices before pumping the host window: this helper '
+          'answers the request through the controller, so a host window that '
+          'is already on screen is left showing a question nobody taps',
+    );
+  }
 }
 
 /// Opens a Session from [from] to [to] over a real loopback socket.
@@ -593,11 +635,12 @@ Future<void> connectDevices(
 
 /// Pairs two windows by clicking, the way two people now do it.
 ///
-/// One window receives: its user taps Receive a connection and waits. The
-/// other's user taps Pair on the card of the Device they want, which dials the
-/// receiver's open Pairing. Nothing is typed anywhere — the digits both
-/// screens show are derived on each Device and never sent, so the test reads
-/// them off both screens only to assert they agree.
+/// The host does nothing to prepare: it answers requests for as long as it is
+/// running, so the guest simply taps Pair on its card. What the host's user is
+/// asked is *one question* — whether to talk to the Device that dialled — and
+/// only then do the two screens show the digits to compare. Nothing is typed
+/// anywhere; the digits are derived on each Device and never sent, so the test
+/// reads them off both screens only to assert they agree.
 Future<void> pairThroughWindows(
   WidgetTester tester,
   TestWindow host,
@@ -606,16 +649,10 @@ Future<void> pairThroughWindows(
   required UiDevice guestDevice,
 }) async {
   await openTab(tester, l10n.tabDevices, window: host);
-  await tapButton(tester, l10n.receiveAConnection, window: host);
-  await pumpUntil(
-    tester,
-    () => dialogIsOpen(host),
-    description: 'the host to open its receive dialog',
-  );
   await pumpUntil(
     tester,
     () => windowHostListening(tester, host),
-    description: 'the host to be listening for a connection',
+    description: 'the host to be answering Pairing requests',
   );
 
   await openTab(tester, l10n.tabDevices, window: guest);
@@ -625,6 +662,16 @@ Future<void> pairThroughWindows(
     description: 'the guest to discover the host and offer Pair',
   );
   await tapButton(tester, l10n.pair, window: guest);
+
+  // The guest is now blocked on the host's user. The question arrives on the
+  // host by itself — nobody opened a window for it — and the guest stays out
+  // until it is answered.
+  await pumpUntil(
+    tester,
+    () => hasButton(tester, l10n.continuePairing, window: host),
+    description: 'the host to be asked about the request',
+  );
+  await tapDialogButton(tester, l10n.continuePairing, window: host);
 
   // Both sides now hold an attempt and show the digits to compare.
   await pumpUntil(
@@ -663,10 +710,18 @@ Future<void> pairThroughWindows(
   );
 }
 
-/// Whether [window]'s receive dialog is past opening the invitation, i.e.
-/// whether the listener the guest will dial is actually up.
-bool windowHostListening(WidgetTester tester, TestWindow window) =>
-    window.within(find.text(l10n.receiveWaiting)).evaluate().isNotEmpty;
+/// Whether [window]'s pairing card says this Device is answering requests.
+///
+/// Read off the card's switch rather than the controller, and read off the
+/// *subtitle* rather than the switch: the subtitle reports the listener while
+/// the switch reports the preference, and it is the listener — the thing the
+/// guest's dial can actually reach — that has to be up before the guest taps
+/// Pair.
+bool windowHostListening(WidgetTester tester, TestWindow window) => onPage(
+  window,
+  DevicesPage,
+  find.text(l10n.pairingListening),
+).evaluate().isNotEmpty;
 
 /// Whether [window] currently has a button labelled [label].
 bool hasButton(

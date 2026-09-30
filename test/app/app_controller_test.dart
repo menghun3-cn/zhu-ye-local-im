@@ -53,18 +53,22 @@ Future<TestDevice> startDevice(
   return device;
 }
 
-/// Runs the typed-code Pairing between [host] and [guest] to completion.
+/// Runs the Pairing two people now do: [host] answers requests, [guest] picks it
+/// out of its list, and the host's user allows it.
 ///
-/// Both users confirm, as they would on two screens: the code gets the two
-/// Devices talking, and the confirmation is what turns that into membership.
+/// Both users confirm, as they would on two screens: allowing the request gets
+/// the two Devices talking, and the confirmation is what turns that into
+/// membership. The two halves are started before either is awaited — the dial
+/// does not resolve until the other side allows it, which is the whole point of
+/// the flow and would deadlock a sequential version.
 Future<void> pairUp(TestDevice host, TestDevice guest) async {
-  final invitation = await host.controller.invite();
-  final guestAttempt = await guest.controller.join(
+  final request = host.controller.pairingRequests.first;
+  final joinFuture = guest.controller.pairWith(
     host: InternetAddress.loopbackIPv4.address,
-    code: invitation.code,
-    port: invitation.port,
+    port: host.controller.pairingPort,
   );
-  final hostAttempt = await invitation.attempt;
+  final hostAttempt = await (await request).admit();
+  final guestAttempt = await joinFuture;
   expect(
     hostAttempt.sas,
     guestAttempt.sas,
@@ -187,27 +191,58 @@ void main() {
       );
     });
 
-    test('a code that does not match the invitation pairs nobody', () async {
+    test('a request the user refuses pairs nobody', () async {
       final hub = MemoryBeaconHub();
       final alice = await startDevice(hub.a, 'Alice');
       final bob = await startDevice(hub.b, 'Bob');
 
-      final invitation = await alice.controller.invite();
-      final wrong = PairingSecret.generateCode();
-      expect(wrong, isNot(invitation.code));
+      final request = alice.controller.pairingRequests.first;
+      final joinFuture = bob.controller.pairWith(
+        host: InternetAddress.loopbackIPv4.address,
+        port: alice.controller.pairingPort,
+      );
+      await (await request).refuse();
 
+      // Which error depends on whether the refusal lands before or after the
+      // caller's first message: a closed link ends the read, and a send onto a
+      // link being torn down fails the handshake. Either way there is no
+      // attempt to confirm, which is what the test is about.
       await expectLater(
-        bob.controller.join(
-          host: InternetAddress.loopbackIPv4.address,
-          code: wrong,
-          port: invitation.port,
-        ),
-        throwsA(isA<PairingException>()),
+        joinFuture,
+        throwsA(anyOf(isA<PairingException>(), isA<HandshakeException>())),
       );
       expect(alice.controller.isPaired, isFalse);
       expect(bob.controller.isPaired, isFalse);
-      await invitation.cancel();
     });
+
+    test(
+      'turning requests off takes the listener down, and on brings it back',
+      () async {
+        final hub = MemoryBeaconHub();
+        final alice = await startDevice(hub.a, 'Alice');
+
+        expect(alice.controller.acceptsPairingRequests, isTrue);
+        expect(alice.controller.isAcceptingPairings, isTrue);
+        expect(alice.controller.pairingPort, isNotNull);
+
+        await alice.controller.setAcceptsPairingRequests(false);
+
+        expect(alice.controller.acceptsPairingRequests, isFalse);
+        expect(
+          alice.controller.isAcceptingPairings,
+          isFalse,
+          reason:
+              'a Device that says it is not answering must not be listening',
+        );
+        expect(alice.controller.pairingPort, isNull);
+
+        await alice.controller.setAcceptsPairingRequests(true);
+
+        expect(alice.controller.acceptsPairingRequests, isTrue);
+        expect(alice.controller.isAcceptingPairings, isTrue);
+        expect(alice.controller.pairingPort, isNotNull);
+      },
+    );
 
     test('renaming keeps the group and changes what is announced', () async {
       final hub = MemoryBeaconHub();

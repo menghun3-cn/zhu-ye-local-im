@@ -33,10 +33,20 @@ const int defaultPairingPort = 47656;
 /// because a UI has one thing to say about all of them: this Device was not
 /// paired.
 final class PairingException implements Exception {
-  const PairingException(this.message);
+  const PairingException(this.message, {this.unreachable = false});
 
   /// Why the Pairing failed, for logs and for the UI.
   final String message;
+
+  /// Whether the failure was that the other Device could not be reached at all.
+  ///
+  /// Split out because it is the one failure a user can usually fix, and the
+  /// fix is not in this application: a dial that never arrived is a Device that
+  /// is not running, on another network, or behind a firewall that drops
+  /// incoming connections. The distinction cannot be recovered from [message] —
+  /// that carries the operating system's own words, verbatim and untranslated —
+  /// so it is carried here instead, where a UI can act on it.
+  final bool unreachable;
 
   @override
   String toString() => 'PairingException: $message';
@@ -104,17 +114,15 @@ abstract interface class PairingAttempt {
   Future<void> cancel();
 }
 
-/// A Pairing this Device is hosting: it shows a code and waits — or, on an
-/// open Pairing, waits with no code on screen at all.
+/// A Pairing this Device is hosting by code: it shows a code and waits for
+/// somebody to type it.
+///
+/// The code path is the fallback, not the flow a user meets: a Device that is
+/// *answering requests* (see [PairingService.receive]) is reached by tapping its
+/// name in a list, and no code is exchanged at all. This class is what remains
+/// for the case where there is no list to tap — a Device Discovery cannot see.
 final class PairingInvitation {
-  PairingInvitation._(
-    this._service, {
-    required String? code,
-    required this.port,
-  })
-    // A named parameter cannot be a private field, so each is assigned here.
-    // ignore: prefer_initializing_formals
-    : _code = code {
+  PairingInvitation._(this._service, {required this.code, required this.port}) {
     // A failure is delivered to whoever is waiting on [attempt]. A caller that
     // is *not* waiting — a screen the user navigated away from, a test that
     // only cancels — must not have it surface as an unhandled error, which Dart
@@ -125,24 +133,8 @@ final class PairingInvitation {
 
   final PairingService _service;
 
-  final String? _code;
-
   /// The code the other Device's user types. Ten Crockford base32 symbols.
-  ///
-  /// Reading this on an open Pairing — one that asked for no code — is a
-  /// [StateError] rather than an empty string: an invitation either shows a
-  /// code or it does not, and a blank that looks like a code would be a bug
-  /// wearing a value.
-  String get code {
-    final value = _code;
-    if (value == null) {
-      throw StateError('an open Pairing shows no code');
-    }
-    return value;
-  }
-
-  /// Whether this invitation is waiting for a Device that will type a code.
-  bool get showsCode => _code != null;
+  final String code;
 
   /// The port the invitation listens on.
   final int port;
@@ -189,13 +181,64 @@ final class PairingInvitation {
   }
 }
 
+/// A Device that has dialled this one and is waiting for a person to decide.
+///
+/// A request is emitted the moment the caller has completed the handshake, and
+/// **before anything has been given to it**. That ordering is the whole point of
+/// the type: on an open Pairing the handshake secret is a well-known constant,
+/// so any Device on the link can complete it — what such a caller must not be
+/// able to obtain is this Device's group secret. Nothing offers that until
+/// somebody taps through [admit], and a request nobody answers is refused
+/// rather than left holding a link.
+///
+/// The wait is bounded: see [PairingService.requestTimeout].
+abstract interface class PairingRequest {
+  /// The Device asking, as it claimed itself during the handshake.
+  ///
+  /// A claim, not a proof. Anyone can complete a handshake against a well-known
+  /// secret and call itself anything, so an Alias from here is worth exactly
+  /// what a screen says it is worth — a label — and the check that matters is
+  /// the six digits the comparison step derives. [PairingAttempt.peer] is the
+  /// same Device after it has proved it holds the key it announced.
+  DeviceDescriptor get caller;
+
+  /// Lets [caller] through to the six-digit comparison.
+  ///
+  /// Everything up to the comparison happens here: the two Devices sign over
+  /// the session, check each other's keys and settle on a group secret. What
+  /// comes back is still only an opportunity to confirm — nothing is admitted
+  /// until both users confirm.
+  ///
+  /// Throws [PairingException] when the peer's admission does not check out,
+  /// and [StateError] when the request has already been settled.
+  Future<PairingAttempt> admit();
+
+  /// Turns [caller] away. Neither side is admitted, and nothing is written.
+  ///
+  /// Safe to call when the request has already settled, so a screen that is
+  /// being torn down can refuse without having to know what it already did.
+  Future<void> refuse();
+}
+
 /// Pairs this Device with another, one Pairing at a time.
 ///
 /// A Pairing runs on its own temporary link, never through a Session: the
 /// Session port is authenticated with the group secret, and the whole point of
-/// a Pairing is that the two Devices do not share one yet. So the two sides
-/// meet on [defaultPairingPort] with a secret derived from a code one user
-/// reads to the other, and when it is over that link is gone.
+/// a Pairing is that the two Devices do not share one yet. So the two sides meet
+/// on [defaultPairingPort], and when it is over that link is gone.
+///
+/// ## Two ways in, and which one is the flow
+///
+/// * **[receive]** — this Device answers requests, always. Somebody picks this
+///   Device out of a list and taps Pair beside it; this Device asks its user,
+///   and the two users compare digits. This is the flow, because it is the one
+///   that asks nothing of the user being paired *with* beyond a tap on a
+///   question.
+/// * **[invite]** — this Device shows a code and the other user types it. A
+///   fallback for a peer Discovery cannot see and the two users can still talk
+///   to each other, not a second way in: it derives the handshake secret's
+///   strength from ten typed symbols, where [receive] stands on the fact that
+///   the callers have to be answered one at a time by a person.
 ///
 /// What a Pairing actually decides:
 ///
@@ -210,21 +253,26 @@ final class PairingInvitation {
 ///   keys the handshake derived, so two Devices agree on them without either
 ///   sending anything, and a Device that did not take part in *this* exchange
 ///   cannot know them.
-/// * **What the group secret is.** Two Devices pairing for the first time each
-///   derive it from the code, so nothing travels; a Device joining an existing
-///   group is handed the group's secret inside the sealed link.
+/// * **What the group secret is.** Two Devices pairing for the first time on a
+///   code each derive it from the code, so nothing travels; on a request the
+///   answering Device mints one and hands it over inside the sealed link. A
+///   Device joining an existing group is handed the group's secret.
 /// * **Who else is in the group.** The peer hands over its roster, so joining
 ///   an established group joins the whole group.
 ///
 /// ## What the digits are not
 ///
 /// A short authentication string is not a second layer of secrecy over the
-/// code. A peer that knows the code completes the handshake and derives the
-/// same digits as this Device, so the comparison cannot catch it; and a peer
-/// that does not know the code cannot complete the handshake at all. What the
-/// digits give the users is something *they* can check — the peer's identity
-/// and this exchange's freshness are on screen together, and the step is what
-/// keeps admission a human decision rather than an automatic one.
+/// secret that admitted the caller. On a code Pairing, a peer that knows the
+/// code completes the handshake and derives the same digits as this Device, so
+/// the comparison cannot catch it; and a peer that does not know the code cannot
+/// complete the handshake at all. On a request there is no code to know — what
+/// the digits are for is that the handshake secret is a *public constant*, so
+/// the comparison plus the two confirmations are the entire admission check.
+/// What the digits give the users in both cases is something *they* can check —
+/// the peer's identity and this exchange's freshness are on screen together, and
+/// the step is what keeps admission a human decision rather than an automatic
+/// one.
 ///
 /// The bound that does matter is the code's ~50 bits: an attacker who records a
 /// typed-code Pairing can test code guesses offline against it. That is a
@@ -246,6 +294,8 @@ final class PairingService {
     required this.store,
     this.handshakeTimeout = const Duration(seconds: 15),
     this.confirmationTimeout = const Duration(seconds: 240),
+    this.requestTimeout = const Duration(minutes: 2),
+    this.onNotice,
   });
 
   /// This Device's identity and profile, kept current by every successful
@@ -264,19 +314,55 @@ final class PairingService {
   /// the other Device and reads six digits off a screen.
   final Duration confirmationTimeout;
 
+  /// How long a [PairingRequest] may sit unanswered before it is refused.
+  ///
+  /// Bounded rather than open-ended because the caller is *waiting*: a request
+  /// nobody answers would leave the other user watching a spinner until the
+  /// process died. Two minutes is long enough to notice a prompt and walk over
+  /// to a screen, and short enough that a Device nobody is sitting at stops
+  /// collecting diallers.
+  final Duration requestTimeout;
+
+  /// Where a failure that is not anybody's request is reported.
+  ///
+  /// The listener dying is the case: a Device that can no longer be dialled
+  /// should say so somewhere a user will see rather than only via [isReceiving]
+  /// going false on a screen that is not being redrawn.
+  final void Function(String message)? onNotice;
+
   final StreamController<LocalProfile> _changes =
       StreamController<LocalProfile>.broadcast();
+  final StreamController<PairingRequest> _requests =
+      StreamController<PairingRequest>.broadcast();
   final Set<_Attempt> _attempts = {};
 
   ServerSocket? _server;
   PairingInvitation? _invitation;
+  _Receiving? _receiving;
   bool _closed = false;
 
   /// Emits the profile whenever a Pairing changes it.
   Stream<LocalProfile> get changes => _changes.stream;
 
+  /// Devices asking to pair with this one, in arrival order.
+  ///
+  /// Empty until [receive] has been called. A request is emitted once the
+  /// caller's handshake has completed and before it has been offered anything:
+  /// see [PairingRequest].
+  ///
+  /// Whoever is listening has to answer, because the caller is blocked until
+  /// then. With nobody listening at all the request is refused on the spot
+  /// rather than left hanging — there is no screen for it to appear on.
+  Stream<PairingRequest> get requests => _requests.stream;
+
   /// Whether an invitation is currently open.
   bool get isInviting => _invitation != null;
+
+  /// Whether this Device is answering Pairing requests.
+  bool get isReceiving => _receiving != null;
+
+  /// The port requests are answered on, or null when not receiving.
+  int? get receivingPort => _receiving?.port;
 
   /// This Device, as it announces itself on a Pairing link.
   ///
@@ -301,27 +387,149 @@ final class PairingService {
   /// guesses an attacker could combine. [port] defaults to
   /// [defaultPairingPort]; pass 0 for any free port, which is what a test
   /// wants.
-  Future<PairingInvitation> invite({int port = defaultPairingPort}) =>
-      _listen(code: PairingSecret.generateCode(), port: port);
+  ///
+  /// A Device cannot do this while it is answering requests: both want
+  /// [defaultPairingPort], and a caller that arrives on a request listener has
+  /// shown no code to be checked against. [stopReceiving] first. The code path
+  /// is a fallback for a peer Discovery cannot find, not a second way in.
+  Future<PairingInvitation> invite({int port = defaultPairingPort}) async {
+    if (isReceiving) {
+      throw StateError(
+        'this Device is answering Pairing requests on $receivingPort: '
+        'stopReceiving() first',
+      );
+    }
+    return _listen(code: PairingSecret.generateCode(), port: port);
+  }
 
-  /// Opens an invitation that asks for no code, and waits.
+  /// Starts answering Pairing requests on [port], and keeps answering.
   ///
-  /// This is the receiving side of the click-to-pair flow: the user of the
-  /// other Device picks this Device from a list, so nothing has to be read
-  /// off one screen and keyed into another. What stands in place of the code
-  /// is the six digits both screens show once the peer arrives — the
-  /// comparison step is not optional here, because a well-known handshake
-  /// secret means any Device on the link can start a Pairing, and the digits
-  /// plus the two confirmations are what keep admission a human decision.
+  /// This is the receiving side of the click-to-pair flow, and it is a
+  /// *listener* rather than an invitation with a lifetime. An invitation that
+  /// exists only while a window is open can only be reached by somebody who
+  /// remembered to open that window, which is a step the user of the other
+  /// Device can neither see nor perform — and it made "add a Device" something
+  /// that had to be done to a screen rather than to a Device.
   ///
-  /// When both Devices are forming a fresh group, this Device mints the group
-  /// secret and hands it to the peer inside the sealed link, so nothing about
-  /// the Pairing's outcome is derivable from the well-known constant.
-  Future<PairingInvitation> inviteOpen({int? port}) =>
-      _listen(code: null, port: port ?? defaultPairingPort);
+  /// What replaces the window as the bound is [PairingRequest]: dialling this
+  /// Device puts a question on its screen and nothing else. A caller gets an
+  /// answer, a refusal, or — past [requestTimeout] with nobody looking — a
+  /// closed link. It is never handed this Device's group secret to hold while
+  /// the user thinks about it.
+  ///
+  /// Idempotent for a port already being listened on; a [port] of 0 binds any
+  /// free port, which is what a test wants. Returns the port bound.
+  ///
+  /// Throws [PairingException] when the port cannot be bound — a second copy of
+  /// the app on one host is the case that matters — which a caller is expected
+  /// to report and carry on without rather than treat as fatal: a Device that
+  /// cannot be dialled is still a Device that can dial.
+  Future<int> receive({int port = defaultPairingPort}) async {
+    if (_closed) throw StateError('this PairingService is closed');
+    final open = _invitation;
+    if (open != null) {
+      throw StateError('an invitation is already open on ${open.port}');
+    }
+    final answering = _receiving;
+    if (answering != null) {
+      if (answering.port == port) return answering.port;
+      throw StateError(
+        'already answering Pairing requests on ${answering.port}',
+      );
+    }
+    final ServerSocket server;
+    try {
+      server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+    } on SocketException catch (error) {
+      throw PairingException(
+        'cannot answer Pairing requests on port $port: ${error.message}',
+      );
+    }
+    final receiving = _Receiving(server);
+    _receiving = receiving;
+    server.listen(
+      (socket) => unawaited(_answer(socket, receiving)),
+      onError: (Object error) {
+        // The listener is gone; saying so through [isReceiving] is more honest
+        // than leaving a Device that reports it is answering and is not.
+        _receiving = null;
+        onNotice?.call('the pairing listener failed: $error');
+      },
+      cancelOnError: false,
+    );
+    return receiving.port;
+  }
+
+  /// Stops answering Pairing requests.
+  ///
+  /// A caller already past the prompt is left to finish: refusing it would
+  /// cancel a comparison the user is in the middle of. Turning the listener off
+  /// is a statement about the next caller, not about the one on screen.
+  Future<void> stopReceiving() async {
+    final receiving = _receiving;
+    if (receiving == null) return;
+    _receiving = null;
+    await receiving.close();
+  }
+
+  /// Answers one caller: complete the handshake, then hand it to a person.
+  ///
+  /// The handshake is finished *before* anybody is asked, for a reason the
+  /// prompt depends on: the name to show comes from the descriptor exchanged
+  /// there. Nothing travels the other way — see [_negotiate] for what would,
+  /// and for why none of it may happen until [PairingRequest.admit].
+  Future<void> _answer(Socket socket, _Receiving receiving) async {
+    if (!receiving.beginHandshake()) {
+      // Too many half-open diallers already. Bounded rather than accepted,
+      // because a listener that answers every caller waits on each one for
+      // [handshakeTimeout] and a hostile Device can open them faster than that.
+      socket.destroy();
+      return;
+    }
+    final transport = SocketByteTransport.fromSocket(socket);
+    final SecureLink link;
+    try {
+      link = await SecureLink.establish(
+        transport: transport,
+        role: LinkRole.responder,
+        local: _descriptor,
+        secret: PairingSecret.openPairing(),
+        timeout: handshakeTimeout,
+      );
+    } on Object {
+      // A caller that cannot complete the handshake is not running this
+      // protocol, and there is nothing to ask a user about. The transport is
+      // closed here because `establish` hands that duty to its caller.
+      await transport.close();
+      return;
+    } finally {
+      receiving.endHandshake();
+    }
+
+    final request = _Caller(
+      service: this,
+      link: link,
+      receiving: receiving,
+      caller: link.peer.device,
+    );
+    // Nobody to ask, or somebody already being asked: the caller is turned away
+    // rather than left holding a link that no screen is going to look at. The
+    // second case is a Pairing at a time, still — two in flight would both
+    // commit to the same profile, and the rosters they write would each be
+    // missing the other's Device.
+    if (_closed ||
+        !identical(_receiving, receiving) ||
+        !_requests.hasListener ||
+        !receiving.prompt(request)) {
+      await request.refuse();
+      return;
+    }
+    _requests.add(request);
+    request.expireAfter(requestTimeout);
+  }
 
   Future<PairingInvitation> _listen({
-    required String? code,
+    required String code,
     required int port,
   }) async {
     if (_closed) throw StateError('this PairingService is closed');
@@ -329,9 +537,7 @@ final class PairingService {
     if (open != null) {
       throw StateError('an invitation is already open on ${open.port}');
     }
-    final secret = code == null
-        ? PairingSecret.openPairing()
-        : PairingSecret.fromCode(code);
+    final secret = PairingSecret.fromCode(code);
     final ServerSocket server;
     try {
       server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
@@ -387,11 +593,19 @@ final class PairingService {
     return _dial(secret: secret, host: host, port: port, openPairing: false);
   }
 
-  /// Pairs with a Device that is receiving at [host], without typing a code.
+  /// Pairs with a Device that is answering requests at [host], with no code.
   ///
   /// This is the initiating side of the click-to-pair flow: [host] is a Device
-  /// whose user tapped Receive a connection, at the address Discovery saw it
-  /// at. See [inviteOpen] for what stands in place of the code.
+  /// Discovery saw, which the user picked by name. What stands in place of the
+  /// code is the six digits both screens show — the comparison is not optional
+  /// here, because a well-known handshake secret means any Device on the link
+  /// can start a Pairing, and the digits plus the two confirmations are what
+  /// keep admission a human decision.
+  ///
+  /// Resolving is therefore not the same as being paired, and it is not
+  /// immediate either: it waits for the *other* user to allow the request. A
+  /// caller that gives up before then gets a [PairingException] rather than an
+  /// attempt to confirm.
   Future<PairingAttempt> joinOpen({
     required String host,
     int port = defaultPairingPort,
@@ -413,7 +627,14 @@ final class PairingService {
     try {
       transport = await SocketByteTransport.connect(host, port);
     } on SocketException catch (error) {
-      throw PairingException('cannot reach $host:$port: ${error.message}');
+      // Marked unreachable so a UI can say what to check. A dial that never
+      // lands is a Device that is not running, on another network, or behind a
+      // firewall that drops incoming connections — none of which is a fault in
+      // this application, and all of which are the user's to fix.
+      throw PairingException(
+        'cannot reach $host:$port: ${error.message}',
+        unreachable: true,
+      );
     }
     final SecureLink link;
     try {
@@ -437,16 +658,18 @@ final class PairingService {
     );
   }
 
-  /// Closes the service: the invitation, any attempt still in flight, and the
-  /// change stream.
+  /// Closes the service: the listener, the invitation, any attempt still in
+  /// flight, and the change stream.
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    await stopReceiving();
     final invitation = _invitation;
     if (invitation != null) await invitation.cancel();
     for (final attempt in _attempts.toList()) {
       await attempt.cancel();
     }
+    if (!_requests.isClosed) await _requests.close();
     if (!_changes.isClosed) await _changes.close();
   }
 
@@ -455,7 +678,6 @@ final class PairingService {
     PairingSecret secret,
     PairingInvitation invitation,
   ) async {
-    final openPairing = invitation._code == null;
     try {
       final socket = await invitation._connected.future;
       final link = await SecureLink.establish(
@@ -469,7 +691,7 @@ final class PairingService {
         link: link,
         role: LinkRole.responder,
         secret: secret,
-        openPairing: openPairing,
+        openPairing: false,
       );
       if (!invitation._attempt.isCompleted) {
         invitation._attempt.complete(attempt);
@@ -514,7 +736,11 @@ final class PairingService {
   ///
   /// On a typed-code Pairing the both-fresh case keeps deriving the secret
   /// from the code, exactly as before.
-  Future<PairingAttempt> _negotiate({
+  ///
+  /// Returns the concrete [_Attempt] rather than the interface: the receive
+  /// path attaches an [onFinished] hook to it, so a caller that answered the
+  /// prompt but never finished the comparison still gives its slot back.
+  Future<_Attempt> _negotiate({
     required SecureLink link,
     required LinkRole role,
     required PairingSecret secret,
@@ -531,7 +757,7 @@ final class PairingService {
     // The read is started before anything is sent. The initiator sends right
     // away; the responder waits to read first — see the doc above for why.
     final incoming = StreamIterator<WireMessage>(link.messages);
-    final theirs = _readAdmission(link, incoming);
+    final theirs = _readAdmission(link, incoming, openPairing: openPairing);
 
     final Uint8List? mineSecret;
     if (role == LinkRole.initiator) {
@@ -676,10 +902,16 @@ Uint8List _deriveGroupSecret(PairingSecret pairing) => HkdfSha256.deriveKey(
 );
 
 /// Reads the peer's admission off a Pairing link.
+///
+/// [openPairing] decides what a link that closes before admitting anything
+/// means. On a request it means the other user did not allow the Pairing —
+/// which is an answer, and the caller deserves to read it as one rather than as
+/// a peer that vanished. On a typed code it means the peer went away.
 Future<PairAdmitMessage> _readAdmission(
   SecureLink link,
-  StreamIterator<WireMessage> incoming,
-) async {
+  StreamIterator<WireMessage> incoming, {
+  required bool openPairing,
+}) async {
   while (await incoming.moveNext()) {
     final message = incoming.current;
     if (message is PairAdmitMessage) return message;
@@ -691,8 +923,10 @@ Future<PairAdmitMessage> _readAdmission(
     );
   }
   await link.close();
-  throw const PairingException(
-    'the peer closed the Pairing before admitting itself',
+  throw PairingException(
+    openPairing
+        ? 'the other Device did not allow this Pairing'
+        : 'the peer closed the Pairing before admitting itself',
   );
 }
 
@@ -705,6 +939,163 @@ Object _asPairingFailure(Object error) {
     );
   }
   return PairingException('the Pairing failed: $error');
+}
+
+/// The listener a Device answers Pairing requests on.
+///
+/// Holds what the single-shot invitation used to hold implicitly: who is being
+/// dealt with right now, and how many strangers are allowed to be mid-handshake
+/// while that happens.
+final class _Receiving {
+  _Receiving(this._server);
+
+  /// How many callers may be mid-handshake at once.
+  ///
+  /// A listener that is always open is reachable by anything on the link, and
+  /// every half-open dialler costs a task that waits `handshakeTimeout` for a
+  /// peer that never speaks. Bounded so that a flood of them cannot pin the
+  /// process — the cost of the bound is that the ninth simultaneous caller is
+  /// dropped, which no honest pair of users will ever be.
+  static const int maxHandshakes = 8;
+
+  final ServerSocket _server;
+
+  int _handshakes = 0;
+  _Caller? _prompt;
+  final Set<_Caller> _comparing = {};
+
+  int get port => _server.port;
+
+  /// Whether a caller is already being dealt with.
+  bool get isBusy => _prompt != null || _comparing.isNotEmpty;
+
+  /// Claims a handshake slot, or reports that there is none left.
+  bool beginHandshake() {
+    if (_handshakes >= maxHandshakes) return false;
+    _handshakes++;
+    return true;
+  }
+
+  void endHandshake() {
+    if (_handshakes > 0) _handshakes--;
+  }
+
+  /// Puts [request] on screen, or reports that somebody is already there.
+  ///
+  /// One at a time, still: two Pairings in flight would both commit to the same
+  /// profile, and the rosters they write would each be missing the other's
+  /// Device. A second caller is turned away rather than queued — a queue of
+  /// prompts nobody asked for is worse than an honest refusal.
+  bool prompt(_Caller request) {
+    if (isBusy) return false;
+    _prompt = request;
+    return true;
+  }
+
+  /// Moves [request] from the prompt to the comparison, where it stays until it
+  /// settles.
+  void compare(_Caller request) {
+    if (identical(_prompt, request)) _prompt = null;
+    _comparing.add(request);
+  }
+
+  /// Gives up whatever [request] was holding.
+  void release(_Caller request) {
+    if (identical(_prompt, request)) _prompt = null;
+    _comparing.remove(request);
+  }
+
+  /// Stops listening, and refuses anybody still waiting to be asked about.
+  Future<void> close() async {
+    await _server.close();
+    final waiting = _prompt;
+    _prompt = null;
+    if (waiting != null) await waiting.refuse();
+  }
+}
+
+/// A Device waiting on the other side of a prompt.
+///
+/// The name it carries is what the handshake said, which is a claim; the
+/// identity it is *checked* against arrives with the admission, and is what
+/// [PairingAttempt.peer] reports afterwards.
+final class _Caller implements PairingRequest {
+  _Caller({
+    required PairingService service,
+    required SecureLink link,
+    required _Receiving receiving,
+    required this.caller,
+  }) : // A named parameter cannot be a private field, so each is assigned here.
+       // ignore: prefer_initializing_formals
+       _service = service,
+       // ignore: prefer_initializing_formals
+       _link = link,
+       // ignore: prefer_initializing_formals
+       _receiving = receiving;
+
+  final PairingService _service;
+  final SecureLink _link;
+  final _Receiving _receiving;
+
+  @override
+  final DeviceDescriptor caller;
+
+  Timer? _expiry;
+  bool _settled = false;
+  bool _admitted = false;
+
+  @override
+  Future<PairingAttempt> admit() async {
+    if (_settled) {
+      throw StateError('this Pairing request has already been settled');
+    }
+    _settled = true;
+    _expiry?.cancel();
+    final _Attempt attempt;
+    try {
+      attempt = await _service._negotiate(
+        link: _link,
+        role: LinkRole.responder,
+        secret: PairingSecret.openPairing(),
+        openPairing: true,
+      );
+    } on Object {
+      // The exchange failed, so there is nobody to compare digits with: give
+      // the slot up now rather than when the link eventually times out.
+      _receiving.release(this);
+      rethrow;
+    }
+    _admitted = true;
+    _receiving.compare(this);
+    attempt.onFinished = () => _receiving.release(this);
+    return attempt;
+  }
+
+  @override
+  Future<void> refuse() async {
+    if (_admitted) {
+      // Past this point the link belongs to the attempt, and the way to abandon
+      // it is [PairingAttempt.cancel] — killing it here would break a
+      // comparison the user is still looking at.
+      return;
+    }
+    _settled = true;
+    _expiry?.cancel();
+    _receiving.release(this);
+    await _link.close();
+  }
+
+  /// Refuses this request when nobody has answered it within [time].
+  void expireAfter(Duration time) =>
+      _expiry = Timer(time, () => unawaited(_expire()));
+
+  Future<void> _expire() async {
+    try {
+      await refuse();
+    } on Object {
+      // Nothing to report: the caller is gone, one way or another.
+    }
+  }
 }
 
 /// One side's Pairing, from the code comparison to the commit.
@@ -742,6 +1133,13 @@ final class _Attempt implements PairingAttempt {
   @override
   bool get isOpen => !_settled && !_link.isClosed;
 
+  /// Called once when this attempt settles, whoever settles it.
+  ///
+  /// Attached by the receive path, which holds a slot for the Device on the
+  /// other end: a user who answered the prompt and then walked away would
+  /// otherwise block the next Device for the life of the process.
+  void Function()? onFinished;
+
   @override
   Future<PairingOutcome> confirm() async {
     if (!isOpen) throw const PairingException('this Pairing is over');
@@ -767,17 +1165,25 @@ final class _Attempt implements PairingAttempt {
     } on Object catch (error) {
       throw PairingException('the Pairing could not be completed: $error');
     } finally {
-      _service._notifyAttemptFinished(this);
+      _finish();
       await _link.close();
     }
   }
 
   @override
   Future<void> cancel() async {
-    _service._notifyAttemptFinished(this);
+    _finish();
     if (!isOpen) return;
     _settled = true;
     await _link.close();
+  }
+
+  /// Reports that this attempt is over, exactly once.
+  void _finish() {
+    final onFinished = this.onFinished;
+    this.onFinished = null;
+    onFinished?.call();
+    _service._notifyAttemptFinished(this);
   }
 
   Future<void> _awaitConfirmation() async {

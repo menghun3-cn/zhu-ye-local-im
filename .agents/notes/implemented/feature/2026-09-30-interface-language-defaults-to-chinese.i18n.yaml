@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-09-30-interface-language-defaults-to-chinese.md
 #   git hash-object 2026-09-30-interface-language-defaults-to-chinese.zh.md
-2026-09-30-interface-language-defaults-to-chinese.md: c4de7c38506f0cccd3c5840526bbf9c6c2f6c0a7
-2026-09-30-interface-language-defaults-to-chinese.zh.md: 6781df5ae67bd446b98c62b9693f43b34c1405a0
+2026-09-30-interface-language-defaults-to-chinese.md: 6a2ec160619ab6d226ca58ffbe32ce6520be65f7
+2026-09-30-interface-language-defaults-to-chinese.zh.md: b71c93dc50b0beb2c26b50696831fa28dd5e683d
