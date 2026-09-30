@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-app-layer-plain-dart-orchestration.md
+#   git hash-object 2026-09-30-app-layer-plain-dart-orchestration.zh.md
+2026-09-30-app-layer-plain-dart-orchestration.md: e8744c9aee2ebd021e8ef2ac87df9b6459260d92
+2026-09-30-app-layer-plain-dart-orchestration.zh.md: 8a10008ab633e580ffb2d1ca402a68e128fd82f9
