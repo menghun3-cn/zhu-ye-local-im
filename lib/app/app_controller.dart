@@ -254,6 +254,13 @@ final class LocalTransferController {
       onNotice: _notice,
     )..start();
     _clipboard = clipboard;
+    // A staged entry is something a screen renders and a user has to answer, so
+    // it has to *reach* the screen rather than wait for an unrelated rebuild to
+    // happen to carry it there. The mirror reports it on its own stream and not
+    // through `onNotice` — it is a waiting item, not a notice — so the tick that
+    // says "something moved" is wired up here. Without it the Clipboard surface
+    // sits on a stale list until the user navigates away and back.
+    _watch.add(clipboard.staged.listen((_) => _notify()));
     final pairing = PairingService(local: local, store: _store);
     _pairing = pairing;
     _watch.add(
