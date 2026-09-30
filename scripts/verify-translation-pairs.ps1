@@ -90,9 +90,9 @@ foreach ($metaFile in $metaFiles) {
                     $rendered.Add($line)
                 }
             }
-            [System.IO.File]::WriteAllLines(
+            [System.IO.File]::WriteAllText(
                 $metaFile.FullName,
-                $rendered,
+                ($rendered -join "`n") + "`n",
                 [System.Text.UTF8Encoding]::new($false)
             )
             Write-Host "verify-translation-pairs: 已重写 $rel"
