@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-flutter-ui-shell.md
+#   git hash-object 2026-09-30-flutter-ui-shell.zh.md
+2026-09-30-flutter-ui-shell.md: 450c8706ca72d9390de2c34e8e172c0ef803b70d
+2026-09-30-flutter-ui-shell.zh.md: 676eab855bf70373107d829f5f88145232f70439

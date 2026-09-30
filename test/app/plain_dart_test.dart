@@ -48,4 +48,50 @@ void main() {
       );
     });
   });
+
+  // The other half of the same boundary. Flutter lives in `lib/ui` and nowhere
+  // else, so "would this file need a widget tree to test" is answered by its
+  // path — which is the only answer available on a machine where no widget
+  // test can run.
+  group('the Flutter-facing layer', () {
+    final flutterImport = RegExp(
+      '^\\s*(import|export)\\s+[\'"]package:flutter[/\'"]',
+    );
+
+    test('exists and has the widgets in it', () {
+      final directory = Directory('lib/ui');
+      expect(directory.existsSync(), isTrue);
+      final files = directory
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .toList();
+      expect(files.length, greaterThan(4));
+    });
+
+    test('is the only layer that imports Flutter', () {
+      final offenders = <String>[];
+      var scanned = 0;
+      for (final entity in Directory('lib').listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final path = entity.path.replaceAll(Platform.pathSeparator, '/');
+        if (path.startsWith('lib/ui/') || path == 'lib/main.dart') continue;
+        scanned++;
+        for (final line in entity.readAsLinesSync()) {
+          if (flutterImport.hasMatch(line)) {
+            offenders.add('$path: ${line.trim()}');
+          }
+        }
+      }
+      // A glob that matched nothing would make this pass for the wrong reason.
+      expect(scanned, greaterThan(20));
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'Flutter is confined to lib/ui, so these files are in the wrong '
+            'place:\n${offenders.join('\n')}',
+      );
+    });
+  });
 }

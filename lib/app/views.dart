@@ -162,6 +162,32 @@ final class TransferView {
   }
 }
 
+/// A byte count as a person reads it, in binary units.
+///
+/// Binary because that is what everything below counts in — a chunk is 512
+/// KiB, not 512 kB — and a label that quietly rescaled to decimal would
+/// disagree with the protocol about a number the user can see twice.
+///
+/// One decimal below ten units and none above it, because a progress line is
+/// read at a glance: "1.5 MiB" is worth the precision, "200 KiB" is not worth
+/// the characters.
+String formatBytes(int bytes) {
+  assert(bytes >= 0, 'a byte count is never negative');
+  if (bytes <= 0) return '0 B';
+  if (bytes < 1024) return '$bytes B';
+  const units = ['KiB', 'MiB', 'GiB', 'TiB'];
+  var value = bytes / 1024;
+  var unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  final rendered = value < 10
+      ? value.toStringAsFixed(1)
+      : value.toStringAsFixed(0);
+  return '$rendered ${units[unit]}';
+}
+
 /// Where a received file is allowed to land.
 ///
 /// Peer-supplied names are untrusted input: a name is allowed to *name* a file
