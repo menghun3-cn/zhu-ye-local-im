@@ -366,6 +366,33 @@ final class LocalTransferController {
     );
   }
 
+  /// Opens a Session with whatever Device answers at [address]:[port].
+  ///
+  /// This is the Manual Address path: the user typed where to look, so nothing
+  /// was discovered and there is no Fingerprint to pin. The handshake still
+  /// holds — a peer has to prove it knows the Pairing Secret, so a stranger on
+  /// that address is refused rather than admitted — and what is given up is
+  /// only the narrower guarantee that the Device answering a *known* address is
+  /// the one expected there.
+  ///
+  /// [port] defaults to [defaultSessionPort], which is where a Device with the
+  /// standard configuration listens. Throws [AppStateException] when this
+  /// Device is unpaired, when no address was given, or when the port is not a
+  /// port; throws [HandshakeException] when the dial fails or the peer cannot
+  /// prove it belongs in the group.
+  Future<ManagedSession> connectTo({required String address, int? port}) async {
+    final manager = _requireManager();
+    final host = address.trim();
+    if (host.isEmpty) {
+      throw const AppStateException('no address was given to dial');
+    }
+    final target = port ?? defaultSessionPort;
+    if (target <= 0 || target > 65535) {
+      throw AppStateException('$target is not a port');
+    }
+    return manager.connect(host, target);
+  }
+
   /// Sends [text] to a peer as a Transfer.
   Future<OutgoingTransfer> sendText(String text, {Fingerprint? to}) async {
     final target = _target(to);
