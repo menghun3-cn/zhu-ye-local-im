@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 /// A duplex stream of raw bytes, and the only thing the layers above know
 /// about the network.
@@ -25,10 +26,13 @@ abstract interface class ByteTransport {
 /// A [ByteTransport] over a TCP [Socket].
 final class SocketByteTransport implements ByteTransport {
   SocketByteTransport.fromSocket(this._socket) {
-    _socket.done.then(
-      (_) => _closed.complete(),
-      onError: (Object _) => _closed.complete(),
-    );
+    // Deliberately *not* driven by `_socket.done`: measured on this platform,
+    // that future never completes when the *peer* closes the connection — it
+    // only ever completes for a socket this side closed. A peer that destroys
+    // its end is reported on the read side instead (`onDone`, or `onError` on
+    // a reset), so completion is derived from there, and a caller learns the
+    // Session is gone whether it was torn down locally or remotely.
+    _socket.done.then((_) => _complete(), onError: (Object _) => _complete());
   }
 
   /// Dials [host]:[port].
@@ -44,12 +48,34 @@ final class SocketByteTransport implements ByteTransport {
 
   final Socket _socket;
   final Completer<void> _closed = Completer<void>();
+  Stream<List<int>>? _incoming;
 
   /// The peer's address, as reported by the socket.
   InternetAddress? get remoteAddress => _socket.remoteAddress;
 
+  /// Bytes from the peer.
+  ///
+  /// Single-subscription, like the socket underneath, and wrapped so that the
+  /// end of the read side completes [done]: that end is where a peer's
+  /// disappearance shows up.
+  ///
+  /// A transport nobody reads from cannot notice the peer leaving at all —
+  /// dart:io reports nothing on an unlistened socket. Every consumer here
+  /// reads (the frame decoder subscribes as soon as a Session exists), so in
+  /// practice nothing depends on the unread case.
   @override
-  Stream<List<int>> get incoming => _socket;
+  Stream<List<int>> get incoming => _incoming ??= _socket.transform(
+    StreamTransformer<Uint8List, List<int>>.fromHandlers(
+      handleDone: (sink) {
+        _complete();
+        sink.close();
+      },
+      handleError: (error, stack, sink) {
+        _complete();
+        sink.addError(error, stack);
+      },
+    ),
+  );
 
   @override
   void add(List<int> bytes) {
@@ -64,7 +90,12 @@ final class SocketByteTransport implements ByteTransport {
     // destroy rather than close: an abandoned Session must not wait for a
     // graceful FIN that the peer may never send.
     _socket.destroy();
+    _complete();
     await done;
+  }
+
+  void _complete() {
+    if (!_closed.isCompleted) _closed.complete();
   }
 }
 

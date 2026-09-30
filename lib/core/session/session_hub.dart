@@ -86,6 +86,7 @@ final class SessionHub {
         _clipboardMessages.add(message);
       case HelloMessage():
       case HelloAckMessage():
+      case SessionConfirmMessage():
         // The handshake is history by the time a hub exists: both sides sent
         // theirs before the link was returned.
         break;

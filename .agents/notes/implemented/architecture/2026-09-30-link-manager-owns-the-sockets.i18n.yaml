@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-30-link-manager-owns-the-sockets.md
+#   git hash-object 2026-09-30-link-manager-owns-the-sockets.zh.md
+2026-09-30-link-manager-owns-the-sockets.md: 5c19903c1e9a391c9c146c5d9226bf29a35c7c8a
+2026-09-30-link-manager-owns-the-sockets.zh.md: 975178fc2e937ff95724a06b6872b1c7e73b1a6e

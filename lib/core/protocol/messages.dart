@@ -202,6 +202,7 @@ sealed class WireMessage {
       'failed' => FailedMessage.fromJson(json),
       'cancel' => CancelMessage.fromJson(json),
       'clipboard' => ClipboardMessage.fromJson(json),
+      'confirm' => SessionConfirmMessage.fromJson(json),
       'error' => ErrorMessage.fromJson(json),
       _ => throw FormatException('unknown message type "$type"'),
     };
@@ -491,6 +492,28 @@ final class ClipboardMessage extends WireMessage {
         text: _string(json, 'text'),
         capturedAt: _dateTime(json, 'at'),
       );
+}
+
+/// Confirms that a Session's keys are shared, before the Session exists.
+///
+/// Sent once by each side at the end of the handshake, encrypted with the
+/// keys the handshake derived. Both Devices derive those keys from the
+/// Pairing Secret, so a peer holding a different secret cannot produce a
+/// record that decrypts: this message is how "we both hold the same secret"
+/// stops being an assumption and becomes something the handshake checked.
+///
+/// It carries nothing. Its authentication tag is the whole payload.
+final class SessionConfirmMessage extends WireMessage {
+  const SessionConfirmMessage();
+
+  @override
+  String get type => 'confirm';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static SessionConfirmMessage fromJson(Map<String, Object?> json) =>
+      const SessionConfirmMessage();
 }
 
 /// Reports a protocol-level problem that has no more specific message.
