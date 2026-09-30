@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-09-29-dart-test-as-the-core-gate.md
 #   git hash-object 2026-09-29-dart-test-as-the-core-gate.zh.md
-2026-09-29-dart-test-as-the-core-gate.md: 09bda176fd17c22cea07e2cbdb2d5241f9b5a4a5
-2026-09-29-dart-test-as-the-core-gate.zh.md: d161723913ef60e4895e3ef373cfcca4a69bbf20
+2026-09-29-dart-test-as-the-core-gate.md: 548c5acb194ab5a2dfdd9c6cda26a4c014bc77bb
+2026-09-29-dart-test-as-the-core-gate.zh.md: a666e37db0254b5175f6fbd45f03627a0dcddac9

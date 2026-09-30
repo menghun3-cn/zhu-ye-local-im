@@ -160,6 +160,13 @@ final class FileProfileStore implements ProfileStore {
   @override
   Future<void> save(Map<String, Object?> json) async {
     final temp = File(_tempPath);
+    // `profile_location.dart` decides where a profile goes and says outright
+    // that the store is what makes that place exist. On a first launch it
+    // does not yet: `%APPDATA%/LocalTransfer` has never been created, and
+    // neither has the directory a chosen incoming folder names. Without this
+    // the very first save — the one that mints the Device's identity — is the
+    // one that fails, and it fails before any window is drawn.
+    await temp.parent.create(recursive: true);
     await temp.writeAsString(
       const JsonEncoder.withIndent('  ').convert(json),
       flush: true,

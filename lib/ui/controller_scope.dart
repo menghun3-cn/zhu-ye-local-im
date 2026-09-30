@@ -4,18 +4,22 @@ import 'package:flutter/material.dart';
 
 import '../app/app.dart';
 
-/// Makes the controller available to everything below it, and rebuilds that
-/// subtree whenever the controller reports a change.
+/// Makes the controller available to everything below it, and rebuilds what
+/// reads it whenever the controller reports a change.
 ///
-/// One rebuild at the root per change, rather than a subscription per widget:
-/// the controller's `changes` stream is deliberately coarse, the views it
-/// hands out are small value objects, and a tree that rebuilds wholesale cannot
-/// race itself the way a dozen independent subscriptions can.
+/// One notification at the root per change, rather than a subscription per
+/// widget: the controller's `changes` stream is deliberately coarse, the views
+/// it hands out are small value objects, and a tree that rebuilds wholesale
+/// cannot race itself the way a dozen independent subscriptions can.
 ///
 /// A page reads the controller with [ControllerScope.of] in its own `build` and
-/// holds no subscription of its own — with the whole subtree rebuilt on every
-/// change there is nothing for a page to subscribe to, and nothing for it to
-/// forget to cancel.
+/// holds no subscription of its own — reading it is what subscribes it, so
+/// there is nothing for a page to remember to cancel.
+///
+/// The notification has to travel through
+/// [_ControllerProvider.updateShouldNotify]. Rebuilding this widget alone would
+/// reach nothing: the [child] instance handed in here never changes, and Flutter
+/// skips a subtree whose widget instance is identical.
 class ControllerScope extends StatefulWidget {
   /// Exposes [controller] to [child].
   const ControllerScope({
@@ -75,7 +79,14 @@ final class _ControllerProvider extends InheritedWidget {
 
   final LocalTransferController controller;
 
+  /// Always `true`, and it has to be.
+  ///
+  /// This widget is rebuilt only when the controller has reported a change (see
+  /// [_ControllerScopeState]), and the controller instance is the same one for
+  /// the life of the scope — so comparing the two would answer "no" every time
+  /// and leave every page that reads the controller frozen at its first build.
+  /// Everything the controller hands out is read inside `build`, so "a change
+  /// happened" is exactly the question dependents want answered.
   @override
-  bool updateShouldNotify(_ControllerProvider oldWidget) =>
-      !identical(oldWidget.controller, controller);
+  bool updateShouldNotify(_ControllerProvider oldWidget) => true;
 }

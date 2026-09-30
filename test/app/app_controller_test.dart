@@ -410,6 +410,42 @@ void main() {
       expect(bob.clipboard.applied, contains('review me'));
     });
 
+    test('a staged entry announces itself, so a screen can redraw', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+      await connect(alice, bob);
+
+      alice.controller.setClipboardMode(ClipboardMode.mirror);
+      bob.controller.setClipboardMode(ClipboardMode.stage);
+
+      // `changes` is this controller's whole contract with a screen: it fires
+      // whenever something a screen renders has changed. A staged entry *is*
+      // something a screen renders — it is the list the user answers — so it
+      // has to fire one. A surface that only redrew when something unrelated
+      // happened would leave the entry invisible until the user navigated away
+      // and came back, which is indistinguishable from it never arriving.
+      var ticks = 0;
+      final watch = bob.controller.changes.listen((_) => ticks++);
+      addTearDown(watch.cancel);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      final before = ticks;
+
+      alice.clipboard.copy('announce me');
+      await until(
+        () => bob.controller.stagedEntries.isNotEmpty,
+        description: 'Bob to have a staged entry',
+      );
+      // The list can land a tick before the announcement does, so this waits
+      // for the announcement rather than asserting on one instant.
+      await until(
+        () => ticks > before,
+        description: 'Bob to announce the staged entry',
+      );
+      expect(bob.controller.stagedEntries.single.text, 'announce me');
+    });
+
     test('nothing travels while the clipboard is off', () async {
       final hub = MemoryBeaconHub();
       final alice = await startDevice(hub.a, 'Alice');
