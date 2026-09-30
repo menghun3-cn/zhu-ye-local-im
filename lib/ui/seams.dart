@@ -102,22 +102,43 @@ DevicePlatform currentPlatform() {
 /// project implements in its own [MainActivity]. A platform that has not
 /// implemented it throws [MissingPluginException], which is handled as
 /// "nowhere to write" rather than as a failure.
-const MethodChannel _pathsChannel = MethodChannel(
+const MethodChannel defaultPathsChannel = MethodChannel(
   'cn.hnasct.local_transfer/paths',
 );
+
+/// The method [defaultPathsChannel] is asked for.
+const String appDataDirectoryMethod = 'appDataDirectory';
 
 /// Brings up the seams the application runs on.
 ///
 /// [beacon] binds the discovery port, so this is where two copies of the app
 /// on one host collide: the second one gets a [SocketException] from here, and
 /// the caller is expected to show that rather than to swallow it.
-Future<PlatformSeams> openPlatformSeams() async {
-  final platform = currentPlatform();
-  final appDataDirectory = await _appDataDirectory();
-  final environment = Platform.environment;
+///
+/// The four optional parameters are test seams, and they exist because this
+/// product's platforms cannot otherwise all be exercised from one machine.
+/// [platform] and [environment] let a test ask what the Android and Windows
+/// rules resolve to without being on Android, or without reading the real
+/// `%APPDATA%`; [pathsChannel] lets a test answer the Android directory
+/// question with a stand-in for the Kotlin side; [beacon] lets a test hand over
+/// an in-memory transport so that what this function decides — which store it
+/// picks, and where — can be checked without binding the well-known discovery
+/// port, which only one process on a host may hold. Production passes none of
+/// them, and then every answer comes from the running host.
+Future<PlatformSeams> openPlatformSeams({
+  DevicePlatform? platform,
+  Map<String, String>? environment,
+  MethodChannel pathsChannel = defaultPathsChannel,
+  BeaconTransport? beacon,
+}) async {
+  final running = platform ?? currentPlatform();
+  final appDataDirectory = running == DevicePlatform.android
+      ? await _readAppDataDirectory(pathsChannel)
+      : null;
+  final host = environment ?? Platform.environment;
   final path = profileFilePath(
-    platform: platform,
-    environment: environment,
+    platform: running,
+    environment: host,
     appDataDirectory: appDataDirectory,
   );
   return PlatformSeams(
@@ -126,12 +147,12 @@ Future<PlatformSeams> openPlatformSeams() async {
     // restart. Saying so beats pretending the file was saved.
     store: path == null ? MemoryProfileStore() : FileProfileStore(path),
     profilePath: path,
-    beacon: await UdpBeaconTransport.bind(),
+    beacon: beacon ?? await UdpBeaconTransport.bind(),
     clipboard: FlutterSystemClipboard(),
-    platform: platform,
+    platform: running,
     defaultIncomingDirectory: defaultIncomingDirectory(
-      platform: platform,
-      environment: environment,
+      platform: running,
+      environment: host,
       appDataDirectory: appDataDirectory,
     ),
   );
@@ -139,12 +160,16 @@ Future<PlatformSeams> openPlatformSeams() async {
 
 /// The private directory this app may write to, when the platform has one and
 /// this app can reach it.
-Future<String?> _appDataDirectory() async {
-  // Only Android needs asking. Asking on Windows would throw a
-  // MissingPluginException for a fact `%APPDATA%` already states.
-  if (!Platform.isAndroid) return null;
+///
+/// Asked only on Android: asking on Windows would throw a
+/// [MissingPluginException] for a fact `%APPDATA%` already states. Both ways of
+/// not being answerable — a platform that never registered the channel and one
+/// that registered it but failed — mean the same thing here: nowhere durable to
+/// write, which the caller turns into an in-memory profile rather than an
+/// error.
+Future<String?> _readAppDataDirectory(MethodChannel channel) async {
   try {
-    return await _pathsChannel.invokeMethod<String>('appDataDirectory');
+    return await channel.invokeMethod<String>(appDataDirectoryMethod);
   } on PlatformException {
     return null;
   } on MissingPluginException {

@@ -120,9 +120,16 @@ CHANGELOG 正文用中文书写，按 [Keep a Changelog](https://keepachangelog.
 flutter analyze
 dart format --set-exit-if-changed .
 
-# 测试
-flutter test
+# 测试：纯 Dart 套件（test/）
+dart test
+
+# 测试：widget 套件（test_flutter/），需要一台能跑 flutter test 的机器
+flutter test test_flutter
 ```
+
+测试按「谁能跑它」分目录：`test/` 只放不需要 widget 树的测试，必须能被 `dart test` 跑起来；`test_flutter/` 放导入 `package:flutter_test` 的测试。把 widget 测试放进 `test/` 会打断 `dart test` —— 那是本机唯一总能跑的门禁。理由见 [.agents/notes/implemented/testing/2026-09-29-dart-test-as-the-core-gate.md](.agents/notes/implemented/testing/2026-09-29-dart-test-as-the-core-gate.md)。
+
+`flutter analyze` 覆盖整个仓库，包括 `test_flutter/`：它在 widget 套件跑不起来时仍能保证它「能编译」，但这不等于「能工作」。
 
 发布前额外执行：
 
@@ -142,7 +149,8 @@ flutter test
 docs/             架构与平台事实文档
 scripts/          门禁与工具脚本（PowerShell）
 lib/              Flutter 源码
-test/             测试
+test/             纯 Dart 测试（由 dart test 跑）
+test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 ```
 
 ## 7. 平台事实约束
