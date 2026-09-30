@@ -87,8 +87,8 @@ a window for it.** This shipped first, and was replaced: see
 ## Consequences
 
 - Pairing two Devices is now: tap Pair on the peer's card, answer the question
-  that arrives on the other Device, compare the digits, confirm. No fields, no
-  retyping, no address, and nothing to prepare on either side.
+  that arrives on the other Device. No fields, no retyping, no address, and
+  nothing to prepare on either side.
 - A Device on the link can *start* an open Pairing where before it could not
   start a typed one. The confirmation step is the compensating control; the
   typed-code path remains in the core for a future QR or out-of-band flow, and

@@ -485,7 +485,7 @@ abstract class AppLocalizations {
   /// No description provided for @pairingCardUnpairedBody.
   ///
   /// In en, this message translates to:
-  /// **'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to confirm. Both screens then show the same six digits. After that, sending files and messages needs nothing further.'**
+  /// **'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.'**
   String get pairingCardUnpairedBody;
 
   /// No description provided for @acceptPairingRequests.
@@ -541,12 +541,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'trusted'**
   String get trusted;
-
-  /// No description provided for @menuSendText.
-  ///
-  /// In en, this message translates to:
-  /// **'Send text'**
-  String get menuSendText;
 
   /// No description provided for @menuSendFile.
   ///
@@ -824,18 +818,6 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get save;
 
-  /// No description provided for @compareDigits.
-  ///
-  /// In en, this message translates to:
-  /// **'Compare these digits with {peer}. If the two screens disagree, cancel.'**
-  String compareDigits(String peer);
-
-  /// No description provided for @theyMatch.
-  ///
-  /// In en, this message translates to:
-  /// **'They match'**
-  String get theyMatch;
-
   /// No description provided for @pairingRequestTitle.
   ///
   /// In en, this message translates to:
@@ -857,26 +839,20 @@ abstract class AppLocalizations {
   /// No description provided for @pairingRequestClaimHint.
   ///
   /// In en, this message translates to:
-  /// **'That name is the caller\'s own claim and nothing has checked it. What checks it is the six digits both screens show next.'**
+  /// **'The name is the caller\'s own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.'**
   String get pairingRequestClaimHint;
 
-  /// No description provided for @pairingPreparing.
+  /// No description provided for @pairingCompleting.
   ///
   /// In en, this message translates to:
-  /// **'Preparing the digits to compare…'**
-  String get pairingPreparing;
+  /// **'Finishing the Pairing…'**
+  String get pairingCompleting;
 
-  /// No description provided for @continuePairing.
+  /// No description provided for @acceptPairing.
   ///
   /// In en, this message translates to:
-  /// **'Continue'**
-  String get continuePairing;
-
-  /// No description provided for @cancelThisPairing.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel this Pairing'**
-  String get cancelThisPairing;
+  /// **'Allow'**
+  String get acceptPairing;
 
   /// No description provided for @connectToPeerTitle.
   ///
@@ -887,7 +863,7 @@ abstract class AppLocalizations {
   /// No description provided for @reachingOtherDevice.
   ///
   /// In en, this message translates to:
-  /// **'Reaching the other Device…'**
+  /// **'Reaching the other Device, waiting for its user to allow it…'**
   String get reachingOtherDevice;
 
   /// No description provided for @manualAddressTitle.
@@ -926,23 +902,23 @@ abstract class AppLocalizations {
   /// **'Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.'**
   String get manualAddressNote;
 
-  /// No description provided for @sendTextTitle.
+  /// No description provided for @openConversation.
   ///
   /// In en, this message translates to:
-  /// **'Send text to {peer}'**
-  String sendTextTitle(String peer);
+  /// **'Open conversation'**
+  String get openConversation;
 
-  /// No description provided for @fieldText.
+  /// No description provided for @conversationEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Text'**
-  String get fieldText;
+  /// **'Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.'**
+  String get conversationEmpty;
 
-  /// No description provided for @textHelper.
+  /// No description provided for @messageHint.
   ///
   /// In en, this message translates to:
-  /// **'It arrives as a Transfer the Device has to accept'**
-  String get textHelper;
+  /// **'Type a message'**
+  String get messageHint;
 
   /// No description provided for @send.
   ///

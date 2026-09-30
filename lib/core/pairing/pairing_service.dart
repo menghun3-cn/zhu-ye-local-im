@@ -64,7 +64,10 @@ final class PairingOutcome {
   /// The Device that was admitted.
   final KnownDevice peer;
 
-  /// The six digits the two users compared.
+  /// The short authentication string this Pairing derived.
+  ///
+  /// Nobody reads it. It is carried because it is what the admission was
+  /// signed over, and a caller holding the outcome may want to log it.
   final String sas;
 
   /// The Owner Group this Device now belongs to.
@@ -83,29 +86,30 @@ final class PairingOutcome {
       'PairingOutcome(${peer.fingerprint.short()}, "${peer.alias}", sas: $sas)';
 }
 
-/// A Pairing that has reached the point where a human has to compare codes.
+/// A Pairing that has reached the point where a human has to decide.
 ///
 /// Everything cryptographic is already done by the time this is handed out: the
-/// link is authenticated with the typed code, the peer's Owner key has been
+/// link is authenticated with the Pairing secret, the peer's Owner key has been
 /// checked against the identity it announced, and both sides have agreed on the
-/// group secret. What remains is the one thing only people can do — confirm
-/// that the six digits on the two screens match, which is what rules out a peer
-/// that guessed the code.
+/// group secret. What remains is the one thing only a person can do — say
+/// whether this Device belongs in the group.
 abstract interface class PairingAttempt {
   /// The Device on the other end, as it proved itself.
   KnownDevice get peer;
 
-  /// The six digits both users compare.
+  /// The short authentication string this Pairing derived.
+  ///
+  /// Signed over, never displayed: see [SecureLink.shortAuthenticationString].
   String get sas;
 
   /// Whether this attempt is still live.
   bool get isOpen;
 
-  /// Records that the user confirmed the two codes match, and finishes the
-  /// Pairing once the peer has confirmed too.
+  /// Records that the user allowed this Pairing, and finishes it once the peer
+  /// has allowed it too.
   ///
   /// Nothing is written before the peer's confirmation arrives. A user who
-  /// confirms on one Device and cancels on the other must not leave a
+  /// allows on one Device and cancels on the other must not leave a
   /// half-paired state behind, where one side believes in a group the other
   /// knows nothing about.
   Future<PairingOutcome> confirm();
@@ -144,7 +148,7 @@ final class PairingInvitation {
   final Completer<void> _done = Completer<void>();
   Future<void>? _release;
 
-  /// Completes once a peer has connected and the codes are ready to compare.
+  /// Completes once a peer has connected and the question is ready to be asked.
   ///
   /// Fails with [PairingException] when the peer's attempt went wrong, and also
   /// when the invitation is withdrawn before anybody connects — so a UI that
@@ -197,17 +201,17 @@ abstract interface class PairingRequest {
   ///
   /// A claim, not a proof. Anyone can complete a handshake against a well-known
   /// secret and call itself anything, so an Alias from here is worth exactly
-  /// what a screen says it is worth — a label — and the check that matters is
-  /// the six digits the comparison step derives. [PairingAttempt.peer] is the
-  /// same Device after it has proved it holds the key it announced.
+  /// what a screen says it is worth — a label. What keeps that from being the
+  /// last word is that the person on this end is asked and answers;
+  /// [PairingAttempt.peer] is the same Device after it has proved it holds the
+  /// key it announced.
   DeviceDescriptor get caller;
 
-  /// Lets [caller] through to the six-digit comparison.
+  /// Lets [caller] through, and runs the admission exchange.
   ///
-  /// Everything up to the comparison happens here: the two Devices sign over
-  /// the session, check each other's keys and settle on a group secret. What
-  /// comes back is still only an opportunity to confirm — nothing is admitted
-  /// until both users confirm.
+  /// The two Devices sign over the session, check each other's keys and settle
+  /// on a group secret. What comes back is still only an opportunity to
+  /// confirm — nothing is admitted until both users do.
   ///
   /// Throws [PairingException] when the peer's admission does not check out,
   /// and [StateError] when the request has already been settled.
@@ -231,9 +235,9 @@ abstract interface class PairingRequest {
 ///
 /// * **[receive]** — this Device answers requests, always. Somebody picks this
 ///   Device out of a list and taps Pair beside it; this Device asks its user,
-///   and the two users compare digits. This is the flow, because it is the one
-///   that asks nothing of the user being paired *with* beyond a tap on a
-///   question.
+///   and that one answer is the whole of the decision. This is the flow,
+///   because it is the one that asks nothing of the user being paired *with*
+///   beyond a tap on a question.
 /// * **[invite]** — this Device shows a code and the other user types it. A
 ///   fallback for a peer Discovery cannot see and the two users can still talk
 ///   to each other, not a second way in: it derives the handshake secret's
@@ -245,14 +249,12 @@ abstract interface class PairingRequest {
 /// * **Who the peer is.** The Fingerprint the peer announced is checked against
 ///   the Owner key it signs with, so the identity is proven rather than
 ///   claimed. An Alias is not proof of anything — it is whatever a Device chose
-///   to call itself — so the Fingerprint is the part worth comparing out of
-///   band if the stakes are high.
-/// * **That a person meant it.** Both users see the peer as it identified
-///   itself and six digits derived from the session, and both have to confirm.
-///   The digits are what makes the confirmation checkable: they come from the
-///   keys the handshake derived, so two Devices agree on them without either
-///   sending anything, and a Device that did not take part in *this* exchange
-///   cannot know them.
+///   to call itself — so the Fingerprint is the part worth checking out of band
+///   if the stakes are high.
+/// * **That a person meant it.** Each side shows its user the peer as it
+///   identified itself, and asks. Both have to answer yes. The answering user
+///   verifies nothing about the request, and is not asked to: this is the step
+///   that keeps admission a human decision rather than an automatic one.
 /// * **What the group secret is.** Two Devices pairing for the first time on a
 ///   code each derive it from the code, so nothing travels; on a request the
 ///   answering Device mints one and hands it over inside the sealed link. A
@@ -260,24 +262,23 @@ abstract interface class PairingRequest {
 /// * **Who else is in the group.** The peer hands over its roster, so joining
 ///   an established group joins the whole group.
 ///
-/// ## What the digits are not
+/// ## What the digits are, and are not
 ///
-/// A short authentication string is not a second layer of secrecy over the
-/// secret that admitted the caller. On a code Pairing, a peer that knows the
-/// code completes the handshake and derives the same digits as this Device, so
-/// the comparison cannot catch it; and a peer that does not know the code cannot
-/// complete the handshake at all. On a request there is no code to know — what
-/// the digits are for is that the handshake secret is a *public constant*, so
-/// the comparison plus the two confirmations are the entire admission check.
-/// What the digits give the users in both cases is something *they* can check —
-/// the peer's identity and this exchange's freshness are on screen together, and
-/// the step is what keeps admission a human decision rather than an automatic
-/// one.
+/// Every Pairing still derives a short authentication string and still signs
+/// over it — see [SecureLink.shortAuthenticationString]. What it is not is a
+/// check the users perform, and it was never a good one: both screens agree on
+/// it **whatever peer dialled**, because it is derived from the handshake and
+/// the Fingerprint a caller announces is a claim. A comparison across two
+/// screens catches a third Device relaying between the two people, and nothing
+/// more. Nothing shows it now, so what stands between a Device on the link and
+/// this group is the answering user's own answer to the question — and on a
+/// request the handshake secret is a *public constant*, so there was never
+/// anything else it could be.
 ///
 /// The bound that does matter is the code's ~50 bits: an attacker who records a
 /// typed-code Pairing can test code guesses offline against it. That is a
-/// property of the code, not of this comparison, and the reason the code path
-/// is a fallback rather than the preferred one.
+/// property of the code, not of any comparison, and the reason the code path is
+/// a fallback rather than the preferred one.
 ///
 /// Only after the user confirms on *both* Devices is anything written.
 ///
@@ -310,8 +311,9 @@ final class PairingService {
 
   /// How long to wait for the peer's user to confirm, once this side has.
   ///
-  /// Generous on purpose: the whole point of the step is that a human walks to
-  /// the other Device and reads six digits off a screen.
+  /// Generous on purpose: the whole point of the step is that a person on the
+  /// other Device has to read the question and answer it, which may mean
+  /// walking over to that Device.
   final Duration confirmationTimeout;
 
   /// How long a [PairingRequest] may sit unanswered before it is refused.
@@ -463,7 +465,7 @@ final class PairingService {
   /// Stops answering Pairing requests.
   ///
   /// A caller already past the prompt is left to finish: refusing it would
-  /// cancel a comparison the user is in the middle of. Turning the listener off
+  /// cancel a Pairing the user is in the middle of. Turning the listener off
   /// is a statement about the next caller, not about the one on screen.
   Future<void> stopReceiving() async {
     final receiving = _receiving;
@@ -577,8 +579,8 @@ final class PairingService {
 
   /// Pairs with a Device showing [code] at [host].
   ///
-  /// Resolves once the two Devices are ready for the users to compare codes;
-  /// call [PairingAttempt.confirm] afterwards to finish.
+  /// Resolves once the two Devices are ready for their users to be asked; call
+  /// [PairingAttempt.confirm] afterwards to finish.
   Future<PairingAttempt> join({
     required String host,
     required String code,
@@ -597,10 +599,9 @@ final class PairingService {
   ///
   /// This is the initiating side of the click-to-pair flow: [host] is a Device
   /// Discovery saw, which the user picked by name. What stands in place of the
-  /// code is the six digits both screens show — the comparison is not optional
-  /// here, because a well-known handshake secret means any Device on the link
-  /// can start a Pairing, and the digits plus the two confirmations are what
-  /// keep admission a human decision.
+  /// code is the other user's answer: a well-known handshake secret means any
+  /// Device on the link can start a Pairing, and the question that Device is
+  /// shown — and answers — is what keeps admission a human decision.
   ///
   /// Resolving is therefore not the same as being paired, and it is not
   /// immediate either: it waits for the *other* user to allow the request. A
@@ -739,7 +740,7 @@ final class PairingService {
   ///
   /// Returns the concrete [_Attempt] rather than the interface: the receive
   /// path attaches an [onFinished] hook to it, so a caller that answered the
-  /// prompt but never finished the comparison still gives its slot back.
+  /// prompt but never finished the Pairing still gives its slot back.
   Future<_Attempt> _negotiate({
     required SecureLink link,
     required LinkRole role,
@@ -892,8 +893,8 @@ List<int> _pairingContext(Fingerprint a, Fingerprint b, String sas) {
 ///
 /// Deterministic from the Pairing code, so the two sides agree without either
 /// sending anything. It is as strong as the code that produced it — the same
-/// 50 bits the Pairing itself stands on, and the reason codes are compared
-/// before admission rather than trusted.
+/// 50 bits the Pairing handshake itself stands on — which is what makes the
+/// typed code a fallback rather than the preferred way in.
 Uint8List _deriveGroupSecret(PairingSecret pairing) => HkdfSha256.deriveKey(
   ikm: pairing.bytes,
   salt: utf8.encode('local-transfer group v1'),
@@ -962,12 +963,12 @@ final class _Receiving {
 
   int _handshakes = 0;
   _Caller? _prompt;
-  final Set<_Caller> _comparing = {};
+  final Set<_Caller> _deciding = {};
 
   int get port => _server.port;
 
   /// Whether a caller is already being dealt with.
-  bool get isBusy => _prompt != null || _comparing.isNotEmpty;
+  bool get isBusy => _prompt != null || _deciding.isNotEmpty;
 
   /// Claims a handshake slot, or reports that there is none left.
   bool beginHandshake() {
@@ -992,17 +993,19 @@ final class _Receiving {
     return true;
   }
 
-  /// Moves [request] from the prompt to the comparison, where it stays until it
-  /// settles.
-  void compare(_Caller request) {
+  /// Moves [request] past the prompt, where it stays until it settles.
+  ///
+  /// Past the prompt means the user has let it through and the commit is
+  /// pending — the attempt is theirs to finish or abandon from here.
+  void decide(_Caller request) {
     if (identical(_prompt, request)) _prompt = null;
-    _comparing.add(request);
+    _deciding.add(request);
   }
 
   /// Gives up whatever [request] was holding.
   void release(_Caller request) {
     if (identical(_prompt, request)) _prompt = null;
-    _comparing.remove(request);
+    _deciding.remove(request);
   }
 
   /// Stops listening, and refuses anybody still waiting to be asked about.
@@ -1060,13 +1063,13 @@ final class _Caller implements PairingRequest {
         openPairing: true,
       );
     } on Object {
-      // The exchange failed, so there is nobody to compare digits with: give
-      // the slot up now rather than when the link eventually times out.
+      // The exchange failed, so there is no Pairing to decide on: give the
+      // slot up now rather than when the link eventually times out.
       _receiving.release(this);
       rethrow;
     }
     _admitted = true;
-    _receiving.compare(this);
+    _receiving.decide(this);
     attempt.onFinished = () => _receiving.release(this);
     return attempt;
   }
@@ -1075,8 +1078,8 @@ final class _Caller implements PairingRequest {
   Future<void> refuse() async {
     if (_admitted) {
       // Past this point the link belongs to the attempt, and the way to abandon
-      // it is [PairingAttempt.cancel] — killing it here would break a
-      // comparison the user is still looking at.
+      // it is [PairingAttempt.cancel] — killing it here would break a Pairing
+      // the user is still looking at.
       return;
     }
     _settled = true;
@@ -1098,7 +1101,7 @@ final class _Caller implements PairingRequest {
   }
 }
 
-/// One side's Pairing, from the code comparison to the commit.
+/// One side's Pairing, from the user's answer to the commit.
 final class _Attempt implements PairingAttempt {
   _Attempt(
     this._service,

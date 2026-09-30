@@ -66,11 +66,18 @@ IconData iconForPlatform(DevicePlatform? platform) => switch (platform) {
 };
 
 /// How a peer's location reads, or why it has none.
+///
+/// A peer this Device holds a Session with reads as its address even when it
+/// advertises no Session port: the connection is the stronger fact, and a line
+/// saying "not accepting connections" beside a peer that is demonstrably
+/// connected would contradict itself.
 String describePeerAddress(PeerView peer, AppLocalizations l10n) {
   final address = peer.address;
   if (address == null) return l10n.neverSeen;
   final port = peer.sessionPort;
-  if (port == null) return l10n.peerNotAccepting(address);
+  if (port == null) {
+    return peer.isConnected ? address : l10n.peerNotAccepting(address);
+  }
   return '$address:$port';
 }
 
@@ -78,13 +85,25 @@ String describePeerAddress(PeerView peer, AppLocalizations l10n) {
 ///
 /// Assembled here rather than in the card that shows it: the list is a reading
 /// of [PeerView], and turning that reading into words is what this file is for.
+///
+/// Two rules keep the line from contradicting itself. The "last seen" clause is
+/// only added when there is an address to pair it with — without one it would
+/// read "never seen · last seen never", the same fact said twice and the second
+/// time as a contradiction. And a connected peer is never described as unseen:
+/// its address is normally known, since the Session was opened to it, but it is
+/// read off the transport and one that reports none would otherwise put "never
+/// seen" on a Device this one is talking to right now.
 String describePeerFacts(PeerView peer, AppLocalizations l10n) {
+  final connected = peer.isConnected;
   final facts = <String>[
     if (peer.alias == null) l10n.peerNameNotAnnounced,
-    describePeerAddress(peer, l10n),
-    if (peer.isConnected)
+    if (peer.address != null)
+      describePeerAddress(peer, l10n)
+    else if (!connected)
+      l10n.neverSeen,
+    if (connected)
       l10n.sessionOpen
-    else
+    else if (peer.address != null)
       l10n.lastSeen(describeLastSeen(peer.lastSeen, l10n)),
     if (!peer.isInGroup) l10n.notInOwnerGroup,
     if (peer.isFavorite) l10n.trusted,

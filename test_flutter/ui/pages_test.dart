@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -128,9 +129,28 @@ void main() {
         findsNothing,
         reason: 'there is nothing left to connect',
       );
+      // A Device this one is talking to is a Device to talk *to*: the card
+      // offers its conversation, and the whole row opens it.
       expect(
-        onPage(windowA, DevicesPage, find.byTooltip(l10n.send)),
+        onPage(windowA, DevicesPage, find.text(l10n.openConversation)),
         findsOneWidget,
+      );
+      // And the card keeps saying where that Device is. Following a Session
+      // rather than a beacon is the point: Discovery restarts when the Session
+      // layer comes up, and a card that fell back to "never seen" every time
+      // that happened would lose the one address a user needs.
+      expect(
+        onPage(
+          windowA,
+          DevicesPage,
+          find.textContaining(InternetAddress.loopbackIPv4.address),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.neverSeen)),
+        findsNothing,
+        reason: 'a Device that is connected has plainly been seen',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -194,7 +214,7 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('the digits are not shown until the request is allowed', (
+    testWidgets('allowing the request is the whole of the Pairing', (
       tester,
     ) async {
       final hub = MemoryBeaconHub();
@@ -207,6 +227,82 @@ void main() {
       // than the well-known one: a window's Pair button can only reach the
       // default port, and binding that here would collide with the other test
       // file that does, which `flutter test` runs alongside this one.
+      //
+      // What the dial resolves to is read out of [joined] rather than awaited
+      // further down. Alice's half of the exchange runs inside the widget
+      // tree's zone, so it only advances while the test pumps, and a bare
+      // `await` on this future would be waiting on work that cannot move.
+      PairingAttempt? joined;
+      await tester.runAsync(() async {
+        await untilTrue(
+          () => alice.controller.isAcceptingPairings,
+          'Alice to answer Pairing requests',
+        );
+        unawaited(
+          bob.controller
+              .pairWith(
+                host: InternetAddress.loopbackIPv4.address,
+                port: alice.controller.pairingPort,
+              )
+              // Settled into a value here, so that a failure is never an
+              // unhandled error and the test can read what happened later.
+              .then<void>((attempt) {
+                joined = attempt;
+              }, onError: (Object _) {}),
+        );
+      });
+
+      // Alice is asked, and the question is the only thing she is shown. There
+      // is no second step behind it: the six digits the handshake derives are
+      // never put on a screen, so the one tap is the whole decision.
+      await pumpUntil(
+        tester,
+        () => hasButton(tester, l10n.acceptPairing, window: windowA),
+        description: 'Alice to be asked about the request',
+      );
+      expect(hasButton(tester, l10n.refuse, window: windowA), isTrue);
+
+      await tapDialogButton(tester, l10n.acceptPairing, window: windowA);
+      await pumpUntil(
+        tester,
+        () => joined != null,
+        description: 'the tap to let the caller through',
+      );
+
+      // Bob has no window, so his half of the confirmation is issued from his
+      // controller — the way [pairDevices] does the whole exchange. Neither
+      // side commits until both have, which is what stops a half-formed group.
+      final attempt = joined!;
+      await tester.runAsync(() async {
+        unawaited(attempt.confirm().then<void>((_) {}, onError: (Object _) {}));
+      });
+      await pumpUntil(
+        tester,
+        () => alice.controller.isPaired && bob.controller.isPaired,
+        description: 'allowing the request to pair both Devices',
+      );
+
+      // Alice's window is free again — the question was answered, not left
+      // open — and she is still answering the next one. Waited for rather than
+      // asserted outright: the window is popped from inside Alice's own half of
+      // the exchange, so it is still fading out for a frame or two after both
+      // Devices report the group.
+      await pumpUntil(
+        tester,
+        () => !dialogIsOpen(windowA),
+        description: 'Alice\u2019s question to close once it has been answered',
+      );
+      expect(alice.controller.isAcceptingPairings, isTrue);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('refusing the request pairs nobody', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pumpWindow(tester, alice);
+
       late final Future<Object?> bobSaw;
       await tester.runAsync(() async {
         await untilTrue(
@@ -223,20 +319,11 @@ void main() {
             .then<Object?>((_) => null, onError: (Object error) => error);
       });
 
-      // Alice is asked, and the question is the only thing she is shown: the
-      // comparison is behind it, which is what keeps an unattended Device from
-      // handing its group secret to whoever dialled it.
       await pumpUntil(
         tester,
-        () => hasButton(tester, l10n.continuePairing, window: windowA),
+        () => hasButton(tester, l10n.acceptPairing, window: windowA),
         description: 'Alice to be asked about the request',
       );
-      expect(
-        hasButton(tester, l10n.theyMatch, window: windowA),
-        isFalse,
-        reason: 'the digits are behind the question',
-      );
-
       await tapDialogButton(tester, l10n.refuse, window: windowA);
 
       await tester.runAsync(() async {

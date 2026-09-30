@@ -249,7 +249,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pairingCardUnpairedBody =>
-      '配对只做一次：在另一台设备上点本机旁边的「配对」，本机就会弹出请求；确认后两边核对同样的 6 位数字。完成之后，互相发文件、发消息都不再需要任何操作。';
+      '配对只做一次：在另一台设备上点本机旁边的「配对」，本机就会弹出请求；你点「接受」就完成了。之后互相发文件、发消息都不再需要任何操作。';
 
   @override
   String get acceptPairingRequests => '应答配对请求';
@@ -279,9 +279,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get trusted => '已信任';
-
-  @override
-  String get menuSendText => '发送文本';
 
   @override
   String get menuSendFile => '发送文件';
@@ -439,14 +436,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get save => '保存';
 
   @override
-  String compareDigits(String peer) {
-    return '和 $peer 核对这组数字。两边显示不一致就取消。';
-  }
-
-  @override
-  String get theyMatch => '两边一致';
-
-  @override
   String get pairingRequestTitle => '配对请求';
 
   @override
@@ -459,16 +448,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pairingRequestClaimHint =>
-      '上面的名字是对方自称的，没有任何核实。真正的核实靠下一步两边显示的 6 位数字。';
+      '名字是对方自称的，本机无法核实。点「接受」就是把对方加入你的设备组，之后双方可以互相发送内容。';
 
   @override
-  String get pairingPreparing => '正在准备比对数字…';
+  String get pairingCompleting => '正在完成配对…';
 
   @override
-  String get continuePairing => '继续';
-
-  @override
-  String get cancelThisPairing => '取消这次配对';
+  String get acceptPairing => '接受';
 
   @override
   String connectToPeerTitle(String peer) {
@@ -476,7 +462,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get reachingOtherDevice => '正在连接对方设备…';
+  String get reachingOtherDevice => '正在连接对方设备，等待对方点「接受」…';
 
   @override
   String get manualAddressTitle => '按地址连接设备';
@@ -498,15 +484,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '事先并不知道这台设备的任何信息，因此要靠连接握手来证明它属于同一个设备组；属于其他设备组的会被拒绝。';
 
   @override
-  String sendTextTitle(String peer) {
-    return '发送文本给 $peer';
-  }
+  String get openConversation => '打开会话';
 
   @override
-  String get fieldText => '文本';
+  String get conversationEmpty => '还没有收发过内容。发出的文字和文件，对方都要先确认才会接收。';
 
   @override
-  String get textHelper => '对方会收到一个传输请求，需要它确认后才能接收';
+  String get messageHint => '输入要发送的文字';
 
   @override
   String get send => '发送';

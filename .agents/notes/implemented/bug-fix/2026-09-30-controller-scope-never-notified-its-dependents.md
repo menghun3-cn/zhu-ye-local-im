@@ -29,12 +29,12 @@ skips a subtree whose widget instance is identical. So the scope rebuilt, and
 reached nobody. Every page that read the controller stayed at its first build.
 
 The symptom was visible only once the widget suite could be run at all. In the
-two-window end-to-end test, pairing completed: both sides confirmed the digits
-and both controllers reported `isServing`. The comparison dialog advanced,
-because a dialog's stepping is its own local state. But the Devices page never
-re-rendered to its paired wording — `Pair another Device` never appeared, and
-the test hung waiting for a screen that was never going to change. The
-assertion was right; the screen was frozen.
+two-window end-to-end test, pairing completed: both users allowed it and both
+controllers reported `isServing`. The dialog advanced, because a dialog's
+stepping is its own local state. But the Devices page never re-rendered to its
+paired wording — `Pair another Device` never appeared, and the test hung waiting
+for a screen that was never going to change. The assertion was right; the screen
+was frozen.
 
 Nothing had caught this before for two separate reasons. The plain Dart suite
 drives `LocalTransferController` directly and builds no widget tree, so it has

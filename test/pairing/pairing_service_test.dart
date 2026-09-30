@@ -172,7 +172,7 @@ Future<Object?> failureOf(Future<Object?> future) =>
 /// Whether [future] has settled by now, after giving the event loop a turn.
 ///
 /// The turn is what makes this usable as a negative: by the time a Pairing
-/// request has been emitted, everything up to the comparison has already
+/// request has been emitted, everything up to the question has already
 /// happened, so a call that *should* be blocked resolves within microseconds if
 /// it is going to resolve at all. A device that has been holding out for 100ms
 /// is holding out.
@@ -299,8 +299,10 @@ void main() {
       );
 
       final asking = await request;
-      // The name on the prompt is the caller's own claim — the digits are the
-      // part that gets checked, and they are derived rather than sent.
+      // The name on the prompt is the caller's own claim. The digits are the
+      // part that is proved rather than claimed, and they are derived rather
+      // than sent — which is why both sides can be held to the same value
+      // without either of them seeing a screen.
       expect(asking.caller.alias, joiner.alias);
       final hostAttempt = await asking.admit();
       final joinerAttempt = await joinFuture;
@@ -396,7 +398,7 @@ void main() {
       final asking = await request;
       expect(asking.caller.alias, joiner.alias);
 
-      // The caller is on hold, and holds nothing: if the comparison had run
+      // The caller is on hold, and holds nothing: if the admission had run
       // before anybody was asked, this future would already have resolved.
       expect(
         await hasSettled(joinFuture),
