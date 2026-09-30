@@ -41,6 +41,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String failureCannotReach(String detail) {
+    return 'Could not reach the other Device: $detail. Check that it is running, that both machines are on the same network, and that its firewall allows incoming TCP 47656.';
+  }
+
+  @override
   String refusalSessionAlreadyOpen(String peer) {
     return 'A Session with $peer is already open.';
   }
@@ -252,10 +257,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairingCardUnpairedBody =>
-      'Pairing takes two taps and no code to retype: tap Receive a connection here, and on the other Device tap Pair beside this one in its list. Both screens then show the same six digits to confirm.';
+      'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to confirm. Both screens then show the same six digits. After that, sending files and messages needs nothing further.';
 
   @override
-  String get receiveAConnection => 'Receive a connection';
+  String get acceptPairingRequests => 'Answer pairing requests';
+
+  @override
+  String get pairingListening => 'Answering requests from other Devices';
+
+  @override
+  String get pairingNotListening => 'Not answering requests';
+
+  @override
+  String get factPairingRequests => 'Pairing requests';
 
   @override
   String get peerNameNotAnnounced => 'name not announced yet';
@@ -450,8 +464,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get theyMatch => 'They match';
 
   @override
-  String get receiveWaiting =>
-      'Waiting for a Device to connect. On the other Device, tap Pair beside this one. Both screens will then show the same six digits to compare.';
+  String get pairingRequestTitle => 'Pairing request';
+
+  @override
+  String pairingRequestFrom(String alias) {
+    return '$alias wants to pair with this Device.';
+  }
+
+  @override
+  String get pairingRequestUnnamed => 'a Device with no name yet';
+
+  @override
+  String get pairingRequestClaimHint =>
+      'That name is the caller\'s own claim and nothing has checked it. What checks it is the six digits both screens show next.';
+
+  @override
+  String get pairingPreparing => 'Preparing the digits to compare…';
+
+  @override
+  String get continuePairing => 'Continue';
 
   @override
   String get cancelThisPairing => 'Cancel this Pairing';

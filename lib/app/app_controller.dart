@@ -18,7 +18,8 @@ export 'views.dart';
 /// ## What it owns
 ///
 /// * a [DiscoveryService] over an injected [BeaconTransport];
-/// * a [PairingService] over an injected [ProfileStore];
+/// * a [PairingService] over an injected [ProfileStore], answering Pairing
+///   requests for as long as the profile says to;
 /// * a [LinkManager] — but only once this Device holds a group secret, because
 ///   a Device with no secret has nothing to authenticate a peer with, so it
 ///   serves no Sessions and announces no port;
@@ -30,6 +31,12 @@ export 'views.dart';
 /// It never answers an incoming Transfer on the user's behalf. An offer arrives
 /// on [incoming] and appears in [transfers] with [TransferView.offer] set; only
 /// [acceptInto] or [reject] settles it.
+///
+/// It never answers a Pairing request on the user's behalf either. A Device that
+/// dialled this one arrives on [pairingRequests] and waits there; only
+/// [PairingRequest.admit] or [PairingRequest.refuse] settles it. That is the
+/// whole reason a Device can answer requests while nobody is sitting at it: the
+/// listener is permanent, but nothing is admitted without a tap.
 final class LocalTransferController {
   /// Builds a controller over the seams a platform provides.
   ///
@@ -80,6 +87,8 @@ final class LocalTransferController {
   final StreamController<void> _changes = StreamController<void>.broadcast();
   final StreamController<IncomingTransfer> _incoming =
       StreamController<IncomingTransfer>.broadcast();
+  final StreamController<PairingRequest> _pairingRequests =
+      StreamController<PairingRequest>.broadcast();
   final Map<String, _WiredSession> _wired = {};
   final List<_Tracked> _transfers = [];
   final List<StreamSubscription<Object?>> _watch = [];
@@ -112,6 +121,13 @@ final class LocalTransferController {
   /// means calling it.
   Stream<IncomingTransfer> get incoming => _incoming.stream;
 
+  /// Devices asking to pair with this one, in arrival order.
+  ///
+  /// A question rather than an event: whoever is listening has to answer it,
+  /// because the Device on the other end is waiting. Emitted only while this
+  /// Device is answering requests — see [acceptsPairingRequests].
+  Stream<PairingRequest> get pairingRequests => _pairingRequests.stream;
+
   /// Everything that went wrong in a way that was not fatal, newest last.
   ///
   /// Refusals and notices the core layers report through `onNotice` land here,
@@ -136,6 +152,20 @@ final class LocalTransferController {
 
   /// Whether a peer can be dialled, i.e. whether this Device is serving.
   bool get isServing => _manager?.isServing ?? false;
+
+  /// Whether this Device is set to answer Pairing requests at all.
+  ///
+  /// The user's intent. Distinct from [isAcceptingPairings], which is whether
+  /// the listener is actually up: the two differ when the port is taken — by a
+  /// second copy of this app on one host, which cannot be dialled either.
+  bool get acceptsPairingRequests =>
+      _local?.profile.acceptsPairingRequests ?? false;
+
+  /// Whether this Device is answering Pairing requests right now.
+  bool get isAcceptingPairings => _pairing?.isReceiving ?? false;
+
+  /// The port Pairing requests are answered on, or null when not answering.
+  int? get pairingPort => _pairing?.receivingPort;
 
   /// The port Sessions are accepted on, or null when not serving.
   int? get listenPort => _manager?.listenPort;
@@ -261,7 +291,11 @@ final class LocalTransferController {
     // says "something moved" is wired up here. Without it the Clipboard surface
     // sits on a stale list until the user navigates away and back.
     _watch.add(clipboard.staged.listen((_) => _notify()));
-    final pairing = PairingService(local: local, store: _store);
+    final pairing = PairingService(
+      local: local,
+      store: _store,
+      onNotice: _notice,
+    );
     _pairing = pairing;
     _watch.add(
       pairing.changes.listen(
@@ -272,7 +306,13 @@ final class LocalTransferController {
         onError: (Object error) => _notice('pairing failed: $error'),
       ),
     );
+    // Requests are forwarded into this controller's own stream rather than
+    // handed out directly: a listener that subscribes before `start` has
+    // finished would otherwise be talking to a service that does not exist yet,
+    // and would never hear the first request.
+    _watch.add(pairing.requests.listen(_pairingRequests.add));
     await _syncLayers();
+    await _syncPairingListener();
     _notify();
   }
 
@@ -297,52 +337,36 @@ final class LocalTransferController {
     await _pairing?.close();
     await _clipboard?.close();
     if (!_incoming.isClosed) await _incoming.close();
+    if (!_pairingRequests.isClosed) await _pairingRequests.close();
     if (!_changes.isClosed) await _changes.close();
   }
 
-  /// Opens an invitation for a peer to type this Device's code into.
+  /// Sets whether this Device answers Pairing requests, and persists it.
   ///
-  /// The returned [PairingInvitation] carries the code to show and an
-  /// [PairingInvitation.attempt] that resolves once a peer arrives, at which
-  /// point the two users compare the short authentication strings and both
-  /// call [PairingAttempt.confirm].
-  Future<PairingInvitation> invite() =>
-      _requirePairing().invite(port: _pairingPort);
+  /// Turning it off takes the listener down; turning it back on tries to bring
+  /// it up. Either way the preference is written, so a Device that was told not
+  /// to answer does not quietly start answering again after a restart.
+  Future<void> setAcceptsPairingRequests(bool value) async {
+    final local = _requireLocal();
+    if (local.profile.acceptsPairingRequests == value) return;
+    local.profile.acceptsPairingRequests = value;
+    await _syncPairingListener();
+    await _persist();
+    _notify();
+  }
 
-  /// Opens a no-code invitation and waits for a Device to connect to it.
-  ///
-  /// This is the receiving side of the click-to-pair flow: the user of the
-  /// other Device taps this Device's name in a list, and both users then
-  /// compare the six digits their screens show.
-  Future<PairingInvitation> inviteOpen() =>
-      _requirePairing().inviteOpen(port: _pairingPort);
-
-  /// Joins a Device showing [code] at [host].
-  ///
-  /// [port] defaults to this controller's pairing port, which is where a Device
-  /// running with the standard configuration listens. It is a parameter because
-  /// the port a Device actually bound is the one to dial, and a caller that
-  /// read it off the invitation — as a test with an ephemeral port must — needs
-  /// to be able to say so.
-  Future<PairingAttempt> join({
-    required String host,
-    required String code,
-    int? port,
-  }) => _requirePairing().join(
-    host: host,
-    code: code,
-    port: port ?? _pairingPort,
-  );
-
-  /// Pairs with a Device that is receiving at [host], without a code.
+  /// Pairs with a Device that is answering requests at [host], without a code.
   ///
   /// The initiating side of the click-to-pair flow: [host] is the address
-  /// Discovery saw the receiving Device at, and the exchange ends at the same
-  /// six-digit comparison a typed Pairing ends at. [port] defaults to the
-  /// well-known pairing port, which is where a receiving Device listens — the
-  /// port to dial is the *peer's*, not this Device's own binding, which is
-  /// why it is not read from this controller's configuration.
-  Future<PairingAttempt> joinOpen({required String host, int? port}) =>
+  /// Discovery saw the Device at, and the exchange ends at the same six-digit
+  /// comparison a typed Pairing ends at. [port] defaults to the well-known
+  /// Pairing port, which is where a Device answers requests — the port to dial
+  /// is the *peer's*, not this Device's own binding, which is why it is not
+  /// read from this controller's configuration.
+  ///
+  /// Resolving is not being paired: it waits for the other user to allow the
+  /// request, and throws [PairingException] if they refuse or never answer.
+  Future<PairingAttempt> pairWith({required String host, int? port}) =>
       _requirePairing().joinOpen(host: host, port: port ?? defaultPairingPort);
 
   /// Opens a Session with [peer] right after a Pairing has completed.
@@ -583,6 +607,33 @@ final class LocalTransferController {
     await _syncDiscovery(_requireManager().advertised);
   }
 
+  /// Makes the Pairing listener match the profile.
+  ///
+  /// Called wherever [acceptsPairingRequests] can have changed, so the listener
+  /// and the switch cannot disagree — a Device that says it is not answering
+  /// but is would be the kind of lie that costs trust in the whole screen.
+  ///
+  /// Failing to bind is reported rather than raised: the usual cause is a
+  /// second copy of the app on one host, and that user can still dial out and
+  /// pair, so an unanswerable Device is a degraded one rather than a broken
+  /// one. [isAcceptingPairings] stays honest about which of the two it is.
+  Future<void> _syncPairingListener() async {
+    final pairing = _pairing;
+    final local = _local;
+    if (pairing == null || local == null || _closed) return;
+    final wanted = local.profile.acceptsPairingRequests;
+    if (wanted == pairing.isReceiving) return;
+    try {
+      if (wanted) {
+        await pairing.receive(port: _pairingPort);
+      } else {
+        await pairing.stopReceiving();
+      }
+    } on Object catch (error) {
+      _notice('this Device cannot answer Pairing requests: $error');
+    }
+  }
+
   Future<void> _syncDiscovery(DeviceDescriptor? advertised) async {
     final local = _requireLocal();
     final descriptor = advertised ?? _descriptorOf(local.profile);
@@ -631,6 +682,9 @@ final class LocalTransferController {
     _local = next;
     _clipboard?.setGroup(next.profile.group);
     unawaited(_syncLayersSafely());
+    // A profile written by something other than [setAcceptsPairingRequests] —
+    // restored from disk, say — must not leave the listener behind the switch.
+    unawaited(_syncPairingListener());
     _notify();
   }
 
