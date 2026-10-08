@@ -76,10 +76,14 @@ editions rather than hardcoding a path.
 - **The archive is now the thing that gets checked, not the source.** A green
   gate run no longer implies a correct package, and the script is the only way
   to get a package that has been checked at all.
-- **The packaged readme is generated from `build/dist/使用说明.txt`**, which is
-  outside the assembled directory (that directory is rebuilt every run, so a
-  file kept inside it would be erased). The build date and commit are rewritten
-  on each run rather than stored in the template, where they would go stale.
+- **The packaged readme is generated from `packaging/使用说明.txt`.** It lives in
+  the repository rather than beside the build output, because it is a document a
+  person maintains — keeping it under `build/` would mean a fresh clone can only
+  produce the minimal fallback, and the full text (pairing, ports, firewall,
+  troubleshooting) would exist on one machine. The build date and commit are
+  rewritten on each run rather than stored in the template, where they would go
+  stale. `build/dist/使用说明.txt` is still consulted as a second choice for
+  compatibility with the earlier hand-assembly layout.
 - **The script detects the stale-file case instead of deleting**: it overwrites
   in place and then warns about files present in the staging directory that the
   current build does not produce. The sandbox this was developed in refuses

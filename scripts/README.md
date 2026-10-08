@@ -28,7 +28,7 @@
 - **`build/dist/*.zip` 不会自己更新。** `flutter test` 通过只说明源码对，zip 里装的是上一次构建的 `app.so`。本项目出过一次「测试全绿、包还是旧的」——用户报「为什么别人打开是灰色的」，根因就是对方装的包里没有那个修复。
 - **`flutter build windows` 不会带上 VC++ 运行库。** `local_transfer.exe` 动态导入 `MSVCP140.dll` / `VCRUNTIME140.dll` / `VCRUNTIME140_1.dll`，开发机上 `System32` 里有所以测不出来，干净机器上会直接报「找不到 VCRUNTIME140.dll」。脚本从 VS 的 `VC\Redist\MSVC\<ver>\x64\Microsoft.VC143.CRT` 取来补齐。
 
-说明文件的维护位置：**`build/dist/使用说明.txt`**（在仓库里被 `.gitignore` 忽略，因为它含构建日期与 commit 号）。脚本每次把它复制进包；没有才生成一份最小的兜底。
+说明文件的维护位置：**`packaging/使用说明.txt`**（在版本库里，别人 clone 后就有完整版）。脚本每次把它复制进包，并把「构建日期」和「代码版本」两行改写成实际值——这两行随每次打包变化，写死在模板里必然过时。找不到该文件时依次退回 `build/dist/使用说明.txt`，再没有就生成一份最小的兜底。
 
 ## 常用命令
 

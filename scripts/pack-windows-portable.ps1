@@ -172,11 +172,16 @@ foreach ($n in $crtNames) {
 }
 
 # 说明文件从 stage 外面取 —— stage 每一轮都被清空重建，放在里面会被抹掉。
-# 约定：手工维护的那份放在 build/dist/使用说明.txt（被 .gitignore 忽略，
-# 因为它含构建日期与 commit 号）。没有就用一份最小的兜底，免得包里没说明。
+# 首选 packaging/使用说明.txt（在版本库里，别人 clone 后就有完整版）；
+# 退回 build/dist/使用说明.txt（早期手工打包留下的位置，被 .gitignore 忽略）；
+# 都没有就生成一份最小的兜底，免得包里没说明。
 $note = Join-Path $stage '使用说明.txt'
-$noteSource = Join-Path $dist '使用说明.txt'
-if (Test-Path $noteSource) {
+$noteCandidates = @(
+    (Join-Path $repo 'packaging\使用说明.txt'),
+    (Join-Path $dist '使用说明.txt')
+)
+$noteSource = $noteCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($noteSource) {
     # 构建日期与 commit 号随每次打包变化，写死在模板里必然过时 —— 自动改写这两行。
     $commit = (& git rev-parse --short HEAD 2>$null)
     if (-not $commit) { $commit = 'unknown' }
@@ -186,7 +191,7 @@ if (Test-Path $noteSource) {
     $body = $body -replace '(?m)^构建日期：.*$', "构建日期：$(Get-Date -Format 'yyyy-MM-dd')"
     $body = $body -replace '(?m)^代码版本：.*$', "代码版本：$branch @ $commit"
     Set-Content -Path $note -Value $body -Encoding UTF8 -NoNewline
-    Write-Host "    + 使用说明.txt (来自 build/dist/使用说明.txt，已改写为 $branch @ $commit)"
+    Write-Host "    + 使用说明.txt (来自 $noteSource，已改写为 $branch @ $commit)"
 } else {
     $ver = (Select-String -Path (Join-Path $repo 'pubspec.yaml') -Pattern '^\s*version:\s*(\S+)').Matches[0].Groups[1].Value
     @(
@@ -203,7 +208,7 @@ if (Test-Path $noteSource) {
         'UDP 47654 自动发现 / TCP 47656 配对 / TCP 47655 数据通道。',
         '全部在本局域网内，不连外网。'
     ) | Set-Content -Path $note -Encoding UTF8
-    Write-Host '    + 使用说明.txt (自动生成的最小版本 —— 建议在 build/dist/使用说明.txt 维护完整版)'
+    Write-Host '    + 使用说明.txt (自动生成的最小版本 —— 建议在 packaging/使用说明.txt 维护完整版)'
 }
 
 # ---------------------------------------------------------------- 4. 打 zip

@@ -147,11 +147,26 @@ flutter test test_flutter
   notes/          Agent Notes（决策记录）
   skills/         项目内技能（git-publish、文档规范等）
 docs/             架构与平台事实文档
+packaging/        随包发布的文件（使用说明模板），由 scripts/pack-windows-portable.ps1 消费
 scripts/          门禁与工具脚本（PowerShell）
 lib/              Flutter 源码
 test/             纯 Dart 测试（由 dart test 跑）
 test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 ```
+
+### 6.1 Windows 绿色包
+
+`build/dist/` 下的 zip 是仓库之外的人真正运行的东西，**它不随源码自动更新**：
+`flutter test` 量的是源码树，压缩包量的是上一次构建。改动 Dart 代码后要出包，
+必须重新跑打包脚本——不要手工组装：
+
+```powershell
+.\scripts\pack-windows-portable.ps1 -Smoke
+```
+
+脚本会在写完之后**验证压缩包本身**（文件齐全、目录布局、包内 `app.so` 含本次新增
+文案、解压后可启动并绑上端口）。见
+[.agents/notes/implemented/process/2026-10-08-packaging-is-a-script-not-a-ritual.md](.agents/notes/implemented/process/2026-10-08-packaging-is-a-script-not-a-ritual.md)。
 
 ## 7. 平台事实约束
 
