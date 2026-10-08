@@ -16,12 +16,15 @@ import 'seams.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
 ///
+/// It leads the list: talking to somebody is what the app is for, and the
+/// Devices surface is what you visit to set that up, so Devices sits second.
+///
 /// Only this one index has a name: the shell builds the pages and the
 /// destinations from the same ordered list, so every index is already in the
 /// same order by construction, and the only place an index is *written* rather
 /// than derived is [_HomeShellState._showConversation]. A full set of names
 /// would be five constants kept in step with a list for no gain.
-const int _conversationsSurface = 1;
+const int _conversationsSurface = 0;
 
 /// The five surfaces, and the way between them.
 class HomeShell extends StatefulWidget {
@@ -78,7 +81,15 @@ class _HomeShellState extends State<HomeShell> {
       await request.refuse();
       return;
     }
-    await showPairingRequestDialog(context, request);
+    // The controller travels with the question because the answer may have to
+    // open a Session: which side does that, when both sides asked at once, is
+    // decided from the two Fingerprints, and this is the side that knows one
+    // of them.
+    await showPairingRequestDialog(
+      context,
+      ControllerScope.of(context),
+      request,
+    );
   }
 
   /// Brings the Conversations surface forward, with [peer]'s conversation open.
@@ -105,13 +116,13 @@ class _HomeShellState extends State<HomeShell> {
         .length;
 
     final pages = <Widget>[
-      DevicesPage(
-        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
-        onConversationRequested: _showConversation,
-      ),
       ConversationsPage(
         defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
         requestedPeer: _requestedConversation,
+      ),
+      DevicesPage(
+        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+        onConversationRequested: _showConversation,
       ),
       TransfersPage(
         defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
@@ -120,11 +131,6 @@ class _HomeShellState extends State<HomeShell> {
       SettingsPage(seams: widget.seams),
     ];
     final destinations = <NavigationDestination>[
-      NavigationDestination(
-        icon: const Icon(Icons.devices_outlined),
-        selectedIcon: const Icon(Icons.devices),
-        label: l10n.tabDevices,
-      ),
       NavigationDestination(
         // The same badge as Transfers, because it counts the same thing: a
         // Transfer waiting on an answer is the one event worth interrupting
@@ -140,6 +146,11 @@ class _HomeShellState extends State<HomeShell> {
           child: const Icon(Icons.forum),
         ),
         label: l10n.tabConversation,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.devices_outlined),
+        selectedIcon: const Icon(Icons.devices),
+        label: l10n.tabDevices,
       ),
       NavigationDestination(
         icon: Badge.count(
