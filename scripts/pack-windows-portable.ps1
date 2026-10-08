@@ -64,9 +64,13 @@ $zip     = Join-Path $dist "$name.zip"
 
 # 新功能独有的文案，用来证明 zip 里的 app.so 确实是当前代码编出来的。
 # 挑句子而不是挑词：'对话' 这种短词会撞上 '原生对话框'，本仓库上过一次当。
+# 这个列表是"必改项"：每加一个功能，把该功能独有的句子加进来，把被它替换掉的
+# 句子删掉。留着旧句子等于把这个检查变成永久的红灯 —— 上一次改动把
+# conversationListEmpty / conversationPickOne 的文案重写了（"在「设备」里连接"
+# 改成"扫描到就自动出现在这里"），旧句子从此不可能在 app.so 里出现。
 $newProbes = @(
-    '还没有对话。在「设备」里连接一台设备，它就会出现在这里。',
-    '从左边选一个对话，或者先在「设备」里连接一台设备。',
+    '还没有对话。只要扫描到设备，它就会自动出现在这里，可以直接连接。',
+    '从左边选一个对话，或者先连接一台设备。',
     '连接已断开',
     '还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。'
 )
@@ -280,17 +284,35 @@ if ($Smoke) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $sandbox)
     Write-Host "    解压到 $sandbox"
 
+    # 上一轮冒烟留下的实例要清掉：它占着 47654/47656，新的一份就会绑不上端口，
+    # 而 _syncPairingListener 是"绑不上就记一条 notice"，不会退出 —— 于是冒烟会
+    # 报"TCP 47656 没监听"，看起来像产品坏了，实际是上一份还活着。
+    Get-Process -Name 'local_transfer' -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            Write-Host "    清掉上一次遗留的 local_transfer pid $($_.Id)"
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
+
     $p = Start-Process -FilePath (Join-Path $sandbox 'local_transfer.exe') -PassThru
     try {
-        Start-Sleep -Seconds 8
-        $p.Refresh()
-        if ($p.HasExited) { throw "启动后立刻退出 (code $($p.ExitCode))" }
-        Write-Host "    pid $($p.Id) 响应对答=$($p.Responding) 内存=$([math]::Round($p.WorkingSet64/1MB,1))MB"
+        # 端口不是启动即到位的：配对监听要等 profile 落盘之后再起，而 47656
+        # 刚被上一个进程关掉时还会在 TIME_WAIT 里停留一会儿。只读一次等于在赌
+        # 那 8 秒够用，实测会偶发假失败（同一份 app.so 重跑就过）——所以轮询。
+        $udp = @()
+        $tcp = @()
+        $deadline = (Get-Date).AddSeconds(30)
+        while ((Get-Date) -lt $deadline) {
+            $p.Refresh()
+            if ($p.HasExited) { throw "启动后立刻退出 (code $($p.ExitCode))" }
+            $udp = @(Get-NetUDPEndpoint -OwningProcess $p.Id -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.LocalPort })
+            $tcp = @(Get-NetTCPConnection -OwningProcess $p.Id -State Listen -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.LocalPort })
+            if (($udp -contains 47654) -and ($tcp -contains 47656)) { break }
+            Start-Sleep -Milliseconds 500
+        }
 
-        $udp = @(Get-NetUDPEndpoint -OwningProcess $p.Id -ErrorAction SilentlyContinue |
-            ForEach-Object { $_.LocalPort })
-        $tcp = @(Get-NetTCPConnection -OwningProcess $p.Id -State Listen -ErrorAction SilentlyContinue |
-            ForEach-Object { $_.LocalPort })
+        Write-Host "    pid $($p.Id) 响应对答=$($p.Responding) 内存=$([math]::Round($p.WorkingSet64/1MB,1))MB"
         Write-Host "    UDP $($udp -join ',')   TCP $($tcp -join ',')"
         if ($udp -notcontains 47654) { throw 'UDP 47654 没绑上 —— 自动发现不会工作' }
         if ($tcp -notcontains 47656) { throw 'TCP 47656 没监听 —— 别人配不上对' }
@@ -298,7 +320,15 @@ if ($Smoke) {
     }
     finally {
         Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
+        # 等端口真的回到可用：TIME_WAIT 还在时下一轮会绑不上，就是这个脚本自己
+        # 制造了上面那个偶发失败的场景。
+        $released = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $released) {
+            $held = @(Get-NetTCPConnection -LocalPort 47656 -ErrorAction SilentlyContinue |
+                Where-Object { $_.State -eq 'Listen' })
+            if ($held.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 500
+        }
         Clear-Tree $sandbox
     }
 }

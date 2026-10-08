@@ -935,13 +935,13 @@ abstract class AppLocalizations {
   /// No description provided for @conversationListEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No conversations yet. Connect a Device from Devices and it will show up here.'**
+  /// **'No conversations yet. A Device this one finds shows up here on its own, ready to connect.'**
   String get conversationListEmpty;
 
   /// No description provided for @conversationPickOne.
   ///
   /// In en, this message translates to:
-  /// **'Pick a conversation on the left, or connect a Device from Devices first.'**
+  /// **'Pick a conversation on the left, or connect a Device first.'**
   String get conversationPickOne;
 
   /// No description provided for @conversationDisconnected.

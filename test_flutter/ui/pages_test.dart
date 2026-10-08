@@ -19,6 +19,10 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
+      // Conversations leads the shell now, so this surface is offstage until it
+      // is asked for. Every other group already opens its tab; this one used to
+      // be the surface a window started on and got away without saying so.
+      await openTab(tester, l10n.tabDevices, window: windowA);
 
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.pairingCardUnpairedTitle)),
@@ -71,6 +75,7 @@ void main() {
       // sitting on Alice's screen.
       await pairDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabDevices, window: windowA);
 
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.pairingCardPairedTitle)),
@@ -82,22 +87,27 @@ void main() {
         findsOneWidget,
       );
 
-      // Discovery has to have placed Bob with a port before he can be dialled,
-      // and the card is where that shows up.
-      await pumpUntil(
-        tester,
-        () => onPage(
-          windowA,
-          DevicesPage,
-          find.text(l10n.connect),
-        ).evaluate().isNotEmpty,
-        description: 'Bob to be offered as diallable',
+      // Discovery has to have placed Bob with a port before he can be dialled.
+      // The card here says where he is; the button that dials lives in the
+      // conversation list, so this surface is read first and the tab is changed
+      // before the button is looked for.
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.connect)),
+        findsNothing,
+        reason: 'connecting is not done from this surface any more',
       );
       expect(onPage(windowA, DevicesPage, find.text('Bob')), findsOneWidget);
       expect(
         onPage(windowA, DevicesPage, find.textContaining(l10n.sessionOpen)),
         findsNothing,
         reason: 'nothing is connected yet',
+      );
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationConnectable(windowA, 'Bob'),
+        description: 'Bob to be offered as diallable in the conversation list',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -115,6 +125,7 @@ void main() {
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabDevices, window: windowA);
 
       await pumpUntil(
         tester,
@@ -128,7 +139,7 @@ void main() {
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.connect)),
         findsNothing,
-        reason: 'there is nothing left to connect',
+        reason: 'a connected peer has nothing left to connect on this surface',
       );
       // A Device this one is talking to is a Device to talk *to*: the card
       // offers its conversation, and the whole row opens it.
@@ -164,6 +175,7 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
+      await openTab(tester, l10n.tabDevices, window: windowA);
 
       // On from the moment the Device comes up: answering is a standing state,
       // not a step, so there is nothing to open.
@@ -765,6 +777,95 @@ void main() {
       expect(
         onConversation(windowA, find.text(l10n.conversationEmpty)),
         findsOneWidget,
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a Device that has only been found is listed, with Connect', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      // Paired, so the peer is in the group and therefore diallable, but never
+      // connected: this is the state a user is in when they have just opened
+      // the app and the other Device has announced itself.
+      await pairDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      // The whole point of the move: the Device shows up here on its own,
+      // because Discovery placed it — no trip to the Devices surface first.
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the found Device to appear in the conversation list',
+      );
+      expect(
+        conversationConnectable(windowA, 'Bob'),
+        isTrue,
+        reason: 'a found Device has to offer the one action that matters',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('tapping Connect on a listed Device is wired to the dial', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      await pumpUntil(
+        tester,
+        () => conversationConnectable(windowA, 'Bob'),
+        description: 'Bob to be offered as diallable',
+      );
+
+      // What this surface is answerable for: the row offers the one action, it
+      // is aimed at Bob rather than at a second peer on the same list, and the
+      // peer it points at has somewhere to dial. Everything the button needs is
+      // checked here, because whether the *socket* lands is not this test's
+      // question: a dial started from a tap runs on the widget test's clock and
+      // its continuations never return to a `testWidgets` body, so the Session
+      // is asserted where it can be — by [connectDevices], which dials on the
+      // real event loop, and by the two-window e2e test that pairs by clicking.
+      final connectButton = onPage(
+        windowA,
+        ConversationsPage,
+        find.descendant(
+          of: find.widgetWithText(ListTile, 'Bob'),
+          matching: find.bySubtype<ButtonStyleButton>(),
+        ),
+      );
+      expect(
+        connectButton,
+        findsOneWidget,
+        reason: "Bob's row offers exactly one action",
+      );
+
+      final bobView = alice.controller.peers.firstWhere(
+        (view) => view.displayName == 'Bob',
+      );
+      expect(
+        bobView.isInGroup,
+        isTrue,
+        reason: 'Connect rather than Pair, because the Pairing is done',
+      );
+      expect(bobView.isConnected, isFalse, reason: 'nothing has dialled yet');
+      expect(
+        bobView.isDiallable,
+        isTrue,
+        reason: 'the row only offers Connect when there is somewhere to dial',
       );
 
       await shutdown(tester, [alice, bob]);
