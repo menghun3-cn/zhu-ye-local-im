@@ -304,6 +304,11 @@ void main() {
       // than sent — which is why both sides can be held to the same value
       // without either of them seeing a screen.
       expect(asking.caller.alias, joiner.alias);
+      // The address is not part of the handshake at all — it is read off the
+      // socket this side accepted, which is why it is the one fact on the
+      // prompt nobody on the far end got to choose. The loopback dial above
+      // makes it 127.0.0.1, and a Device that announced no name shows with it.
+      expect(asking.callerAddress, '127.0.0.1');
       final hostAttempt = await asking.admit();
       final joinerAttempt = await joinFuture;
       expect(hostAttempt.sas, joinerAttempt.sas);
