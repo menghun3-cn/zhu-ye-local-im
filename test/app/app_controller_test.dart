@@ -288,35 +288,53 @@ void main() {
       final sent = await alice.controller.sendText('hello from Alice');
       expect(sent.text, 'hello from Alice');
 
+      // Nothing is offered for a decision: text is answered on arrival, so it
+      // never reaches the stream a UI draws its prompts from.
       await until(
-        () => bob.offers.isNotEmpty,
-        description: 'Bob to be offered a Transfer',
+        () => sent.state.isSettled,
+        description: 'the text to settle on both sides',
       );
-      final offer = bob.offers.single;
-      expect(offer.kind, PayloadKind.text);
-      expect(offer.text, 'hello from Alice');
-      expect(offer.state, TransferState.awaitingDecision);
-      expect(offer.direction, TransferDirection.incoming);
+      expect(
+        bob.offers,
+        isEmpty,
+        reason: 'text is not a question, so nothing is offered',
+      );
 
-      // The offer is visible to a UI, and undecided, before anybody answers it.
-      final pending = bob.controller.transfers.single;
-      expect(pending.needsDecision, isTrue);
-      expect(pending.offer, same(offer));
-      expect(pending.peer, alice.fingerprint);
+      final received = bob.controller.transfers.single;
+      expect(received.kind, PayloadKind.text);
+      expect(received.text, 'hello from Alice');
+      expect(received.direction, TransferDirection.incoming);
+      expect(received.state, TransferState.completed);
+      expect(
+        received.needsDecision,
+        isFalse,
+        reason: 'nothing about a text needs deciding',
+      );
+      expect(received.offer, isNull);
+      expect(received.peer, alice.fingerprint);
       expect(alice.controller.transfers.single.peer, bob.fingerprint);
+      expect(sent.state, TransferState.completed);
+    });
 
-      await bob.controller.acceptInto(
-        offer,
-        tempDirectory('local-transfer-in-'),
-      );
-
+    test('text arrives with nothing written to disk', () async {
+      // The whole reason text needs no prompt: there is no answer to give.
+      // Accepting one opens no sink and names no directory, so an offer of text
+      // is settled by the controller alone.
+      final sent = await alice.controller.sendText('no files here');
       await until(
-        () =>
-            offer.state == TransferState.completed &&
-            sent.state == TransferState.completed,
-        description: 'both sides to settle as completed',
+        () => sent.state.isSettled,
+        description: 'the text to settle',
       );
-      expect(bob.controller.transfers.single.needsDecision, isFalse);
+
+      final received = bob.controller.transfers.single;
+      expect(received.kind, PayloadKind.text);
+      // A text offer's item carries its body inline, so it has no digest and
+      // therefore no byte stream to write anywhere.
+      for (final name in received.names) {
+        expect(name, isNotEmpty);
+      }
+      expect(received.totalBytes, greaterThan(0));
+      expect(received.transferredBytes, received.totalBytes);
     });
 
     test('a file arrives byte for byte, across several chunks', () async {
@@ -360,10 +378,16 @@ void main() {
     });
 
     test('a refused offer is reported to the sender', () async {
-      final sent = await alice.controller.sendText('not wanted');
+      // A file, because it is the kind that still waits: text is accepted on
+      // arrival and so can never be refused.
+      final home = tempDirectory('local-transfer-out-');
+      final source = File('${home.path}${Platform.pathSeparator}unwanted.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      final sent = await alice.controller.sendFile(source);
+
       await until(
         () => bob.offers.isNotEmpty,
-        description: 'Bob to be offered a Transfer',
+        description: 'Bob to be offered the file',
       );
 
       await bob.controller.reject(bob.offers.single, RejectionReason.declined);
@@ -386,16 +410,47 @@ void main() {
       },
     );
 
-    test('sending does not answer an offer on the user behalf', () async {
-      await alice.controller.sendText('first');
+    test('a file is not accepted on the user behalf', () async {
+      final home = tempDirectory('local-transfer-out-');
+      final source = File('${home.path}${Platform.pathSeparator}waiting.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      final sent = await alice.controller.sendFile(source);
+
       await until(
         () => bob.offers.isNotEmpty,
         description: 'Bob to be offered a Transfer',
       );
       // Nothing has moved on Bob's side: the bytes are the sender's problem
-      // until the user says yes.
+      // until the user says yes, and where they land is the user's to say.
       expect(bob.offers.single.state, TransferState.awaitingDecision);
       expect(bob.offers.single.transferredBytes, 0);
+      expect(bob.controller.transfers.single.needsDecision, isTrue);
+
+      // Refused before this test ends, so the sender lets go of the file it is
+      // holding open: an undecided Transfer keeps the source handle, and the
+      // teardown that deletes the directory would then fail on Windows.
+      // `outcome` is awaited rather than a state, because it is the sender
+      // finishing with the Transfer — which is what releases the handle — and
+      // not merely the state it lands in.
+      final offered = bob.offers.single;
+      await bob.controller.reject(offered);
+      await sent.outcome;
+      expect(offered.state.isSettled, isTrue);
+    });
+
+    test('text is accepted on the arrival, and never offered', () async {
+      // The other half of the same rule, stated from the other side: what the
+      // user would have been asked about text is a question with no answer, so
+      // the controller answers it and no prompt is ever drawn.
+      final sent = await alice.controller.sendText('goes straight through');
+      await until(
+        () => sent.state.isSettled,
+        description: 'the text to settle',
+      );
+
+      expect(bob.offers, isEmpty, reason: 'there was nothing to ask');
+      expect(bob.controller.transfers.single.state, TransferState.completed);
+      expect(bob.controller.transfers.single.offer, isNull);
     });
   });
 
@@ -541,10 +596,12 @@ void main() {
 
         await alice.controller.sendText('over a typed address');
         await until(
-          () => bob.offers.isNotEmpty,
-          description: 'Bob to be offered the text',
+          () =>
+              bob.controller.transfers.isNotEmpty &&
+              bob.controller.transfers.single.state.isSettled,
+          description: 'Bob to receive the text',
         );
-        expect(bob.offers.single.text, 'over a typed address');
+        expect(bob.controller.transfers.single.text, 'over a typed address');
       },
     );
 

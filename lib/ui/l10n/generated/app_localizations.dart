@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @conversationEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.'**
+  /// **'Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.'**
   String get conversationEmpty;
 
   /// No description provided for @messageHint.
@@ -925,6 +925,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send'**
   String get send;
+
+  /// No description provided for @tabConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get tabConversation;
+
+  /// No description provided for @conversationListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations yet. Connect a Device from Devices and it will show up here.'**
+  String get conversationListEmpty;
+
+  /// No description provided for @conversationPickOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a conversation on the left, or connect a Device from Devices first.'**
+  String get conversationPickOne;
+
+  /// No description provided for @conversationDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Session closed'**
+  String get conversationDisconnected;
 
   /// No description provided for @sendFileTitle.
   ///

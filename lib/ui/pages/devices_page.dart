@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
+import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
 import '../feedback.dart';
@@ -14,10 +15,25 @@ import 'conversation_page.dart';
 /// Who this Device is, who is around, and how to reach them.
 class DevicesPage extends StatelessWidget {
   /// Builds the Devices surface.
-  const DevicesPage({super.key, this.defaultIncomingDirectory});
+  const DevicesPage({
+    super.key,
+    this.defaultIncomingDirectory,
+    this.onConversationRequested,
+  });
 
   /// Where a file received from a conversation lands by default.
   final String? defaultIncomingDirectory;
+
+  /// Called when the user asks for a conversation with [Fingerprint]'s Device.
+  ///
+  /// The shell passes one that brings the Conversations surface to the front,
+  /// which is the point of the parameter: connecting from here used to leave
+  /// the user on this page, having to find the conversation themselves. This
+  /// page does not know the shell exists, so it asks rather than switches.
+  ///
+  /// Null in a test that only cares about this surface; the card then falls
+  /// back to pushing the conversation as a route of its own.
+  final void Function(Fingerprint peer)? onConversationRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +63,7 @@ class DevicesPage extends StatelessWidget {
               peer: peer,
               controller: controller,
               defaultIncomingDirectory: defaultIncomingDirectory,
+              onConversationRequested: onConversationRequested,
             ),
       ],
     );
@@ -182,18 +199,22 @@ class _PairingCard extends StatelessWidget {
 ///
 /// A Device this one holds a Session with is a Device to talk to, so the whole
 /// card opens the conversation and the column beside the name says so. The
-/// other two states are single actions — Pair, or open a Session — and stay as
-/// the button they always were.
+/// other two states are single actions — Pair, or Connect — and stay as the
+/// button they always were; Connect now ends in the conversation rather than on
+/// this card, because a Session is the beginning of a conversation and not a
+/// thing to establish for its own sake.
 class _PeerCard extends StatelessWidget {
   const _PeerCard({
     required this.peer,
     required this.controller,
     required this.defaultIncomingDirectory,
+    this.onConversationRequested,
   });
 
   final PeerView peer;
   final LocalTransferController controller;
   final String? defaultIncomingDirectory;
+  final void Function(Fingerprint peer)? onConversationRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -233,10 +254,7 @@ class _PeerCard extends StatelessWidget {
                     : l10n.nothingKnownAboutPeer,
                 child: TextButton(
                   onPressed: canConnect
-                      ? () => guarded(
-                          context,
-                          () => controller.connect(peer.fingerprint),
-                        )
+                      ? () => guarded(context, () => _connect(context))
                       : canPair
                       ? () => showPairWithPeerDialog(context, controller, peer)
                       : null,
@@ -249,7 +267,31 @@ class _PeerCard extends StatelessWidget {
     );
   }
 
+  /// Opens a Session, and takes the user to the conversation it starts.
+  ///
+  /// Connecting used to leave the user here, on a card that now said
+  /// "connected", with the conversation somewhere else. A Session is not a
+  /// thing to establish — it is the beginning of a conversation — so the two
+  /// are one action: dial, then go where the talking happens. A dial that
+  /// fails throws through [guarded], which reports it, and nothing moves.
+  Future<void> _connect(BuildContext context) async {
+    await controller.connect(peer.fingerprint);
+    if (!context.mounted) return;
+    _openConversation(context);
+  }
+
+  /// Shows the conversation, either in the shell or as a route of its own.
+  ///
+  /// The shell is asked first, because a conversation belongs in the
+  /// Conversations surface beside the others; the pushed route is what is left
+  /// when there is no shell to ask — a test that pumps this page alone, or any
+  /// caller that has a reason to want a page rather than a pane.
   void _openConversation(BuildContext context) {
+    final request = onConversationRequested;
+    if (request != null) {
+      request(peer.fingerprint);
+      return;
+    }
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute<void>(

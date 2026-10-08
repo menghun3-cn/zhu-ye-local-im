@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
+import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
@@ -364,10 +365,24 @@ void main() {
       await connectDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
 
-      // Sending writes to a real socket, so it waits on the real event loop.
-      await tester.runAsync(
-        () => alice.controller.sendText('hello from Alice'),
-      );
+      // A file, because a text no longer waits: it is accepted on arrival, so
+      // there would be no answer to show. This is the surface a *question*
+      // shows up on, and only a file is still a question.
+      //
+      // Waited for, because `runAsync` cannot be re-entered: with the send
+      // outstanding, the plain waits below would throw
+      // "Reentrant call to runAsync() denied" rather than wait, and the refusal
+      // that lets the send finish could never be reached. See [offerFile].
+      //
+      // Awaiting a send whose answer arrives later and "unfinished" rows do not
+      // actually conflict: Bob lives in this test's tree, so the offer lands
+      // while the send is blocked on it, and `reject` below is what releases
+      // the send — leaving the tracked Transfer behind in a state the row can
+      // still show.
+      final home = tempDirectory('local-transfer-ui-out-');
+      final source = File('${home.path}${Platform.pathSeparator}payload.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      await offerFile(tester, alice, source);
       await openTab(tester, l10n.tabTransfers, window: windowA);
       await pumpUntil(
         tester,
@@ -378,16 +393,40 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'the Transfer to render with its state',
       );
-      // Nothing has answered it, and the row says both what it is and who it
-      // is with.
-      expect(
-        onPage(
+      // Nothing has answered it yet, so the row names the Device it is waiting
+      // on and says what kind of thing it is. The bytes behind it are nought
+      // because a file moves only once it is taken.
+      await pumpUntil(
+        tester,
+        () => onPage(
           windowA,
           TransfersPage,
-          find.text('${l10n.transferTo('Bob')} · ${l10n.kindText}'),
-        ),
+          find.textContaining(l10n.transferTo('Bob')),
+        ).evaluate().isNotEmpty,
+        description: 'the row to name the Device on the other end',
+      );
+      expect(
+        onPage(windowA, TransfersPage, find.textContaining(l10n.kindFiles)),
         findsOneWidget,
       );
+      expect(
+        onPage(windowA, TransfersPage, find.text(l10n.stateAwaitingDecision)),
+        findsWidgets,
+      );
+
+      // Answered before the test ends, so this leaves no Transfer half-decided
+      // for a later teardown to trip over — and so the send, which has been
+      // blocked on this very answer, can finish. Bob does the refusing; nobody
+      // here asserts the outcome.
+      //
+      // Waited for, because the offer reaches Bob's controller over the real
+      // socket and this line is the first thing that needs it to have arrived.
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
 
       await shutdown(tester, [alice, bob]);
     });
@@ -403,11 +442,15 @@ void main() {
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
 
-      await tester.runAsync(() => alice.controller.sendText('answer me'));
+      // A file: the offer that still needs answering.
+      final home = tempDirectory('local-transfer-ui-out-');
+      final source = File('${home.path}${Platform.pathSeparator}answer-me.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      await tester.runAsync(() => alice.controller.sendFile(source));
       await pumpUntil(
         tester,
         () => bob.offers.isNotEmpty,
-        description: 'Bob to be offered the text',
+        description: 'Bob to be offered the file',
       );
       await openTab(tester, l10n.tabTransfers, window: windowA);
       await pumpUntil(
@@ -622,6 +665,166 @@ void main() {
       );
 
       await shutdown(tester, [device]);
+    });
+  });
+
+  group('the Conversations surface', () {
+    testWidgets('says where conversations come from when there are none', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      expect(
+        onPage(
+          windowA,
+          ConversationsPage,
+          find.text(l10n.conversationListEmpty),
+        ),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('a connected Device shows up without pressing anything', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      // The point of the surface: a live Session is a conversation, so it is
+      // here on its own — no "open conversation" step, and nothing tapped on
+      // the Devices surface first.
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the connected Device to appear in the list',
+      );
+      // Named by its address as well as its name, which is what tells two
+      // Machines claiming the same name apart.
+      expect(
+        onPage(
+          windowA,
+          ConversationsPage,
+          find.textContaining(InternetAddress.loopbackIPv4.address),
+        ),
+        findsWidgets,
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('picking a conversation opens it beside the list', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to be listed',
+      );
+
+      // Before anything is picked the right-hand pane says what to do, rather
+      // than showing a conversation the user did not ask for.
+      expect(
+        onPage(windowA, ConversationsPage, find.text(l10n.conversationPickOne)),
+        findsOneWidget,
+      );
+
+      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
+      await settleRoute(tester);
+
+      // The pane is a conversation: a composer to type in, and the empty-state
+      // line the shared body draws.
+      expect(
+        onConversation(windowA, find.text(l10n.messageHint)),
+        findsOneWidget,
+      );
+      expect(
+        onConversation(windowA, find.text(l10n.conversationEmpty)),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('text sent from the pane arrives with no answer needed', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to be listed',
+      );
+      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
+      await settleRoute(tester);
+
+      // Typed into the composer and sent, the way a user does it.
+      await tester.enterText(
+        onConversation(windowA, find.byType(TextField)),
+        'straight through',
+      );
+      await tester.tap(onConversation(windowA, find.byTooltip(l10n.send)));
+      await settleRoute(tester);
+
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          // The bubble composes the two labels into one line, so this matches
+          // the line rather than either word on its own.
+          find.text('${l10n.kindText} · ${l10n.stateCompleted}'),
+        ).evaluate().isNotEmpty,
+        description: 'the message to settle as sent',
+      );
+      // The receiver was never asked: text is not an offer, so nothing is
+      // waiting on Bob to tap anything.
+      expect(
+        bob.offers,
+        isEmpty,
+        reason: 'text is not a question, so Bob is not offered one',
+      );
+      // And the sent text is in the thread, as a message.
+      expect(
+        onConversation(windowA, find.text('straight through')),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [alice, bob]);
     });
   });
 }

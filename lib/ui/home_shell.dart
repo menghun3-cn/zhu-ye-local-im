@@ -8,12 +8,22 @@ import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
 import 'pages/clipboard_page.dart';
+import 'pages/conversations_page.dart';
 import 'pages/devices_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
 
-/// The four surfaces, and the way between them.
+/// Where the Conversations surface sits, for the one place that has to name it.
+///
+/// Only this one index has a name: the shell builds the pages and the
+/// destinations from the same ordered list, so every index is already in the
+/// same order by construction, and the only place an index is *written* rather
+/// than derived is [_HomeShellState._showConversation]. A full set of names
+/// would be five constants kept in step with a list for no gain.
+const int _conversationsSurface = 1;
+
+/// The five surfaces, and the way between them.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
   const HomeShell({super.key, required this.seams});
@@ -28,6 +38,16 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  /// The conversation the user asked for from another surface, if any.
+  ///
+  /// The Devices surface cannot switch tabs itself — it does not know this
+  /// shell exists — so it asks through a callback, and the request lands here
+  /// until the Conversations surface has taken it. Connecting to a Device is
+  /// the case this exists for: the user asked to talk to somebody, so the tab
+  /// changes and that conversation is already open.
+  Fingerprint? _requestedConversation;
+
   StreamSubscription<PairingRequest>? _requests;
 
   @override
@@ -35,7 +55,7 @@ class _HomeShellState extends State<HomeShell> {
     super.didChangeDependencies();
     // Wired here rather than in the page that draws the pairing card: a request
     // arrives whoever the user is looking at, and a prompt that only appeared on
-    // one of four surfaces would be a prompt that gets missed. The shell is the
+    // one of the surfaces would be a prompt that gets missed. The shell is the
     // narrowest thing that is always alive.
     _requests ??= ControllerScope.of(context).pairingRequests
         .listen(_ask, onError: (Object _) {});
@@ -61,6 +81,18 @@ class _HomeShellState extends State<HomeShell> {
     await showPairingRequestDialog(context, request);
   }
 
+  /// Brings the Conversations surface forward, with [peer]'s conversation open.
+  ///
+  /// Handed to the Devices surface, which is where a user connects to a Device:
+  /// having done so, the thing they want is the conversation, and this is what
+  /// makes that one action instead of two.
+  void _showConversation(Fingerprint peer) {
+    setState(() {
+      _requestedConversation = peer;
+      _index = _conversationsSurface;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -75,6 +107,11 @@ class _HomeShellState extends State<HomeShell> {
     final pages = <Widget>[
       DevicesPage(
         defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+        onConversationRequested: _showConversation,
+      ),
+      ConversationsPage(
+        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+        requestedPeer: _requestedConversation,
       ),
       TransfersPage(
         defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
@@ -87,6 +124,22 @@ class _HomeShellState extends State<HomeShell> {
         icon: const Icon(Icons.devices_outlined),
         selectedIcon: const Icon(Icons.devices),
         label: l10n.tabDevices,
+      ),
+      NavigationDestination(
+        // The same badge as Transfers, because it counts the same thing: a
+        // Transfer waiting on an answer is the one event worth interrupting
+        // for, and it now has two places it can be answered from.
+        icon: Badge.count(
+          count: waiting,
+          isLabelVisible: waiting > 0,
+          child: const Icon(Icons.forum_outlined),
+        ),
+        selectedIcon: Badge.count(
+          count: waiting,
+          isLabelVisible: waiting > 0,
+          child: const Icon(Icons.forum),
+        ),
+        label: l10n.tabConversation,
       ),
       NavigationDestination(
         icon: Badge.count(
@@ -113,9 +166,11 @@ class _HomeShellState extends State<HomeShell> {
       ),
     ];
 
-    // Wide windows get a rail, narrow ones a bar. The same four destinations
+    // Wide windows get a rail, narrow ones a bar. The same destinations
     // either way: this is one layout decision, not two screens.
     final wide = MediaQuery.sizeOf(context).width >= 720;
+    // Every surface, kept alive: switching tabs must not restart a page, and a
+    // conversation half-typed into one must survive a look at another.
     final content = IndexedStack(index: _index, children: pages);
 
     return Scaffold(

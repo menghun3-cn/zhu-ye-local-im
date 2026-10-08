@@ -7,9 +7,9 @@ import 'package:local_transfer/app/app.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
+import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
-import 'package:local_transfer/ui/pages/conversation_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/seams.dart';
 
@@ -31,10 +31,16 @@ const ValueKey<String> windowAKey = ValueKey('window-a');
 const ValueKey<String> windowBKey = ValueKey('window-b');
 
 /// The five surfaces, in the order the shell lists them.
+///
+/// Written out here rather than imported from the shell: the shell's own names
+/// are what the shell uses, and a test that read them would agree with any
+/// ordering the shell happened to pick. These numbers are the assertion — a
+/// tab that moved is a tab a user has to relearn.
 const int devicesSurface = 0;
-const int transfersSurface = 1;
-const int clipboardSurface = 2;
-const int settingsSurface = 3;
+const int conversationsSurface = 1;
+const int transfersSurface = 2;
+const int clipboardSurface = 3;
+const int settingsSurface = 4;
 
 /// The strings the windows under test are showing.
 ///
@@ -489,10 +495,21 @@ Finder onPage(TestWindow window, Type page, Finder matching) =>
     find.descendant(of: window.within(find.byType(page)), matching: matching);
 
 /// A directory that goes away when the test does.
+///
+/// Best effort, and deliberately so: a TestDevice that is still holding a
+/// source file open — an undecided Transfer keeps its handle — would make the
+/// delete throw on Windows, and failing a test over the cleanup of a directory
+/// under the system temp rather than over what it asserted is the wrong
+/// failure. The directory lives under `Directory.systemTemp`, so a handle that
+/// outlives the test is reaped by the operating system instead.
 Directory tempDirectory(String prefix) {
   final directory = Directory.systemTemp.createTempSync(prefix);
   addTearDown(() {
-    if (directory.existsSync()) directory.deleteSync(recursive: true);
+    try {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+    } on FileSystemException {
+      // A file still open somewhere. See above.
+    }
   });
   return directory;
 }
@@ -514,6 +531,37 @@ Future<void> untilTrue(
     }
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
+}
+
+/// Offers [file] from [device] without waiting for it to be answered.
+///
+/// The returned future resolves when the send itself returns, which for a file
+/// means *after the other side has answered*. Nothing in [file]'s reads has
+/// happened by the time this call returns, which is the point: a test that
+/// wants to look at the state a Transfer waits in cannot first wait for the
+/// answer that ends it.
+///
+/// ## Two clocks, and why the underlying call is posted rather than awaited
+///
+/// A send crosses a real socket, so it lives on the real event loop and has to
+/// start inside [WidgetTester.runAsync]. But `runAsync` refuses to be
+/// re-entered: while the send is outstanding, every later `runAsync` — which is
+/// what [pumpUntil] and [untilTrue] use to yield — throws
+/// `Reentrant call to runAsync() denied` instead of waiting.
+///
+/// So this starts the send and immediately returns, and the *caller* must
+/// arrange for it to be answered before awaiting the result — with
+/// [UiDevice.controller]'s own `reject`/`acceptInto` on the receiving Device,
+/// driven through `runAsync` *after* the send has found its offer. Awaiting it
+/// with the answer still outstanding hangs the test with no output at all,
+/// which is a far worse failure to debug than this comment is to read.
+///
+/// The default `sendFile` is deliberately not used directly by tests that need
+/// this: awaiting it inline is correct for every test that *does* answer
+/// promptly, and a helper that hid the distinction would make the wrong one
+/// easy to reach for.
+Future<void> offerFile(WidgetTester tester, UiDevice device, File file) {
+  return tester.runAsync(() => device.controller.sendFile(file));
 }
 
 /// Pairs two Devices through the controller, with no window in the way.
@@ -681,6 +729,10 @@ Future<void> pairThroughWindows(
 /// By the card, because the card is what a user has: the whole row is the tap
 /// target for a Device that is connected, which is the discoverability the
 /// conversation is there to give.
+///
+/// Tapping it lands on the Conversations surface with that thread open — the
+/// shell's doing, not a pushed route — so this leaves the window there rather
+/// than on the Devices surface it started from.
 Future<void> openConversation(
   WidgetTester tester,
   TestWindow window, {
@@ -711,12 +763,19 @@ bool conversationOffered(TestWindow window, String name) => onPage(
 /// [matching], restricted to the conversation [window] has open.
 ///
 /// `descendant` rather than `ancestor`: the ancestor form collapses to the
-/// `ConversationPage` widget itself, so a tap aimed through it lands in the
-/// middle of the message list rather than on the control the finder named. This
-/// form answers the same question for an assertion — is this inside the
-/// conversation — and is also the thing to tap.
+/// conversation widget itself, so a tap aimed through it lands in the middle of
+/// the message list rather than on the control the finder named. This form
+/// answers the same question for an assertion — is this inside the conversation
+/// — and is also the thing to tap.
+///
+/// Keyed on [ConversationView], which is the body of a conversation wherever it
+/// is drawn: the shell's Conversations surface puts one in a pane, and the
+/// pushed page puts one under an `AppBar`. Both are "the conversation this
+/// window has open", so a test does not have to know which way it got there —
+/// and the composer, the history and the two answers are the same widgets
+/// either way.
 Finder onConversation(TestWindow window, Finder matching) => window.within(
-  find.descendant(of: find.byType(ConversationPage), matching: matching),
+  find.descendant(of: find.byType(ConversationView), matching: matching),
 );
 
 /// Whether [window]'s pairing card says this Device is answering requests.

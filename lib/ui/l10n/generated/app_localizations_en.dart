@@ -506,13 +506,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationEmpty =>
-      'Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.';
+      'Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.';
 
   @override
   String get messageHint => 'Type a message';
 
   @override
   String get send => 'Send';
+
+  @override
+  String get tabConversation => 'Conversations';
+
+  @override
+  String get conversationListEmpty =>
+      'No conversations yet. Connect a Device from Devices and it will show up here.';
+
+  @override
+  String get conversationPickOne =>
+      'Pick a conversation on the left, or connect a Device from Devices first.';
+
+  @override
+  String get conversationDisconnected => 'Session closed';
 
   @override
   String sendFileTitle(String peer) {
