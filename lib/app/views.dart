@@ -153,7 +153,9 @@ final class TransferView {
   /// The live offer while one is waiting to be answered, else null.
   ///
   /// Handed out so a UI can call `accept` or `reject` on it; the controller
-  /// will not answer an offer on the user's behalf.
+  /// will not answer a *file* offer on the user's behalf. Text is never handed
+  /// out here: the controller answers a text offer itself, on arrival, so there
+  /// is never a decision for a UI to draw.
   final IncomingTransfer? offer;
 
   /// Whether this Device has to answer before anything moves.

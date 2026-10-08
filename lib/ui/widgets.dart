@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// The small pieces the four surfaces share.
+/// The small pieces the surfaces share.
 ///
 /// Three widgets rather than a design system: a titled divider, a label/value
-/// line, and a quiet line where a list would be. They exist because all four
-/// pages need them and four copies would drift.
+/// line, and a quiet line where a list would be. They exist because several
+/// pages need them and that many copies would drift.
 
 /// A titled divider between the groups of a page, with an optional action.
 class SectionHeader extends StatelessWidget {

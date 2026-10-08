@@ -487,13 +487,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openConversation => '打开会话';
 
   @override
-  String get conversationEmpty => '还没有收发过内容。发出的文字和文件，对方都要先确认才会接收。';
+  String get conversationEmpty => '还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。';
 
   @override
   String get messageHint => '输入要发送的文字';
 
   @override
   String get send => '发送';
+
+  @override
+  String get tabConversation => '对话';
+
+  @override
+  String get conversationListEmpty => '还没有对话。在「设备」里连接一台设备，它就会出现在这里。';
+
+  @override
+  String get conversationPickOne => '从左边选一个对话，或者先在「设备」里连接一台设备。';
+
+  @override
+  String get conversationDisconnected => '连接已断开';
 
   @override
   String sendFileTitle(String peer) {

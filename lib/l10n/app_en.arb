@@ -234,9 +234,13 @@
   "portIsANumber": "A port is a number.",
   "manualAddressNote": "Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.",
   "openConversation": "Open conversation",
-  "conversationEmpty": "Nothing has been sent or received here yet. Text and files both wait for the other Device to accept them.",
+  "conversationEmpty": "Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.",
   "messageHint": "Type a message",
   "send": "Send",
+  "tabConversation": "Conversations",
+  "conversationListEmpty": "No conversations yet. Connect a Device from Devices and it will show up here.",
+  "conversationPickOne": "Pick a conversation on the left, or connect a Device from Devices first.",
+  "conversationDisconnected": "Session closed",
   "sendFileTitle": "Send a file to {peer}",
   "@sendFileTitle": {
     "placeholders": { "peer": { "type": "String" } }

@@ -28,9 +28,17 @@ export 'views.dart';
 ///
 /// ## What it does not do
 ///
-/// It never answers an incoming Transfer on the user's behalf. An offer arrives
-/// on [incoming] and appears in [transfers] with [TransferView.offer] set; only
-/// [acceptInto] or [reject] settles it.
+/// It never answers an incoming *file* Transfer on the user's behalf. An offer
+/// arrives on [incoming] and appears in [transfers] with [TransferView.offer]
+/// set; only [acceptInto] or [reject] settles it.
+///
+/// Text is the exception, and deliberately so: a text offer is accepted the
+/// moment it arrives, without a prompt. There is nothing to decide — a text
+/// item carries its body inside the offer, takes no sink, and lands nowhere on
+/// disk, so accepting one asks the user a question with no consequence either
+/// way. Files stay prompted because they are the case the question exists for:
+/// they write bytes into the user's folders, and the answer is *where*, which
+/// only the user knows.
 ///
 /// It never answers a Pairing request on the user's behalf either. A Device that
 /// dialled this one arrives on [pairingRequests] and waits there; only
@@ -85,6 +93,15 @@ final class LocalTransferController {
   final DateTime Function() _clock;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
+
+  /// Offers waiting for the user to answer them — a file, never a text.
+  ///
+  /// A broadcast controller does **not** hold on to an event that has not been
+  /// delivered yet: the event is kept alive by whatever [add] captured, and
+  /// falls out of reach the moment that is the only reference left. So a caller
+  /// that adds an offer and then drops its own last reference to it has created
+  /// a race with its own listeners. [_pruneTransfers] obeys that rule rather
+  /// than relying on this stream to be patient.
   final StreamController<IncomingTransfer> _incoming =
       StreamController<IncomingTransfer>.broadcast();
   final StreamController<PairingRequest> _pairingRequests =
@@ -119,6 +136,11 @@ final class LocalTransferController {
   ///
   /// The live [IncomingTransfer] rather than a view, because answering one
   /// means calling it.
+  ///
+  /// Text never reaches this stream: it is answered on arrival (see the class
+  /// doc), so by the time a listener could act the offer is already settled.
+  /// What arrives here is what genuinely needs an answer — files, whose
+  /// landing directory only the user can name.
   Stream<IncomingTransfer> get incoming => _incoming.stream;
 
   /// Devices asking to pair with this one, in arrival order.
@@ -524,6 +546,10 @@ final class LocalTransferController {
   /// Names come from the peer and are therefore sanitised by
   /// [incomingPathFor]; a name that would collide with an existing file is
   /// numbered rather than overwriting it.
+  ///
+  /// This is the file path: a text offer is accepted by the controller on
+  /// arrival and is never awaiting a decision by the time a UI could call this,
+  /// so passing one throws [AppRefusal.offerAlreadyAnswered].
   Future<void> acceptInto(
     IncomingTransfer transfer,
     Directory directory,
@@ -762,7 +788,39 @@ final class LocalTransferController {
 
   void _onOffer(Fingerprint peer, IncomingTransfer offer) {
     _track(offer, peer);
-    if (!_incoming.isClosed) _incoming.add(offer);
+    // Text settles itself: a text item carries its body in the offer and takes
+    // no sink, so accepting it commits nothing, writes nothing and has no
+    // answer the user could give differently. Prompting for it would be a
+    // question with one sensible answer, and the thing a conversation is made
+    // of would stall on a tap — so it does not.
+    //
+    // A file is the opposite in every one of those respects: it writes bytes
+    // into a folder the user picks, so it waits here like everything else.
+    if (offer.kind == PayloadKind.text) {
+      unawaited(_acceptInline(offer, peer));
+    } else if (!_incoming.isClosed) {
+      _incoming.add(offer);
+    }
+    _notify();
+  }
+
+  /// Accepts an offer that carries its whole body inside itself.
+  ///
+  /// No sinks: every item of such an offer has no digest by construction, and
+  /// `accept` rejects a sink for an item that streams nothing.
+  Future<void> _acceptInline(IncomingTransfer offer, Fingerprint peer) async {
+    try {
+      await offer.accept(itemIds: [for (final item in offer.items) item.id]);
+    } on Object catch (error) {
+      // A text that could not be accepted is not worth a dialog: the offer is
+      // already settled by `accept`'s failure path or by the Session dying, and
+      // the sender is told through its own outcome. A notice keeps it visible
+      // without pretending the user has something to answer.
+      _notice(
+        'a text Transfer from ${peer.short()} could not be accepted: '
+        '$error',
+      );
+    }
     _notify();
   }
 
@@ -800,6 +858,20 @@ final class LocalTransferController {
   }
 
   /// Keeps the finished-transfer list from growing without bound.
+  ///
+  /// Only ever drops Transfers that are **already settled**, which is what
+  /// makes dropping them safe for the two things besides the list that hold on
+  /// to one. The record was also the only strong reference keeping the object
+  /// alive for consumers, and `_incoming` is a *broadcast* controller — a
+  /// broadcast controller does not keep an undelivered event alive, so an offer
+  /// whose listeners have not run yet would be collected rather than
+  /// delivered, and the peer's question would vanish. A Transfer that has not
+  /// settled is a question still in flight, so it is not a candidate.
+  ///
+  /// Above [keep] the oldest are dropped regardless, which is the bound
+  /// talking: a hundred live Transfers is far past anything a person is
+  /// watching, and the alternative is a list that grows for the life of the
+  /// process.
   void _pruneTransfers() {
     const keep = 100;
     if (_transfers.length <= keep) return;
@@ -821,7 +893,16 @@ final class LocalTransferController {
       totalBytes: transfer.totalBytes,
       names: [for (final item in transfer.items) item.name],
       text: transfer.text,
-      offer: transfer is IncomingTransfer && transfer.isDecidable
+      // Text is never handed out as a decision: it is answered on arrival, so
+      // an offer of it is either already settled or about to be, and a UI that
+      // drew a prompt for one would be drawing a question the controller has
+      // already answered. Belt beside the braces of `_onOffer` — this is the
+      // single place that decides what a UI is allowed to answer, so the rule
+      // lives here too.
+      offer:
+          transfer is IncomingTransfer &&
+              transfer.isDecidable &&
+              transfer.kind != PayloadKind.text
           ? transfer
           : null,
     );
