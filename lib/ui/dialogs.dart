@@ -311,11 +311,15 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final caller = widget.request.caller;
-    // An empty name is what a Device that answered Discovery without announcing
-    // one looks like; saying so beats a blank where a name should be.
-    final name = caller.alias.isEmpty
-        ? l10n.pairingRequestUnnamed
-        : caller.alias;
+    // A Device that answered Discovery without announcing a name looks like an
+    // empty Alias here. Its address is a better answer than a placeholder: it
+    // came off the transport rather than out of the caller's mouth, so it is
+    // the one thing on this window nobody chose, and it is the thing a user
+    // needs to work out which machine is asking. A nameless stranger and a
+    // second nameless stranger are told apart by it and by nothing else.
+    final name = caller.alias.isNotEmpty
+        ? caller.alias
+        : widget.request.callerAddress ?? l10n.pairingRequestUnnamed;
     return AlertDialog(
       title: Text(l10n.pairingRequestTitle),
       content: Column(

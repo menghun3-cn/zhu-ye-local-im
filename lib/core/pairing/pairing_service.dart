@@ -207,6 +207,16 @@ abstract interface class PairingRequest {
   /// key it announced.
   DeviceDescriptor get caller;
 
+  /// The address [caller] dialled in from, as the transport read it.
+  ///
+  /// A fact this side observed rather than one the peer supplied, which is
+  /// exactly why it is worth showing: an Alias is a claim anyone can make, and
+  /// a caller that announces nothing would otherwise reach the screen as a
+  /// nameless stranger with no way to tell it apart from the next one.
+  ///
+  /// Null when the transport reports no remote address.
+  String? get callerAddress;
+
   /// Lets [caller] through, and runs the admission exchange.
   ///
   /// The two Devices sign over the session, check each other's keys and settle
@@ -513,6 +523,7 @@ final class PairingService {
       link: link,
       receiving: receiving,
       caller: link.peer.device,
+      callerAddress: socket.remoteAddress.address,
     );
     // Nobody to ask, or somebody already being asked: the caller is turned away
     // rather than left holding a link that no screen is going to look at. The
@@ -1028,6 +1039,7 @@ final class _Caller implements PairingRequest {
     required SecureLink link,
     required _Receiving receiving,
     required this.caller,
+    required this.callerAddress,
   }) : // A named parameter cannot be a private field, so each is assigned here.
        // ignore: prefer_initializing_formals
        _service = service,
@@ -1042,6 +1054,9 @@ final class _Caller implements PairingRequest {
 
   @override
   final DeviceDescriptor caller;
+
+  @override
+  final String? callerAddress;
 
   Timer? _expiry;
   bool _settled = false;

@@ -96,9 +96,16 @@ final class PeerView {
   /// Whether there is both an address and a port to dial.
   bool get isDiallable => address != null && sessionPort != null;
 
-  /// What to show for this peer: its Alias when it has one, its Fingerprint
-  /// when it does not.
-  String get displayName => alias ?? fingerprint.short();
+  /// What to show for this peer, in order of how much it tells a person.
+  ///
+  /// An Alias first, because it is what the peer chose to be called and it is
+  /// the only name anyone recognises. Failing that, its address: it is not a
+  /// name, but it is a fact — this Device is *there*, and two Devices that both
+  /// announce nothing are still told apart by it, where a shared placeholder
+  /// would leave a list of identical rows. Only when neither exists does this
+  /// fall back to the Fingerprint, which is stable but is a claim read off a
+  /// handshake rather than somewhere to knock.
+  String get displayName => alias ?? address ?? fingerprint.short();
 
   /// The first bytes of the Fingerprint, for a compact label.
   String get shortFingerprint => fingerprint.short();
