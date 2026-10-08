@@ -30,8 +30,13 @@ void main() {
       await openTab(tester, l10n.tabSettings, window: windowA);
       expect(selectedSurface(tester, window: windowA), settingsSurface);
 
+      // Devices is second now, behind Conversations: talking to somebody is
+      // what the app is for, and this surface is where that is set up.
       await openTab(tester, l10n.tabDevices, window: windowA);
       expect(selectedSurface(tester, window: windowA), devicesSurface);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      expect(selectedSurface(tester, window: windowA), conversationsSurface);
 
       await shutdown(tester, [device]);
     });
@@ -51,6 +56,10 @@ void main() {
 
       final bar = windowA.within(find.byType(NavigationBar));
       final labels = [
+        // All five, Conversations first: a narrow window has no rail, so the
+        // bar is the only way to reach a surface and a missing entry is a
+        // surface with no way in at all.
+        l10n.tabConversation,
         l10n.tabDevices,
         l10n.tabTransfers,
         l10n.tabClipboard,
@@ -66,6 +75,9 @@ void main() {
 
       await openTab(tester, l10n.tabSettings, window: windowA);
       expect(selectedSurface(tester, window: windowA), settingsSurface);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      expect(selectedSurface(tester, window: windowA), conversationsSurface);
 
       await shutdown(tester, [device]);
     });

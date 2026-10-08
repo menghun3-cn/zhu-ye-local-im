@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/app/app.dart';
 import 'package:local_transfer/core/core.dart';
@@ -114,6 +115,23 @@ void main() {
     test('says so when it is not accepting Sessions', () {
       final facts = describePeerFacts(peer(address: '10.0.0.7'), l10n);
       expect(facts, contains(l10n.peerNotAccepting('10.0.0.7')));
+    });
+  });
+
+  group('how a conversation is drawn', () {
+    test('does not wear the peer platform', () {
+      // The row used to be drawn with the platform icon, which in a list of
+      // conversations reads as "which app is this" — a question nobody is
+      // asking. The platform is still on the peer's own card.
+      expect(iconForConversation(), Icons.forum_outlined);
+      expect(
+        iconForConversation(),
+        isNot(iconForPlatform(DevicePlatform.windows)),
+      );
+      expect(
+        iconForConversation(),
+        isNot(iconForPlatform(DevicePlatform.android)),
+      );
     });
   });
 }

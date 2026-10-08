@@ -61,7 +61,6 @@ class DevicesPage extends StatelessWidget {
           for (final peer in peers)
             _PeerCard(
               peer: peer,
-              controller: controller,
               defaultIncomingDirectory: defaultIncomingDirectory,
               onConversationRequested: onConversationRequested,
             ),
@@ -195,36 +194,28 @@ class _PairingCard extends StatelessWidget {
   }
 }
 
-/// One Device in the list, with what can be done with it.
+/// One Device in the list, and whether it is reachable.
 ///
-/// A Device this one holds a Session with is a Device to talk to, so the whole
-/// card opens the conversation and the column beside the name says so. The
-/// other two states are single actions — Pair, or Connect — and stay as the
-/// button they always were; Connect now ends in the conversation rather than on
-/// this card, because a Session is the beginning of a conversation and not a
-/// thing to establish for its own sake.
+/// This surface answers "what is on the network" — the address, the group, how
+/// long since it was heard from — and nothing else. Connecting is not done
+/// here: a Session is the beginning of a conversation, so the button that opens
+/// one lives in the conversation list, beside the conversation it is going to
+/// start. What is left on the card is the peer's own facts and, for a Device
+/// that is already connected, a way across to the talking.
 class _PeerCard extends StatelessWidget {
   const _PeerCard({
     required this.peer,
-    required this.controller,
     required this.defaultIncomingDirectory,
     this.onConversationRequested,
   });
 
   final PeerView peer;
-  final LocalTransferController controller;
   final String? defaultIncomingDirectory;
   final void Function(Fingerprint peer)? onConversationRequested;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // Dialling needs both an address to dial and a peer in the group: a Device
-    // from somebody else's group would fail the handshake, so offering the
-    // button would be offering a failure. Pairing needs only an address — the
-    // whole point of it is to bring a Device that is not in the group in.
-    final canConnect = peer.isDiallable && peer.isInGroup;
-    final canPair = !peer.isInGroup && peer.address != null;
     final conversation = peer.isConnected
         ? () => _openConversation(context)
         : null;
@@ -238,46 +229,19 @@ class _PeerCard extends StatelessWidget {
           '${peer.shortFingerprint} · ${describePeerFacts(peer, l10n)}',
         ),
         isThreeLine: true,
-        trailing: peer.isConnected
-            ? FilledButton.tonalIcon(
+        // A peer with no Session has no action here, so the row says only what
+        // it is. The conversation list is where it can be connected from, and
+        // repeating the button in two places would be two places to change when
+        // what "connect" means changes.
+        trailing: conversation == null
+            ? null
+            : FilledButton.tonalIcon(
                 onPressed: conversation,
                 icon: const Icon(Icons.forum_outlined, size: 18),
                 label: Text(l10n.openConversation),
-              )
-            : Tooltip(
-                message: canConnect
-                    ? l10n.openSession
-                    : canPair
-                    ? l10n.pairWithThisDevice
-                    : peer.isInGroup
-                    ? l10n.nothingToDialYet
-                    : l10n.nothingKnownAboutPeer,
-                child: TextButton(
-                  onPressed: canConnect
-                      ? () => guarded(context, () => _connect(context))
-                      : canPair
-                      ? () => showPairWithPeerDialog(context, controller, peer)
-                      : null,
-                  child: Text(
-                    canPair && !canConnect ? l10n.pair : l10n.connect,
-                  ),
-                ),
               ),
       ),
     );
-  }
-
-  /// Opens a Session, and takes the user to the conversation it starts.
-  ///
-  /// Connecting used to leave the user here, on a card that now said
-  /// "connected", with the conversation somewhere else. A Session is not a
-  /// thing to establish — it is the beginning of a conversation — so the two
-  /// are one action: dial, then go where the talking happens. A dial that
-  /// fails throws through [guarded], which reports it, and nothing moves.
-  Future<void> _connect(BuildContext context) async {
-    await controller.connect(peer.fingerprint);
-    if (!context.mounted) return;
-    _openConversation(context);
   }
 
   /// Shows the conversation, either in the shell or as a route of its own.

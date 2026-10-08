@@ -65,6 +65,16 @@ IconData iconForPlatform(DevicePlatform? platform) => switch (platform) {
   DevicePlatform.other || null => Icons.devices_other_outlined,
 };
 
+/// The icon for a conversation row.
+///
+/// A conversation is a place messages accumulate, not a Device, so the row is
+/// drawn the way the Conversations destination is drawn rather than with the
+/// peer's platform: the platform icon in a list of conversations reads as
+/// "which app is this", which is not what the list is about. The platform is
+/// still a fact worth having — the Devices surface and the peer's own card
+/// carry it.
+IconData iconForConversation() => Icons.forum_outlined;
+
 /// How a peer's location reads, or why it has none.
 ///
 /// A peer this Device holds a Session with reads as its address even when it
