@@ -89,7 +89,8 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final controller = _controller;
+    final app = MaterialApp(
       // The window and task-switcher title is a string like any other, so it is
       // read from the localizations rather than fixed here.
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
@@ -103,17 +104,44 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       // A `Builder`, because this widget's own context sits *above* the
       // MaterialApp and therefore above the localizations it installs:
       // everything below reads its strings off this inner context instead.
-      home: Builder(builder: _screen),
+      home: Builder(builder: (context) => _screenFor(context)),
     );
+
+    // The scope wraps the whole `MaterialApp`, not just the shell inside
+    // `home`.
+    //
+    // A pushed route does not build below `home`: it builds in the root
+    // navigator's overlay, which is a *sibling* of `home` rather than a
+    // descendant of it. A scope around the shell alone therefore does not
+    // reach the conversation — `ControllerScope.of` throws
+    // `no ControllerScope above this widget`, and a release build draws that
+    // as a grey window. Wrapping the `MaterialApp` puts the scope above the
+    // navigator and so above `home` and every route pushed on top of it.
+    //
+    // Above rather than inside via `MaterialApp.builder` because the
+    // navigator is created by the `MaterialApp` itself and cannot be handed
+    // in: `builder` only decorates the navigator it made, so a scope there
+    // wraps a child that is not the routes. `home` also has to stay the shell
+    // — replacing it with a placeholder leaves the navigator with no route at
+    // all, which renders as an empty window.
+    //
+    // The scope is only installed once there is a controller to put in it.
+    // Before that (and after a failure) there is nothing below that could read
+    // one: the tree is the startup screen, which reads only its own strings.
+    return controller == null
+        ? app
+        : ControllerScope(controller: controller, child: app);
   }
 
-  Widget _screen(BuildContext context) {
+  /// The screen under the navigator: the shell, a startup failure, or a wait.
+  ///
+  /// The controller arrives asynchronously and can fail, so all three states
+  /// live here rather than this widget's `build` — `home` is the only place a
+  /// route can come from.
+  Widget _screenFor(BuildContext context) {
     final controller = _controller;
     if (controller != null) {
-      return ControllerScope(
-        controller: controller,
-        child: HomeShell(seams: widget.seams),
-      );
+      return HomeShell(seams: widget.seams);
     }
     final failure = _failure;
     if (failure != null) {
