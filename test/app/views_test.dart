@@ -74,12 +74,43 @@ void main() {
       expect(view().isDiallable, isFalse);
     });
 
-    test('falls back to the Fingerprint when no Alias was ever announced', () {
+    test('prefers the Alias over everything, because it is the only name', () {
+      expect(view(alias: 'Bob').displayName, 'Bob');
+      expect(view(alias: 'Bob', address: '10.0.0.2').displayName, 'Bob');
+      expect(
+        view(alias: 'Bob', address: '10.0.0.2', port: 53000).displayName,
+        'Bob',
+      );
+    });
+
+    test('shows the address when no Alias was announced', () {
+      // A nameless peer used to read as the same Fingerprint-derived string as
+      // every other nameless peer; the address is the fact that tells them
+      // apart, and it is the one nobody on the far end chose.
+      final peer = view(address: '10.0.0.2', port: 53000);
+      expect(peer.alias, isNull);
+      expect(peer.displayName, '10.0.0.2');
+      expect(
+        view(address: '10.0.0.7', port: 53000).displayName,
+        isNot(peer.displayName),
+      );
+    });
+
+    test('shows the address even when the peer accepts no Sessions', () {
+      // There is nothing to dial, but "where it is" is still worth more than a
+      // placeholder: a peer seen through Discovery and never connected to has
+      // an address and no port.
+      final peer = view(address: '10.0.0.2');
+      expect(peer.isDiallable, isFalse);
+      expect(peer.displayName, '10.0.0.2');
+    });
+
+    test('falls back to the Fingerprint only when there is no address', () {
       final peer = view();
       expect(peer.alias, isNull);
+      expect(peer.address, isNull);
       expect(peer.displayName, peer.shortFingerprint);
       expect(peer.displayName, isNot(isEmpty));
-      expect(view(alias: 'Bob').displayName, 'Bob');
     });
   });
 
