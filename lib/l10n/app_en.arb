@@ -238,8 +238,8 @@
   "messageHint": "Type a message",
   "send": "Send",
   "tabConversation": "Conversations",
-  "conversationListEmpty": "No conversations yet. Connect a Device from Devices and it will show up here.",
-  "conversationPickOne": "Pick a conversation on the left, or connect a Device from Devices first.",
+  "conversationListEmpty": "No conversations yet. A Device this one finds shows up here on its own, ready to connect.",
+  "conversationPickOne": "Pick a conversation on the left, or connect a Device first.",
   "conversationDisconnected": "Session closed",
   "sendFileTitle": "Send a file to {peer}",
   "@sendFileTitle": {

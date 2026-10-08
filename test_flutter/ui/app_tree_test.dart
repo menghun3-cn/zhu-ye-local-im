@@ -75,10 +75,11 @@ void main() {
       });
       app = ControllerScope.of(tester.element(find.byType(HomeShell)));
 
-      // Push the conversation the way `_PeerCard._openConversation` does:
-      // onto the root navigator, from a context inside the shell. The peer
-      // here is this Device itself, which the page tolerates — what is under
-      // test is the build, not the conversation's contents.
+      // Push the conversation the way `_PeerCard._openConversation` does for a
+      // caller with no shell to ask: onto the root navigator, from a context
+      // inside the shell. The peer here is this Device itself, which the page
+      // tolerates — what is under test is the build, not the conversation's
+      // contents.
       //
       // The navigator is kept from here rather than looked up again later:
       // once the conversation is on top, the shell below it is no longer

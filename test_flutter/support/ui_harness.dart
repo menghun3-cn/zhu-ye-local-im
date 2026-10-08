@@ -10,6 +10,7 @@ import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
+import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/seams.dart';
 
@@ -36,8 +37,8 @@ const ValueKey<String> windowBKey = ValueKey('window-b');
 /// are what the shell uses, and a test that read them would agree with any
 /// ordering the shell happened to pick. These numbers are the assertion — a
 /// tab that moved is a tab a user has to relearn.
-const int devicesSurface = 0;
-const int conversationsSurface = 1;
+const int conversationsSurface = 0;
+const int devicesSurface = 1;
 const int transfersSurface = 2;
 const int clipboardSurface = 3;
 const int settingsSurface = 4;
@@ -666,10 +667,17 @@ Future<void> connectDevices(
 /// Pairs two windows by clicking, the way two people now do it.
 ///
 /// The host does nothing to prepare: it answers requests for as long as it is
-/// running, so the guest simply taps Pair on its card. What the host's user is
-/// asked is *one question* — whether to let the Device that dialled in — and
-/// allowing it is the whole of the Pairing. Nothing is typed and nothing is
-/// compared: both Devices confirm on their own once the question is answered.
+/// running, so the guest simply taps Pair on the found Device's row in its
+/// conversation list. What the host's user is asked is *one question* — whether
+/// to let the Device that dialled in — and allowing it is the whole of the
+/// Pairing. Nothing is typed and nothing is compared: both Devices confirm on
+/// their own once the question is answered.
+///
+/// Pair lives on the conversation list, not on the Devices surface: a Pairing is
+/// the first line of a conversation, so the button that starts one sits beside
+/// the conversation it is going to start. Only the host's *listening* state is
+/// read from the Devices surface, which is still where "can anything reach me"
+/// is answered.
 Future<void> pairThroughWindows(
   WidgetTester tester,
   TestWindow host,
@@ -684,10 +692,10 @@ Future<void> pairThroughWindows(
     description: 'the host to be answering Pairing requests',
   );
 
-  await openTab(tester, l10n.tabDevices, window: guest);
+  await openTab(tester, l10n.tabConversation, window: guest);
   await pumpUntil(
     tester,
-    () => hasButton(tester, l10n.pair, window: guest),
+    () => conversationHasButton(guest, button: l10n.pair, name: 'Alice'),
     description: 'the guest to discover the host and offer Pair',
   );
   await tapButton(tester, l10n.pair, window: guest);
@@ -726,23 +734,65 @@ Future<void> pairThroughWindows(
 
 /// Opens [window]'s conversation with the Device shown as [name].
 ///
-/// By the card, because the card is what a user has: the whole row is the tap
-/// target for a Device that is connected, which is the discoverability the
-/// conversation is there to give.
+/// By the row in the conversation list, because that is what a user has now:
+/// connecting a Device and talking to it both happen on the Conversations
+/// surface, so the list row is where a peer is reached from rather than the
+/// Devices card.
 ///
-/// Tapping it lands on the Conversations surface with that thread open — the
-/// shell's doing, not a pushed route — so this leaves the window there rather
-/// than on the Devices surface it started from.
+/// Assumes the window is already showing the conversation list; [openTab] with
+/// [l10n.tabConversation] is how a test gets there.
 Future<void> openConversation(
   WidgetTester tester,
   TestWindow window, {
   required String name,
 }) async {
   await tester.tap(
-    onPage(window, DevicesPage, find.widgetWithText(ListTile, name)),
+    onPage(window, ConversationsPage, find.widgetWithText(ListTile, name)),
   );
   await settleRoute(tester);
 }
+
+/// Whether [window]'s conversation list has a row for [name] at all.
+///
+/// Weaker than [conversationOffered]: a row is drawn for a Device that has only
+/// been found, so this answers "is it in the list" and not "can it be talked to
+/// yet". Use it for the discovery half of the flow and
+/// [conversationConnectable] for the action half.
+bool conversationListed(TestWindow window, String name) => onPage(
+  window,
+  ConversationsPage,
+  find.widgetWithText(ListTile, name),
+).evaluate().isNotEmpty;
+
+/// Whether [window]'s row for [name] is offering a button labelled [button].
+///
+/// The button rather than the label, so a button offered by a different peer on
+/// the same list cannot answer for this one — which matters as soon as two
+/// Devices are in the list at once. A row offers Connect when the peer is in the
+/// group, and Pair when it is not, so this names the button rather than assuming
+/// which one is there.
+bool conversationHasButton(
+  TestWindow window, {
+  required String button,
+  required String name,
+}) => onPage(
+  window,
+  ConversationsPage,
+  find.descendant(
+    of: find.widgetWithText(ListTile, name),
+    matching: _buttonShowing(find.byType(ConversationsPage), button),
+  ),
+).evaluate().isNotEmpty;
+
+/// Whether [window]'s row for [name] is offering Connect.
+bool conversationConnectable(TestWindow window, String name) => onPage(
+  window,
+  ConversationsPage,
+  find.descendant(
+    of: find.widgetWithText(ListTile, name),
+    matching: _buttonShowing(find.byType(ConversationsPage), l10n.connect),
+  ),
+).evaluate().isNotEmpty;
 
 /// Whether [window]'s Devices surface is offering a conversation with [name].
 ///
