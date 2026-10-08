@@ -60,18 +60,18 @@ void main() {
       );
       source.writeAsBytesSync(bytes);
 
-      // Send it from Alice's conversation with Bob. The card is the way in —
-      // tapping a connected Device's row opens its thread — and the attach
-      // button beside the composer is where a file is picked.
-      await openTab(tester, l10n.tabDevices, window: windowA);
-      // The Session is up at the controller, but the peer card is a rendering
-      // of it and the frame that opened the tab does not have to be the one
-      // that carries it. Waiting for the card to offer the conversation is what
-      // a user does — they look at the panel until it is there.
+      // Send it from Alice's conversation with Bob. The conversation list is
+      // the way in — tapping a connected Device's row opens its thread — and
+      // the attach button beside the composer is where a file is picked.
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      // The Session is up at the controller, but the list is a rendering of it
+      // and the frame that opened the tab does not have to be the one that
+      // carries it. Waiting for the row to appear is what a user does — they
+      // look at the list until it is there.
       await pumpUntil(
         tester,
-        () => conversationOffered(windowA, 'Bob'),
-        description: 'the connected peer card to offer its conversation',
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the connected Device to appear in the conversation list',
       );
       await openConversation(tester, windowA, name: 'Bob');
       await pumpUntil(

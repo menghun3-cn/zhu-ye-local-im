@@ -519,11 +519,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationListEmpty =>
-      'No conversations yet. Connect a Device from Devices and it will show up here.';
+      'No conversations yet. A Device this one finds shows up here on its own, ready to connect.';
 
   @override
   String get conversationPickOne =>
-      'Pick a conversation on the left, or connect a Device from Devices first.';
+      'Pick a conversation on the left, or connect a Device first.';
 
   @override
   String get conversationDisconnected => 'Session closed';

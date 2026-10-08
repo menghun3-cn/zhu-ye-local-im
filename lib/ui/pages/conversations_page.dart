@@ -4,6 +4,8 @@ import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../conversation_view.dart';
+import '../dialogs.dart';
+import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../widgets.dart';
@@ -15,6 +17,12 @@ import '../widgets.dart';
 /// from first. That is the point of the surface: a Session coming up *is* a
 /// conversation starting, so a Device that connects appears here on its own,
 /// with nothing to press.
+///
+/// And a Device that has merely been *found* appears here too, with the one
+/// button that starts a conversation on its row. Connecting a Device is not a
+/// thing done to a Device; it is the first line of a conversation, so the whole
+/// gesture lives on this surface and the Devices surface is left to describe
+/// what is on the network.
 ///
 /// Who is in the list is deliberately not just "who is connected". A
 /// conversation outlives its Session — the messages are still there after the
@@ -80,6 +88,15 @@ class _ConversationsPageState extends State<ConversationsPage> {
     // Peers are the spine, not the transfers: a peer that is connected but has
     // never exchanged anything still belongs here, because the first thing a
     // user does with a live Session is type into it.
+    //
+    // Every peer Discovery knows about is listed, connected or not. A Device
+    // that has been found but not dialled is a conversation the user has not
+    // started yet, and the row carries the Connect button that starts it — so
+    // this list is where a Device first appears, and the Devices surface is
+    // where the things that are not conversations live. A peer with neither an
+    // address nor a port is still listed: it has been heard, and a row saying
+    // "not accepting Sessions" with no button on it is the honest reading of
+    // what was heard.
     final entries = <_Conversation>[];
     for (final peer in controller.peers) {
       final history = controller.transfers
@@ -90,7 +107,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
           )
           .toList();
       final waiting = history.where((view) => view.needsDecision).isNotEmpty;
-      if (!peer.isConnected && history.isEmpty) continue;
       entries.add(
         _Conversation(peer: peer, history: history, waiting: waiting),
       );
@@ -225,6 +241,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
           l10n: l10n,
           selected:
               entry.peer.fingerprint.hex == selected?.peer.fingerprint.hex,
+          controller: ControllerScope.of(context),
           onTap: () => setState(() => _selected = entry.peer.fingerprint.hex),
         );
       },
@@ -251,20 +268,44 @@ class _Conversation {
 
   /// The last thing said, for the one-line summary a row shows.
   TransferView? get latest => history.isEmpty ? null : history.first;
+
+  /// Whether this is a conversation the user could open right now.
+  ///
+  /// A Session is what makes a conversation a place to type; without one there
+  /// is nothing on the other pane but the history, and the row's job is to
+  /// offer the button that opens it.
+  bool get isLive => peer.isConnected;
 }
 
-/// A row in the conversation list: who it is, and where it got to.
+/// A row in the conversation list: who it is, where it got to, and what can be
+/// done with it.
+///
+/// This row carries the whole of connecting. A found Device appears here before
+/// anybody has done anything about it, and the one button that matters is on
+/// the row: Connect when there is an address to dial and a group to dial into,
+/// Pair when the Device is not in the group yet — pairing is how a Device gets
+/// in — and nothing when there is neither, because a button that can only fail
+/// is worse than no button.
+///
+/// The facts are read the same way the Devices card reads them, so the two
+/// surfaces cannot disagree about what a row is offering.
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.entry,
     required this.l10n,
     required this.selected,
+    required this.controller,
     required this.onTap,
   });
 
   final _Conversation entry;
   final AppLocalizations l10n;
   final bool selected;
+
+  /// Used to dial, and to open the pairing window. The tile is the only place a
+  /// Session is started from, so it needs the controller and not just the view.
+  final LocalTransferController controller;
+
   final VoidCallback onTap;
 
   @override
@@ -272,12 +313,16 @@ class _ConversationTile extends StatelessWidget {
     final theme = Theme.of(context);
     final peer = entry.peer;
     final latest = entry.latest;
+    // Dialling needs both an address to dial and a peer in the group: a Device
+    // from somebody else's group would fail the handshake, so offering the
+    // button would be offering a failure. Pairing needs only an address — the
+    // whole point of it is to bring a Device that is not in the group in.
+    final canConnect = peer.isDiallable && peer.isInGroup;
+    final canPair = !peer.isInGroup && peer.address != null;
     return ListTile(
       selected: selected,
       onTap: onTap,
-      leading: CircleAvatar(
-        child: Icon(iconForPlatform(peer.platform ?? DevicePlatform.other)),
-      ),
+      leading: CircleAvatar(child: Icon(iconForConversation())),
       // The name and the address, which is what a conversation is called here:
       // a name can be claimed by anyone, the address is where it actually is.
       title: Text(peer.displayName, overflow: TextOverflow.ellipsis),
@@ -286,20 +331,77 @@ class _ConversationTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodySmall,
       ),
-      trailing: entry.waiting
-          ? Badge(
-              label: const Icon(Icons.download, size: 12),
-              backgroundColor: theme.colorScheme.error,
-              child: const SizedBox(width: 24),
-            )
-          : latest == null
-          ? null
-          : Text(
-              labelForState(latest.state, l10n),
-              style: theme.textTheme.labelSmall,
-            ),
+      trailing: _trailing(context, peer, latest, canConnect, canPair),
       isThreeLine: false,
     );
+  }
+
+  /// What sits at the end of the row: the action when there is one to take, and
+  /// otherwise how the last exchange went.
+  ///
+  /// A connected peer has no reconnect button — the Session is up, and pressing
+  /// again would be refused as a second one — so the row falls back to the last
+  /// Transfer's state, which is what a messenger puts there.
+  Widget? _trailing(
+    BuildContext context,
+    PeerView peer,
+    TransferView? latest,
+    bool canConnect,
+    bool canPair,
+  ) {
+    if (!peer.isConnected && (canConnect || canPair)) {
+      return Tooltip(
+        message: canConnect
+            ? l10n.openSession
+            : canPair
+            ? l10n.pairWithThisDevice
+            : '',
+        child: canConnect
+            ? FilledButton.tonal(
+                onPressed: () => guarded(context, () => _connect(context)),
+                child: Text(l10n.connect),
+              )
+            : TextButton(
+                onPressed: () =>
+                    showPairWithPeerDialog(context, controller, peer),
+                child: Text(l10n.pair),
+              ),
+      );
+    }
+    if (entry.waiting) {
+      return Badge(
+        label: const Icon(Icons.download, size: 12),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        child: const SizedBox(width: 24),
+      );
+    }
+    if (latest == null) {
+      // Nothing to report and nothing to press: a found Device this one is
+      // already in a group with but cannot reach says as much as it can.
+      return peer.isConnected
+          ? null
+          : Text(
+              peer.isDiallable
+                  ? l10n.nothingKnownAboutPeer
+                  : l10n.nothingToDialYet,
+              style: Theme.of(context).textTheme.labelSmall,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            );
+    }
+    return Text(
+      labelForState(latest.state, l10n),
+      style: Theme.of(context).textTheme.labelSmall,
+    );
+  }
+
+  /// Opens a Session. The conversation is already selected here, because this
+  /// row only ever appears in the list the user is looking at.
+  ///
+  /// A dial that fails throws through [guarded], which reports it, and nothing
+  /// moves: the row stays where it was, still offering the same button.
+  Future<void> _connect(BuildContext context) async {
+    await controller.connect(entry.peer.fingerprint);
   }
 }
 

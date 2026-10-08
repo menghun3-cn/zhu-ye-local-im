@@ -499,10 +499,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabConversation => '对话';
 
   @override
-  String get conversationListEmpty => '还没有对话。在「设备」里连接一台设备，它就会出现在这里。';
+  String get conversationListEmpty => '还没有对话。只要扫描到设备，它就会自动出现在这里，可以直接连接。';
 
   @override
-  String get conversationPickOne => '从左边选一个对话，或者先在「设备」里连接一台设备。';
+  String get conversationPickOne => '从左边选一个对话，或者先连接一台设备。';
 
   @override
   String get conversationDisconnected => '连接已断开';
