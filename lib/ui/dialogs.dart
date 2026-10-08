@@ -33,10 +33,12 @@ Future<void> showRenameDialog(
 /// looking at is not a Device that said yes.
 Future<void> showPairingRequestDialog(
   BuildContext context,
+  LocalTransferController controller,
   PairingRequest request,
 ) => showDialog<void>(
   context: context,
-  builder: (_) => _PairingRequestDialog(request: request),
+  builder: (_) =>
+      _PairingRequestDialog(controller: controller, request: request),
 );
 
 /// Pairs with a discovered [peer] that is receiving, without typing a code.
@@ -216,6 +218,35 @@ class _RenameDialogState extends State<_RenameDialog> {
 
 // --------------------------------------------------------- pairing requests
 
+/// Who dials when both Devices tap Connect at the same time.
+///
+/// When both sides start at once, each one finds the other already knocking and
+/// the two Pairings that follow are mirror images. Left alone that is fine —
+/// the handshake is symmetric and both halves complete — but it leaves *two*
+/// things expecting to dial, and a Session dialled from both ends at once is a
+/// Session each end refuses as a second one: the Pairing works and there is
+/// still nobody to talk to.
+///
+/// So the side that would otherwise be second is told to open the Session and
+/// the other to wait for it. The choice is made on the two Fingerprints, which
+/// are known before either side is asked anything, so both Devices work it out
+/// from the same pair of facts and reach opposite answers.
+///
+/// This is deliberately only consulted by the *answering* side. The side whose
+/// user pressed Pair dialled the Pairing link in the first place and always
+/// opens the Session, so the ordinary flow — one Device asks, the other
+/// answers — has exactly one dialler no matter which Fingerprint sorts first.
+/// The rule bites only where there would otherwise be two: two people tapping
+/// Connect at the same moment, so that the answering side here is answering a
+/// request while its own request is out. Then one of them must stand down, and
+/// the Fingerprints are the only thing both sides can agree on.
+///
+/// Getting this wrong is silent and asymmetric: a rule the *presser* also
+/// consults leaves the ordinary flow with no dialler at all whenever the
+/// presser sorts higher, and nothing happens for twenty seconds.
+bool _dialsFirst(Fingerprint self, Fingerprint peer) =>
+    self.hex.compareTo(peer.hex) < 0;
+
 /// The answering side of the click-to-pair flow: a Device dialled this one and
 /// is waiting to hear whether it may pair.
 ///
@@ -224,7 +255,15 @@ class _RenameDialogState extends State<_RenameDialog> {
 /// let this Device into their group; saying yes pairs the two and nothing else
 /// is asked afterwards.
 class _PairingRequestDialog extends StatefulWidget {
-  const _PairingRequestDialog({required this.request});
+  const _PairingRequestDialog({
+    required this.controller,
+    required this.request,
+  });
+
+  /// Needed for two things the request alone cannot do: reading this Device's
+  /// own Fingerprint, which decides which side opens the Session, and opening
+  /// that Session at all.
+  final LocalTransferController controller;
 
   final PairingRequest request;
 
@@ -285,9 +324,25 @@ class _PairingRequestDialogState extends State<_PairingRequestDialog> {
     try {
       await attempt.confirm();
       _settled = true;
-      // No Session is opened from this side: the Device that dialled opens it,
-      // and a Session dialled from both ends at once would have each end refuse
-      // the other's as a second one.
+      // Usually this side opens nothing: the Device that dialled the Pairing
+      // asked for it and opens the Session itself, and a Session dialled from
+      // both ends at once is one each end refuses as a second one.
+      //
+      // The exception is the pair of people who tapped Connect on each other at
+      // the same moment. Then this side is answering a request while its own
+      // request is out, both sides would dial, and one has to stand down — so
+      // the tie-break is consulted, from the two Fingerprints, and the same
+      // answer comes out on both Devices. See [_dialsFirst].
+      final peerFingerprint = attempt.peer.fingerprint;
+      if (_dialsFirst(widget.controller.self.fingerprint, peerFingerprint)) {
+        try {
+          await widget.controller.connectAfterPairing(peerFingerprint);
+        } on Object {
+          // Deliberately swallowed: the Pairing itself succeeded, and reporting
+          // a Session failure here would read as the Pairing having failed. A
+          // Session that did not come up leaves the row offering Connect.
+        }
+      }
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (mounted) {
@@ -436,14 +491,21 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
     try {
       await attempt.confirm();
       _settled = true;
+      final peerFingerprint = attempt.peer.fingerprint;
       // The Session is what the user is here for, so it is opened now, while
-      // the Pairing that allows it is the thing on screen. A Session that
-      // fails to follow is a tap away on the peer card, and reporting it here
-      // would read as the Pairing having failed when it has not.
+      // the Pairing that allows it is the thing on screen. This side asked for
+      // the Pairing, so this side opens the Session — unconditionally, because
+      // it is the only side that knows a Session is wanted at all, and because
+      // [connectAfterPairing] retries through the window where the peer has not
+      // re-announced the port yet. The two people who tap Connect at the same
+      // moment are the one case with two diallers; there the answering side
+      // stands down instead, which is what [_dialsFirst] is for.
       try {
-        await widget.controller.connectAfterPairing(attempt.peer.fingerprint);
+        await widget.controller.connectAfterPairing(peerFingerprint);
       } on Object {
-        // Deliberately swallowed; see above.
+        // Deliberately swallowed: the Session is a tap away on the row the user
+        // pressed, and reporting it here would read as the Pairing having
+        // failed when it has not.
       }
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
