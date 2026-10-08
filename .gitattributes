@@ -9,6 +9,11 @@
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
 
+# Shipped to Windows users and read in Notepad, which shows LF-only files as one
+# long line. Forced to CRLF so the blob in the repository matches what lands in
+# the package.
+packaging/*.txt text eol=crlf
+
 # Binary assets — never touch
 *.png binary
 *.jpg binary
