@@ -105,8 +105,11 @@ void main() {
           windowA,
           find.text('payload.bin'),
         ).evaluate().isNotEmpty,
-        description: 'the picked file to appear in Alice\u2019s conversation',
+        description: 'the picked file to appear in Alice\u2019s composer',
       );
+      // Choosing a file is composing, not sending: the file waits in the box
+      // and 发送 is what puts it on the wire.
+      await tester.tap(sendButton(windowA));
 
       // Bob is offered it, and has to answer.
       await pumpUntil(

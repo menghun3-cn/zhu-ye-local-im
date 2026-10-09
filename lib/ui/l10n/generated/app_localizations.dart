@@ -962,6 +962,12 @@ abstract class AppLocalizations {
   /// **'Send'**
   String get send;
 
+  /// No description provided for @removeAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeAttachment;
+
   /// No description provided for @tabConversation.
   ///
   /// In en, this message translates to:
