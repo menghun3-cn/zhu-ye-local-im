@@ -192,22 +192,29 @@ class _ImageBubbleState extends State<ImageBubble> {
   }
 
   /// What is drawn while the picture is being read.
+  ///
+  /// [WeChat.surface] rather than the page grey, because this box sits *inside*
+  /// a bubble: a received bubble is grey now, and a grey box in a grey bubble
+  /// would be invisible. White reads as a hole in the fill on both bubbles.
   Widget _placeholderBox() {
     return Container(
       width: _placeholder.width,
       height: _placeholder.height,
-      color: WeChat.pageBackground,
+      color: WeChat.surface,
     );
   }
 
   /// What an image that cannot be decoded shows instead.
+  ///
+  /// White for the same reason as [_placeholderBox]: it has to stand out
+  /// against whichever bubble is around it.
   Widget _unreadableBox() {
     return Container(
       width: _maxSide,
       height: _maxSide,
       alignment: Alignment.center,
       padding: const EdgeInsets.all(12),
-      color: WeChat.pageBackground,
+      color: WeChat.surface,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
