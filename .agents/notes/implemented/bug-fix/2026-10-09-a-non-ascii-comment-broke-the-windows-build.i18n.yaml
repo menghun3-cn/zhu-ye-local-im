@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-a-non-ascii-comment-broke-the-windows-build.md
+#   git hash-object 2026-10-09-a-non-ascii-comment-broke-the-windows-build.zh.md
+2026-10-09-a-non-ascii-comment-broke-the-windows-build.md: 450af12ed9c6f7448b2e23d4a06017d827c458ce
+2026-10-09-a-non-ascii-comment-broke-the-windows-build.zh.md: c79f81cddb2b3ecd0b8686ced24e6d87baa21d5d
