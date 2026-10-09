@@ -97,12 +97,28 @@ final class TransferEngine {
   /// Every item is read through once here, to hash it. The digest in an Offer
   /// is a promise about bytes that have not moved yet, so the sender has to
   /// have seen them first.
-  Future<OutgoingTransfer> sendFiles(List<OutgoingItem> items) async {
+  Future<OutgoingTransfer> sendFiles(List<OutgoingItem> items) =>
+      _sendStreams(PayloadKind.file, items);
+
+  /// Offers [items] to the peer as one image payload.
+  ///
+  /// The same byte stream, the same digests and the same sinks as [sendFiles] —
+  /// only the kind on the wire differs, which is what tells the receiver to
+  /// draw a picture instead of naming a file. Kept separate rather than passed
+  /// as a flag at the call site so that a caller cannot accidentally offer
+  /// image bytes as a nameless file.
+  Future<OutgoingTransfer> sendImages(List<OutgoingItem> items) =>
+      _sendStreams(PayloadKind.image, items);
+
+  Future<OutgoingTransfer> _sendStreams(
+    PayloadKind kind,
+    List<OutgoingItem> items,
+  ) async {
     if (items.isEmpty) {
       throw ArgumentError.value(
         items,
         'items',
-        'a file offer needs at least one item',
+        'a ${kind.wireName} offer needs at least one item',
       );
     }
     final descriptors = <PayloadItem>[];
@@ -124,7 +140,7 @@ final class TransferEngine {
       digests[itemId] = digest;
     }
     return _start(
-      kind: PayloadKind.file,
+      kind: kind,
       items: descriptors,
       sources: sources,
       digests: digests,
