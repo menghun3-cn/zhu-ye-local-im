@@ -27,7 +27,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"local_transfer", origin, size)) {
+  // The title bar. Spelled as escapes rather than as the characters themselves
+  // on purpose: how this file is encoded is whatever the toolchain on this
+  // machine decides it is, and the product's own name — "Zhuye LAN Transfer" —
+  // is not worth discovering that the hard way. `\u7af9\u53f6` is zhuye, the
+  // rest is "LAN transfer".
+  if (!window.Create(L"\u7af9\u53f6\u5c40\u57df\u7f51\u4f20\u8f93", origin,
+                     size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

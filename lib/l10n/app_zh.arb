@@ -1,14 +1,14 @@
 {
   "@@locale": "zh",
 
-  "appTitle": "局域网传输",
-  "startupFailureTitle": "局域网传输无法启动",
+  "appTitle": "竹叶局域网传输",
+  "startupFailureTitle": "竹叶局域网传输无法启动",
 
   "tabDevices": "设备",
   "tabTransfers": "传输",
   "tabClipboard": "剪贴板",
   "tabSettings": "设置",
-  "notPairedYet": "还没有和任何设备配对",
+  "tabAbout": "关于",
 
   "failureUnreachable": "无法连接到该设备：{detail}",
   "failurePairing": "配对失败：{detail}",
@@ -139,7 +139,17 @@
   "factReceivedFiles": "接收的文件",
   "noDefaultFolder": "没有默认文件夹",
   "nothingWentWrong": "一切正常。",
-  "settingsAbout": "局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。",
+
+  "aboutDescription": "竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。",
+  "aboutVersion": "版本 {version}",
+  "aboutCheckForUpdates": "检查更新",
+  "aboutChecking": "正在检查…",
+  "aboutUpToDate": "已是最新版本。",
+  "aboutUpdateAvailable": "有新版本 {version}。",
+  "aboutOpenDownload": "打开下载页",
+  "aboutNoRelease": "还没有发布过任何版本，暂时无从比较本机这版。",
+  "aboutUnreachable": "连不上更新服务器。请检查网络，或手动下载新版本。",
+  "aboutHowToUpgrade": "升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。",
 
   "aliasHelper": "其他设备上显示的名称",
   "cancel": "取消",

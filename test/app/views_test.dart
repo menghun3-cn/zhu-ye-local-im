@@ -98,43 +98,81 @@ void main() {
       expect(peer.displayName, peer.shortFingerprint);
     });
 
-    test('falls back to the Fingerprint when no Alias was announced', () {
-      // The address is a fact about *where* a Device is, not who it is: two
-      // Devices that both announce nothing are told apart by the Fingerprint
-      // they proved they hold, and the address is shown beside it in every row
-      // anyway. Ordering the fallback the other way round would put a value
-      // nobody chose where a name belongs.
+    test('falls back to the address when no Alias was announced', () {
+      // A Device that announced nothing is one nobody has named, and the two
+      // facts on offer answer different questions: the Fingerprint says which
+      // *record* this is, the address says which *machine*. A list of Devices
+      // on one network is asked the second one — it is what a person would type
+      // into a router or a firewall rule, and it is what tells two nameless
+      // Devices apart at a glance.
       final peer = view(address: '10.0.0.2', port: 53000);
       expect(peer.alias, isNull);
       expect(peer.hasRealAlias, isFalse);
-      expect(peer.displayName, peer.shortFingerprint);
+      expect(peer.displayName, '10.0.0.2');
       expect(
-        view(address: '10.0.0.7', port: 53000).displayName,
         peer.displayName,
-        reason: 'the same Device, seen at a second address',
-      );
-    });
-
-    test('names a peer the same way whether or not it has an address', () {
-      // There is nothing to dial in the second case, but "who" does not depend
-      // on "where": a peer seen through Discovery and never connected to is
-      // still the same Device, and it reads the same.
-      final unreachable = view(address: '10.0.0.2');
-      expect(unreachable.isDiallable, isFalse);
-      expect(unreachable.displayName, unreachable.shortFingerprint);
-      expect(
-        view().displayName,
-        unreachable.displayName,
-        reason: 'the Fingerprint does not come from the address',
+        isNot(peer.shortFingerprint),
+        reason: 'eight characters of hex nobody chose are the last resort',
       );
     });
 
     test('has something to show even with neither a name nor an address', () {
+      // The address is the one fallback that can be *absent*: a peer in the
+      // Owner Group that has never been heard from has none, and its row still
+      // has to be called something.
       final peer = view();
       expect(peer.alias, isNull);
       expect(peer.address, isNull);
       expect(peer.displayName, peer.shortFingerprint);
       expect(peer.displayName, isNot(isEmpty));
+    });
+  });
+
+  group('the label a peer wears in its avatar', () {
+    PeerView view({String? address, String? alias}) => PeerView(
+      fingerprint: Fingerprint.ofPublicKey(const [4, 5, 6]),
+      alias: alias,
+      platform: DevicePlatform.windows,
+      address: address,
+      sessionPort: 53000,
+      isConnected: false,
+      isInGroup: true,
+      isFavorite: false,
+      lastSeen: null,
+    );
+
+    test('is the address, ten digits through, for a Device with no name', () {
+      // The first character of `192.168.1.115` is a `1`, and every address in
+      // the list starts with one: a circle that reads the same on every row
+      // tells the user nothing, which is the one thing an avatar must not do.
+      expect(view(address: '192.168.1.115').avatarLabel, '115');
+      expect(view(address: '10.0.0.7').avatarLabel, '7');
+    });
+
+    test('is left to the name when the Device announced one', () {
+      expect(view(alias: 'Bob', address: '192.168.1.115').avatarLabel, isNull);
+    });
+
+    test('is left to the name when there is no octet to read', () {
+      expect(view().avatarLabel, isNull);
+      expect(
+        view(address: 'fe80::1').avatarLabel,
+        isNull,
+        reason: 'an IPv6 address has no last octet to put in a circle',
+      );
+    });
+  });
+
+  group('lastOctetOf', () {
+    test('reads the last number of a dotted address', () {
+      expect(lastOctetOf('192.168.1.115'), '115');
+      expect(lastOctetOf('10.0.0.1'), '1');
+    });
+
+    test('has nothing to say about an address with no octets', () {
+      expect(lastOctetOf('fe80::1'), isNull);
+      expect(lastOctetOf(''), isNull);
+      expect(lastOctetOf('192.168.1.'), isNull);
     });
   });
 

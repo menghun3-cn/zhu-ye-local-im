@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/app.dart';
 import '../core/core.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'update_check.dart';
 
 /// How the application's words and pictures are chosen.
 ///
@@ -111,9 +112,16 @@ String describePeerFacts(PeerView peer, AppLocalizations l10n) {
     // The placeholder the sanitiser substitutes is not a name: a peer whose
     // only alias is "Unnamed device" has not announced one, and says so here.
     if (!peer.hasRealAlias) l10n.peerNameNotAnnounced,
-    if (peer.address != null)
+    // The address — unless this card is already *titled* with it. A peer that
+    // announced no name is named by its address, and printing the same string
+    // twice on one card is the definition of noise; what that fact was also
+    // carrying is the Session port, and a port is a fact about the peer rather
+    // than a repeat of its name.
+    if (peer.address != null && peer.displayName != peer.address)
       describePeerAddress(peer, l10n)
-    else if (!connected)
+    else if (peer.address != null && peer.sessionPort != null)
+      l10n.onPort(peer.sessionPort!)
+    else if (peer.address == null && !connected)
       l10n.neverSeen,
     if (connected)
       l10n.sessionOpen
@@ -191,3 +199,16 @@ String describeRefusal(
     AppRefusal.noFreeFileName => l10n.refusalNoFreeFileName(subject),
   };
 }
+
+/// What a look for a newer build came back with, as a sentence.
+///
+/// The outcome crosses the seam as a name — see [UpdateOutcome] — so this is
+/// where the name turns into words, exactly as [describeRefusal] does for the
+/// app layer's refusals.
+String describeUpdateCheck(UpdateCheck check, AppLocalizations l10n) =>
+    switch (check.outcome) {
+      UpdateOutcome.upToDate => l10n.aboutUpToDate,
+      UpdateOutcome.available => l10n.aboutUpdateAvailable(check.version ?? ''),
+      UpdateOutcome.noRelease => l10n.aboutNoRelease,
+      UpdateOutcome.unreachable => l10n.aboutUnreachable,
+    };

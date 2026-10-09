@@ -117,11 +117,21 @@ final class PeerView {
   /// [DeviceDescriptor.fallbackAlias] before the descriptor ever reaches the
   /// wire — so the placeholder arrives here as an ordinary alias, and it is
   /// rejected: a name every nameless Device shares would put the same two
-  /// words on every row in every list. Failing a real name, the Fingerprint:
-  /// short, stable, and unique, which is what a list of devices needs from a
-  /// stand-in. The address is deliberately not a name here — it is a fact
-  /// about *where*, and the surfaces that show this name show the address
-  /// beside it.
+  /// words on every row in every list.
+  ///
+  /// Failing a name, **the address**. On a local network that is the one thing
+  /// about a peer a person can act on — it is what they would type into a
+  /// router, a `ping`, or a firewall rule — and it is what tells two nameless
+  /// Devices apart at a glance, which the Fingerprint also does but in eight
+  /// characters of hex nobody chose. This is the order
+  /// `2026-10-08-a-nameless-peer-shows-its-address.md` argued for, restored by
+  /// request after a day of the Fingerprint being preferred: "which machine is
+  /// this" turned out to be the question the lists are actually asked.
+  ///
+  /// The Fingerprint stays as the last resort rather than being dropped,
+  /// because the address is the one fallback that can be *absent*: a peer that
+  /// is in the Owner Group but has never been heard from has no address at all,
+  /// and a row still has to be called something.
   String get displayName {
     final named = alias;
     if (named != null &&
@@ -129,8 +139,25 @@ final class PeerView {
         named != DeviceDescriptor.fallbackAlias) {
       return named;
     }
+    final placed = address;
+    if (placed != null && placed.isNotEmpty) return placed;
     return fingerprint.short();
   }
+
+  /// The first bytes of the Fingerprint, for a compact label.
+  String get shortFingerprint => fingerprint.short();
+
+  /// What to draw in this peer's avatar, when the name is not what should be
+  /// drawn there.
+  ///
+  /// Null for a Device that announced a name: the first letter of a name is
+  /// what an avatar is for, and every other avatar in the application is drawn
+  /// that way. A Device named by its address would otherwise get the first
+  /// character of the address, which is a `1` on every peer in the list —
+  /// the one thing an avatar must never be is the same for everybody. What
+  /// identifies the machine there is the last number, so `192.168.1.115` puts
+  /// `115` in the circle.
+  String? get avatarLabel => hasRealAlias ? null : lastOctetOf(address ?? '');
 
   /// Whether the peer announced a name of its own choosing.
   ///
@@ -140,9 +167,6 @@ final class PeerView {
       alias != null &&
       alias!.isNotEmpty &&
       alias != DeviceDescriptor.fallbackAlias;
-
-  /// The first bytes of the Fingerprint, for a compact label.
-  String get shortFingerprint => fingerprint.short();
 }
 
 /// One Transfer, as a UI renders it.
@@ -267,6 +291,25 @@ String formatBytes(int bytes) {
 String fileNameOf(String path) {
   final cut = path.lastIndexOf(RegExp(r'[/\\]'));
   return cut < 0 ? path : path.substring(cut + 1);
+}
+
+/// The last number of a dotted address, or null when the address has no dots.
+///
+/// What an unnamed Device is drawn as inside its avatar. `192.168.1.115` reads
+/// as `115`, which is short enough for a circle and is the part of an address
+/// two machines on one network differ in — the first two octets are the same
+/// for everybody on the network, so a label built from them would be identical
+/// on every row.
+///
+/// Null for anything else — a bare IPv6 address, an address with a trailing
+/// dot, an empty string — and the caller falls back to the name's first
+/// character, because a whole address does not fit in an avatar and half of one
+/// identifies nobody.
+String? lastOctetOf(String address) {
+  final cut = address.lastIndexOf('.');
+  if (cut < 0) return null;
+  final tail = address.substring(cut + 1);
+  return tail.isEmpty ? null : tail;
 }
 
 /// Where a received file is allowed to land.

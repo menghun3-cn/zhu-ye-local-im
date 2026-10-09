@@ -101,13 +101,13 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Local Transfer'**
+  /// **'Zhuye Local Transfer'**
   String get appTitle;
 
   /// No description provided for @startupFailureTitle.
   ///
   /// In en, this message translates to:
-  /// **'Local Transfer could not start'**
+  /// **'Zhuye Local Transfer could not start'**
   String get startupFailureTitle;
 
   /// No description provided for @tabDevices.
@@ -134,11 +134,11 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get tabSettings;
 
-  /// No description provided for @notPairedYet.
+  /// No description provided for @tabAbout.
   ///
   /// In en, this message translates to:
-  /// **'Not paired with any Device yet'**
-  String get notPairedYet;
+  /// **'About'**
+  String get tabAbout;
 
   /// No description provided for @failureUnreachable.
   ///
@@ -830,11 +830,65 @@ abstract class AppLocalizations {
   /// **'Nothing has gone wrong.'**
   String get nothingWentWrong;
 
-  /// No description provided for @settingsAbout.
+  /// No description provided for @aboutDescription.
   ///
   /// In en, this message translates to:
-  /// **'Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.'**
-  String get settingsAbout;
+  /// **'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.'**
+  String get aboutDescription;
+
+  /// No description provided for @aboutVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String aboutVersion(String version);
+
+  /// No description provided for @aboutCheckForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get aboutCheckForUpdates;
+
+  /// No description provided for @aboutChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get aboutChecking;
+
+  /// No description provided for @aboutUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the latest version.'**
+  String get aboutUpToDate;
+
+  /// No description provided for @aboutUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available.'**
+  String aboutUpdateAvailable(String version);
+
+  /// No description provided for @aboutOpenDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the download page'**
+  String get aboutOpenDownload;
+
+  /// No description provided for @aboutNoRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'No version has been published yet, so there is nothing to compare this build against.'**
+  String get aboutNoRelease;
+
+  /// No description provided for @aboutUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The update server could not be reached. Check the network, or download the new version by hand.'**
+  String get aboutUnreachable;
+
+  /// No description provided for @aboutHowToUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.'**
+  String get aboutHowToUpgrade;
 
   /// No description provided for @aliasHelper.
   ///

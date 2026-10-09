@@ -6,7 +6,7 @@ import '../core/core.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
-import 'labels.dart';
+import 'pages/about_page.dart';
 import 'pages/clipboard_page.dart';
 import 'pages/conversations_page.dart';
 import 'pages/devices_page.dart';
@@ -27,7 +27,7 @@ import 'wechat/theme.dart';
 /// would be five constants kept in step with a list for no gain.
 const int _conversationsSurface = 0;
 
-/// The five surfaces, and the way between them.
+/// The six surfaces, and the way between them.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
   const HomeShell({super.key, required this.seams});
@@ -109,7 +109,6 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
-    final self = controller.self;
     // A Transfer that is waiting for this Device is the one thing worth
     // interrupting for, so the count rides on the destination itself.
     final waiting = controller.transfers
@@ -134,6 +133,7 @@ class _HomeShellState extends State<HomeShell> {
       TransfersPage(defaultIncomingDirectory: incoming),
       const ClipboardPage(),
       SettingsPage(seams: widget.seams),
+      const AboutPage(),
     ];
     final destinations = <NavigationDestination>[
       NavigationDestination(
@@ -180,6 +180,11 @@ class _HomeShellState extends State<HomeShell> {
         selectedIcon: const Icon(Icons.settings),
         label: l10n.tabSettings,
       ),
+      NavigationDestination(
+        icon: const Icon(Icons.info_outline),
+        selectedIcon: const Icon(Icons.info),
+        label: l10n.tabAbout,
+      ),
     ];
 
     // Wide windows get a rail, narrow ones a bar. The same destinations
@@ -190,28 +195,12 @@ class _HomeShellState extends State<HomeShell> {
     final content = IndexedStack(index: _index, children: pages);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.appTitle),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(iconForPlatform(self.platform), size: 18),
-                const SizedBox(width: 8),
-                Text(self.alias),
-                if (!self.isPaired) ...[
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: l10n.notPairedYet,
-                    child: const Icon(Icons.link_off, size: 18),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+      // No `AppBar` on purpose. The window's own title bar already carries the
+      // application's name, and this Device's name is a fact about this Device
+      // rather than about the surface being looked at — it belongs on the
+      // Devices surface with the rest of what this Device says about itself,
+      // not pinned above six pages that have nothing to do with it. What is
+      // left is a strip of chrome doing no work, so it goes.
       body: wide
           ? Row(
               children: [
