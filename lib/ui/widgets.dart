@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
+import 'wechat/theme.dart';
+
 /// The small pieces the surfaces share.
 ///
 /// Three widgets rather than a design system: a titled divider, a label/value
 /// line, and a quiet line where a list would be. They exist because several
 /// pages need them and that many copies would drift.
+///
+/// They read their colours from [WeChat] rather than from the `ColorScheme`,
+/// even though the scheme carries the same values: a widget that says
+/// `WeChat.secondaryText` states which grey it means, and a later re-theming
+/// has one obvious place to look.
 
 /// A titled divider between the groups of a page, with an optional action.
 class SectionHeader extends StatelessWidget {
@@ -25,7 +32,17 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+            child: Text(
+              title,
+              // The quiet grey heading the desktop client puts above a group.
+              // Deliberately not `titleSmall`: that slot is the *content*
+              // title, and a section heading and a file's name are two
+              // different ranks that must not share one size.
+              style: const TextStyle(
+                fontSize: WeChat.fontSizePreview,
+                color: WeChat.secondaryText,
+              ),
+            ),
           ),
           ?trailing,
         ],
@@ -47,7 +64,6 @@ class FactLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -57,8 +73,9 @@ class FactLine extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: const TextStyle(
+                fontSize: WeChat.fontSizePreview,
+                color: WeChat.secondaryText,
               ),
             ),
           ),
@@ -79,13 +96,13 @@ class HintText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
         message,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+        style: const TextStyle(
+          fontSize: WeChat.fontSizePreview,
+          color: WeChat.secondaryText,
         ),
       ),
     );

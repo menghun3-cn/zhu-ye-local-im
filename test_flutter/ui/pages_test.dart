@@ -15,6 +15,7 @@ import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
+import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
 
@@ -1200,6 +1201,127 @@ void main() {
         tester,
         () => alice.controller.transfers.length == 2,
         description: 'the second message to be handed over',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a row says when the conversation last moved', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be discovered and listed',
+      );
+      // The clock in the row's top-right corner. Nothing has been said in this
+      // conversation yet, so it falls back to when the Device was last heard
+      // from — which is this instant, Discovery having just placed it. A row
+      // with a blank corner would be the bug this asserts against.
+      expect(
+        find.descendant(
+          of: conversationRow(windowA, 'Bob'),
+          matching: find.text(l10n.timeJustNow),
+        ),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a row is parted from the next by an inset hairline', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be discovered and listed',
+      );
+      final line = find.descendant(
+        of: conversationRow(windowA, 'Bob'),
+        matching: find.byType(Divider),
+      );
+      expect(line, findsOneWidget);
+      expect(tester.widget<Divider>(line).color, WeChat.divider);
+
+      // Inset to the avatar rather than to the row: a full-bleed line would cut
+      // the list into blocks, and the row's own padding is what puts the avatar
+      // where the line has to start. Read off every `Padding` above the line,
+      // because which of them is the innermost is not this test's business.
+      expect(
+        tester
+            .widgetList<Padding>(
+              find.ancestor(of: line, matching: find.byType(Padding)),
+            )
+            .map((padding) => padding.padding),
+        contains(const EdgeInsets.only(left: WeChat.conversationRowPadding)),
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('the way in is a word, not a filled button', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      // Unpaired on purpose: that is the one row that still carries an action,
+      // and the action is what has to look like WeChat's rather than like
+      // Material's.
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      await pumpUntil(
+        tester,
+        () => conversationHasButton(windowA, button: l10n.pair, name: 'Bob'),
+        description: 'the found Device to be offered as Pair',
+      );
+      final style = tester
+          .widget<TextButton>(
+            find.descendant(
+              of: conversationRow(windowA, 'Bob'),
+              matching: find.widgetWithText(TextButton, l10n.pair),
+            ),
+          )
+          .style!;
+
+      // No fill. A filled button is the loudest thing Material draws, and a
+      // list of found Devices would be a column of them.
+      expect(
+        style.backgroundColor?.resolve(const <WidgetState>{}),
+        Colors.transparent,
+      );
+      expect(
+        style.foregroundColor?.resolve(const <WidgetState>{}),
+        WeChat.secondaryText,
+      );
+      // And the dot in front of the word, which is the mark the desktop client
+      // uses for "you can act here".
+      expect(
+        tester
+            .widgetList<Container>(
+              find.descendant(
+                of: conversationRow(windowA, 'Bob'),
+                matching: find.byType(Container),
+              ),
+            )
+            .where((container) {
+              final decoration = container.decoration;
+              return decoration is BoxDecoration &&
+                  decoration.shape == BoxShape.circle;
+            }),
+        isNotEmpty,
       );
 
       await shutdown(tester, [alice, bob]);
