@@ -125,6 +125,11 @@ final class KnownDevice {
 ///   this clipboard. Until the user ticks a peer on the Clipboard surface,
 ///   nothing is mirrored in either direction (see the sharing-whitelist gate
 ///   in `ClipboardMirror`, the fourth of its four);
+/// * `incomingDirectory` — where the user wants received files to land. Null
+///   means "not chosen", and the platform's own default (Downloads on Windows,
+///   the app's directory on Android) applies. This is a *preference*, not
+///   permission: it decides the folder offered in the accept dialog, and
+///   nothing about whether a Transfer may be accepted at all;
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -141,6 +146,7 @@ final class DeviceProfile {
     Set<Fingerprint> clipboardPeers = const {},
     Map<String, KnownDevice> known = const {},
     this.acceptsPairingRequests = true,
+    this.incomingDirectory,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
@@ -173,6 +179,15 @@ final class DeviceProfile {
   /// Device listening on the Pairing port, so it can still pair with somebody
   /// else — it just cannot be picked out of a list.
   bool acceptsPairingRequests;
+
+  /// Where the user wants received files to land, or null for the platform's
+  /// own default.
+  ///
+  /// Stored as the user typed or chose it, not resolved: a path that does not
+  /// exist yet is still a folder the accept dialog can offer to create, and
+  /// resolving it here would turn a choice into a failure on a machine where
+  /// the drive is not mounted right now.
+  String? incomingDirectory;
 
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
@@ -240,6 +255,16 @@ final class DeviceProfile {
       _known.values.toList()
         ..sort((a, b) => a.fingerprint.compareTo(b.fingerprint));
 
+  /// Sets where received files should land.
+  ///
+  /// An empty or whitespace-only [path] means "no choice", which is how the
+  /// user goes back to the platform's default — a null-and-empty distinction
+  /// would be a distinction the settings screen has no way to show.
+  void setIncomingDirectory(String? path) {
+    final trimmed = path?.trim();
+    incomingDirectory = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+  }
+
   Map<String, Object?> toJson() => {
     'self': self.hex,
     'alias': alias,
@@ -248,6 +273,7 @@ final class DeviceProfile {
     'acceptPairingRequests': acceptsPairingRequests,
     'favorites': [for (final favorite in favorites) favorite.hex],
     'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
+    if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
     'known': [for (final device in knownDevices) device.toJson()],
   };
 
@@ -299,6 +325,7 @@ final class DeviceProfile {
       // listener is the flow, and a Device that silently stopped being
       // diallable after an upgrade would be a Device nobody can add.
       acceptsPairingRequests: rawAccepts is bool ? rawAccepts : true,
+      incomingDirectory: _optionalString(json, 'incomingDirectory'),
     );
   }
 
@@ -321,6 +348,15 @@ String _string(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! String) {
     throw FormatException('"$key" must be a string, got ${value.runtimeType}');
+  }
+  return value;
+}
+
+String? _optionalString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) return null;
+  if (value is! String) {
+    throw FormatException('"$key" must be a string when present');
   }
   return value;
 }

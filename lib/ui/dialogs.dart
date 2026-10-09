@@ -7,6 +7,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'pickers.dart';
 
 /// The dialogs the surfaces open.
 ///
@@ -778,6 +779,19 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
     super.dispose();
   }
 
+  /// Opens the platform's own folder chooser and puts what it returned in the
+  /// field.
+  ///
+  /// The field stays editable: the chooser cannot reach a network share the
+  /// user has not mounted, and a destination that could only be set by
+  /// clicking would be one that cannot be set at all for those. So this is an
+  /// addition to typing, not a replacement for it.
+  Future<void> _browse() async {
+    final chosen = await PickerResolution.picker.directory();
+    if (!mounted || chosen == null) return;
+    _path.text = chosen;
+  }
+
   void _accept() {
     final path = _path.text.trim();
     if (path.isEmpty) {
@@ -804,8 +818,16 @@ class _DirectoryDialogState extends State<_DirectoryDialog> {
             ),
             onSubmitted: (_) => _accept(),
           ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => unawaited(_browse()),
+              icon: const Icon(Icons.folder_open_outlined, size: 18),
+              label: Text(l10n.browseFolder),
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(l10n.folderNote),
           ),
           _ErrorLine(_failure),

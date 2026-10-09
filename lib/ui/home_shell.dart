@@ -114,19 +114,23 @@ class _HomeShellState extends State<HomeShell> {
     final waiting = controller.transfers
         .where((transfer) => transfer.needsDecision)
         .length;
+    // What the user chose beats what the platform suggests. Resolved here
+    // rather than inside each page so that "where do files go" has one answer
+    // in the running app: three pages each resolving it their own way is three
+    // chances to disagree.
+    final incoming =
+        controller.incomingDirectory ?? widget.seams.defaultIncomingDirectory;
 
     final pages = <Widget>[
       ConversationsPage(
-        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+        defaultIncomingDirectory: incoming,
         requestedPeer: _requestedConversation,
       ),
       DevicesPage(
-        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
+        defaultIncomingDirectory: incoming,
         onConversationRequested: _showConversation,
       ),
-      TransfersPage(
-        defaultIncomingDirectory: widget.seams.defaultIncomingDirectory,
-      ),
+      TransfersPage(defaultIncomingDirectory: incoming),
       const ClipboardPage(),
       SettingsPage(seams: widget.seams),
     ];
