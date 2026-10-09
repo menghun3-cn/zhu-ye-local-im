@@ -18,6 +18,7 @@ import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/seams.dart';
+import 'package:local_transfer/ui/wechat/theme.dart';
 
 /// Shared scaffolding for the tests that need a widget tree.
 ///
@@ -269,10 +270,13 @@ Widget _pane(Key key, UiDevice device, Size size) {
           locale: appLocale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: appLocales,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            pageTransitionsTheme: _instantTheme,
-          ),
+          // The shipping theme, not a stand-in. A window built on some other
+          // scheme would pass every assertion here while the real one regressed
+          // — and the whole point of the palette being one file is that a test
+          // can hold it to what it claims. Only the route transition is
+          // replaced, because a real one is still sliding while a test awaits a
+          // socket on the real event loop.
+          theme: WeChat.theme().copyWith(pageTransitionsTheme: _instantTheme),
           home: HomeShell(seams: device.seams),
         ),
       ),

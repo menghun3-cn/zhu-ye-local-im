@@ -13,6 +13,7 @@ import 'pages/devices_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
+import 'wechat/theme.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
 ///
@@ -228,7 +229,7 @@ class _HomeShellState extends State<HomeShell> {
                       ),
                   ],
                 ),
-                const VerticalDivider(width: 1),
+                const VerticalDivider(width: 1, color: WeChat.divider),
                 Expanded(child: content),
               ],
             )

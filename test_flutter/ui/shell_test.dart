@@ -1,10 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
 
 void main() {
+  group('the WeChat theme', () {
+    test('names the slots Material would otherwise fill in itself', () {
+      final theme = WeChat.theme();
+      final scheme = theme.colorScheme;
+      // Material's own light scheme, to compare against. Every assertion below
+      // is "this is not merely what Material would have chosen": a slot left at
+      // its default is a slot that renders in Material's palette, and one
+      // lavender chip in an otherwise grey list is worse than a whole page of
+      // the wrong theme.
+      const material = ColorScheme.light();
+
+      expect(
+        scheme.secondaryContainer,
+        isNot(material.secondaryContainer),
+        reason: 'a tonal button would come out lavender',
+      );
+      expect(
+        scheme.onSurfaceVariant,
+        isNot(material.onSurfaceVariant),
+        reason: 'every secondary label would come out purple-grey',
+      );
+      expect(
+        scheme.outline,
+        isNot(material.outline),
+        reason: 'dividers and borders would come out purple-grey',
+      );
+      // A tinted surface would wash every flat white card towards the seed.
+      expect(scheme.surfaceTint, Colors.transparent);
+      expect(scheme.secondaryContainer, WeChat.listHover);
+      expect(scheme.onSurfaceVariant, WeChat.secondaryText);
+
+      expect(theme.cardTheme.color, WeChat.bubbleIn);
+      expect(theme.cardTheme.elevation, 0);
+      expect(theme.scaffoldBackgroundColor, WeChat.pageBackground);
+      expect(theme.dividerColor, WeChat.divider);
+      // The Chinese-first stack: Material's Roboto carries no Han glyphs, so
+      // without this the font is whatever Windows happens to substitute.
+      // `ThemeData.fontFamily` is a constructor parameter applied onto the
+      // default text theme, not a readable field — so the assertion reads the
+      // family off the body style that every page's text ends up inheriting.
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
+    });
+
+    test('paints the navigation surfaces in the WeChat greys', () {
+      final theme = WeChat.theme();
+
+      final rail = theme.navigationRailTheme;
+      expect(rail.backgroundColor, WeChat.sidebarBackground);
+      expect(rail.selectedIconTheme?.color, WeChat.brand);
+      expect(rail.unselectedIconTheme?.color, WeChat.secondaryText);
+
+      final bar = theme.navigationBarTheme;
+      expect(bar.backgroundColor, WeChat.toolbarBackground);
+      expect(
+        bar.indicatorColor,
+        Colors.transparent,
+        reason: 'the WeChat bar marks the current tab by tint, not by a pill',
+      );
+    });
+  });
+
   group('the shell', () {
     testWidgets('a wide window offers the four surfaces and switches', (
       tester,

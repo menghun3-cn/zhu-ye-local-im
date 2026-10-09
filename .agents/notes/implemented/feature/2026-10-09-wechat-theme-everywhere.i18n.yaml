@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-wechat-theme-everywhere.md
+#   git hash-object 2026-10-09-wechat-theme-everywhere.zh.md
+2026-10-09-wechat-theme-everywhere.md: cdbd644da30ca6d345d34b535c689d791bad9b65
+2026-10-09-wechat-theme-everywhere.zh.md: 20299a553da42a43d51a190c2bd4d27b993a69ca

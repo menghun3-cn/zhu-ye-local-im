@@ -1032,7 +1032,12 @@ final class LocalTransferController {
   }
 
   void _track(Transfer transfer, Fingerprint peer, {String? localPath}) {
-    final tracked = _Tracked(transfer, peer, localPath: localPath);
+    final tracked = _Tracked(
+      transfer,
+      peer,
+      at: _clock(),
+      localPath: localPath,
+    );
     _transfers.add(tracked);
     final progress = transfer.updates.listen((_) => _notify());
     // Settling happens once and is what a UI cares about most, so it is worth a
@@ -1082,6 +1087,7 @@ final class LocalTransferController {
       direction: transfer.direction,
       kind: transfer.kind,
       peer: tracked.peer,
+      at: tracked.at,
       state: transfer.state,
       transferredBytes: transfer.transferredBytes,
       totalBytes: transfer.totalBytes,
@@ -1229,10 +1235,20 @@ final class _WiredSession {
 
 /// A Transfer and the Device it is with.
 final class _Tracked {
-  _Tracked(this.transfer, this.peer, {this.localPath});
+  _Tracked(this.transfer, this.peer, {required this.at, this.localPath});
 
   final Transfer transfer;
   final Fingerprint peer;
+
+  /// When this Transfer was first tracked.
+  ///
+  /// Read once, at the moment the Transfer enters the conversation, from the
+  /// controller's own clock. The engine's `Transfer` carries no time of its
+  /// own — it is a protocol object and a protocol object has no business
+  /// knowing what a wall clock says — so this is where "when was this said"
+  /// is decided, and a conversation list that wants to print a time reads it
+  /// from here rather than inventing one at render time.
+  final DateTime at;
 
   /// Where this Transfer's bytes live on *this* machine, once they do.
   ///
