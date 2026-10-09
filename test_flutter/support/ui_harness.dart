@@ -1001,12 +1001,14 @@ class ScriptedPicker implements FilePicker {
   }
 }
 
-/// A [ClipboardPaste] that hands back whatever the test put in it.
+/// A [ClipboardPaste] that hands back whatever the test put in it, and keeps
+/// whatever the app put in it.
 ///
-/// The same seam argument as [ScriptedPicker]: reading the real clipboard means
-/// a platform channel, and a method call to a channel with no engine behind it
-/// throws in a `testWidgets` body. A test installs this, presses the real
-/// Ctrl+V, and asserts on what the conversation did with the answer.
+/// The same seam argument as [ScriptedPicker]: reading or writing the real
+/// clipboard means a platform channel, and a method call to a channel with no
+/// engine behind it throws in a `testWidgets` body. A test installs this,
+/// presses the real Ctrl+V or chooses the real menu item, and asserts on what
+/// the conversation did with the answer.
 ///
 /// ```dart
 /// final clipboard = ScriptedClipboard.install();
@@ -1052,6 +1054,24 @@ class ScriptedClipboard implements ClipboardPaste {
 
   @override
   Future<Uint8List?> image() async => _image;
+
+  /// Every picture the app has put on the clipboard, in order.
+  ///
+  /// Kept separate from [_image] — what the app *reads* — because a copy that
+  /// landed in the same field it reads from would make a test that pastes its
+  /// own copy look like a test that copied what it pasted.
+  final List<Uint8List> copiedImages = [];
+
+  /// What the next write answers. False stands in for a platform that will not
+  /// let the app write its clipboard, which is what the failure sentence is for.
+  bool answersWrites = true;
+
+  @override
+  Future<bool> writeImage(Uint8List bytes) async {
+    if (!answersWrites) return false;
+    copiedImages.add(bytes);
+    return true;
+  }
 }
 
 /// A [Revealer] that records what it was asked to show.

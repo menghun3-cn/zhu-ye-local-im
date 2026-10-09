@@ -106,7 +106,13 @@ $newProbes = @(
     # 空态那句被这一轮改写了，旧句子从此不可能再出现在 app.so 里 —— 上面那一条
     # 已经换成新句子，这里只补右键菜单独有的两句。
     '打开所在目录',
-    '没能打开那个文件夹。'
+    '没能打开那个文件夹。',
+    # 2026-10-09 第六轮：图片不再裹在气泡里，右键多了「复制图片」。
+    # 这一轮几乎没有新文案 —— 它改的是图片怎么画 —— 唯一新增的是右键菜单里
+    # 那一条和它失败时那一句。（缩略图的圆角、进度条宽度、占位块颜色都住在
+    # 主题里，不是文案。）
+    '复制图片',
+    '没能复制这张图片。'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -147,6 +153,9 @@ $requiredGlyphs = @{
     '0xe33c' = 'Icons.info'
     '0xe637' = 'Icons.system_update_alt'
     '0xe45c' = 'Icons.open_in_new'
+    # 2026-10-09 第六轮：右键菜单里「复制图片」那一条的图标。
+    # 0xef7f = Icons.content_copy_outlined
+    '0xef7f' = 'Icons.content_copy_outlined'
 }
 
 function Step($m) { Write-Host "==> $m" }
