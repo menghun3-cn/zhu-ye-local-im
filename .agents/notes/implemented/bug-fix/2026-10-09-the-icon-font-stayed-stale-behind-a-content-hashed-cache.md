@@ -51,8 +51,15 @@ the bytes the cache hashes. `BundleWindowsAssets.inputs` does list
 `{PROJECT_DIR}/pubspec.yaml` — which is what made the touch look plausible —
 but listing an input is not the same as detecting that it changed.
 
-Deleting the produced font is not a lever either: `BundleWindowsAssets.outputs`
-is an empty list, so the output side of the check has nothing to find missing.
+Deleting the produced font is a lever, but a brittle one. `BundleWindowsAssets`
+declares no `outputs` of its own, yet `Target.resolveOutputs` also walks the
+target's depfiles, and `flutter_assets.d` lists every file the previous run
+wrote — the font among them. A missing output invalidates, so removing the
+`.otf` does make the step re-run: measured, by deleting only the font, leaving
+the stamp alone, and rebuilding; it came back at 6140 B. What that lever can
+see, though, is exactly the file set the *previous* run declared, and it is the
+previous run whose view is in question here.
+
 `build_system.dart` states the rule for the input side plainly: *"If the stamp
 file is missing, the target's action is always rerun."*
 
