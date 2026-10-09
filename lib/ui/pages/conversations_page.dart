@@ -8,6 +8,8 @@ import '../dialogs.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
+import '../wechat/bubble.dart';
+import '../wechat/theme.dart';
 import '../widgets.dart';
 
 /// Every conversation this Device has, beside the one being read.
@@ -179,11 +181,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
     return Row(
       children: [
-        SizedBox(
-          width: 300,
+        Container(
+          width: WeChat.conversationListWidth,
+          color: WeChat.sidebarBackground,
           child: _list(context, l10n, conversations, selected: selected),
         ),
-        const VerticalDivider(width: 1),
+        const VerticalDivider(width: 1, color: WeChat.divider),
         Expanded(
           child: selected == null
               ? Padding(
@@ -310,7 +313,6 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final peer = entry.peer;
     final latest = entry.latest;
     // Dialling needs both an address to dial and a peer in the group: a Device
@@ -319,79 +321,155 @@ class _ConversationTile extends StatelessWidget {
     // whole point of it is to bring a Device that is not in the group in.
     final canConnect = peer.isDiallable && peer.isInGroup;
     final canPair = !peer.isInGroup && peer.address != null;
-    return ListTile(
+    final action = _actionFor(context, peer, canConnect, canPair);
+    // The trailing slot is shared between the action button and the summary, so
+    // whichever is drawn sets the width the other's absence leaves behind. An
+    // action is right-aligned against the same edge WeChat puts its timestamp
+    // on, so the two never look like different rows.
+    final trailing = action ?? _summary(context, peer, latest);
+
+    return ConversationRow(
       selected: selected,
       onTap: onTap,
-      leading: CircleAvatar(child: Icon(iconForConversation())),
-      // The name and the address, which is what a conversation is called here:
-      // a name can be claimed by anyone, the address is where it actually is.
-      title: Text(peer.displayName, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        describePeerAddress(peer, l10n),
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodySmall,
+      // The name is handed down so a test can name one row and reach only it.
+      // Without it a finder for "Connect" would match every row on the list,
+      // and the harness that drives these surfaces has to be able to say *which*
+      // conversation it means.
+      peer: peer.displayName,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Avatar(name: peer.displayName, seed: peer.fingerprint.hex),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    peer.displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: WeChat.fontSizeTitle,
+                      color: WeChat.bubbleText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _previewFor(peer, latest),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: WeChat.fontSizePreview,
+                      color: WeChat.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              // Bounded, because the fallback summary is a whole sentence
+              // ("Not accepting Sessions", or the address) and an unbounded one
+              // in a fixed-width row overflows instead of ellipsising. A third
+              // of the row is enough for a button or a state word and leaves
+              // the name the room it needs.
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: WeChat.conversationListWidth * 0.42,
+                ),
+                child: trailing,
+              ),
+            ],
+          ],
+        ),
       ),
-      trailing: _trailing(context, peer, latest, canConnect, canPair),
-      isThreeLine: false,
     );
   }
 
-  /// What sits at the end of the row: the action when there is one to take, and
-  /// otherwise how the last exchange went.
+  /// What the row says under the name: the last thing said, or where the peer
+  /// is reachable.
+  ///
+  /// A conversation with no history still needs a second line — a row of one
+  /// line is a different height from its neighbours and the list looks broken —
+  /// so it falls back to the address, which is also the answer to "which
+  /// machine is this".
+  String _previewFor(PeerView peer, TransferView? latest) {
+    final last = latest;
+    if (last == null) return describePeerAddress(peer, l10n);
+    final text = last.text;
+    if (last.kind == PayloadKind.text && text != null && text.isNotEmpty) {
+      // A newline in a preview would make the row taller than its neighbours.
+      return text.replaceAll(RegExp(r'\s+'), ' ');
+    }
+    if (last.kind == PayloadKind.image) {
+      return last.names.isEmpty
+          ? l10n.kindImages
+          : '[${l10n.kindImages}] ${last.names.first}';
+    }
+    if (last.names.isNotEmpty) return last.names.first;
+    return labelForKind(last.kind, l10n);
+  }
+
+  /// The row's action button, when it has one.
   ///
   /// A connected peer has no reconnect button — the Session is up, and pressing
-  /// again would be refused as a second one — so the row falls back to the last
-  /// Transfer's state, which is what a messenger puts there.
-  Widget? _trailing(
+  /// again would be refused as a second one.
+  Widget? _actionFor(
     BuildContext context,
     PeerView peer,
-    TransferView? latest,
     bool canConnect,
     bool canPair,
   ) {
-    if (!peer.isConnected && (canConnect || canPair)) {
-      return Tooltip(
-        message: canConnect
-            ? l10n.openSession
-            : canPair
-            ? l10n.pairWithThisDevice
-            : '',
-        child: canConnect
-            ? FilledButton.tonal(
-                onPressed: () => guarded(context, () => _connect(context)),
-                child: Text(l10n.connect),
-              )
-            : TextButton(
-                onPressed: () =>
-                    showPairWithPeerDialog(context, controller, peer),
-                child: Text(l10n.pair),
-              ),
-      );
-    }
+    if (peer.isConnected || !(canConnect || canPair)) return null;
+    return Tooltip(
+      message: canConnect ? l10n.openSession : l10n.pairWithThisDevice,
+      child: canConnect
+          ? _RowAction(
+              label: l10n.connect,
+              primary: true,
+              onPressed: () => guarded(context, () => _connect(context)),
+            )
+          : _RowAction(
+              label: l10n.pair,
+              primary: false,
+              onPressed: () =>
+                  showPairWithPeerDialog(context, controller, peer),
+            ),
+    );
+  }
+
+  /// What sits at the end of the row when there is nothing to press: how the
+  /// last exchange went, or a badge when something is waiting to be let in.
+  Widget? _summary(BuildContext context, PeerView peer, TransferView? latest) {
     if (entry.waiting) {
       return Badge(
         label: const Icon(Icons.download, size: 12),
-        backgroundColor: Theme.of(context).colorScheme.error,
+        backgroundColor: WeChat.badge,
         child: const SizedBox(width: 24),
       );
     }
     if (latest == null) {
       // Nothing to report and nothing to press: a found Device this one is
       // already in a group with but cannot reach says as much as it can.
-      return peer.isConnected
-          ? null
-          : Text(
-              peer.isDiallable
-                  ? l10n.nothingKnownAboutPeer
-                  : l10n.nothingToDialYet,
-              style: Theme.of(context).textTheme.labelSmall,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-            );
+      if (peer.isConnected) return null;
+      return Text(
+        peer.isDiallable ? l10n.nothingKnownAboutPeer : l10n.nothingToDialYet,
+        style: const TextStyle(
+          fontSize: WeChat.fontSizeMeta,
+          color: WeChat.secondaryText,
+        ),
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.end,
+      );
     }
     return Text(
       labelForState(latest.state, l10n),
-      style: Theme.of(context).textTheme.labelSmall,
+      style: const TextStyle(
+        fontSize: WeChat.fontSizeMeta,
+        color: WeChat.secondaryText,
+      ),
     );
   }
 
@@ -402,6 +480,116 @@ class _ConversationTile extends StatelessWidget {
   /// moves: the row stays where it was, still offering the same button.
   Future<void> _connect(BuildContext context) async {
     await controller.connect(entry.peer.fingerprint);
+  }
+}
+
+/// A row that answers the mouse the way the desktop client's list does.
+///
+/// [ListTile] is not used here because its selected and hover colours come from
+/// the colour scheme, and the scheme's colours are the seed's, not WeChat's —
+/// the whole point of this list is that a hovered row is `#E9E9E9` and a
+/// selected one is `#C9C9C9`, both of which the scheme has no slot for.
+///
+/// Public, and named by [peer], so that the widget tests can find one row and
+/// not its neighbours. `find.widgetWithText(ListTile, name)` used to do that
+/// job; this is the type that does it now.
+class ConversationRow extends StatefulWidget {
+  const ConversationRow({
+    super.key,
+    required this.peer,
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
+
+  /// What this row is called, for a finder to name it by.
+  final String peer;
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<ConversationRow> createState() => _ConversationRowState();
+}
+
+class _ConversationRowState extends State<ConversationRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = widget.selected
+        ? WeChat.listSelected
+        : _hovered
+        ? WeChat.listHover
+        : Colors.transparent;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          height: WeChat.conversationRowHeight,
+          color: colour,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// A small button on a conversation row.
+///
+/// A [TextButton] with every colour overridden, rather than a `Material` and an
+/// `InkWell`. A hand-rolled button would look the same and behave worse: it
+/// would have no focus ring, no keyboard activation, no `Tooltip` semantics and
+/// no `ButtonStyleButton` for a test to find. The desktop client's flat pill is
+/// a *style*, and Material expresses styles as `ButtonStyle` — which is the
+/// whole reason that class exists.
+class _RowAction extends StatelessWidget {
+  const _RowAction({
+    required this.label,
+    required this.primary,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool primary;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ButtonStyle(
+      backgroundColor: WidgetStatePropertyAll(
+        primary ? WeChat.brand : Colors.transparent,
+      ),
+      foregroundColor: WidgetStatePropertyAll(
+        primary ? Colors.white : WeChat.bubbleText,
+      ),
+      // The hairline the outline variant needs, and nothing for the filled one.
+      side: primary
+          ? null
+          : const WidgetStatePropertyAll(BorderSide(color: WeChat.divider)),
+      // Square-ish, and small: a row is 64 logical pixels tall and a
+      // Material-default button would fill a third of it.
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      ),
+      minimumSize: const WidgetStatePropertyAll(Size.zero),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontSize: WeChat.fontSizeMeta),
+      ),
+    );
+    return TextButton(onPressed: onPressed, style: style, child: Text(label));
   }
 }
 
@@ -427,11 +615,13 @@ class _PaneHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final subtitle = this.subtitle;
     return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Padding(
+      color: WeChat.toolbarBackground,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: WeChat.divider)),
+        ),
         padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
         child: Row(
           children: [
@@ -440,6 +630,8 @@ class _PaneHeader extends StatelessWidget {
                 onPressed: onBack,
                 icon: const Icon(Icons.arrow_back),
                 tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                color: WeChat.secondaryText,
+                visualDensity: VisualDensity.compact,
               ),
             Expanded(
               child: Column(
@@ -451,16 +643,19 @@ class _PaneHeader extends StatelessWidget {
                       Flexible(
                         child: Text(
                           title,
-                          style: theme.textTheme.titleMedium,
+                          style: const TextStyle(
+                            fontSize: WeChat.fontSizeTitle,
+                            color: WeChat.bubbleText,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (offline) ...[
                         const SizedBox(width: 6),
-                        Icon(
+                        const Icon(
                           Icons.link_off,
                           size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: WeChat.secondaryText,
                         ),
                       ],
                     ],
@@ -468,7 +663,10 @@ class _PaneHeader extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodySmall,
+                      style: const TextStyle(
+                        fontSize: WeChat.fontSizeMeta,
+                        color: WeChat.secondaryText,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],

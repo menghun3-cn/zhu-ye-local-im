@@ -92,6 +92,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get kindFiles => '文件';
 
   @override
+  String get kindImages => '图片';
+
+  @override
   String get kindClipboard => '剪贴板';
 
   @override
@@ -282,6 +285,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get menuSendFile => '发送文件';
+
+  @override
+  String get menuSendImage => '发送图片';
+
+  @override
+  String get dropToSend => '松手即发送';
 
   @override
   String get trustDevice => '信任这台设备';

@@ -82,7 +82,10 @@ $newProbes = @(
     '对方还没广播名称',
     # 2026-10-09 这一轮：剪贴板白名单与「传输菜单只列文件」的新文案。
     '只有勾选的设备会收到本机复制的内容，本机也只会应用它们发来的内容。',
-    '还没有传输过文件。文字内容在对话里，不在这里显示。'
+    '还没有传输过文件。文字内容在对话里，不在这里显示。',
+    # 同一轮的微信 UI 对齐：拖放提示与发图入口。
+    '松手即发送',
+    '发送图片'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -93,11 +96,13 @@ $newProbes = @(
 # 0xe2c3 = Icons.forum（对话入口选中态）
 # 0xe571 = Icons.send（会话发送）
 # 0xe0b1 = Icons.attach_file（会话附加文件）
+# 0xf120 = Icons.image_outlined（会话「发送图片」按钮，2026-10-09 微信对齐那一轮加的）
 $requiredGlyphs = @{
     '0xf0b0' = 'Icons.forum_outlined'
     '0xe2c3' = 'Icons.forum'
     '0xe571' = 'Icons.send'
     '0xe0b1' = 'Icons.attach_file'
+    '0xf120' = 'Icons.image_outlined'
 }
 
 function Step($m) { Write-Host "==> $m" }

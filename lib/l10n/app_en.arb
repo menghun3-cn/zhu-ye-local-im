@@ -51,6 +51,7 @@
 
   "kindText": "Text",
   "kindFiles": "Files",
+  "kindImages": "Images",
   "kindClipboard": "Clipboard",
 
   "stateAwaitingDecision": "Waiting for an answer",
@@ -143,6 +144,8 @@
   "trusted": "trusted",
 
   "menuSendFile": "Send a file",
+  "menuSendImage": "Send an image",
+  "dropToSend": "Let go to send",
   "trustDevice": "Trust this Device",
   "stopTrustingDevice": "Stop trusting this Device",
   "openSession": "Open a Session",
