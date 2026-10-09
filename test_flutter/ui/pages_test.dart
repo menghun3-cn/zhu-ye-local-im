@@ -1023,5 +1023,55 @@ void main() {
 
       await shutdown(tester, [alice, bob]);
     });
+
+    testWidgets('Enter sends and leaves the caret in the box', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to be listed',
+      );
+      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
+      await settleRoute(tester);
+
+      final composer = onConversation(windowA, find.byType(TextField));
+      await tester.tap(composer);
+      await tester.enterText(composer, 'first');
+      // Enter, not the send button: on desktop the key is what drops focus.
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 1,
+        description: 'the first message to be handed over',
+      );
+
+      // The box is empty and still has the caret, so the next message can be
+      // typed without reaching for the mouse.
+      final field = tester.widget<TextField>(composer);
+      expect(field.controller!.text, isEmpty);
+      expect(field.focusNode!.hasFocus, isTrue);
+
+      // And typing again lands in the same box rather than nowhere.
+      await tester.enterText(composer, 'second');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 2,
+        description: 'the second message to be handed over',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
   });
 }
