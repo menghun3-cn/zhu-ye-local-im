@@ -27,7 +27,11 @@ void main() {
   group('two windows on one machine', () {
     testWidgets('pair by clicking, then move a file across', (tester) async {
       // The picker seam is a static, so it is put back however this test ends.
-      tearDown(PickerResolution.reset);
+      // `addTearDown` and not `tearDown`: the latter declares a hook and only
+      // works while the suite is still being declared, so calling it from
+      // inside a test body throws "Can't call tearDown() once tests have begun
+      // running" — which fails the test before a single line of it runs.
+      addTearDown(PickerResolution.reset);
       final picker = ScriptedPicker.install();
       final hub = MemoryBeaconHub();
       // Alice receives, so she listens where the guest's Pair tap dials by
