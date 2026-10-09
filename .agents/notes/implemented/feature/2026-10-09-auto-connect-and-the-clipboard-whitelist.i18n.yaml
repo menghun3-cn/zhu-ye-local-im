@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-auto-connect-and-the-clipboard-whitelist.md
+#   git hash-object 2026-10-09-auto-connect-and-the-clipboard-whitelist.zh.md
+2026-10-09-auto-connect-and-the-clipboard-whitelist.md: ab08751040a6b7f331d77fe4032d9df58182704e
+2026-10-09-auto-connect-and-the-clipboard-whitelist.zh.md: f6437a4cc809d0ca710bdefbf3c9828530d37b8e

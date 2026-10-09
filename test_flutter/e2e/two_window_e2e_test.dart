@@ -188,6 +188,20 @@ void main() {
       expect(alice.controller.clipboardMode, ClipboardMode.mirror);
       expect(bob.controller.clipboardMode, ClipboardMode.mirror);
 
+      // Pairing got these two into one Owner Group, and that is as far as it
+      // goes: the clipboard is shared only with the Devices each side has
+      // added to the list on the Clipboard surface, and that list starts empty.
+      // Each Device adds the other, which is what the two users would do — done
+      // through the controller rather than by ticking the boxes, because what
+      // is under test *here* is that a copy crosses a real socket once the
+      // consent exists, and the boxes themselves are covered by the Clipboard
+      // surface's own widget test.
+      alice.controller.setClipboardPeer(bob.fingerprint, value: true);
+      bob.controller.setClipboardPeer(alice.fingerprint, value: true);
+      await tester.pump();
+      expect(alice.controller.isClipboardPeer(bob.fingerprint), isTrue);
+      expect(bob.controller.isClipboardPeer(alice.fingerprint), isTrue);
+
       alice.clipboard.copy('copied on Alice');
 
       // Bob's clipboard takes it without being asked, and his surface says so.

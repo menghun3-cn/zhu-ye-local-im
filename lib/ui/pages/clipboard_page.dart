@@ -57,6 +57,13 @@ class _ClipboardPageState extends State<ClipboardPage> {
     final controller = ControllerScope.of(context);
     final capability = controller.self.capability;
     final staged = controller.stagedEntries;
+    // The whitelist is edited over the paired peers: a Device outside the
+    // group has no Session to carry an entry, so ticking one would be a
+    // promise the transport could not keep.
+    final groupPeers = [
+      for (final peer in controller.peers)
+        if (peer.isInGroup) peer,
+    ];
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -98,6 +105,20 @@ class _ClipboardPageState extends State<ClipboardPage> {
         if (!controller.isPaired) ...[
           const SizedBox(height: 12),
           HintText(l10n.clipboardNeedsGroup),
+        ] else ...[
+          const SizedBox(height: 20),
+          SectionHeader(title: l10n.clipboardPeersHeader),
+          // The sharing whitelist. Group membership says a Device may hold a
+          // Session; this list says which of those Devices the clipboard is
+          // actually shared with, and it is empty until the user adds one —
+          // pairing a Device does not volunteer this Device's clipboard.
+          if (groupPeers.isEmpty)
+            HintText(l10n.clipboardPeersEmpty)
+          else ...[
+            HintText(l10n.clipboardPeersHint),
+            for (final peer in groupPeers)
+              _ClipboardPeerTile(peer: peer, controller: controller),
+          ],
         ],
         const SizedBox(height: 20),
         SectionHeader(title: l10n.clipboardWaitingHeader),
@@ -140,6 +161,36 @@ class _ClipboardPageState extends State<ClipboardPage> {
     }
     if (capability.canOriginate) return l10n.clipboardNoteOriginateOnly;
     return l10n.clipboardNoteNone;
+  }
+}
+
+/// One row of the clipboard-sharing whitelist: who it is, and whether it is
+/// on the list.
+///
+/// Ticking sends [LocalTransferController.setClipboardPeer], which updates the
+/// profile *and* the running mirror, so a tick takes effect on the traffic
+/// already flowing and survives a restart — the two things a switch that only
+/// touched one of them would quietly fail to do.
+class _ClipboardPeerTile extends StatelessWidget {
+  const _ClipboardPeerTile({required this.peer, required this.controller});
+
+  final PeerView peer;
+  final LocalTransferController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final controller = this.controller;
+    return CheckboxListTile(
+      value: controller.isClipboardPeer(peer.fingerprint),
+      onChanged: (value) =>
+          controller.setClipboardPeer(peer.fingerprint, value: value ?? false),
+      title: Text(peer.displayName, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        describePeerAddress(peer, l10n),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
   }
 }
 

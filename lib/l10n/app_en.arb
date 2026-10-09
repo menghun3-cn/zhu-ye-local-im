@@ -155,7 +155,7 @@
   "pair": "Pair",
   "connect": "Connect",
 
-  "transfersEmptyHint": "Nothing has been sent or received yet.",
+  "transfersEmptyHint": "No files have been transferred yet. Text messages live in their conversations, not here.",
   "transferTo": "To {peer}",
   "@transferTo": {
     "placeholders": { "peer": { "type": "String" } }
@@ -185,7 +185,10 @@
   "clipboardAppliedHeader": "Put on this clipboard",
   "clipboardNothingStaged": "Nothing is waiting to be applied.",
   "clipboardNothingApplied": "Nothing has reached this clipboard yet.",
-  "clipboardNeedsGroup": "Clipboard sync happens inside an Owner Group, and this Device is not in one yet. Pairing is on the Devices surface.",
+  "clipboardNeedsGroup": "Clipboard sync happens inside an Owner Group, and this Device is not in one yet.",
+  "clipboardPeersHeader": "Devices that may share the clipboard",
+  "clipboardPeersHint": "Only the devices ticked below receive what this Device copies, and only their entries are applied here.",
+  "clipboardPeersEmpty": "No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.",
   "clipboardNoteBoth": "Copies made here travel to the group, and copies from the group replace this clipboard.",
   "clipboardNoteApplyOnly": "This platform only lets an app read its clipboard while its window is on screen, so copies made here travel only while this window is focused. Copies from the group are applied at any time.",
   "clipboardNoteOriginateOnly": "Copies made here travel to the group. This platform cannot apply a copy that arrives.",

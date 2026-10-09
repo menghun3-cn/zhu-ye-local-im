@@ -23,7 +23,17 @@ class TransfersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
-    final transfers = controller.transfers;
+    // Only files are listed here. A text message is a conversation, not a
+    // transfer — it lives in the conversation it was said in, where the answer
+    // to it belongs too — and a clipboard entry is mirrored, not moved. Both
+    // travel the same machinery underneath, so both appear in `controller`
+    // .transfers, and both are filtered out here: a menu that repeated what
+    // two other surfaces already show, minus the context, would be a third
+    // place answering for one thing.
+    final transfers = [
+      for (final view in controller.transfers)
+        if (view.kind == PayloadKind.file) view,
+    ];
     if (transfers.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16),

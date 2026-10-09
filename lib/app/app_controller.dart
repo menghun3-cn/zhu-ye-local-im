@@ -303,13 +303,18 @@ final class LocalTransferController {
       alias: _alias,
     );
     _local = local;
-    final clipboard = ClipboardMirror(
-      group: local.profile.group,
-      capability: ClipboardCapability.forPlatform(_platform),
-      clipboard: _systemClipboard,
-      mode: _clipboardMode,
-      onNotice: _notice,
-    )..start();
+    final clipboard =
+        ClipboardMirror(
+            group: local.profile.group,
+            capability: ClipboardCapability.forPlatform(_platform),
+            clipboard: _systemClipboard,
+            mode: _clipboardMode,
+            onNotice: _notice,
+          )
+          // The whitelist starts as the profile has it, so a Device that restarts
+          // keeps sharing with exactly the peers its user left on the list.
+          ..setAllowedPeers(local.profile.clipboardPeers)
+          ..start();
     _clipboard = clipboard;
     // A staged entry is something a screen renders and a user has to answer, so
     // it has to *reach* the screen rather than wait for an unrelated rebuild to
@@ -449,6 +454,27 @@ final class LocalTransferController {
   /// Sets whether Transfers to [peer] skip the per-Transfer confirmation.
   void setFavorite(Fingerprint peer, {required bool value}) {
     _requireLocal().profile.setFavorite(peer, value: value);
+    unawaited(_persist());
+    _notify();
+  }
+
+  /// Whether [peer] is on this Device's clipboard-sharing whitelist.
+  bool isClipboardPeer(Fingerprint peer) =>
+      _local?.profile.isClipboardPeer(peer) ?? false;
+
+  /// Sets whether [peer] may share the clipboard with this Device, and
+  /// persists it.
+  ///
+  /// The whitelist is the user's per-device consent, kept in the profile and
+  /// mirrored into the running [ClipboardMirror] here: the profile is what a
+  /// restart reads, the mirror is what the running traffic consults, and a
+  /// setter that updated one and not the other would make the switch lie
+  /// about itself until the next restart.
+  void setClipboardPeer(Fingerprint peer, {required bool value}) {
+    final local = _requireLocal();
+    if (local.profile.isClipboardPeer(peer) == value) return;
+    local.profile.setClipboardPeer(peer, value: value);
+    _mirror.setAllowedPeers(local.profile.clipboardPeers);
     unawaited(_persist());
     _notify();
   }
@@ -740,9 +766,82 @@ final class LocalTransferController {
     _discovered = discovery.currentPeers;
     _discoveryWatch = discovery.peers.listen((peers) {
       _discovered = peers;
+      _autoConnectPeers();
       _notify();
     }, onError: (Object error) => _notice('discovery failed: $error'));
     discovery.start();
+  }
+
+  /// The peers an automatic connect is currently trying, by fingerprint hex.
+  ///
+  /// Discovery re-reports a peer on every visible change — a new address, a
+  /// restarted service — and this is what keeps a slow attempt from stacking
+  /// a second one on top of the first.
+  final Set<String> _autoConnecting = {};
+
+  /// Opens Sessions to every paired peer Discovery has placed.
+  ///
+  /// A paired Device that has just been discovered is not a stranger to be
+  /// introduced: the user already paired it, and the Session it needs is the
+  /// same one the Connect button opens, so the controller opens it on the
+  /// user's behalf. Both ends try, because neither knows which direction the
+  /// network allows — a Device whose inbound is firewalled cannot be reached,
+  /// but it can still do the reaching — and two dials to one peer resolve the
+  /// way the Session layer always resolves a duplicate: one Session survives,
+  /// and the loser finds the peer connected instead.
+  ///
+  /// Discovery only emits on a visible change — a peer that is new, or new
+  /// where it is — so this does not fire on every routine announce. An
+  /// attempt that fails simply stops: the Connect button stays on the
+  /// conversation row, and a firewall is not worth a notice every time the
+  /// app starts.
+  void _autoConnectPeers() {
+    final local = _local;
+    if (local == null || _closed) return;
+    for (final discovered in _discovered) {
+      final peer = discovered.fingerprint;
+      if (peer == local.profile.self) continue;
+      // Only paired peers. An unpaired Device needs its user's consent, and
+      // that consent is what the Pairing flow exists to collect; skipping it
+      // here would make discovery a way to join without being asked.
+      if (!local.profile.group.contains(peer)) continue;
+      if (_wired.containsKey(peer.hex)) continue;
+      if (!_autoConnecting.add(peer.hex)) continue;
+      unawaited(_autoConnect(peer));
+    }
+  }
+
+  /// One automatic connect: a few dials, then quiet.
+  ///
+  /// Unlike [connectAfterPairing] this is not racing a peer that is certainly
+  /// coming up — the beacon that triggered it is evidence the peer is already
+  /// serving — so the retry exists for the narrow gap between a beacon
+  /// arriving and the peer's socket listening, and gives up after it.
+  Future<void> _autoConnect(Fingerprint peer) async {
+    try {
+      for (var tries = 0; tries < 3; tries++) {
+        if (_closed) return;
+        if (_wired.containsKey(peer.hex)) return;
+        try {
+          await connect(peer);
+          return;
+        } on HandshakeException {
+          // Both ends of a pair auto-connect, and one dial of the two loses:
+          // the Session layer closes a second Session to a peer it already
+          // holds. A Session by now is the race resolving the good way.
+          if (_wired.containsKey(peer.hex)) return;
+        } on SocketException {
+          // Nothing listening where the beacon said, or the peer is
+          // unreachable from here; the next try, or the peer's own dial,
+          // is the way through.
+        } on AppStateException {
+          // No address for the peer yet; the next beacon brings one.
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    } finally {
+      _autoConnecting.remove(peer.hex);
+    }
   }
 
   Future<void> _teardownSessionLayer() async {
@@ -761,6 +860,7 @@ final class LocalTransferController {
   void _onProfileChanged(LocalProfile next) {
     _local = next;
     _clipboard?.setGroup(next.profile.group);
+    _clipboard?.setAllowedPeers(next.profile.clipboardPeers);
     unawaited(_syncLayersSafely());
     // A profile written by something other than [setAcceptsPairingRequests] —
     // restored from disk, say — must not leave the listener behind the switch.
