@@ -308,7 +308,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connect => '连接';
 
   @override
-  String get transfersEmptyHint => '还没有发送或接收过任何内容。';
+  String get transfersEmptyHint => '还没有传输过文件。文字内容在对话里，不在这里显示。';
 
   @override
   String transferTo(String peer) {
@@ -363,7 +363,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clipboardNothingApplied => '还没有内容写入本机剪贴板。';
 
   @override
-  String get clipboardNeedsGroup => '剪贴板同步只在设备组内进行，本机还没有加入任何设备组。配对入口在「设备」页。';
+  String get clipboardNeedsGroup => '剪贴板同步只在设备组内进行，本机还没有加入任何设备组。';
+
+  @override
+  String get clipboardPeersHeader => '可共享剪贴板的设备';
+
+  @override
+  String get clipboardPeersHint => '只有勾选的设备会收到本机复制的内容，本机也只会应用它们发来的内容。';
+
+  @override
+  String get clipboardPeersEmpty => '还没有已配对的设备；先在对话列表里配对，再回来勾选要共享剪贴板的设备。';
 
   @override
   String get clipboardNoteBoth => '在本机复制的内容会发给组内设备，组内发来的内容会替换本机剪贴板。';

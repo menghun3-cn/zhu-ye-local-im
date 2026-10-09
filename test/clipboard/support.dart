@@ -51,9 +51,17 @@ final class MirrorFixture {
     ClipboardCapability? capability,
     ClipboardMode mode = ClipboardMode.mirror,
     DateTime Function()? clock,
+    Set<Fingerprint> allowedPeers = const {},
+    bool allowEveryoneInGroup = false,
   }) : clipboard = MemorySystemClipboard() {
     mirror = ClipboardMirror(
       group: group,
+      // The sharing whitelist. A fixture that asks for
+      // `allowEveryoneInGroup` is one testing the *other* gates — the Owner
+      // Group, the capability, the origin tag — and would otherwise have to
+      // restate the same seed in every call. A fixture that names peers
+      // explicitly is one testing the whitelist itself.
+      allowedPeers: allowEveryoneInGroup ? group.members.toSet() : allowedPeers,
       capability:
           capability ?? ClipboardCapability.forPlatform(DevicePlatform.windows),
       clipboard: clipboard,

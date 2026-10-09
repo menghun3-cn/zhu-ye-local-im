@@ -106,7 +106,9 @@ String describePeerAddress(PeerView peer, AppLocalizations l10n) {
 String describePeerFacts(PeerView peer, AppLocalizations l10n) {
   final connected = peer.isConnected;
   final facts = <String>[
-    if (peer.alias == null) l10n.peerNameNotAnnounced,
+    // The placeholder the sanitiser substitutes is not a name: a peer whose
+    // only alias is "Unnamed device" has not announced one, and says so here.
+    if (!peer.hasRealAlias) l10n.peerNameNotAnnounced,
     if (peer.address != null)
       describePeerAddress(peer, l10n)
     else if (!connected)

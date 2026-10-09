@@ -60,12 +60,22 @@ enum ClipboardMode {
 /// Session, and a per-peer mirror would have to relearn all three per peer and
 /// would still get the two-Device loop wrong.
 ///
-/// ## Three gates, and why each one exists
+/// ## Four gates, and why each one exists
 ///
 /// **The Owner Group gate.** An entry is captured only for peers in the group,
 /// and applied only when it came from a member. This is the security boundary:
 /// the Session already proves the peer knows the Pairing Secret, but a Secret
 /// can be shared with a Device that has no business reading this clipboard.
+///
+/// **The sharing whitelist.** Group membership alone is still not consent:
+/// every member of the group would otherwise read every copy made on this
+/// Device, forever, by default. The whitelist is the user's per-device
+/// decision — the set the Clipboard surface edits, empty until somebody is
+/// added, checked in *both* directions. An entry leaves only for a peer on
+/// this Device's list, and an entry is applied only when its origin is on it,
+/// so two Devices share a clipboard when each has added the other and never
+/// otherwise. A peer removed from the list goes quiet at once, without its
+/// Session being touched.
 ///
 /// **The capability gate.** Reading and writing the clipboard are governed by
 /// different platform rules, so a Device can be a Mirror target without being
@@ -79,6 +89,7 @@ enum ClipboardMode {
 final class ClipboardMirror {
   ClipboardMirror({
     required this._group,
+    Set<Fingerprint> allowedPeers = const {},
     required this._capability,
     required this._clipboard,
     this._mode = ClipboardMode.off,
@@ -86,7 +97,8 @@ final class ClipboardMirror {
     Random? random,
     this.onNotice,
   }) : _clock = clock ?? DateTime.now,
-       _random = random ?? Random.secure();
+       _random = random ?? Random.secure(),
+       _allowed = {...allowedPeers};
 
   /// How many applied values are remembered to recognise our own echo.
   static const int _echoMemory = 16;
@@ -101,6 +113,13 @@ final class ClipboardMirror {
   static const int _entryIdBytes = 12;
 
   OwnerGroup _group;
+
+  /// The clipboard-sharing whitelist, as the user last edited it.
+  ///
+  /// Empty until the user adds a peer, and re-read from the profile wherever
+  /// the profile changes; see the class doc's sharing-whitelist gate for why
+  /// it exists and why it is checked in both directions.
+  Set<Fingerprint> _allowed;
   final ClipboardCapability _capability;
   final SystemClipboard _clipboard;
   final DateTime Function() _clock;
@@ -199,6 +218,18 @@ final class ClipboardMirror {
     }
   }
 
+  /// Replaces the clipboard-sharing whitelist.
+  ///
+  /// Called wherever the profile's `clipboardPeers` changes. Unlike
+  /// [setGroup] this detaches nothing: the whitelist is a permission, not a
+  /// connection, so a peer taken off the list keeps its Session and its
+  /// clipboard channel and simply stops qualifying through the gates — which
+  /// is also why putting a peer back takes effect at once, with nothing to
+  /// re-establish.
+  void setAllowedPeers(Iterable<Fingerprint> peers) {
+    _allowed = {...peers};
+  }
+
   /// Starts listening to [channel] as [fingerprint]'s clipboard conversation.
   ///
   /// Re-attaching the same Fingerprint replaces the previous channel, so a
@@ -239,6 +270,13 @@ final class ClipboardMirror {
       onNotice?.call(
         'refused to apply an entry from ${entry.origin.short()}, which is not '
         'in this Owner Group',
+      );
+      return;
+    }
+    if (entry.origin != self && !_allowed.contains(entry.origin)) {
+      onNotice?.call(
+        'refused to apply an entry from ${entry.origin.short()}, which is not '
+        'on this Device\'s clipboard-sharing whitelist',
       );
       return;
     }
@@ -302,6 +340,10 @@ final class ClipboardMirror {
     );
     for (final peer in _peers.values) {
       if (!_group.contains(peer.fingerprint)) continue;
+      // The sharing whitelist, outbound direction: a copy made here travels
+      // only to the peers the user has added. Group membership got the peer
+      // this far and no further.
+      if (!_allowed.contains(peer.fingerprint)) continue;
       unawaited(_push(peer, entry));
     }
   }
@@ -336,6 +378,17 @@ final class ClipboardMirror {
       onNotice?.call(
         'refused a clipboard entry from ${entry.origin.short()}, which is not '
         'in this Owner Group',
+      );
+      return;
+    }
+    // The sharing whitelist, inbound direction: the sender checked its own
+    // side before pushing, but this Device's consent is what applies here —
+    // a peer on somebody else's whitelist is not on this one until the user
+    // says so.
+    if (!_allowed.contains(entry.origin)) {
+      onNotice?.call(
+        'refused a clipboard entry from ${entry.origin.short()}, which is not '
+        'on this Device\'s clipboard-sharing whitelist',
       );
       return;
     }

@@ -15,15 +15,19 @@
        干净机器上会直接报「找不到 VCRUNTIME140.dll」。本脚本从 VS 的
        VC/Redist/MSVC/<ver>/x64/Microsoft.VC143.CRT 取来补齐。
 
-    验证部分做三件事，全部基于 zip 内的字节（不是磁盘上的源文件）：
+    验证部分做四件事，全部基于 zip 内的字节（不是磁盘上的源文件）：
       - 文件齐全性（exe / flutter_windows.dll / 三个 CRT / data / 说明）
       - 结构（顶层直接是 exe，没有多套一层目录）
       - 新旧代码鉴别：在 app.so 里检索若干条 UTF-16LE 文案，要求新功能的句子
         命中、且 app.so 与上一次构建不同。
+      - 图标字形：解析 data/flutter_assets/fonts/MaterialIcons-Regular.otf 的 cmap，
+        要求这一轮新用到的 codePoint 真的在字体里。缺了就是界面上一个个空胶囊。
 
 .PARAMETER SkipBuild
-    跳过 `flutter build windows --release`，只用现有的 build/windows/x64/runner/Release
-    重新组包。用于只改了说明文件时。
+    跳过 `flutter pub get` + `flutter build windows --release`（含让 assets 步骤
+    失效的 touch），只用现有的 build/windows/x64/runner/Release 重新组包。用于只改了
+    说明文件时。注意：正常路径一定会重建 assets —— 图标字体的字形子集化只在 assets
+    步骤整跑时才重做，增量构建会让字体停在上一次、新图标切不进去。
 
 .PARAMETER Smoke
     打包后解压到临时目录并启动 8 秒，检查进程响应、UDP 47654 / TCP 47656+47655
@@ -75,8 +79,26 @@ $newProbes = @(
     '连接已断开',
     '还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。',
     '名字是对方自称的，本机无法核实。点「接受」就是把对方加入你的设备组，之后双方可以互相发送内容。',
-    '对方还没广播名称'
+    '对方还没广播名称',
+    # 2026-10-09 这一轮：剪贴板白名单与「传输菜单只列文件」的新文案。
+    '只有勾选的设备会收到本机复制的内容，本机也只会应用它们发来的内容。',
+    '还没有传输过文件。文字内容在对话里，不在这里显示。'
 )
+
+# 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
+# 的，而它只在 assets 步骤重跑时才重做 —— 增量构建会让它一直停在上一次的结果上，
+# 于是「代码要的图标」和「字体里有的图标」悄悄分叉，界面上就是一个个空胶囊。
+# 这里直接读字体的 cmap，点名几个 2026-10-09 之后才用到的字形。
+# 0xf0b0 = Icons.forum_outlined（对话入口未选中态）
+# 0xe2c3 = Icons.forum（对话入口选中态）
+# 0xe571 = Icons.send（会话发送）
+# 0xe0b1 = Icons.attach_file（会话附加文件）
+$requiredGlyphs = @{
+    '0xf0b0' = 'Icons.forum_outlined'
+    '0xe2c3' = 'Icons.forum'
+    '0xe571' = 'Icons.send'
+    '0xe0b1' = 'Icons.attach_file'
+}
 
 function Step($m) { Write-Host "==> $m" }
 
@@ -128,6 +150,31 @@ function Sync-Tree($source, $target, $extra = @()) {
 
 # ---------------------------------------------------------------- 1. 构建
 if (-not $SkipBuild) {
+    # 必须先让 assets 步骤失效。`flutter build windows --release` 是增量的，而
+    # Material Icons 的字形子集化只在整个 assets 步骤重跑时才会重做 —— 只加新图标、
+    # 不改 pubspec 的话那一步不会触发，新图标就永远切不进字体。2026-10-09 就是这么
+    # 出的事：出货的 MaterialIcons-Regular.otf 只有 4848 字节 / 36 个字形，对话功能
+    # 引入的 6 个图标（forum、forum_outlined、notes、send、attach_file、
+    # description_outlined）一个都不在里面，而每个更早就有的图标都在 —— 界面上
+    # 表现为「对话」入口是一个空的紫胶囊、对话列表头像是一个空圈。
+    #
+    # 这里有一个坑：第一反应是 `flutter clean`，但本机沙箱的 safe-delete 会拦它。
+    #   - 删除量 > 50 个文件 → SAFE_DELETE_BULK_CONFIRM_REQUIRED
+    #   - 小目录 → SAFE_DELETE_FAIL_CLOSED (trash-failed)
+    # 实测 `flutter clean` 打印 "Failed to remove ...\build" 后仍然 exit 0，
+    # 而那个 4848 B 的字体原封不动 —— 看起来成功，其实什么都没清。
+    #
+    # 有效且更轻的办法：把 pubspec.yaml 的 mtime 摸一下。asset 步骤的缓存键包含
+    # pubspec，mtime 变了就会整步重跑，图标子树化跟着重做。代价是几十秒的
+    # `flutter pub get` + 重建，远小于 clean 全量重编。
+    Step '让 assets 步骤失效（touch pubspec.yaml）'
+    $pubspec = Join-Path $repo 'pubspec.yaml'
+    (Get-Item $pubspec).LastWriteTime = Get-Date
+
+    Step 'flutter pub get'
+    & flutter pub get
+    if ($LASTEXITCODE -ne 0) { throw "flutter pub get 失败 (exit $LASTEXITCODE)" }
+
     Step 'flutter build windows --release'
     & flutter build windows --release
     if ($LASTEXITCODE -ne 0) { throw "flutter build 失败 (exit $LASTEXITCODE)" }
@@ -268,6 +315,69 @@ try {
 
     $soSha = [System.Security.Cryptography.SHA256]::Create().ComputeHash($so)
     Write-Host ("    app.so sha256 {0}" -f (($soSha | ForEach-Object { $_.ToString('X2') }) -join ''))
+
+    # 图标的字形：读 MaterialIcons-Regular.otf 的 cmap，确认这一轮用到的 codePoint
+    # 真的被切进了字体。app.so 里有文案不代表界面画得出来 —— 2026-10-09 的坏包
+    # 文案全中、图标全空，正是这一项缺失导致的。
+    # 注意这里**不能**用"字节数太小就报错"来判坏。图标子集化本来就是按需切的，
+    # 一个只用了几十个字形的 app 切出来的字体就是几 KB —— 2026-10-09 修好之后
+    # 也只有 5404 B / 42 个字形，而坏掉的那份是 4848 B / 36 个。两者只差 500 字节，
+    # 任何尺寸阈值都分不开。**唯一可靠的判据是下面的 cmap 点名**：坏包里那四个
+    # 图标一个都不在，好包里四个都在。
+    $fontEntry = $entries['data\flutter_assets\fonts\MaterialIcons-Regular.otf']
+    if (-not $fontEntry) { throw 'zip 里没有 data\flutter_assets\fonts\MaterialIcons-Regular.otf' }
+    $fms = New-Object System.IO.MemoryStream
+    $fs = $fontEntry.Open(); $fs.CopyTo($fms); $fs.Close()
+    $font = $fms.ToArray(); $fms.Dispose()
+    if ($font.Length -lt 1000) {
+        throw "MaterialIcons-Regular.otf 只有 $($font.Length) B —— 这不可能是字体，资源打包出问题了"
+    }
+    $missing = @()
+    # 解析 cmap 的 format 4 子表：这才是字形索引的真实来源。
+    # 逐字节扫整份字体会很慢（几十万次迭代），而且 '0xf0b0' 这种字节对可能在
+    # 别处偶然出现，扫出来的是假阳性。
+    function Get-CmapCodepoints($bytes) {
+        $found = @{}
+        $numTables = [int]$bytes[4] * 256 + [int]$bytes[5]
+        $cmapOffset = 0
+        for ($t = 0; $t -lt $numTables; $t++) {
+            $rec = 12 + $t * 16
+            $tag = [System.Text.Encoding]::ASCII.GetString($bytes, $rec, 4)
+            if ($tag -eq 'cmap') {
+                $cmapOffset = [int]$bytes[$rec + 8] * 16777216 + [int]$bytes[$rec + 9] * 65536 + [int]$bytes[$rec + 10] * 256 + [int]$bytes[$rec + 11]
+                break
+            }
+        }
+        if ($cmapOffset -eq 0) { return $found }
+        $subTables = [int]$bytes[$cmapOffset + 2] * 256 + [int]$bytes[$cmapOffset + 3]
+        for ($s = 0; $s -lt $subTables; $s++) {
+            $rec = $cmapOffset + 4 + $s * 8
+            $sub = $cmapOffset + ([int]$bytes[$rec + 4] * 16777216 + [int]$bytes[$rec + 5] * 65536 + [int]$bytes[$rec + 6] * 256 + [int]$bytes[$rec + 7])
+            $format = [int]$bytes[$sub] * 256 + [int]$bytes[$sub + 1]
+            if ($format -ne 4) { continue }
+            $segCount = ([int]$bytes[$sub + 6] * 256 + [int]$bytes[$sub + 7]) / 2
+            $endBase = $sub + 14
+            $startBase = $endBase + $segCount * 2 + 2
+            for ($g = 0; $g -lt $segCount; $g++) {
+                $end = [int]$bytes[$endBase + $g * 2] * 256 + [int]$bytes[$endBase + $g * 2 + 1]
+                $start = [int]$bytes[$startBase + $g * 2] * 256 + [int]$bytes[$startBase + $g * 2 + 1]
+                if ($start -eq 0xFFFF) { continue }
+                for ($c = $start; $c -le $end; $c++) { $found[$c] = $true }
+            }
+        }
+        return $found
+    }
+    $codepoints = Get-CmapCodepoints $font
+    foreach ($cp in $requiredGlyphs.Keys) {
+        $value = [Convert]::ToInt32($cp.Substring(2), 16)
+        if (-not $codepoints.ContainsKey($value)) {
+            $missing += "$cp ($($requiredGlyphs[$cp]))"
+        }
+    }
+    if ($missing.Count -gt 0) {
+        throw "MaterialIcons-Regular.otf 里没有这些字形，界面上的图标会是空白的:`n      " + ($missing -join "`n      ") + "`n      多半是 assets 步骤没重跑（`flutter build` 是增量的）。本脚本默认会 touch pubspec.yaml 强制它重跑。"
+    }
+    Write-Host "    MaterialIcons-Regular.otf $($font.Length) B，必备字形 $($requiredGlyphs.Count)/$($requiredGlyphs.Count) 命中"
 }
 finally { $archive.Dispose() }
 

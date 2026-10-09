@@ -248,27 +248,35 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _body(context, l10n, foreground),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  outgoing ? Icons.north_east : Icons.south_west,
-                  size: 12,
-                  color: foreground,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  [
-                    labelForKind(view.kind, l10n),
-                    labelForState(view.state, l10n),
-                  ].join(' · '),
-                  style: theme.textTheme.labelSmall?.copyWith(
+            // A conversation is not a transfer: for a text message the
+            // "kind · state" line would read "text · completed", which is
+            // transfer bookkeeping the user has no use for — a chat bubble
+            // says what it says, and its direction is already the side of the
+            // pane it sits on. A file keeps the line, because there it is the
+            // receipt the user reads.
+            if (view.kind != PayloadKind.text) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    outgoing ? Icons.north_east : Icons.south_west,
+                    size: 12,
                     color: foreground,
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 4),
+                  Text(
+                    [
+                      labelForKind(view.kind, l10n),
+                      labelForState(view.state, l10n),
+                    ].join(' · '),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: foreground,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (!view.state.isSettled)
               Padding(
                 padding: const EdgeInsets.only(top: 6),

@@ -318,7 +318,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connect => 'Connect';
 
   @override
-  String get transfersEmptyHint => 'Nothing has been sent or received yet.';
+  String get transfersEmptyHint =>
+      'No files have been transferred yet. Text messages live in their conversations, not here.';
 
   @override
   String transferTo(String peer) {
@@ -376,7 +377,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clipboardNeedsGroup =>
-      'Clipboard sync happens inside an Owner Group, and this Device is not in one yet. Pairing is on the Devices surface.';
+      'Clipboard sync happens inside an Owner Group, and this Device is not in one yet.';
+
+  @override
+  String get clipboardPeersHeader => 'Devices that may share the clipboard';
+
+  @override
+  String get clipboardPeersHint =>
+      'Only the devices ticked below receive what this Device copies, and only their entries are applied here.';
+
+  @override
+  String get clipboardPeersEmpty =>
+      'No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.';
 
   @override
   String get clipboardNoteBoth =>
