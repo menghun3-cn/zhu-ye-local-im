@@ -28,10 +28,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
   // The title bar. Spelled as escapes rather than as the characters themselves
-  // on purpose: how this file is encoded is whatever the toolchain on this
-  // machine decides it is, and the product's own name — "Zhuye LAN Transfer" —
-  // is not worth discovering that the hard way. `\u7af9\u53f6` is zhuye, the
-  // rest is "LAN transfer".
+  // on purpose, and ASCII-only: this file's encoding is whatever the toolchain
+  // on this machine assumes it is, and a non-ASCII byte in it is warning C4819
+  // (the file cannot be read in code page 936) -- which the runner's own build
+  // promotes to a hard error. So the title itself is escaped below, and nothing
+  // here is written in the characters it names.
+  // `\u7af9\u53f6` is zhuye, the rest is "LAN transfer".
   if (!window.Create(L"\u7af9\u53f6\u5c40\u57df\u7f51\u4f20\u8f93", origin,
                      size)) {
     return EXIT_FAILURE;
