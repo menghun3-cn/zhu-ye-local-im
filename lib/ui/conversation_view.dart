@@ -826,6 +826,12 @@ class _AttachmentChip extends StatelessWidget {
 /// the pair mirrored for what the user sent. The avatar is not decoration: it
 /// is what lets the bubble's tail read as pointing at somebody, and it is how
 /// two consecutive messages from different Devices stay tellable apart.
+///
+/// A picture this machine holds is the one message with no bubble: it is drawn
+/// as itself, in the space the bubble would have occupied. Everything else —
+/// including a picture whose bytes are not here yet — is a bubble, because
+/// everything else has something to say *beside* the content: a name, a
+/// progress bar, a decision.
 class MessageBubble extends StatelessWidget {
   /// Draws [view].
   const MessageBubble({
@@ -889,16 +895,23 @@ class MessageBubble extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                // A right-click on a bubble is where "show me that file" lives,
-                // and it is offered by the same widget the Transfers list uses
-                // so the two surfaces cannot drift apart.
+                // A right-click on a message is where "show me that file" and
+                // "copy that picture" live, and they are offered by the same
+                // widget the Transfers list uses so the two surfaces cannot
+                // drift apart.
                 TransferContextMenu(
                   view: view,
-                  child: MessageBubbleShape(
-                    colour: background,
-                    outgoing: outgoing,
-                    child: _contents(context, l10n),
-                  ),
+                  // The bubble is skipped only for a picture this machine
+                  // holds. See [_drawsBareImage]: a picture with no bytes here
+                  // yet keeps the bubble, because the progress bar and the two
+                  // answers need somewhere to be.
+                  child: _drawsBareImage
+                      ? _bareImage(context)
+                      : MessageBubbleShape(
+                          colour: background,
+                          outgoing: outgoing,
+                          child: _contents(context, l10n),
+                        ),
                 ),
                 // A conversation is not a transfer: for a message that *is* its
                 // own content the "kind · state" line would read
@@ -936,6 +949,61 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Whether this message is a picture whose bytes are on this machine, and is
+  /// therefore drawn without a bubble.
+  ///
+  /// The whole of the difference between a picture and every other message: a
+  /// path is the picture itself, and a picture is its own content the way a
+  /// text is. A name plus a progress bar is what everything *without* a path
+  /// has to show instead, and that is a transfer's business — which is what a
+  /// bubble looks like.
+  bool get _drawsBareImage =>
+      view.kind == PayloadKind.image && view.localPath != null;
+
+  /// A picture that is here, drawn as a picture.
+  ///
+  /// Nothing surrounds it: no fill, no padding, no tail. What is left is what
+  /// WeChat leaves — a rounded thumbnail on the side the message came from,
+  /// with the avatar beside it and a click into the full-size view.
+  ///
+  /// The progress bar below it belongs to a *send*: an incoming picture has a
+  /// path only once its bytes have landed, so there is nothing left to report
+  /// by the time this is drawn. It is bounded by the thumbnail's own bound, so
+  /// that a bar drawn under a wide screenshot cannot outrun the picture it is
+  /// a bar for.
+  Widget _bareImage(BuildContext context) {
+    // Non-null by [_drawsBareImage], which is what decides this is called.
+    final path = view.localPath!;
+    final name = view.names.isEmpty ? '' : view.names.first;
+    final outgoing = view.direction == TransferDirection.outgoing;
+    return Column(
+      crossAxisAlignment: outgoing
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ImageBubble(
+          path: path,
+          name: name,
+          onOpen: () =>
+              unawaited(showImagePreview(context, path: path, name: name)),
+        ),
+        if (!view.state.isSettled)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: WeChat.imageMaxSide),
+              child: LinearProgressIndicator(
+                value: view.fraction,
+                minHeight: 3,
+                backgroundColor: Colors.black12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   /// Everything inside the bubble: the message, its progress, and the answers
   /// an offer needs.
   Widget _contents(BuildContext context, AppLocalizations l10n) {
@@ -943,7 +1011,7 @@ class MessageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _body(context, l10n),
+        _body(l10n),
         if (!view.state.isSettled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -991,9 +1059,12 @@ class MessageBubble extends StatelessWidget {
   /// bookkeeping to show.
   bool get _showsReceipt => view.kind == PayloadKind.file;
 
-  /// What the message actually says: its words, an image, or the files it
-  /// carries.
-  Widget _body(BuildContext context, AppLocalizations l10n) {
+  /// What the message actually says: its words, or the files it carries.
+  ///
+  /// A picture never arrives here. One this machine holds is drawn by
+  /// [_bareImage], outside the bubble this is the inside of, and one it does
+  /// not hold is a name and a progress bar, which is [_image].
+  Widget _body(AppLocalizations l10n) {
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
       return SelectableText(
@@ -1005,7 +1076,7 @@ class MessageBubble extends StatelessWidget {
         ),
       );
     }
-    if (view.kind == PayloadKind.image) return _image(context);
+    if (view.kind == PayloadKind.image) return _image();
     final lines = <Widget>[
       for (final name in view.names)
         Row(
@@ -1047,44 +1118,40 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  /// An image message: the picture, or the promise of one.
+  /// A picture message whose bytes are not here yet.
   ///
-  /// Three states, and each has to be told apart from the others because
-  /// "no picture" is not the same as "not here yet":
+  /// One state, and it is a state rather than an instant: an image is filed on
+  /// arrival wherever this Device saves received files, so an image with no
+  /// path is either on the wire, or waiting for the user to say where it should
+  /// go — and in the second case the two answers are drawn below this, inside
+  /// the same bubble.
   ///
-  /// * no path — the bytes are on their way (or the offer has not been
-  ///   answered), so the bubble shows the file's name exactly as a file message
-  ///   would, and the progress bar below it says how long that will take;
-  /// * a path — the picture;
-  /// * a path that no longer reads — [ImageBubble] draws its own fallback.
-  Widget _image(BuildContext context) {
-    final path = view.localPath;
-    if (path == null) {
-      final name = view.names.isEmpty ? '' : view.names.first;
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.image_outlined, size: 18, color: WeChat.bubbleText),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: WeChat.fontSizeBody,
-                color: WeChat.bubbleText,
-              ),
+  /// A name beside a picture glyph is all that can honestly be drawn for
+  /// either: it is the same thing a file message draws, because at this point
+  /// the two *are* the same thing — a transfer with a name — and the progress
+  /// bar underneath says how long that will take.
+  ///
+  /// A path that no longer reads is not a third case: that is a picture whose
+  /// bytes are here, drawn by [_bareImage], and [ImageBubble] falls back to the
+  /// name itself when the decode fails.
+  Widget _image() {
+    final name = view.names.isEmpty ? '' : view.names.first;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.image_outlined, size: 18, color: WeChat.bubbleText),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: WeChat.fontSizeBody,
+              color: WeChat.bubbleText,
             ),
           ),
-        ],
-      );
-    }
-    final name = view.names.isEmpty ? '' : view.names.first;
-    return ImageBubble(
-      path: path,
-      name: name,
-      onOpen: () =>
-          unawaited(showImagePreview(context, path: path, name: name)),
+        ),
+      ],
     );
   }
 }

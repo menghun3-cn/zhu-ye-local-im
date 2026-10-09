@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:pasteboard/pasteboard.dart';
@@ -22,6 +23,18 @@ abstract interface class ClipboardPaste {
   /// Encoded, not decoded: what the bytes *are* is decided by the bytes, and
   /// that is `imageExtensionOf`'s job, not this one's.
   Future<Uint8List?> image();
+
+  /// Replaces the clipboard with the picture encoded in [bytes], and answers
+  /// whether it managed to.
+  ///
+  /// The same plugin, the other direction — and the direction the platforms
+  /// disagree about most. A `bool` rather than a thrown failure because a
+  /// clipboard this platform will not let the app write is an ordinary
+  /// condition and not an error: Android denies the write while the app is in
+  /// the background, and a platform the plugin has no implementation for
+  /// answers nothing at all. Both have to reach the user as "it did not
+  /// happen" rather than as a stack trace or, worse, as silence.
+  Future<bool> writeImage(Uint8List bytes);
 }
 
 /// The real clipboard, through the platform plugin.
@@ -48,6 +61,29 @@ final class SystemClipboardPaste implements ClipboardPaste {
       return await Pasteboard.image;
     } on Object {
       return null;
+    }
+  }
+
+  @override
+  Future<bool> writeImage(Uint8List bytes) async {
+    // The platforms this app ships to, and no others. On Windows the plugin
+    // writes the bytes to a scratch file and lets GDI+ decode it — verified
+    // for a name with no extension, which is what it uses — and sets the
+    // result as `CF_BITMAP`; on the others the channel call does the same job
+    // natively. A platform outside the four falls through the plugin as a
+    // silent no-op, and a no-op that reports success would put "copied" on
+    // screen for a clipboard nothing happened to.
+    final supported =
+        Platform.isWindows ||
+        Platform.isAndroid ||
+        Platform.isIOS ||
+        Platform.isMacOS;
+    if (!supported) return false;
+    try {
+      await Pasteboard.writeImage(bytes);
+      return true;
+    } on Object {
+      return false;
     }
   }
 }
