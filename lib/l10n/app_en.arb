@@ -262,5 +262,10 @@
   "folderHelper": "Created if it does not exist",
   "folderRequired": "A folder is needed: a name from the peer must not be allowed to choose one.",
   "folderNote": "A name that arrives with the Transfer is untrusted: it can name a file inside this folder and nothing else.",
-  "acceptIntoFolder": "Accept into this folder"
+  "acceptIntoFolder": "Accept into this folder",
+  "browseFolder": "Choose a folder…",
+  "chooseFolderTitle": "Choose where files are saved",
+  "changeIncomingFolder": "Change…",
+  "incomingFolderHint": "Received files are saved here by default. You can still pick another folder for each one.",
+  "incomingFolderUnset": "You are asked where to save each file as it arrives."
 }

@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 
 import '../app/app.dart';
 import '../core/core.dart';
+import 'clipboard_paste.dart';
 import 'controller_scope.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
+import 'pasted_image.dart';
 import 'pickers.dart';
 import 'transfer_actions.dart';
 import 'wechat/bubble.dart';
@@ -120,12 +122,50 @@ class _ConversationViewState extends State<ConversationView> {
     await _sendPaths(controller, [chosen.path]);
   }
 
+  /// Sends whatever the clipboard is holding, and says whether it sent
+  /// anything.
+  ///
+  /// Files first, then a picture. Text is deliberately **not** this method's
+  /// business: a plain text clipboard is what Ctrl+V already means, and
+  /// answering it here would take the ordinary paste away from the field. The
+  /// bool is what lets the composer fall through to it.
+  ///
+  /// Copying a file in Explorer puts it on the clipboard as a *file*, not as
+  /// its contents, and a screenshot arrives as an image with no name at all —
+  /// so the picture is written to a temporary file the engine can stream from,
+  /// which is the only shape a Transfer understands.
+  Future<bool> _pasteIntoComposer(LocalTransferController controller) async {
+    // Without a peer there is nowhere to send to, so this is an ordinary text
+    // paste after all.
+    if (_peerOf(controller) == null) return false;
+
+    final clipboard = PasteResolution.paste;
+
+    final paths = await clipboard.files();
+    if (!mounted) return false;
+    if (paths.isNotEmpty && await _sendPaths(controller, paths) > 0) {
+      return true;
+    }
+
+    final bytes = await clipboard.image();
+    if (!mounted || bytes == null) return false;
+    final image = await writePastedImage(bytes);
+    if (!mounted || image == null) return false;
+    return await _sendPaths(controller, [image.path]) > 0;
+  }
+
   /// Sends each of [paths] as its own message, pictures as pictures.
-  Future<void> _sendPaths(
+  ///
+  /// Returns how many messages it sent, which is what tells a paste whether the
+  /// clipboard held anything this app could carry: a folder arrives as a path
+  /// with nothing behind it, and classifying it out is not the same as having
+  /// sent it.
+  Future<int> _sendPaths(
     LocalTransferController controller,
     List<String> paths,
   ) async {
     final drop = classifyDrop(paths);
+    if (drop.images.isEmpty && drop.files.isEmpty) return 0;
     await guarded(context, () async {
       for (final image in drop.images) {
         await controller.sendImage(image, to: widget.peer);
@@ -134,6 +174,7 @@ class _ConversationViewState extends State<ConversationView> {
         await controller.sendFile(file, to: widget.peer);
       }
     });
+    return drop.images.length + drop.files.length;
   }
 
   /// The frame drawn over the history while a drag is in progress.
@@ -241,6 +282,7 @@ class _ConversationViewState extends State<ConversationView> {
         ConversationComposer(
           message: _message,
           onSend: () => _sendMessage(controller),
+          onPaste: () => _pasteIntoComposer(controller),
           onAttach: canSend ? () => unawaited(_pickAndSend(controller)) : null,
           onPickImage: canSend
               ? () => unawaited(_pickAndSendImage(controller))
@@ -269,6 +311,7 @@ class ConversationComposer extends StatefulWidget {
     super.key,
     required this.message,
     required this.onSend,
+    required this.onPaste,
     required this.onAttach,
     this.onPickImage,
   });
@@ -278,6 +321,10 @@ class ConversationComposer extends StatefulWidget {
 
   /// Sends what is in [message].
   final VoidCallback onSend;
+
+  /// Sends whatever the clipboard is holding, and answers false when it held
+  /// no file and no picture — which is the signal to paste text as usual.
+  final Future<bool> Function() onPaste;
 
   /// Null when the peer is no longer known well enough to send to it.
   final VoidCallback? onAttach;
@@ -365,6 +412,7 @@ class _ConversationComposerState extends State<ConversationComposer> {
                       focusNode: _focus,
                       hint: l10n.messageHint,
                       onSend: _send,
+                      onPaste: widget.onPaste,
                     ),
                   ),
                 ),
@@ -397,12 +445,59 @@ class _ComposerField extends StatelessWidget {
     required this.focusNode,
     required this.hint,
     required this.onSend,
+    required this.onPaste,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final String hint;
   final VoidCallback onSend;
+  final Future<bool> Function() onPaste;
+
+  /// Offers the clipboard to the conversation before the field takes it.
+  ///
+  /// Answering the chord means the field's own paste never runs, so the
+  /// ordinary case has to be reproduced by hand: [onPaste] reports whether it
+  /// sent a file or a picture, and if it did not, this is a text paste after
+  /// all and [_pasteText] does what the field would have done.
+  Future<void> _paste() async {
+    if (await onPaste()) return;
+    await _pasteText();
+  }
+
+  /// The paste [TextField] would have performed, done here because intercepting
+  /// Ctrl+V stopped it from ever happening.
+  ///
+  /// Copies [TextField]'s own rule — the selection is replaced, and the caret
+  /// lands after what was inserted — rather than appending, so that pasting
+  /// over a selection behaves the way it does everywhere else on the desktop.
+  Future<void> _pasteText() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null || text.isEmpty) return;
+    final value = controller.value;
+    final selection = value.selection;
+    if (!selection.isValid) {
+      // Never focused, so there is no selection to replace: the text goes on
+      // the end, which is what the field does with a caret it does not have.
+      controller.value = TextEditingValue(
+        text: value.text + text,
+        selection: TextSelection.collapsed(
+          offset: value.text.length + text.length,
+        ),
+      );
+      return;
+    }
+    final replaced = value.text.replaceRange(
+      selection.start,
+      selection.end,
+      text,
+    );
+    controller.value = TextEditingValue(
+      text: replaced,
+      selection: TextSelection.collapsed(offset: selection.start + text.length),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -412,12 +507,28 @@ class _ComposerField extends StatelessWidget {
         // The same intent under the numpad's key, which is a distinct
         // logical key and would otherwise do nothing on a full-size keyboard.
         SingleActivator(LogicalKeyboardKey.numpadEnter): SendMessageIntent(),
+        // Paste, claimed so that a file or a picture on the clipboard can
+        // become a message. Both chords: a desktop has one and a Mac the other,
+        // and this is the same one line either way.
+        SingleActivator(LogicalKeyboardKey.keyV, control: true):
+            PasteIntoComposerIntent(),
+        SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+            PasteIntoComposerIntent(),
       },
       child: Actions(
         actions: {
           SendMessageIntent: CallbackAction<SendMessageIntent>(
             onInvoke: (_) {
               onSend();
+              return null;
+            },
+          ),
+          PasteIntoComposerIntent: CallbackAction<PasteIntoComposerIntent>(
+            onInvoke: (_) {
+              // The clipboard is read asynchronously but a key handler has to
+              // answer now: claiming the chord is what stops the field from
+              // pasting text underneath us, and the fallback runs afterwards.
+              unawaited(_paste());
               return null;
             },
           ),
@@ -458,6 +569,16 @@ class _ComposerField extends StatelessWidget {
 class SendMessageIntent extends Intent {
   /// Const so the intent can live in a `const` shortcut table.
   const SendMessageIntent();
+}
+
+/// What Ctrl+V in the composer means.
+///
+/// Its own intent rather than the framework's `PasteTextIntent`, because this
+/// one is answered by the conversation: the clipboard may be holding a file or
+/// a screenshot, and those are messages rather than text.
+class PasteIntoComposerIntent extends Intent {
+  /// Const so the intent can live in a `const` shortcut table.
+  const PasteIntoComposerIntent();
 }
 
 /// The composer's send button: a flat green pill, as the desktop client has.

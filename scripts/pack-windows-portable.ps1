@@ -85,7 +85,14 @@ $newProbes = @(
     '还没有传输过文件。文字内容在对话里，不在这里显示。',
     # 同一轮的微信 UI 对齐：拖放提示与发图入口。
     '松手即发送',
-    '发送图片'
+    '发送图片',
+    # 2026-10-09 第二轮：接收目录可选，以及输入框可粘贴文件/图片。
+    # 目录那一组是「设置里能挑文件夹」的独有文案；粘贴那一组不产生新文案
+    # （它复用既有的「发送文件」「发送图片」），所以没有可加的探针。
+    '选择保存位置',
+    '选择文件夹…',
+    '以后收到的文件默认保存在这里；每次接收时仍然可以另选一个文件夹。',
+    '每次接收时都会问你保存在哪里。'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -96,6 +103,8 @@ $newProbes = @(
 # 0xe2c3 = Icons.forum（对话入口选中态）
 # 0xe0b1 = Icons.attach_file（会话附加文件）
 # 0xf120 = Icons.image_outlined（会话「发送图片」按钮，2026-10-09 微信对齐那一轮加的）
+# 0xf090 = Icons.folder_open_outlined（设置页「更改…」与文件夹对话框的「选择文件夹…」，
+#          2026-10-09 第二轮加的就地选择器）
 #
 # 0xe571 = Icons.send 曾经在这里，微信对齐那轮把它**删掉了**：发送控件从
 # IconButton 换成了写「发送」二字的 TextButton（见 conversation_view.dart 的
@@ -106,6 +115,7 @@ $requiredGlyphs = @{
     '0xe2c3' = 'Icons.forum'
     '0xe0b1' = 'Icons.attach_file'
     '0xf120' = 'Icons.image_outlined'
+    '0xf090' = 'Icons.folder_open_outlined'
 }
 
 function Step($m) { Write-Host "==> $m" }

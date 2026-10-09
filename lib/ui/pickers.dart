@@ -35,6 +35,14 @@ abstract interface class FilePicker {
 
   /// Asks for one image to send. Null when the user cancelled.
   Future<XFile?> image();
+
+  /// Asks for a folder to keep things in. Null when the user cancelled.
+  ///
+  /// The same seam as the two above, and for the same reason: this is the OS's
+  /// own folder chooser, and a dialog that runs outside Flutter never returns
+  /// to a `testWidgets` body. A destination a user can only *type* is a
+  /// destination most users cannot set at all.
+  Future<String?> directory();
 }
 
 /// The real picker: the operating system's own dialogs.
@@ -51,6 +59,9 @@ final class SystemPicker implements FilePicker {
       XTypeGroup(label: '图片', extensions: imageExtensions),
     ],
   );
+
+  @override
+  Future<String?> directory() => getDirectoryPath(confirmButtonText: '选择');
 }
 
 /// Which picker the composer uses.
