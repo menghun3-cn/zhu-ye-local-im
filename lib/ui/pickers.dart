@@ -91,6 +91,22 @@ bool looksLikeImage(String path) {
   return imageExtensions.contains(extension);
 }
 
+/// One path that names a real file, and whether this app draws it as a picture.
+typedef ClassifiedPath = ({File file, bool isImage});
+
+/// The paths that name a real file, in the order they were handed in.
+///
+/// A folder has a path but no bytes; sending one would produce an offer whose
+/// item is zero bytes long under a name that looks like a file. `File.existsSync`
+/// is false for a directory, so one check covers both. The order is kept
+/// because it is the order the user chose, and a message is read in the order
+/// it was composed.
+List<ClassifiedPath> classifyPaths(List<String> paths) => [
+  for (final path in paths)
+    if (File(path).existsSync())
+      (file: File(path), isImage: looksLikeImage(path)),
+];
+
 /// The result of a drop, as the two things a dropped path can mean.
 ///
 /// Returned rather than acted on so that the widget layer keeps the deciding:
@@ -99,13 +115,8 @@ bool looksLikeImage(String path) {
 ({List<File> images, List<File> files}) classifyDrop(List<String> paths) {
   final images = <File>[];
   final files = <File>[];
-  for (final path in paths) {
-    final file = File(path);
-    // A dropped folder has a path but no bytes; sending it would produce an
-    // offer whose item is zero bytes long under a name that looks like a file.
-    // `File.existsSync` is false for a directory, so one check covers both.
-    if (!file.existsSync()) continue;
-    (looksLikeImage(path) ? images : files).add(file);
+  for (final entry in classifyPaths(paths)) {
+    (entry.isImage ? images : files).add(entry.file);
   }
   return (images: images, files: files);
 }

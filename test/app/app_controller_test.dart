@@ -409,6 +409,48 @@ void main() {
       expect(written.readAsBytesSync(), bytes);
     });
 
+    test('a received picture keeps a path worth drawing', () async {
+      // The conversation draws an image message from `localPath`, and an image
+      // arrives in two halves: the offer first (no bytes, nothing to draw) and
+      // the bytes only once the user has answered. This is the join between
+      // them — a landed picture that no longer had a path would be a bubble
+      // showing a file name for the rest of the conversation's life.
+      final home = tempDirectory('local-transfer-picture-out-');
+      final source = File('${home.path}${Platform.pathSeparator}photo.png');
+      final bytes = Uint8List.fromList(
+        List<int>.generate(64, (index) => (index * 5) % 256),
+      );
+      source.writeAsBytesSync(bytes);
+
+      await alice.controller.sendImage(source);
+
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the picture',
+      );
+      final offer = bob.offers.single;
+      expect(offer.kind, PayloadKind.image);
+      expect(
+        bob.controller.transfers.single.localPath,
+        isNull,
+        reason: 'the bytes have not arrived, so there is nothing to draw yet',
+      );
+
+      final incoming = tempDirectory('local-transfer-picture-in-');
+      await bob.controller.acceptInto(offer, incoming);
+      await until(
+        () => offer.state == TransferState.completed,
+        description: 'the picture to land',
+      );
+
+      final landed = bob.controller.transfers.single.localPath;
+      expect(landed, isNotNull, reason: 'the receiver now has a picture');
+      expect(File(landed!).readAsBytesSync(), bytes);
+      // And the sender's own bubble points at the file it was asked to send,
+      // which is what makes both sides of the conversation draw the same thing.
+      expect(alice.controller.transfers.single.localPath, source.path);
+    });
+
     test('a refused offer is reported to the sender', () async {
       // A file, because it is the kind that still waits: text is accepted on
       // arrival and so can never be refused.

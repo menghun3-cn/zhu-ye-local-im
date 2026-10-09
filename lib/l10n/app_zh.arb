@@ -162,6 +162,7 @@
   "conversationEmpty": "还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。",
   "messageHint": "输入要发送的文字",
   "send": "发送",
+  "removeAttachment": "移除",
   "tabConversation": "对话",
   "conversationListEmpty": "还没有对话。只要扫描到设备，它就会自动出现在这里，可以直接连接。",
   "conversationPickOne": "从左边选一个对话，或者先连接一台设备。",
