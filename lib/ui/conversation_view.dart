@@ -243,7 +243,7 @@ class _ConversationViewState extends State<ConversationView> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: WeChat.bubbleIn,
+            color: WeChat.surface,
             borderRadius: BorderRadius.circular(WeChat.bubbleRadius),
             border: Border.all(color: WeChat.brand, width: 1.5),
           ),
@@ -308,23 +308,30 @@ class _ConversationViewState extends State<ConversationView> {
       children: [
         if (widget.header != null) widget.header!,
         Expanded(
-          child: DropTarget(
-            // Only registered when there is a peer: a target that accepted a
-            // drop it could not send would swallow the file silently.
-            enable: canSend,
-            onDragEntered: (_) => setState(() => _dropping = true),
-            onDragExited: (_) => setState(() => _dropping = false),
-            onDragDone: (detail) {
-              setState(() => _dropping = false);
-              unawaited(
-                _sendDropped([for (final file in detail.files) file.path]),
-              );
-            },
-            child: Stack(
-              children: [
-                Positioned.fill(child: history),
-                if (_dropping) _dropOverlay(),
-              ],
+          // The history is a white board with a grey bubble on it for anything
+          // received: the WeChat conversation inverted, which is what the two
+          // fills trading places means. The header and the composer keep their
+          // own greys, so only this pane moves.
+          child: ColoredBox(
+            color: WeChat.conversationBackground,
+            child: DropTarget(
+              // Only registered when there is a peer: a target that accepted a
+              // drop it could not send would swallow the file silently.
+              enable: canSend,
+              onDragEntered: (_) => setState(() => _dropping = true),
+              onDragExited: (_) => setState(() => _dropping = false),
+              onDragDone: (detail) {
+                setState(() => _dropping = false);
+                unawaited(
+                  _sendDropped([for (final file in detail.files) file.path]),
+                );
+              },
+              child: Stack(
+                children: [
+                  Positioned.fill(child: history),
+                  if (_dropping) _dropOverlay(),
+                ],
+              ),
             ),
           ),
         ),
@@ -497,7 +504,7 @@ class _ConversationComposerState extends State<ConversationComposer> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: WeChat.bubbleIn,
+                      color: WeChat.surface,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: _ComposerField(
@@ -763,7 +770,7 @@ class _AttachmentChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.only(left: 8, right: 2, top: 2, bottom: 2),
       decoration: BoxDecoration(
-        color: WeChat.bubbleIn,
+        color: WeChat.surface,
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: WeChat.divider),
       ),
