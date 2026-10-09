@@ -142,6 +142,97 @@ void main() {
       });
     });
 
+    group('the clipboard-sharing whitelist', () {
+      test('starts empty, so pairing a Device shares nothing', () {
+        // Separate from the group on purpose: joining an Owner Group is about
+        // holding a Session, and says nothing about reading this clipboard.
+        final self = _fp('a');
+        final member = _fp('b');
+        final profile = DeviceProfile(
+          self: self,
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+          group: OwnerGroup(self: self, members: [member]),
+        );
+        expect(profile.group.contains(member), isTrue);
+        expect(profile.clipboardPeers, isEmpty);
+        expect(profile.isClipboardPeer(member), isFalse);
+      });
+
+      test('adding and removing a peer is reflected in isClipboardPeer', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        final peer = _fp('b');
+        profile.setClipboardPeer(peer, value: true);
+        expect(profile.isClipboardPeer(peer), isTrue);
+        expect(profile.clipboardPeers, [peer]);
+        profile.setClipboardPeer(peer, value: false);
+        expect(profile.isClipboardPeer(peer), isFalse);
+        expect(profile.clipboardPeers, isEmpty);
+      });
+
+      test('adding the same peer twice cannot create duplicates', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setClipboardPeer(_fp('b'), value: true);
+        profile.setClipboardPeer(_fp('b'), value: true);
+        expect(profile.clipboardPeers, hasLength(1));
+      });
+
+      test('self can never be on its own whitelist', () {
+        final self = _fp('a');
+        final profile = DeviceProfile(
+          self: self,
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setClipboardPeer(self, value: true);
+        expect(profile.isClipboardPeer(self), isFalse);
+      });
+
+      test('the list survives a JSON round trip', () {
+        final self = _fp('a');
+        final profile = DeviceProfile(
+          self: self,
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+          clipboardPeers: {_fp('b'), _fp('c')},
+        );
+        final restored = DeviceProfile.fromJson(profile.toJson());
+        expect(restored.clipboardPeers, profile.clipboardPeers);
+        expect(restored.clipboardPeers, hasLength(2));
+      });
+
+      test('a profile JSON missing the list decodes to an empty one', () {
+        // Saved by a build that predates the whitelist: the safe reading is
+        // "nothing is shared", never "everything is".
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.clipboardPeers, isEmpty);
+      });
+
+      test('a non-string entry in the list is rejected, not ignored', () {
+        expect(
+          () => DeviceProfile.fromJson({
+            'self': _fp('a').hex,
+            'alias': 'Desk',
+            'platform': 'windows',
+            'clipboardPeers': [42],
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      });
+    });
+
     test('canMirrorTo follows group membership, not favorites', () {
       final self = _fp('a');
       final member = _fp('b');
@@ -167,6 +258,7 @@ void main() {
         platform: DevicePlatform.windows,
         group: OwnerGroup(self: self, members: [member]),
         favorites: {favourite},
+        clipboardPeers: {_fp('e')},
         known: {
           _fp('d').hex: KnownDevice(
             fingerprint: _fp('d'),
@@ -183,6 +275,7 @@ void main() {
       expect(restored.platform, DevicePlatform.windows);
       expect(restored.group, profile.group);
       expect(restored.favorites, [favourite]);
+      expect(restored.clipboardPeers, [_fp('e')]);
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);
       expect(known!.alias, 'Phone');

@@ -119,6 +119,12 @@ final class KnownDevice {
 ///   all. On by default, because a Device that cannot be paired *with* is a
 ///   Device the user of the other one cannot add; off is what a user who does
 ///   not want to be asked wants;
+/// * `clipboardPeers` — the peers the user has added to the clipboard-sharing
+///   whitelist. Deliberately **empty by default**: group membership says a
+///   Device may hold a Session, and says nothing about whether it may read
+///   this clipboard. Until the user ticks a peer on the Clipboard surface,
+///   nothing is mirrored in either direction (see the sharing-whitelist gate
+///   in `ClipboardMirror`, the fourth of its four);
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -132,12 +138,15 @@ final class DeviceProfile {
     required this.platform,
     OwnerGroup? group,
     Set<Fingerprint> favorites = const {},
+    Set<Fingerprint> clipboardPeers = const {},
     Map<String, KnownDevice> known = const {},
     this.acceptsPairingRequests = true,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
          ..removeWhere((favourite) => favourite == self),
+       _clipboardPeers = {...clipboardPeers}
+         ..removeWhere((peer) => peer == self),
        _known = {...known}
          ..removeWhere((_, device) => device.fingerprint == self);
 
@@ -166,6 +175,7 @@ final class DeviceProfile {
   bool acceptsPairingRequests;
 
   final Set<Fingerprint> _favorites;
+  final Set<Fingerprint> _clipboardPeers;
   final Map<String, KnownDevice> _known;
 
   /// The Fingerprints marked as favorites, sorted.
@@ -189,6 +199,27 @@ final class DeviceProfile {
 
   /// Whether [fingerprint] may receive a Mirror without user action.
   bool canMirrorTo(Fingerprint fingerprint) => group.contains(fingerprint);
+
+  /// The Fingerprints allowed to share the clipboard with this Device, sorted.
+  List<Fingerprint> get clipboardPeers => _clipboardPeers.toList()..sort();
+
+  /// Whether [fingerprint] is on the clipboard-sharing whitelist.
+  bool isClipboardPeer(Fingerprint fingerprint) =>
+      _clipboardPeers.contains(fingerprint);
+
+  /// Sets whether [fingerprint] may share the clipboard with this Device.
+  ///
+  /// Adding [self] is a no-op: the whitelist decides which *peers* this
+  /// Device exchanges clipboard entries with, and this Device is not one of
+  /// its own peers.
+  void setClipboardPeer(Fingerprint fingerprint, {required bool value}) {
+    if (fingerprint == self) return;
+    if (value) {
+      _clipboardPeers.add(fingerprint);
+    } else {
+      _clipboardPeers.remove(fingerprint);
+    }
+  }
 
   /// Records or refreshes what is known about a peer.
   ///
@@ -216,12 +247,14 @@ final class DeviceProfile {
     'group': group.toJson(),
     'acceptPairingRequests': acceptsPairingRequests,
     'favorites': [for (final favorite in favorites) favorite.hex],
+    'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
     'known': [for (final device in knownDevices) device.toJson()],
   };
 
   static DeviceProfile fromJson(Map<String, Object?> json) {
     final rawGroup = json['group'];
     final rawFavorites = json['favorites'];
+    final rawClipboardPeers = json['clipboardPeers'];
     final rawKnown = json['known'];
     final rawAccepts = json['acceptPairingRequests'];
     final platform = DevicePlatform.fromWireName(_string(json, 'platform'));
@@ -238,6 +271,15 @@ final class DeviceProfile {
         favorites.add(Fingerprint(entry));
       }
     }
+    final clipboardPeers = <Fingerprint>{};
+    if (rawClipboardPeers is List) {
+      for (final entry in rawClipboardPeers) {
+        if (entry is! String) {
+          throw FormatException('"clipboardPeers[]" must be a string');
+        }
+        clipboardPeers.add(Fingerprint(entry));
+      }
+    }
     final known = <String, KnownDevice>{};
     if (rawKnown is List) {
       for (final entry in rawKnown) {
@@ -251,6 +293,7 @@ final class DeviceProfile {
       platform: platform,
       group: group,
       favorites: favorites,
+      clipboardPeers: clipboardPeers,
       known: known,
       // A profile written before this key existed answers requests: the
       // listener is the flow, and a Device that silently stopped being
@@ -263,6 +306,7 @@ final class DeviceProfile {
   String toString() =>
       'DeviceProfile(${self.short()}, "$alias", '
       '${group.length} group, ${_favorites.length} favorites, '
+      '${_clipboardPeers.length} clipboard peers, '
       '${_known.length} known, '
       '${acceptsPairingRequests ? 'answering requests' : 'not answering'})';
 

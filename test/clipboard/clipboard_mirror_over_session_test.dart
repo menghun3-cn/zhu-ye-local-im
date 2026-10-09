@@ -14,9 +14,15 @@ final class MirroringDevice {
     required this.hub,
     required OwnerGroup group,
     ClipboardMode mode = ClipboardMode.mirror,
+    Set<Fingerprint> allowedPeers = const {},
+    bool allowEveryoneInGroup = false,
   }) : clipboard = MemorySystemClipboard() {
     mirror = ClipboardMirror(
       group: group,
+      // See `MirrorFixture` for why the whitelist is spelled out rather than
+      // defaulted: the tests about the *other* gates ask for it explicitly, so
+      // a passing assertion cannot be an empty whitelist's doing.
+      allowedPeers: allowEveryoneInGroup ? group.members.toSet() : allowedPeers,
       capability: ClipboardCapability.forPlatform(device.platform),
       clipboard: clipboard,
       mode: mode,
@@ -48,6 +54,9 @@ Future<(MirroringDevice, MirroringDevice, HubPair)> connectedMirrors() async {
       self: pair.aliceDevice.fingerprint,
       members: [pair.bobDevice.fingerprint],
     ),
+    // Each side has added the other, which is what sharing requires: neither
+    // list is self-granting.
+    allowedPeers: {pair.bobDevice.fingerprint},
   );
   final bob = MirroringDevice(
     device: pair.bobDevice,
@@ -57,6 +66,7 @@ Future<(MirroringDevice, MirroringDevice, HubPair)> connectedMirrors() async {
       self: pair.bobDevice.fingerprint,
       members: [pair.aliceDevice.fingerprint],
     ),
+    allowedPeers: {pair.aliceDevice.fingerprint},
   );
   return (alice, bob, pair);
 }
@@ -86,15 +96,19 @@ void main() {
     test('carries a copy only to Devices in the Owner Group', () async {
       final pair = await connectedHubs();
       // Alice's mirror knows Bob's Session, but Bob is not in her group.
+      // Bob *is* on her whitelist, though, so what stops the copy is the
+      // group and not an empty list.
       final alice = MirroringDevice(
         device: pair.aliceDevice,
         peer: pair.aliceHub.peer,
         hub: pair.aliceHub,
         group: OwnerGroup(self: pair.aliceDevice.fingerprint),
+        allowedPeers: {pair.bobDevice.fingerprint},
       );
       final bobClipboard = MemorySystemClipboard();
       final bobMirror = ClipboardMirror(
         group: OwnerGroup(self: pair.bobDevice.fingerprint),
+        allowedPeers: {pair.aliceDevice.fingerprint},
         capability: ClipboardCapability.forPlatform(DevicePlatform.windows),
         clipboard: bobClipboard,
         mode: ClipboardMode.mirror,

@@ -386,6 +386,11 @@ class _ConversationComposerState extends State<ConversationComposer> {
 /// therefore given `maxLines: null` (so it still grows) and a [Shortcuts] layer
 /// that turns a bare Enter into [SendMessageIntent] while leaving Shift+Enter
 /// to fall through to the default newline insert.
+///
+/// [TextField.onSubmitted] is wired as well, and is not redundant: a physical
+/// Enter arrives as a key event (the [Shortcuts] path), but a soft keyboard's
+/// send key, a test's `TextInputAction.send`, and any platform that reports the
+/// action instead of the key arrive here. Both roads lead to the same [onSend].
 class _ComposerField extends StatelessWidget {
   const _ComposerField({
     required this.controller,
@@ -422,6 +427,11 @@ class _ComposerField extends StatelessWidget {
           focusNode: focusNode,
           minLines: 1,
           maxLines: 6,
+          // The action a soft keyboard's send key reports, and what a test
+          // drives with `TextInputAction.send`. A physical Enter never reaches
+          // this — it is answered by the [Shortcuts] layer above.
+          textInputAction: TextInputAction.send,
+          onSubmitted: (_) => onSend(),
           style: const TextStyle(
             fontSize: WeChat.fontSizeInput,
             color: WeChat.bubbleText,

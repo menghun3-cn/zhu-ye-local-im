@@ -617,7 +617,7 @@ abstract class AppLocalizations {
   /// No description provided for @transfersEmptyHint.
   ///
   /// In en, this message translates to:
-  /// **'Nothing has been sent or received yet.'**
+  /// **'No files have been transferred yet. Text messages live in their conversations, not here.'**
   String get transfersEmptyHint;
 
   /// No description provided for @transferTo.
@@ -701,8 +701,26 @@ abstract class AppLocalizations {
   /// No description provided for @clipboardNeedsGroup.
   ///
   /// In en, this message translates to:
-  /// **'Clipboard sync happens inside an Owner Group, and this Device is not in one yet. Pairing is on the Devices surface.'**
+  /// **'Clipboard sync happens inside an Owner Group, and this Device is not in one yet.'**
   String get clipboardNeedsGroup;
+
+  /// No description provided for @clipboardPeersHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices that may share the clipboard'**
+  String get clipboardPeersHeader;
+
+  /// No description provided for @clipboardPeersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the devices ticked below receive what this Device copies, and only their entries are applied here.'**
+  String get clipboardPeersHint;
+
+  /// No description provided for @clipboardPeersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.'**
+  String get clipboardPeersEmpty;
 
   /// No description provided for @clipboardNoteBoth.
   ///

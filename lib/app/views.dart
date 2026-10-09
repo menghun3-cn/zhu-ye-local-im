@@ -112,13 +112,34 @@ final class PeerView {
   /// What to show for this peer, in order of how much it tells a person.
   ///
   /// An Alias first, because it is what the peer chose to be called and it is
-  /// the only name anyone recognises. Failing that, its address: it is not a
-  /// name, but it is a fact — this Device is *there*, and two Devices that both
-  /// announce nothing are still told apart by it, where a shared placeholder
-  /// would leave a list of identical rows. Only when neither exists does this
-  /// fall back to the Fingerprint, which is stable but is a claim read off a
-  /// handshake rather than somewhere to knock.
-  String get displayName => alias ?? address ?? fingerprint.short();
+  /// the only name anyone recognises. A Device that announces no name still
+  /// announces *something* — the sanitiser substitutes
+  /// [DeviceDescriptor.fallbackAlias] before the descriptor ever reaches the
+  /// wire — so the placeholder arrives here as an ordinary alias, and it is
+  /// rejected: a name every nameless Device shares would put the same two
+  /// words on every row in every list. Failing a real name, the Fingerprint:
+  /// short, stable, and unique, which is what a list of devices needs from a
+  /// stand-in. The address is deliberately not a name here — it is a fact
+  /// about *where*, and the surfaces that show this name show the address
+  /// beside it.
+  String get displayName {
+    final named = alias;
+    if (named != null &&
+        named.isNotEmpty &&
+        named != DeviceDescriptor.fallbackAlias) {
+      return named;
+    }
+    return fingerprint.short();
+  }
+
+  /// Whether the peer announced a name of its own choosing.
+  ///
+  /// [displayName] folds the placeholder away, but a screen that wants to say
+  /// "no name was announced" in so many words asks this instead.
+  bool get hasRealAlias =>
+      alias != null &&
+      alias!.isNotEmpty &&
+      alias != DeviceDescriptor.fallbackAlias;
 
   /// The first bytes of the Fingerprint, for a compact label.
   String get shortFingerprint => fingerprint.short();

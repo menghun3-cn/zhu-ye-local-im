@@ -82,15 +82,36 @@ Future<void> pairUp(TestDevice host, TestDevice guest) async {
 }
 
 /// Opens a Session from [from] to [to], once Discovery has placed [to].
+///
+/// Tolerates the Session already being up, and tolerates losing the race to get
+/// there: since a discovered peer in the Owner Group is connected to
+/// automatically, this dial may be a duplicate of one that has just happened,
+/// and which of the two ends reaches the LinkManager first is not something a
+/// test can or should pin down. Two shapes of "already connected" come back —
+/// `AppStateException` when this Device had already wired the peer up, and
+/// `HandshakeException` when the peer's dial beat ours to the same Session —
+/// and a test that only wants to say "these two are talking" should not have to
+/// care which one it got.
 Future<void> connect(TestDevice from, TestDevice to) async {
   final target = to.fingerprint;
   await until(
-    () => from.controller.peers.any(
-      (peer) => peer.fingerprint == target && peer.isDiallable,
-    ),
+    () =>
+        from.controller.sessions.isNotEmpty ||
+        from.controller.peers.any(
+          (peer) => peer.fingerprint == target && peer.isDiallable,
+        ),
     description: '${to.controller.self.alias} to be discovered with a port',
   );
-  await from.controller.connect(target);
+  if (from.controller.sessions.isEmpty) {
+    try {
+      await from.controller.connect(target);
+    } on AppStateException {
+      // Already open, as this Device saw it.
+    } on HandshakeException {
+      // Already open, as the LinkManager saw it: the peer dialled us at the
+      // same moment and its Session was established first.
+    }
+  }
   await until(
     () =>
         from.controller.sessions.isNotEmpty &&
@@ -109,6 +130,17 @@ Directory tempDirectory(String prefix) {
 
 Fingerprint fingerprintOf(String label) =>
     Fingerprint.ofPublicKey(Uint8List.fromList(label.codeUnits));
+
+/// Adds each Device to the other's clipboard-sharing whitelist.
+///
+/// Pairing alone shares no clipboard: being in the Owner Group says a Device
+/// may hold a Session, and the whitelist is the separate, explicit decision to
+/// let it read what is copied here. A test about sharing has to make that
+/// decision, in both directions, the way two users would.
+void shareClipboard(TestDevice a, TestDevice b) {
+  a.controller.setClipboardPeer(b.fingerprint, value: true);
+  b.controller.setClipboardPeer(a.fingerprint, value: true);
+}
 
 void main() {
   group('a Device on its own', () {
@@ -461,6 +493,7 @@ void main() {
       final bob = await startDevice(hub.b, 'Bob');
       await pairUp(alice, bob);
       await connect(alice, bob);
+      shareClipboard(alice, bob);
 
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.mirror);
@@ -480,6 +513,7 @@ void main() {
       final bob = await startDevice(hub.b, 'Bob');
       await pairUp(alice, bob);
       await connect(alice, bob);
+      shareClipboard(alice, bob);
 
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
@@ -506,6 +540,7 @@ void main() {
       final bob = await startDevice(hub.b, 'Bob');
       await pairUp(alice, bob);
       await connect(alice, bob);
+      shareClipboard(alice, bob);
 
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
@@ -552,6 +587,113 @@ void main() {
       expect(bob.clipboard.applied, isEmpty);
       expect(bob.controller.stagedEntries, isEmpty);
     });
+  });
+
+  group('connecting to a peer as soon as it is discovered', () {
+    test('a discovered peer in the group gets a Session with no tap', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+
+      // Nothing below this line asks for a connection. Both Devices discover
+      // each other and dial on their own; the two dials race, and the loser is
+      // refused by the LinkManager for a Session that already exists.
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'both Devices to connect without being asked',
+      );
+      expect(alice.controller.sessions, hasLength(1));
+      expect(bob.controller.sessions, hasLength(1));
+    });
+
+    test('a peer outside the group is not connected to', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      // Both are on the same beacon network, so each sees the other. Neither
+      // is in the other's Owner Group, so neither may dial: an unpaired Device
+      // needs its user's consent, and there is no secret to handshake with.
+      await until(
+        () => alice.controller.peers.any((peer) => peer.alias == 'Bob'),
+        description: 'Alice to see Bob',
+      );
+      // Alice's own connection is the point of asking whether she has one: a
+      // few discovery rounds have gone by at this point.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(alice.controller.sessions, isEmpty);
+      expect(bob.controller.sessions, isEmpty);
+    });
+  });
+
+  group('the clipboard-sharing whitelist', () {
+    late MemoryBeaconHub hub;
+    late TestDevice alice;
+    late TestDevice bob;
+
+    setUp(() async {
+      hub = MemoryBeaconHub();
+      alice = await startDevice(hub.a, 'Alice');
+      bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+      await connect(alice, bob);
+      alice.controller.setClipboardMode(ClipboardMode.mirror);
+      bob.controller.setClipboardMode(ClipboardMode.mirror);
+    });
+
+    test('a paired peer shares nothing until it is added', () async {
+      // The whole point of the gate, stated from the controller: pairing is a
+      // Session, not a grant to read the clipboard.
+      expect(alice.controller.isClipboardPeer(bob.fingerprint), isFalse);
+      expect(bob.controller.isClipboardPeer(alice.fingerprint), isFalse);
+
+      alice.clipboard.copy('not for Bob');
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(bob.clipboard.applied, isEmpty);
+      expect(bob.controller.stagedEntries, isEmpty);
+    });
+
+    test('adding a peer one way is still not enough', () async {
+      // Consent is per Device. Bob has added Alice, Alice has not added Bob:
+      // Bob's clipboard would go out, Alice's must not.
+      shareClipboard(alice, bob);
+      alice.controller.setClipboardPeer(bob.fingerprint, value: false);
+
+      alice.clipboard.copy('still not for Bob');
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(bob.clipboard.applied, isEmpty, reason: 'Alice never said yes');
+    });
+
+    test('a copy travels once both sides have added each other', () async {
+      shareClipboard(alice, bob);
+
+      alice.clipboard.copy('for Bob after all');
+      await until(
+        () => bob.clipboard.applied.contains('for Bob after all'),
+        description: 'Bob to apply the mirrored entry',
+      );
+      expect(await bob.clipboard.read(), 'for Bob after all');
+    });
+
+    test(
+      'adding a peer again is not a change, so nothing is punished',
+      () async {
+        shareClipboard(alice, bob);
+        // Idempotent: a second tick must not disturb the Session or the
+        // clipboard, and must not be mistaken for a fresh grant.
+        shareClipboard(alice, bob);
+        expect(alice.controller.isClipboardPeer(bob.fingerprint), isTrue);
+        expect(alice.controller.sessions, isNotEmpty);
+
+        alice.clipboard.copy('after a double tick');
+        await until(
+          () => bob.clipboard.applied.contains('after a double tick'),
+          description: 'Bob to apply the entry',
+        );
+      },
+    );
   });
 
   group('reaching a Device by Manual Address', () {
