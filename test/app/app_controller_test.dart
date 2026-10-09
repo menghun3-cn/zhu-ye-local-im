@@ -295,6 +295,12 @@ void main() {
         () => alice.controller.isServing,
         description: 'Alice to serve again under her new name',
       );
+      // 这条断言盯的不只是「Bob 收到广播了」，而是**谁赢**：Bob 与 Alice 之间
+      // 那条 Session 的握手是在改名之前做的，握手里的名字**在 Session 活着期间
+      // 不会变**。所以只要那条 Session 还挂着，一个「后写的来源覆盖先写的」的
+      // 合并顺序就会把 Alice 的新名字盖回旧名字，而 Bob 会一直显示旧名。
+      // 这条用例因此在 Session 恰好先掉线时绿、恰好后掉线时红 —— 红才是真相，
+      // 别把它当环境抖动放过去。
       await until(
         () =>
             bob.controller.peers.any((peer) => peer.alias == 'Alice (laptop)'),
