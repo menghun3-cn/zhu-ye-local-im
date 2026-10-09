@@ -530,6 +530,33 @@ final class LocalTransferController {
     return transfer;
   }
 
+  /// Sends [file] to a peer as an image message.
+  ///
+  /// The bytes take the same road as [sendFile] — a digest, a sink, a
+  /// verification — and only the kind on the offer differs, so that the far
+  /// side draws the picture rather than naming a file. There is no thumbnail
+  /// or downscale here: re-encoding a photograph to save bandwidth would
+  /// change the bytes the sender chose to send, and a transfer tool that
+  /// silently altered its payload would be lying about its digest.
+  Future<OutgoingTransfer> sendImage(File file, {Fingerprint? to}) async {
+    final target = _target(to);
+    final source = await FileByteSource.open(file);
+    final OutgoingTransfer transfer;
+    try {
+      transfer = await target.engine.sendImages([
+        OutgoingItem(name: _baseName(file.path), source: source),
+      ]);
+    } on Object {
+      await source.close();
+      rethrow;
+    }
+    // Recorded as the tracked Transfer's path straight away, unlike a received
+    // image: this file is the user's own and already whole on disk, so there is
+    // nothing to wait for.
+    _track(transfer, target.peer, localPath: file.path);
+    return transfer;
+  }
+
   /// Sends [items] to a peer as one Transfer.
   Future<OutgoingTransfer> sendFiles(
     List<OutgoingItem> items, {
@@ -558,15 +585,16 @@ final class LocalTransferController {
       throw const AppStateException(AppRefusal.offerAlreadyAnswered);
     }
     final sinks = <String, PayloadSink>{};
+    final landed = <String, String>{};
     var accepted = false;
     try {
       for (final item in transfer.items) {
         // Only an item with a digest carries a byte stream to write; a text or
         // clipboard item arrives inline and takes no sink.
         if (!item.hasDigest) continue;
-        sinks[item.id] = await FilePayloadSink.open(
-          incomingPathFor(directory, item.name),
-        );
+        final path = incomingPathFor(directory, item.name);
+        sinks[item.id] = await FilePayloadSink.open(path);
+        landed[item.id] = path.path;
       }
       await transfer.accept(
         itemIds: [for (final item in transfer.items) item.id],
@@ -580,7 +608,27 @@ final class LocalTransferController {
         }
       }
     }
+    // The bytes are verified and closed by now — `accept` does not return until
+    // they are — so it is only here that a received image has a path worth
+    // drawing. Recorded for the first landed item because that is what an image
+    // message carries; a multi-file offer leaves this null and keeps its names.
+    if (landed.isNotEmpty) {
+      _recordLocalPath(transfer, landed.values.first);
+    }
     _notify();
+  }
+
+  /// Points the tracked record for [transfer] at [path], if one exists.
+  ///
+  /// The record is looked up rather than passed in because `acceptInto` takes
+  /// the [IncomingTransfer] the UI holds, not the wrapper the controller made.
+  void _recordLocalPath(Transfer transfer, String path) {
+    for (final tracked in _transfers) {
+      if (identical(tracked.transfer, transfer)) {
+        tracked.localPath = path;
+        return;
+      }
+    }
   }
 
   /// Refuses [transfer].
@@ -838,8 +886,9 @@ final class LocalTransferController {
     unawaited(_persist());
   }
 
-  void _track(Transfer transfer, Fingerprint peer) {
-    _transfers.add(_Tracked(transfer, peer));
+  void _track(Transfer transfer, Fingerprint peer, {String? localPath}) {
+    final tracked = _Tracked(transfer, peer, localPath: localPath);
+    _transfers.add(tracked);
     final progress = transfer.updates.listen((_) => _notify());
     // Settling happens once and is what a UI cares about most, so it is worth a
     // notification even if no progress tick preceded it. The progress
@@ -893,6 +942,7 @@ final class LocalTransferController {
       totalBytes: transfer.totalBytes,
       names: [for (final item in transfer.items) item.name],
       text: transfer.text,
+      localPath: tracked.localPath,
       // Text is never handed out as a decision: it is answered on arrival, so
       // an offer of it is either already settled or about to be, and a UI that
       // drew a prompt for one would be drawing a question the controller has
@@ -1034,10 +1084,19 @@ final class _WiredSession {
 
 /// A Transfer and the Device it is with.
 final class _Tracked {
-  _Tracked(this.transfer, this.peer);
+  _Tracked(this.transfer, this.peer, {this.localPath});
 
   final Transfer transfer;
   final Fingerprint peer;
+
+  /// Where this Transfer's bytes live on *this* machine, once they do.
+  ///
+  /// Only ever set for an image, and only once the bytes are all present:
+  /// rendering a thumbnail means reading a file, and a path that is still being
+  /// written to would draw a half image or fail outright. Null for a text or
+  /// clipboard Transfer, which has no file, and for a file Transfer, which the
+  /// conversation shows by name rather than by content.
+  String? localPath;
 }
 
 /// What is known about one peer, gathered from every source before being

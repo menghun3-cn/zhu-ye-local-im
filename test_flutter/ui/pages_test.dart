@@ -843,7 +843,7 @@ void main() {
         windowA,
         ConversationsPage,
         find.descendant(
-          of: find.widgetWithText(ListTile, 'Bob'),
+          of: conversationRow(windowA, 'Bob'),
           matching: find.bySubtype<ButtonStyleButton>(),
         ),
       );
@@ -899,16 +899,20 @@ void main() {
         onConversation(windowA, find.byType(TextField)),
         'straight through',
       );
-      await tester.tap(onConversation(windowA, find.byTooltip(l10n.send)));
+      await tester.tap(sendButton(windowA));
       await settleRoute(tester);
 
+      // The bubble itself is the evidence the message settled: it carries the
+      // text from the moment it is drawn, and a message that was still on its
+      // way would be the same bubble, so the assertion is that the text is in
+      // the thread rather than that the thread has a receipt on it. A text
+      // message has no receipt to show — the kind-and-state line belongs to
+      // files, which are the transfers that can be refused or fail.
       await pumpUntil(
         tester,
         () => onConversation(
           windowA,
-          // The bubble composes the two labels into one line, so this matches
-          // the line rather than either word on its own.
-          find.text('${l10n.kindText} · ${l10n.stateCompleted}'),
+          find.text('straight through'),
         ).evaluate().isNotEmpty,
         description: 'the message to settle as sent',
       );

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
+import 'package:local_transfer/ui/pickers.dart';
 
 import '../support/ui_harness.dart';
 
@@ -25,6 +26,9 @@ import '../support/ui_harness.dart';
 void main() {
   group('two windows on one machine', () {
     testWidgets('pair by clicking, then move a file across', (tester) async {
+      // The picker seam is a static, so it is put back however this test ends.
+      tearDown(PickerResolution.reset);
+      final picker = ScriptedPicker.install();
       final hub = MemoryBeaconHub();
       // Alice receives, so she listens where the guest's Pair tap dials by
       // default, which is what a receiving Device does in the shipped
@@ -59,6 +63,7 @@ void main() {
         List.generate(200 * 1024, (index) => (index * 31) % 256),
       );
       source.writeAsBytesSync(bytes);
+      picker.willOffer([source.path]);
 
       // Send it from Alice's conversation with Bob. The conversation list is
       // the way in — tapping a connected Device's row opens its thread — and
@@ -82,28 +87,21 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'the conversation to offer its attach button',
       );
-      await tester.tap(
-        onConversation(windowA, find.byTooltip(l10n.menuSendFile)),
-      );
+      // The attach button opens the operating system's own file dialog, which
+      // lives outside Flutter's event loop and never returns to a
+      // `testWidgets` body. The picker is resolved through a seam for exactly
+      // this reason, so what is driven here is the button a user presses and
+      // everything after it: the classification of what came back, the offer,
+      // the wire, and the file landing on the other side.
+      await tester.tap(attachButton(windowA));
       await settleRoute(tester);
-      await pumpUntil(
-        tester,
-        () => dialogIsOpen(windowA),
-        description: 'the send-a-file dialog to open',
-      );
-      await fillField(tester, l10n.fieldPath, source.path, window: windowA);
-      await tapDialogButton(tester, l10n.send, window: windowA);
-
-      // Alice's own thread carries what she sent: the file is a message in the
-      // conversation she sent it from, not a row that appeared on another
-      // surface.
       await pumpUntil(
         tester,
         () => onConversation(
           windowA,
           find.text('payload.bin'),
         ).evaluate().isNotEmpty,
-        description: 'the file to appear in Alice\u2019s conversation',
+        description: 'the picked file to appear in Alice\u2019s conversation',
       );
 
       // Bob is offered it, and has to answer.

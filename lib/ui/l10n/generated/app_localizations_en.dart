@@ -95,6 +95,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kindFiles => 'Files';
 
   @override
+  String get kindImages => 'Images';
+
+  @override
   String get kindClipboard => 'Clipboard';
 
   @override
@@ -290,6 +293,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuSendFile => 'Send a file';
+
+  @override
+  String get menuSendImage => 'Send an image';
+
+  @override
+  String get dropToSend => 'Let go to send';
 
   @override
   String get trustDevice => 'Trust this Device';
