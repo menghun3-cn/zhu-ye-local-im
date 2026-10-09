@@ -536,6 +536,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get send => 'Send';
 
   @override
+  String get removeAttachment => 'Remove';
+
+  @override
   String get tabConversation => 'Conversations';
 
   @override

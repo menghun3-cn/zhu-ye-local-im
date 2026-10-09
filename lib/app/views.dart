@@ -249,6 +249,16 @@ String formatBytes(int bytes) {
   return '$rendered ${units[unit]}';
 }
 
+/// The last path segment of [path], under either separator convention.
+///
+/// What a file is *called*, which is what a list or a bubble shows: the folder
+/// it happens to sit in is a fact about where, and both surfaces that name a
+/// file already say where it is some other way.
+String fileNameOf(String path) {
+  final cut = path.lastIndexOf(RegExp(r'[/\\]'));
+  return cut < 0 ? path : path.substring(cut + 1);
+}
+
 /// Where a received file is allowed to land.
 ///
 /// Peer-supplied names are untrusted input: a name is allowed to *name* a file

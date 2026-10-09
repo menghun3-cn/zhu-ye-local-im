@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -1067,4 +1068,40 @@ Future<void> sendCtrlV(WidgetTester tester, TestWindow window) async {
   await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
   await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
   await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+}
+
+/// A real PNG of [width] × [height] pixels, written to [file].
+///
+/// Encoded by the engine rather than written out as a byte literal, so the
+/// fixture is a picture the decoder will really accept at the size it claims:
+/// an image message reads its shape from the decoded picture, and a fixture
+/// that only looked like a PNG would exercise the "cannot read it" fallback
+/// instead of the preview.
+///
+/// The colour is irrelevant — only the dimensions are read back.
+Future<void> writePng(
+  WidgetTester tester,
+  File file, {
+  required int width,
+  required int height,
+}) async {
+  await tester.runAsync(() async {
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder).drawRect(
+      ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      ui.Paint()..color = const ui.Color(0xFF3366CC),
+    );
+    final picture = recorder.endRecording();
+    try {
+      final image = await picture.toImage(width, height);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        file.writeAsBytesSync(data!.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      picture.dispose();
+    }
+  });
 }

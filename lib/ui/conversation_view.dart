@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,22 @@ class _ConversationViewState extends State<ConversationView> {
   /// Whether a drag from outside the window is over the history right now.
   bool _dropping = false;
 
+  /// Files and pictures chosen for the next message, in the order they were
+  /// chosen. Nothing here has been offered to the peer yet: picking a file is
+  /// not sending one, and a message is read in the order it was composed, so
+  /// the text and everything staged leave together when 发送 is pressed.
+  final List<StagedAttachment> _staged = [];
+
+  @override
+  void didUpdateWidget(ConversationView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The shell keys this view by peer, so in practice a new peer means a new
+    // State. Clearing anyway costs nothing and makes "a draft never crosses
+    // into somebody else's conversation" a property of this widget rather than
+    // of how its callers happen to key it.
+    if (oldWidget.peer != widget.peer) _staged.clear();
+  }
+
   @override
   void dispose() {
     _message.dispose();
@@ -92,37 +109,52 @@ class _ConversationViewState extends State<ConversationView> {
       if (view.peer == widget.peer && view.kind != PayloadKind.clipboard) view,
   ];
 
+  /// Sends the box: the text that was typed, then everything staged.
+  ///
+  /// One message per staged file, as a picked file always was: a conversation
+  /// reads a line at a time, and a single bubble naming eight files is a folder
+  /// listing, not a message. Everything is sent before either list is cleared,
+  /// so a send that fails leaves the draft where it was and the user can try
+  /// again rather than having to choose the files over.
   void _sendMessage(LocalTransferController controller) {
     final text = _message.text.trim();
-    if (text.isEmpty) return;
+    final staged = List.of(_staged);
+    if (text.isEmpty && staged.isEmpty) return;
     unawaited(
       guarded(context, () async {
-        await controller.sendText(text, to: widget.peer);
+        if (text.isNotEmpty) await controller.sendText(text, to: widget.peer);
+        for (final attachment in staged) {
+          final file = File(attachment.path);
+          await (attachment.isImage
+              ? controller.sendImage(file, to: widget.peer)
+              : controller.sendFile(file, to: widget.peer));
+        }
         _message.clear();
+        if (!mounted) return;
+        setState(() => _staged.clear());
       }),
     );
   }
 
-  /// Asks for files and sends whatever came back.
+  /// Asks for files and puts what came back in the composer.
   ///
-  /// Every chosen file becomes its own message rather than one offer of many:
-  /// a conversation reads a line at a time, and a single bubble naming eight
-  /// files is a folder listing, not a message. Files the picker called images
-  /// are sent as images so they draw.
-  Future<void> _pickAndSend(LocalTransferController controller) async {
+  /// Picking is not sending: the files wait in the box until 发送 is pressed, so
+  /// that a message can be written beside them and a wrong choice can be taken
+  /// back without having to answer a question on the far side's screen.
+  Future<void> _pickFiles() async {
     final chosen = await PickerResolution.picker.files();
     if (!mounted || chosen.isEmpty) return;
-    await _sendPaths(controller, [for (final file in chosen) file.path]);
+    _stagePaths([for (final file in chosen) file.path]);
   }
 
-  /// Asks for one image and sends it.
-  Future<void> _pickAndSendImage(LocalTransferController controller) async {
+  /// Asks for one image and puts it in the composer.
+  Future<void> _pickImage() async {
     final chosen = await PickerResolution.picker.image();
     if (!mounted || chosen == null) return;
-    await _sendPaths(controller, [chosen.path]);
+    _stagePaths([chosen.path]);
   }
 
-  /// Sends whatever the clipboard is holding, and says whether it sent
+  /// Stages whatever the clipboard is holding, and says whether it staged
   /// anything.
   ///
   /// Files first, then a picture. Text is deliberately **not** this method's
@@ -143,38 +175,58 @@ class _ConversationViewState extends State<ConversationView> {
 
     final paths = await clipboard.files();
     if (!mounted) return false;
-    if (paths.isNotEmpty && await _sendPaths(controller, paths) > 0) {
-      return true;
-    }
+    if (paths.isNotEmpty && _stagePaths(paths) > 0) return true;
 
     final bytes = await clipboard.image();
     if (!mounted || bytes == null) return false;
     final image = await writePastedImage(bytes);
     if (!mounted || image == null) return false;
-    return await _sendPaths(controller, [image.path]) > 0;
+    return _stagePaths([image.path]) > 0;
+  }
+
+  /// Puts each of [paths] in the composer, pictures as pictures.
+  ///
+  /// Returns how many it staged, which is what tells a paste whether the
+  /// clipboard held anything this app could carry: a folder arrives as a path
+  /// with nothing behind it, and classifying it out is not the same as having
+  /// taken it.
+  int _stagePaths(List<String> paths) {
+    final staged = [
+      for (final entry in classifyPaths(paths))
+        StagedAttachment(
+          path: entry.file.path,
+          name: fileNameOf(entry.file.path),
+          isImage: entry.isImage,
+        ),
+    ];
+    if (staged.isEmpty) return 0;
+    setState(() => _staged.addAll(staged));
+    return staged.length;
   }
 
   /// Sends each of [paths] as its own message, pictures as pictures.
   ///
-  /// Returns how many messages it sent, which is what tells a paste whether the
-  /// clipboard held anything this app could carry: a folder arrives as a path
-  /// with nothing behind it, and classifying it out is not the same as having
-  /// sent it.
-  Future<int> _sendPaths(
-    LocalTransferController controller,
-    List<String> paths,
-  ) async {
-    final drop = classifyDrop(paths);
-    if (drop.images.isEmpty && drop.files.isEmpty) return 0;
+  /// The drag-and-drop path, and the only one that still sends straight away:
+  /// the overlay a drag draws over the history says "松手即发送", so a drop is a
+  /// person choosing to send a thing rather than to compose a message around
+  /// it. Picking and pasting stage instead, and 发送 is what releases those.
+  Future<void> _sendDropped(List<String> paths) async {
+    final classified = classifyPaths(paths);
+    if (classified.isEmpty) return;
+    final controller = ControllerScope.of(context);
     await guarded(context, () async {
-      for (final image in drop.images) {
-        await controller.sendImage(image, to: widget.peer);
-      }
-      for (final file in drop.files) {
-        await controller.sendFile(file, to: widget.peer);
+      for (final entry in classified) {
+        await (entry.isImage
+            ? controller.sendImage(entry.file, to: widget.peer)
+            : controller.sendFile(entry.file, to: widget.peer));
       }
     });
-    return drop.images.length + drop.files.length;
+  }
+
+  /// Takes the staged attachment at [index] back out of the composer.
+  void _removeStaged(int index) {
+    if (index < 0 || index >= _staged.length) return;
+    setState(() => _staged.removeAt(index));
   }
 
   /// The frame drawn over the history while a drag is in progress.
@@ -265,9 +317,7 @@ class _ConversationViewState extends State<ConversationView> {
             onDragDone: (detail) {
               setState(() => _dropping = false);
               unawaited(
-                _sendPaths(controller, [
-                  for (final file in detail.files) file.path,
-                ]),
+                _sendDropped([for (final file in detail.files) file.path]),
               );
             },
             child: Stack(
@@ -281,16 +331,39 @@ class _ConversationViewState extends State<ConversationView> {
         const Divider(height: 1),
         ConversationComposer(
           message: _message,
+          attachments: _staged,
+          onRemoveAttachment: _removeStaged,
           onSend: () => _sendMessage(controller),
           onPaste: () => _pasteIntoComposer(controller),
-          onAttach: canSend ? () => unawaited(_pickAndSend(controller)) : null,
-          onPickImage: canSend
-              ? () => unawaited(_pickAndSendImage(controller))
-              : null,
+          onAttach: canSend ? () => unawaited(_pickFiles()) : null,
+          onPickImage: canSend ? () => unawaited(_pickImage()) : null,
         ),
       ],
     );
   }
+}
+
+/// A file or a picture chosen for the next message but not sent yet.
+///
+/// The composer's own small model: it knows what to call the thing and whether
+/// it is drawn as a picture, and nothing else — the conversation owns the paths
+/// and does the sending.
+class StagedAttachment {
+  /// Stages [path], which will be sent as [name].
+  const StagedAttachment({
+    required this.path,
+    required this.name,
+    required this.isImage,
+  });
+
+  /// Where the bytes are, as the engine will read them.
+  final String path;
+
+  /// What the chip says — the file's own name, not its folder.
+  final String name;
+
+  /// Whether the far side will draw it as a picture.
+  final bool isImage;
 }
 
 /// The box a message is typed in, and the two things that can be done with it.
@@ -314,15 +387,17 @@ class ConversationComposer extends StatefulWidget {
     required this.onPaste,
     required this.onAttach,
     this.onPickImage,
+    this.attachments = const [],
+    this.onRemoveAttachment,
   });
 
   /// The text being typed. Owned by the caller so it survives a rebuild.
   final TextEditingController message;
 
-  /// Sends what is in [message].
+  /// Sends what is in [message], and everything in [attachments].
   final VoidCallback onSend;
 
-  /// Sends whatever the clipboard is holding, and answers false when it held
+  /// Stages whatever the clipboard is holding, and answers false when it held
   /// no file and no picture — which is the signal to paste text as usual.
   final Future<bool> Function() onPaste;
 
@@ -331,6 +406,16 @@ class ConversationComposer extends StatefulWidget {
 
   /// Null when an image cannot be sent — no peer, or no picker on this platform.
   final VoidCallback? onPickImage;
+
+  /// Files and pictures chosen for this message that have not gone out yet.
+  ///
+  /// Drawn above the field so that what 发送 is about to release is visible
+  /// while the message beside it is being written.
+  final List<StagedAttachment> attachments;
+
+  /// Takes the attachment at the given index back out. Null when nothing can be
+  /// staged, which is the same condition as [onAttach] being null.
+  final ValueChanged<int>? onRemoveAttachment;
 
   @override
   State<ConversationComposer> createState() => _ConversationComposerState();
@@ -378,6 +463,14 @@ class _ConversationComposerState extends State<ConversationComposer> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.attachments.isNotEmpty) ...[
+              _AttachmentTray(
+                attachments: widget.attachments,
+                onRemove: widget.onRemoveAttachment,
+                removeTooltip: l10n.removeAttachment,
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -611,6 +704,108 @@ class _SendButton extends StatelessWidget {
         ),
       ),
       child: Text(label),
+    );
+  }
+}
+
+/// What is waiting in the composer, above the field.
+///
+/// A [Wrap] rather than a row, and rather than a bottom sheet: two files fit on
+/// one line, sixteen do not, and a composer that silently hid the eleventh is a
+/// composer that would send something the user could not see.
+class _AttachmentTray extends StatelessWidget {
+  const _AttachmentTray({
+    required this.attachments,
+    required this.onRemove,
+    required this.removeTooltip,
+  });
+
+  final List<StagedAttachment> attachments;
+  final ValueChanged<int>? onRemove;
+  final String removeTooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (var index = 0; index < attachments.length; index++)
+          _AttachmentChip(
+            attachment: attachments[index],
+            // Indexed rather than keyed by name: two files can share a name —
+            // one picked from two folders — and the chip is positional anyway.
+            onRemove: onRemove == null ? null : () => onRemove!(index),
+            removeTooltip: removeTooltip,
+          ),
+      ],
+    );
+  }
+}
+
+/// One staged file or picture, waiting for 发送.
+class _AttachmentChip extends StatelessWidget {
+  const _AttachmentChip({
+    required this.attachment,
+    required this.onRemove,
+    required this.removeTooltip,
+  });
+
+  final StagedAttachment attachment;
+
+  /// Null when the composer cannot stage anything in the first place.
+  final VoidCallback? onRemove;
+
+  final String removeTooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 8, right: 2, top: 2, bottom: 2),
+      decoration: BoxDecoration(
+        color: WeChat.bubbleIn,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: WeChat.divider),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            attachment.isImage ? Icons.image_outlined : Icons.attach_file,
+            size: 16,
+            color: WeChat.secondaryText,
+          ),
+          const SizedBox(width: 6),
+          // Bounded so that one long name cannot push 发送 off the row; the
+          // tooltip keeps the whole of it reachable.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Tooltip(
+              message: attachment.name,
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: WeChat.fontSizePreview,
+                  color: WeChat.bubbleText,
+                ),
+              ),
+            ),
+          ),
+          // A real [IconButton] rather than a tappable glyph: it keeps the
+          // focus ring, the keyboard activation and the semantic label that a
+          // hand-rolled gesture detector would drop.
+          IconButton(
+            onPressed: onRemove,
+            tooltip: removeTooltip,
+            icon: const Icon(Icons.close, size: 14),
+            color: WeChat.secondaryText,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+          ),
+        ],
+      ),
     );
   }
 }

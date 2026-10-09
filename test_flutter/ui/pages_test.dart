@@ -1207,7 +1207,9 @@ void main() {
   });
 
   group('pasting into the composer', () {
-    testWidgets('a file on the clipboard becomes a message', (tester) async {
+    testWidgets('a file on the clipboard waits in the composer', (
+      tester,
+    ) async {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
       final bob = await startUiDevice(tester, hub.b, 'Bob');
@@ -1238,16 +1240,33 @@ void main() {
       await tester.tap(onConversation(windowA, find.byType(TextField)));
       await sendCtrlV(tester, windowA);
 
+      // A paste is composing, not sending: the file waits in the box beside
+      // whatever is typed next, and nothing crosses the wire until 发送.
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('copied.bin'),
+        ).evaluate().isNotEmpty,
+        description: 'the pasted file to appear in the composer',
+      );
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'a file in the box is not a message until it is sent',
+      );
+
+      await tester.tap(sendButton(windowA));
       await pumpUntil(
         tester,
         () => alice.controller.transfers.isNotEmpty,
-        description: 'the pasted file to become a message',
+        description: 'the staged file to be sent',
       );
       expect(alice.controller.transfers.single.kind, PayloadKind.file);
       expect(
         onConversation(windowA, find.text('copied.bin')),
         findsOneWidget,
-        reason: 'the message names the file that was pasted',
+        reason: 'the sent file is a message, named as it was staged',
       );
 
       // Answered before the test ends, so the send that is still waiting on it
@@ -1262,7 +1281,7 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
-    testWidgets('a screenshot on the clipboard is sent as a picture', (
+    testWidgets('a screenshot on the clipboard waits as a picture', (
       tester,
     ) async {
       final hub = MemoryBeaconHub();
@@ -1292,8 +1311,19 @@ void main() {
 
       await pumpUntil(
         tester,
+        () => onConversation(
+          windowA,
+          find.textContaining('pasted'),
+        ).evaluate().isNotEmpty,
+        description: 'the pasted picture to appear in the composer',
+      );
+      expect(alice.controller.transfers, isEmpty);
+
+      await tester.tap(sendButton(windowA));
+      await pumpUntil(
+        tester,
         () => alice.controller.transfers.isNotEmpty,
-        description: 'the pasted picture to become a message',
+        description: 'the staged picture to be sent',
       );
       expect(
         alice.controller.transfers.single.kind,
@@ -1351,6 +1381,178 @@ void main() {
         alice.controller.transfers,
         isEmpty,
         reason: 'text in the box is not a message until it is sent',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+  });
+
+  group('choosing a file for the composer', () {
+    testWidgets('a picked file waits until 发送 is pressed', (tester) async {
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final home = tempDirectory('local-transfer-pick-');
+      final source = File('${home.path}${Platform.pathSeparator}notes.txt');
+      source.writeAsBytesSync([for (var i = 0; i < 16; i++) i]);
+      picker.willOffer([source.path]);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      await tester.tap(attachButton(windowA));
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('notes.txt'),
+        ).evaluate().isNotEmpty,
+        description: 'the chosen file to appear in the composer',
+      );
+      expect(picker.filesAsked, 1);
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'choosing a file is not sending one',
+      );
+
+      await tester.tap(sendButton(windowA));
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 1,
+        description: 'the staged file to be sent',
+      );
+      expect(alice.controller.transfers.single.kind, PayloadKind.file);
+
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a picked image waits as a picture', (tester) async {
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final home = tempDirectory('local-transfer-pick-image-');
+      final source = File('${home.path}${Platform.pathSeparator}holiday.png');
+      await writePng(tester, source, width: 1200, height: 300);
+      picker.willOfferImage(source.path);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      await tester.tap(imageButton(windowA));
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('holiday.png'),
+        ).evaluate().isNotEmpty,
+        description: 'the chosen picture to appear in the composer',
+      );
+      expect(picker.imagesAsked, 1);
+      expect(alice.controller.transfers, isEmpty);
+
+      await tester.tap(sendButton(windowA));
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 1,
+        description: 'the staged picture to be sent',
+      );
+      expect(
+        alice.controller.transfers.single.kind,
+        PayloadKind.image,
+        reason: 'an image picked as an image travels as one',
+      );
+
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the picture',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a staged file can be taken back out', (tester) async {
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final home = tempDirectory('local-transfer-unpick-');
+      final source = File('${home.path}${Platform.pathSeparator}wrong.txt');
+      source.writeAsBytesSync([1, 2, 3]);
+      picker.willOffer([source.path]);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      await tester.tap(attachButton(windowA));
+      final staged = onConversation(
+        windowA,
+        find.byTooltip(l10n.removeAttachment),
+      );
+      await pumpUntil(
+        tester,
+        () => staged.evaluate().isNotEmpty,
+        description: 'the staged file to appear with a way to take it out',
+      );
+
+      await tester.tap(staged);
+      await pumpUntil(
+        tester,
+        () =>
+            onConversation(windowA, find.text('wrong.txt')).evaluate().isEmpty,
+        description: 'the staged file to be taken back out',
+      );
+
+      // And 发送 with an empty box sends nothing at all, which is what makes
+      // taking a file back out worth doing.
+      await tester.tap(sendButton(windowA));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'nothing was staged by the time 发送 was pressed',
       );
 
       await shutdown(tester, [alice, bob]);

@@ -514,6 +514,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get send => '发送';
 
   @override
+  String get removeAttachment => '移除';
+
+  @override
   String get tabConversation => '对话';
 
   @override

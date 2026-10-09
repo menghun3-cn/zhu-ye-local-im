@@ -567,7 +567,7 @@ final class LocalTransferController {
     final OutgoingTransfer transfer;
     try {
       transfer = await target.engine.sendFiles([
-        OutgoingItem(name: _baseName(file.path), source: source),
+        OutgoingItem(name: fileNameOf(file.path), source: source),
       ]);
     } on Object {
       // The engine takes ownership of a source only once the Transfer exists;
@@ -593,7 +593,7 @@ final class LocalTransferController {
     final OutgoingTransfer transfer;
     try {
       transfer = await target.engine.sendImages([
-        OutgoingItem(name: _baseName(file.path), source: source),
+        OutgoingItem(name: fileNameOf(file.path), source: source),
       ]);
     } on Object {
       await source.close();
@@ -1234,10 +1234,4 @@ final class _PeerFacts {
   int? sessionPort;
   DateTime? lastSeen;
   bool connected = false;
-}
-
-/// The last path segment of [path], under either separator convention.
-String _baseName(String path) {
-  final cut = path.lastIndexOf(RegExp(r'[/\\]'));
-  return cut < 0 ? path : path.substring(cut + 1);
 }
