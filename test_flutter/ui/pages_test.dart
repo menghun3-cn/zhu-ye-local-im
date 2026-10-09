@@ -15,6 +15,7 @@ import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
+import 'package:local_transfer/ui/wechat/bubble.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -917,6 +918,19 @@ void main() {
       await connectDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
 
+      // The board a conversation is drawn on, found by the fill it is painted:
+      // a conversation sits on white, and the one other thing that fill could
+      // be is the page's grey — which is exactly what this rules out.
+      Finder boardOver(Finder inner) => find.ancestor(
+        of: inner,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is ColoredBox &&
+              widget.color == WeChat.conversationBackground,
+          description: 'the conversation board',
+        ),
+      );
+
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
@@ -929,9 +943,20 @@ void main() {
       );
 
       // Before anything is picked the right-hand pane says what to do, rather
-      // than showing a conversation the user did not ask for.
+      // than showing a conversation the user did not ask for — and it is
+      // already the conversation's white, because it is where one would go.
       expect(
         onPage(windowA, ConversationsPage, find.text(l10n.conversationPickOne)),
+        findsOneWidget,
+      );
+      expect(
+        boardOver(
+          onPage(
+            windowA,
+            ConversationsPage,
+            find.text(l10n.conversationPickOne),
+          ),
+        ),
         findsOneWidget,
       );
 
@@ -946,6 +971,12 @@ void main() {
       );
       expect(
         onConversation(windowA, find.text(l10n.conversationEmpty)),
+        findsOneWidget,
+      );
+      // And the history sits on that same white board, rather than on the page
+      // grey it inherited before the two fills traded places.
+      expect(
+        boardOver(onConversation(windowA, find.text(l10n.conversationEmpty))),
         findsOneWidget,
       );
 
@@ -1129,6 +1160,17 @@ void main() {
       expect(
         onConversation(windowA, find.text('straight through')),
         findsOneWidget,
+      );
+      // Drawn in the outgoing fill. The two fills traded places, and this pins
+      // the side that did *not* move, so that a later rearrangement of the two
+      // cannot quietly take the sent message with it.
+      expect(
+        tester
+            .widget<MessageBubbleShape>(
+              onConversation(windowA, find.byType(MessageBubbleShape)),
+            )
+            .colour,
+        WeChat.bubbleOut,
       );
       // A conversation is not a transfer. The "kind · state" line belongs to a
       // file, where it is the receipt the user reads; over a text bubble it

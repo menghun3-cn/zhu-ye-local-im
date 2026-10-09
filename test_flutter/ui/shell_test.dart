@@ -37,7 +37,7 @@ void main() {
       expect(scheme.secondaryContainer, WeChat.listHover);
       expect(scheme.onSurfaceVariant, WeChat.secondaryText);
 
-      expect(theme.cardTheme.color, WeChat.bubbleIn);
+      expect(theme.cardTheme.color, WeChat.surface);
       expect(theme.cardTheme.elevation, 0);
       expect(theme.scaffoldBackgroundColor, WeChat.pageBackground);
       expect(theme.dividerColor, WeChat.divider);
@@ -47,6 +47,38 @@ void main() {
       // default text theme, not a readable field — so the assertion reads the
       // family off the body style that every page's text ends up inheriting.
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
+    });
+
+    test('the conversation board and a received bubble have traded fills', () {
+      // The arrangement is WeChat's own inverted: the board is white and a
+      // received message is grey, where WeChat has a grey board and a white
+      // bubble. What is asserted is therefore the *relationship* between the
+      // tokens rather than any one value — the point of the change is that the
+      // two fills changed places, and a later tweak that moved one without the
+      // other would silently undo it.
+      expect(
+        WeChat.conversationBackground,
+        WeChat.surface,
+        reason: 'the board is the same white as every other panel',
+      );
+      expect(
+        WeChat.bubbleIn,
+        WeChat.pageBackground,
+        reason: 'a received bubble took exactly the grey the board gave up',
+      );
+      expect(
+        WeChat.conversationBackground,
+        isNot(WeChat.bubbleIn),
+        reason: 'a received bubble has to be visible on the board it sits on',
+      );
+
+      // A panel is still a panel: the bubble's grey must not have leaked into
+      // the card, the dialog or the scheme's surface, which is what would
+      // happen if the two roles still shared one token.
+      final theme = WeChat.theme();
+      expect(theme.cardTheme.color, WeChat.surface);
+      expect(theme.dialogTheme.backgroundColor, WeChat.surface);
+      expect(theme.colorScheme.surface, WeChat.surface);
     });
 
     test('paints the navigation surfaces in the WeChat greys', () {

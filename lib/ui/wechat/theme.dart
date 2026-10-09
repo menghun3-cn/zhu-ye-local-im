@@ -32,14 +32,33 @@ class WeChat {
   /// 微信实际用的就是这个浅绿。
   static const Color bubbleOut = Color(0xFF95EC69);
 
-  /// 收到的消息气泡底色，也是卡片和对话框的底色。
-  static const Color bubbleIn = Color(0xFFFFFFFF);
+  /// 收到的消息气泡底色，**取值与会话区底色恰好互换** —— 会话区是白的，
+  /// 收到的气泡是灰的，发出去的气泡仍是浅绿。收到的消息靠这层灰从白底上浮出来。
+  ///
+  /// 取值就是 [pageBackground] 那档灰：要求是「这两块底色互换」，
+  /// 所以两个 token 交换取值，而不是各自挪到一个新灰。
+  static const Color bubbleIn = Color(0xFFEDEDED);
+
+  /// 卡片、对话框、输入框、附件托盘、分段控件，以及 Material 各种 `surface`
+  /// 槽位的底色 —— 一句话说，一块面板。
+  ///
+  /// 之所以和 [bubbleIn] 分成两个 token：在那之前收到的气泡与面板同为白色，
+  /// 于是共用 [bubbleIn] 一个名字；气泡一改灰、面板却必须保持白色，
+  /// 一个 token 就再也说不清「气泡」和「面板」两件事。
+  static const Color surface = Color(0xFFFFFFFF);
 
   /// 气泡里的字色。两种气泡都用近黑，不是纯黑 —— 纯黑在浅绿上发脏。
   static const Color bubbleText = Color(0xFF1A1A1A);
 
-  /// 会话列表、聊天区的页面底色。
+  /// 设备/传输/剪贴板/设置四个页面的底色，也是 `scaffoldBackgroundColor`。
+  /// 这些页面上放的是白色卡片，所以底色是灰的。
   static const Color pageBackground = Color(0xFFEDEDED);
+
+  /// 会话历史区的底色：一块白板，消息气泡浮在上面。
+  ///
+  /// 与 [surface] 同值但**分开命名**：[surface] 是「别的页面上的卡片」，
+  /// 这里是「消息站在什么上面」—— 是两件事。共用一个 token 正是这次要解开的结。
+  static const Color conversationBackground = Color(0xFFFFFFFF);
 
   /// 左侧会话列表、导航栏、工具条的底色。比聊天区略浅，两侧靠这层灰差分开。
   static const Color sidebarBackground = Color(0xFFF7F7F7);
@@ -179,13 +198,13 @@ class WeChat {
       onError: Colors.white,
       errorContainer: errorContainer,
       onErrorContainer: badge,
-      surface: bubbleIn,
+      surface: surface,
       onSurface: bubbleText,
       surfaceDim: pageBackground,
-      surfaceBright: bubbleIn,
-      surfaceContainerLowest: bubbleIn,
-      surfaceContainerLow: bubbleIn,
-      surfaceContainer: bubbleIn,
+      surfaceBright: surface,
+      surfaceContainerLowest: surface,
+      surfaceContainerLow: surface,
+      surfaceContainer: surface,
       surfaceContainerHigh: sidebarBackground,
       surfaceContainerHighest: listHover,
       onSurfaceVariant: secondaryText,
@@ -223,7 +242,7 @@ class WeChat {
         surfaceTintColor: Colors.transparent,
       ),
       cardTheme: const CardThemeData(
-        color: bubbleIn,
+        color: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         // Flush, because the pages put their own gaps between cards: a
@@ -298,7 +317,7 @@ class WeChat {
                 states.contains(WidgetState.selected) ? brand : bubbleText,
           ),
           backgroundColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected) ? bubbleIn : null,
+            (states) => states.contains(WidgetState.selected) ? surface : null,
           ),
           side: const WidgetStatePropertyAll(BorderSide(color: divider)),
           shape: const WidgetStatePropertyAll(
@@ -395,7 +414,7 @@ class WeChat {
         ),
       ),
       dialogTheme: const DialogThemeData(
-        backgroundColor: bubbleIn,
+        backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(

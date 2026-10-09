@@ -189,9 +189,14 @@ class _ConversationsPageState extends State<ConversationsPage> {
         const VerticalDivider(width: 1, color: WeChat.divider),
         Expanded(
           child: selected == null
-              ? Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: HintText(l10n.conversationPickOne),
+              // The pane a conversation would open into, so it wears the
+              // conversation's own white rather than the page's grey.
+              ? ColoredBox(
+                  color: WeChat.conversationBackground,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: HintText(l10n.conversationPickOne),
+                  ),
                 )
               : ConversationView(
                   // Keyed by peer so switching conversations rebuilds the
