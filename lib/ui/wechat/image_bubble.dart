@@ -4,7 +4,13 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// An image message: a thumbnail in the bubble, full size when clicked.
+/// An image message: a thumbnail on its own, full size when clicked.
+///
+/// **Not drawn inside a bubble.** WeChat puts a picture into a conversation as
+/// a picture — a rounded thumbnail with no fill behind it and no tail — and a
+/// picture wrapped in a green rectangle reads as a file that happens to have a
+/// preview rather than as a picture that was sent. The conversation skips
+/// `MessageBubbleShape` for this widget and nothing else; see `MessageBubble`.
 ///
 /// The bytes are read from disk rather than held in memory. A conversation is a
 /// list that is rebuilt on every progress tick of every live Transfer, so an
@@ -14,12 +20,12 @@ import 'theme.dart';
 /// pixel ratio.
 ///
 /// The thumbnail keeps the picture's own shape. Its size is read once from the
-/// decoded image and the box is then made that shape, bounded by [_maxSide] on
-/// both sides — a wide screenshot comes out wide and short, a portrait
-/// photograph tall and narrow, and neither is cut down to a square. A fixed
-/// square with `BoxFit.cover` would show the middle of every picture and
-/// nothing else, which is a preview of the picture's centre rather than of the
-/// picture.
+/// decoded image and the box is then made that shape, bounded by
+/// [WeChat.imageMaxSide] on both sides — a wide screenshot comes out wide and
+/// short, a portrait photograph tall and narrow, and neither is cut down to a
+/// square. A fixed square with `BoxFit.cover` would show the middle of every
+/// picture and nothing else, which is a preview of the picture's centre rather
+/// than of the picture.
 ///
 /// A picture that cannot be read — deleted between the message arriving and the
 /// user scrolling to it, or a format the platform's decoder does not know —
@@ -48,20 +54,16 @@ class ImageBubble extends StatefulWidget {
 }
 
 class _ImageBubbleState extends State<ImageBubble> {
-  /// The largest a thumbnail is allowed to be, on either side.
-  ///
-  /// A square *bound* rather than a width: a portrait photograph at a fixed
-  /// width would be a column of pixels taller than the window, and WeChat
-  /// bounds both sides for exactly that reason.
-  static const double _maxSide = 200;
-
   /// What is drawn between the message appearing and the picture being ready.
   ///
   /// Roughly a landscape photograph's shape, so that the common case grows only
   /// a little when the real size arrives. The alternative — a zero-sized box —
-  /// makes the bubble collapse and spring back, which reads as a glitch rather
+  /// makes the message collapse and spring back, which reads as a glitch rather
   /// than as loading.
-  static const Size _placeholder = Size(_maxSide, _maxSide * 0.66);
+  static const Size _placeholder = Size(
+    WeChat.imageMaxSide,
+    WeChat.imageMaxSide * 0.66,
+  );
 
   ImageStream? _stream;
   ImageStreamListener? _listener;
@@ -143,24 +145,25 @@ class _ImageBubbleState extends State<ImageBubble> {
     setState(() => _unreadable = true);
   }
 
-  /// [size] scaled down to fit [_maxSide] on both sides — never up.
+  /// [size] scaled down to fit [WeChat.imageMaxSide] on both sides — never up.
   ///
   /// A small picture stays small: blowing a 32-pixel icon up to 200 would be a
   /// preview of the decoder's guesswork rather than of the file.
   static Size _fitWithin(Size size) {
+    const bound = WeChat.imageMaxSide;
     if (size.width <= 0 || size.height <= 0) return _placeholder;
-    final fit = (size.width <= _maxSide && size.height <= _maxSide)
+    final fit = (size.width <= bound && size.height <= bound)
         ? 1.0
-        : (_maxSide / size.width < _maxSide / size.height
-              ? _maxSide / size.width
-              : _maxSide / size.height);
+        : (bound / size.width < bound / size.height
+              ? bound / size.width
+              : bound / size.height);
     return Size(size.width * fit, size.height * fit);
   }
 
   @override
   Widget build(BuildContext context) {
     final picture = ClipRRect(
-      borderRadius: BorderRadius.circular(WeChat.bubbleRadius),
+      borderRadius: BorderRadius.circular(WeChat.imageRadius),
       child: _picture(),
     );
     // Nothing to open into when the picture could not be read, so the bubble is
@@ -193,28 +196,31 @@ class _ImageBubbleState extends State<ImageBubble> {
 
   /// What is drawn while the picture is being read.
   ///
-  /// [WeChat.surface] rather than the page grey, because this box sits *inside*
-  /// a bubble: a received bubble is grey now, and a grey box in a grey bubble
-  /// would be invisible. White reads as a hole in the fill on both bubbles.
+  /// [WeChat.pageBackground] rather than [WeChat.surface], because there is no
+  /// longer a bubble around this box: a thumbnail stands on the conversation's
+  /// white, and a white box on white is an invisible one. The page grey is what
+  /// the rest of the interface uses for "a surface darker than the page", so a
+  /// hole waiting to be filled by a picture reads as one.
   Widget _placeholderBox() {
     return Container(
       width: _placeholder.width,
       height: _placeholder.height,
-      color: WeChat.surface,
+      color: WeChat.pageBackground,
     );
   }
 
   /// What an image that cannot be decoded shows instead.
   ///
-  /// White for the same reason as [_placeholderBox]: it has to stand out
-  /// against whichever bubble is around it.
+  /// Grey for the same reason as [_placeholderBox]: it has to stand out
+  /// against the conversation behind it, and there is no fill there to read a
+  /// white box as a hole in.
   Widget _unreadableBox() {
     return Container(
-      width: _maxSide,
-      height: _maxSide,
+      width: WeChat.imageMaxSide,
+      height: WeChat.imageMaxSide,
       alignment: Alignment.center,
       padding: const EdgeInsets.all(12),
-      color: WeChat.surface,
+      color: WeChat.pageBackground,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

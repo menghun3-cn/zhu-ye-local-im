@@ -112,6 +112,8 @@
   "whereShouldThisArrive": "保存到哪个文件夹？",
   "openContainingFolder": "打开所在目录",
   "cannotOpenFolder": "没能打开那个文件夹。",
+  "copyImage": "复制图片",
+  "cannotCopyImage": "没能复制这张图片。",
 
   "clipboardSyncHeader": "剪贴板同步",
   "clipboardWaitingHeader": "等待你处理",

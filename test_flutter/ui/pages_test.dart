@@ -1919,6 +1919,202 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
   });
+
+  group('a picture on a conversation', () {
+    /// Alice sends Bob a picture, and Bob's window ends up looking at it.
+    ///
+    /// Everything all three tests below need before the thing each of them is
+    /// about: a paired pair, a folder for Bob to file into — which is the whole
+    /// difference between a picture and a file, and the reason this one arrives
+    /// without a question — a picture that landed, and the conversation it
+    /// landed in on screen. The source bytes come back so that a test can say
+    /// what the clipboard should have been given.
+    Future<({UiDevice alice, UiDevice bob, Uint8List bytes})> shownPicture(
+      WidgetTester tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final inbox = tempDirectory('local-transfer-picture-in-');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(
+        tester,
+        hub.b,
+        'Bob',
+        defaultIncomingDirectory: inbox.path,
+      );
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      final home = tempDirectory('local-transfer-picture-out-');
+      final source = File('${home.path}${Platform.pathSeparator}holiday.png');
+      await writePng(tester, source, width: 24, height: 16);
+      final bytes = source.readAsBytesSync();
+
+      await tester.runAsync(() => alice.controller.sendImage(source));
+      await pumpUntil(
+        tester,
+        () =>
+            bob.controller.transfers.isNotEmpty &&
+            bob.controller.transfers.single.localPath != null,
+        description: 'the picture to land on Bob',
+      );
+      expect(
+        File(bob.controller.transfers.single.localPath!).parent.path,
+        inbox.path,
+        reason: 'a picture with a folder to go in is filed, not asked about',
+      );
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Alice');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.byType(ImageBubble),
+        ).evaluate().isNotEmpty,
+        description: 'the picture to be drawn in the conversation',
+      );
+      return (alice: alice, bob: bob, bytes: bytes);
+    }
+
+    testWidgets('is drawn as itself, with no bubble around it', (tester) async {
+      final sent = await shownPicture(tester);
+
+      // The thumbnail is the picture. This is also the wait for the decode:
+      // until it finishes there is a placeholder and no [Image] at all.
+      await pumpUntil(
+        tester,
+        () => onConversation(windowA, find.byType(Image)).evaluate().isNotEmpty,
+        description: 'the picture to be decoded and drawn',
+      );
+      expect(
+        onConversation(windowA, find.byType(MessageBubbleShape)),
+        findsNothing,
+        reason:
+            'a picture is put on a conversation as a picture, with no fill '
+            'behind it and no tail — a green rectangle around one reads as a '
+            'file that happens to have a preview',
+      );
+
+      // And it is still the picture that opens, not merely a smaller copy of
+      // it: the thumbnail is a door into the full-size view, which is the part
+      // of "a picture, not a bubble" that a user notices.
+      await tester.tap(onConversation(windowA, find.byType(ImageBubble)));
+      await pumpUntil(
+        tester,
+        () => find.byType(InteractiveViewer).evaluate().isNotEmpty,
+        description: 'the full-size view to open over the conversation',
+      );
+
+      await shutdown(tester, [sent.alice, sent.bob]);
+    });
+
+    testWidgets('offers both of its actions on a right-click', (tester) async {
+      final sent = await shownPicture(tester);
+      await pumpUntil(
+        tester,
+        () => onConversation(windowA, find.byType(Image)).evaluate().isNotEmpty,
+        description: 'the picture to be decoded and drawn',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.byType(ImageBubble)),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.text(l10n.copyImage)).evaluate().isNotEmpty,
+        description: 'the picture to offer its actions',
+      );
+      // Both, on one menu: a picture can be shown in its folder *and* put back
+      // on the clipboard, and the two are not alternatives.
+      expect(
+        windowA.within(find.text(l10n.openContainingFolder)),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [sent.alice, sent.bob]);
+    });
+
+    testWidgets('hands its bytes to the clipboard when Copy is chosen', (
+      tester,
+    ) async {
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      final sent = await shownPicture(tester);
+      await pumpUntil(
+        tester,
+        () => onConversation(windowA, find.byType(Image)).evaluate().isNotEmpty,
+        description: 'the picture to be decoded and drawn',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.byType(ImageBubble)),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.text(l10n.copyImage)).evaluate().isNotEmpty,
+        description: 'the picture to offer its actions',
+      );
+      await tester.tap(windowA.within(find.text(l10n.copyImage)));
+      await pumpUntil(
+        tester,
+        () => clipboard.copiedImages.isNotEmpty,
+        description: 'the picture to reach the clipboard',
+      );
+
+      // The picture itself, byte for byte — not its path and not a re-encode.
+      // What lands on the clipboard has to be pasteable into anything that
+      // takes a picture, and that starts with it being the same picture.
+      expect(clipboard.copiedImages.single, sent.bytes);
+      expect(
+        find.text(l10n.cannotCopyImage),
+        findsNothing,
+        reason: 'a copy that happened says nothing',
+      );
+
+      await shutdown(tester, [sent.alice, sent.bob]);
+    });
+
+    testWidgets('says so when the copy could not happen', (tester) async {
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      // A platform that will not let the app write its own clipboard. That is
+      // an ordinary answer rather than an error — Android gives it while the
+      // window is not focused — and it must not be told as a success.
+      clipboard.answersWrites = false;
+      final sent = await shownPicture(tester);
+      await pumpUntil(
+        tester,
+        () => onConversation(windowA, find.byType(Image)).evaluate().isNotEmpty,
+        description: 'the picture to be decoded and drawn',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.byType(ImageBubble)),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.text(l10n.copyImage)).evaluate().isNotEmpty,
+        description: 'the picture to offer its actions',
+      );
+      await tester.tap(windowA.within(find.text(l10n.copyImage)));
+      await pumpUntil(
+        tester,
+        () => find.text(l10n.cannotCopyImage).evaluate().isNotEmpty,
+        description: 'the failure to be said out loud',
+      );
+
+      await shutdown(tester, [sent.alice, sent.bob]);
+    });
+  });
 }
 
 /// The text currently in [window]'s composer.
