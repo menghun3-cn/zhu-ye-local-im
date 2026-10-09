@@ -45,6 +45,19 @@ dependencies:
   crypto: ^3.0.7
   cryptography: ^2.9.0
 
+  # The OS's own file and image pickers, so that "选择文件" opens the real
+  # Windows dialog instead of asking the user to type a path. `file_selector`
+  # is the Flutter team's plugin and is federated, so Windows, macOS, Linux and
+  # Android each get a native picker without a platform channel of our own.
+  file_selector: ^1.1.0
+
+  # Files dropped onto the window from Explorer. Flutter's own `DragTarget`
+  # only sees drags that started inside the Flutter app — an external drop
+  # arrives as the platform's `WM_DROPFILES` and never becomes a Flutter drag
+  # at all — so this plugin exists to bridge that, which the app cannot do from
+  # Dart alone.
+  desktop_drop: ^0.8.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

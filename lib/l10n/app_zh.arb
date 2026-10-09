@@ -27,6 +27,7 @@
 
   "kindText": "文本",
   "kindFiles": "文件",
+  "kindImages": "图片",
   "kindClipboard": "剪贴板",
 
   "stateAwaitingDecision": "等待对方确认",
@@ -89,6 +90,8 @@
   "trusted": "已信任",
 
   "menuSendFile": "发送文件",
+  "menuSendImage": "发送图片",
+  "dropToSend": "松手即发送",
   "trustDevice": "信任这台设备",
   "stopTrustingDevice": "不再信任这台设备",
   "openSession": "建立连接",

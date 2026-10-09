@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/app/app.dart';
@@ -12,6 +13,7 @@ import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
+import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/seams.dart';
 
 /// Shared scaffolding for the tests that need a widget tree.
@@ -737,6 +739,28 @@ Future<void> pairThroughWindows(
 /// By the row in the conversation list, because that is what a user has now:
 /// connecting a Device and talking to it both happen on the Conversations
 /// surface, so the list row is where a peer is reached from rather than the
+/// The conversation row for [name] in [window]'s list.
+///
+/// Keyed on [ConversationRow] — the row's own type — rather than on the text
+/// alone, because the list holds several peers at once and a finder for the
+/// name would be satisfied by a row this test is not talking about. The row
+/// carries its peer's name for exactly this reason.
+Finder _conversationRow(TestWindow window, String name) => onPage(
+  window,
+  ConversationsPage,
+  find.byWidgetPredicate(
+    (widget) => widget is ConversationRow && widget.peer == name,
+  ),
+);
+
+/// The row for [name] in [window]'s conversation list, for a test that wants to
+/// look inside it itself.
+///
+/// Exported alongside [_conversationRow] because a test asserting *what* a row
+/// offers needs the row, not a boolean about it.
+Finder conversationRow(TestWindow window, String name) =>
+    _conversationRow(window, name);
+
 /// Devices card.
 ///
 /// Assumes the window is already showing the conversation list; [openTab] with
@@ -746,9 +770,7 @@ Future<void> openConversation(
   TestWindow window, {
   required String name,
 }) async {
-  await tester.tap(
-    onPage(window, ConversationsPage, find.widgetWithText(ListTile, name)),
-  );
+  await tester.tap(_conversationRow(window, name));
   await settleRoute(tester);
 }
 
@@ -758,11 +780,8 @@ Future<void> openConversation(
 /// been found, so this answers "is it in the list" and not "can it be talked to
 /// yet". Use it for the discovery half of the flow and
 /// [conversationConnectable] for the action half.
-bool conversationListed(TestWindow window, String name) => onPage(
-  window,
-  ConversationsPage,
-  find.widgetWithText(ListTile, name),
-).evaluate().isNotEmpty;
+bool conversationListed(TestWindow window, String name) =>
+    _conversationRow(window, name).evaluate().isNotEmpty;
 
 /// Whether [window]'s row for [name] is offering a button labelled [button].
 ///
@@ -779,7 +798,7 @@ bool conversationHasButton(
   window,
   ConversationsPage,
   find.descendant(
-    of: find.widgetWithText(ListTile, name),
+    of: _conversationRow(window, name),
     matching: _buttonShowing(find.byType(ConversationsPage), button),
   ),
 ).evaluate().isNotEmpty;
@@ -789,7 +808,7 @@ bool conversationConnectable(TestWindow window, String name) => onPage(
   window,
   ConversationsPage,
   find.descendant(
-    of: find.widgetWithText(ListTile, name),
+    of: _conversationRow(window, name),
     matching: _buttonShowing(find.byType(ConversationsPage), l10n.connect),
   ),
 ).evaluate().isNotEmpty;
@@ -828,6 +847,24 @@ Finder onConversation(TestWindow window, Finder matching) => window.within(
   find.descendant(of: find.byType(ConversationView), matching: matching),
 );
 
+/// The composer's send button in [window]'s open conversation.
+///
+/// Found by the label the user reads rather than by a tooltip: the send control
+/// is a labelled button in the WeChat layout, and a tooltip that only shows on
+/// hover is not what a user identifies it by.
+Finder sendButton(TestWindow window) =>
+    onConversation(window, find.widgetWithText(TextButton, l10n.send));
+
+/// The composer's attach ("send a file") button in [window]'s conversation.
+Finder attachButton(TestWindow window) =>
+    onConversation(window, find.byTooltip(l10n.menuSendFile));
+
+/// The composer's image button in [window]'s conversation.
+Finder imageButton(TestWindow window) => onConversation(
+  window,
+  find.widgetWithIcon(IconButton, Icons.image_outlined),
+);
+
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///
 /// Read off the card's switch rather than the controller, and read off the
@@ -847,3 +884,62 @@ bool hasButton(
   String label, {
   required TestWindow window,
 }) => window.button(label).evaluate().isNotEmpty;
+
+/// A [FilePicker] that hands back whatever the test put in it.
+///
+/// The composer's picker is the one thing in this product a widget test cannot
+/// drive: the real one opens the operating system's dialog, which lives outside
+/// Flutter's event loop and never returns to a `testWidgets` body. Without a
+/// stand-in, every test of sending a file would have to go around the UI and
+/// call the controller — which is exactly the part that then goes untested.
+///
+/// Installed with [install], which returns the fixture so a test can queue
+/// answers and assert what was asked for.
+///
+/// ```dart
+/// final picker = ScriptedPicker.install();
+/// picker.willOffer([source.path]);
+/// await tester.tap(onConversation(windowA, find.byTooltip(l10n.menuSendFile)));
+/// ```
+class ScriptedPicker implements FilePicker {
+  ScriptedPicker._();
+
+  /// Installs a scripted picker in place of the system one.
+  ///
+  /// A test that calls this must also call [PickerResolution.reset] in a
+  /// `tearDown`: the resolution is a static, and a test that left a scripted
+  /// picker behind would silently answer for the next one.
+  static ScriptedPicker install() {
+    final picker = ScriptedPicker._();
+    PickerResolution.picker = picker;
+    return picker;
+  }
+
+  List<String> _files = const [];
+  String? _image;
+
+  /// How many times the file picker was opened.
+  int filesAsked = 0;
+
+  /// How many times the image picker was opened.
+  int imagesAsked = 0;
+
+  /// What the next file picker answers with.
+  void willOffer(List<String> paths) => _files = paths;
+
+  /// What the next image picker answers with, or null to cancel.
+  void willOfferImage(String? path) => _image = path;
+
+  @override
+  Future<List<XFile>> files() async {
+    filesAsked += 1;
+    return [for (final path in _files) XFile(path)];
+  }
+
+  @override
+  Future<XFile?> image() async {
+    imagesAsked += 1;
+    final path = _image;
+    return path == null ? null : XFile(path);
+  }
+}
