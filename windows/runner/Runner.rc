@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "cn.hnasct" "\0"
-            VALUE "FileDescription", "local_transfer" "\0"
+            VALUE "FileDescription", "竹叶局域网传输" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "local_transfer" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 cn.hnasct. All rights reserved." "\0"
             VALUE "OriginalFilename", "local_transfer.exe" "\0"
-            VALUE "ProductName", "local_transfer" "\0"
+            VALUE "ProductName", "竹叶局域网传输" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

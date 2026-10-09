@@ -295,10 +295,13 @@ class _ConversationViewState extends State<ConversationView> {
               view: messages[index],
               controller: controller,
               defaultIncomingDirectory: widget.defaultIncomingDirectory,
-              // A Device with no name is named by its Fingerprint, which is
-              // also its seed — so an unnamed peer still gets an avatar that
-              // is stable and its own.
+              // A Device with no name is named by its address, and by the last
+              // number of it inside the avatar — see `PeerView.avatarLabel`.
+              // With no peer in the list at all there is only the Fingerprint,
+              // which is stable and its own, so the avatar is still the same
+              // one every time.
               peerName: peer?.displayName ?? widget.peer.short(),
+              peerLabel: peer?.avatarLabel,
               peerSeed: widget.peer.hex,
               selfName: self.displayName,
               selfSeed: self.fingerprint.hex,
@@ -831,6 +834,7 @@ class MessageBubble extends StatelessWidget {
     required this.controller,
     required this.defaultIncomingDirectory,
     required this.peerName,
+    required this.peerLabel,
     required this.peerSeed,
     required this.selfName,
     required this.selfSeed,
@@ -847,6 +851,10 @@ class MessageBubble extends StatelessWidget {
 
   /// What the other Device is called, and what colours its avatar.
   final String peerName;
+
+  /// What to draw in the other Device's avatar instead of the first character
+  /// of [peerName], when its name is not what should be drawn there.
+  final String? peerLabel;
 
   /// What colours the other Device's avatar — its Fingerprint.
   final String peerSeed;
@@ -872,7 +880,7 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!outgoing) ...[
-            Avatar(name: peerName, seed: peerSeed),
+            Avatar(name: peerName, seed: peerSeed, label: peerLabel),
             const SizedBox(width: WeChat.bubbleAvatarGap),
           ],
           Flexible(

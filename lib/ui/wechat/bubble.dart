@@ -11,6 +11,9 @@ import 'theme.dart';
 /// same avatar across restarts without anything being persisted, and so that
 /// two nameless Devices still look different from each other.
 ///
+/// The one Device that is not drawn from the first character of its name is a
+/// Device named by its address, which gets its last octet instead — see [label].
+///
 /// Drawn on both sides of a conversation: the peer's on the left, the user's
 /// own on the right, exactly as the desktop client does.
 class Avatar extends StatelessWidget {
@@ -19,6 +22,7 @@ class Avatar extends StatelessWidget {
     super.key,
     required this.name,
     required this.seed,
+    this.label,
     this.size = WeChat.avatar,
   });
 
@@ -27,6 +31,16 @@ class Avatar extends StatelessWidget {
 
   /// What the colour is derived from — a Fingerprint, normally.
   final String seed;
+
+  /// What to draw instead of the first character of [name].
+  ///
+  /// For a Device that is named by its address. The first character of
+  /// `192.168.1.115` is a `1`, and a `1` is what every address in the list
+  /// starts with — a circle that reads the same on every row tells the user
+  /// nothing, which is the one thing an avatar must not do. The last octet is
+  /// what differs between two machines on one network, so that is what
+  /// `PeerView.avatarLabel` hands in here.
+  final String? label;
 
   /// Diameter in logical pixels.
   final double size;
@@ -37,7 +51,9 @@ class Avatar extends StatelessWidget {
     // hex — so the first character would be a letter of a hash nobody chose.
     // That is still the honest label for it, and it still differs per Device,
     // which is what an avatar is for.
-    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
+    final label = this.label;
+    final initial =
+        label ?? (name.isEmpty ? '?' : name.characters.first.toUpperCase());
     return Container(
       width: size,
       height: size,

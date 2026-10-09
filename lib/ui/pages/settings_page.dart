@@ -159,14 +159,6 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-        const SizedBox(height: 24),
-        Text(
-          l10n.settingsAbout,
-          style: const TextStyle(
-            fontSize: WeChat.fontSizeMeta,
-            color: WeChat.secondaryText,
-          ),
-        ),
       ],
     );
   }
