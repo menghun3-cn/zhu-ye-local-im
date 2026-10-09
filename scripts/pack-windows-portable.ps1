@@ -92,7 +92,11 @@ $newProbes = @(
     '选择保存位置',
     '选择文件夹…',
     '以后收到的文件默认保存在这里；每次接收时仍然可以另选一个文件夹。',
-    '每次接收时都会问你保存在哪里。'
+    '每次接收时都会问你保存在哪里。',
+    # 2026-10-09 第三轮：选中的文件先在输入框里等着，点「发送」才发。
+    # 这一轮几乎没有新文案 —— 它改的是时机 —— 唯一新增的是移除暂存项的
+    # tooltip「移除」。整句没有可挑的，就用这个只出现一次的两字词。
+    '移除'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -105,6 +109,9 @@ $newProbes = @(
 # 0xf120 = Icons.image_outlined（会话「发送图片」按钮，2026-10-09 微信对齐那一轮加的）
 # 0xf090 = Icons.folder_open_outlined（设置页「更改…」与文件夹对话框的「选择文件夹…」，
 #          2026-10-09 第二轮加的就地选择器）
+# 0xe16a = Icons.close（输入框里移除暂存文件的 ×，2026-10-09 第三轮加的
+#          附件托盘；图标字体是 tree-shaker 按用到的 codePoint 子集化的，
+#          它没进过字体的话，界面上就是一个空胶囊）
 #
 # 0xe571 = Icons.send 曾经在这里，微信对齐那轮把它**删掉了**：发送控件从
 # IconButton 换成了写「发送」二字的 TextButton（见 conversation_view.dart 的
@@ -116,6 +123,7 @@ $requiredGlyphs = @{
     '0xe0b1' = 'Icons.attach_file'
     '0xf120' = 'Icons.image_outlined'
     '0xf090' = 'Icons.folder_open_outlined'
+    '0xe16a' = 'Icons.close'
 }
 
 function Step($m) { Write-Host "==> $m" }

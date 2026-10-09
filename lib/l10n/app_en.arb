@@ -243,6 +243,7 @@
   "conversationEmpty": "Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.",
   "messageHint": "Type a message",
   "send": "Send",
+  "removeAttachment": "Remove",
   "tabConversation": "Conversations",
   "conversationListEmpty": "No conversations yet. A Device this one finds shows up here on its own, ready to connect.",
   "conversationPickOne": "Pick a conversation on the left, or connect a Device first.",
