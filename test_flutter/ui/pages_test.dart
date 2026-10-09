@@ -981,9 +981,15 @@ void main() {
         onConversation(windowA, find.byType(TextField)),
         'straight through',
       );
-      await tester.tap(onConversation(windowA, find.byTooltip(l10n.send)));
+      await tester.tap(sendButton(windowA));
       await settleRoute(tester);
 
+      // The bubble itself is the evidence the message settled: it carries the
+      // text from the moment it is drawn, and a message that was still on its
+      // way would be the same bubble, so the assertion is that the text is in
+      // the thread rather than that the thread has a receipt on it. A text
+      // message has no receipt to show — the kind-and-state line belongs to
+      // files, which are the transfers that can be refused or fail.
       await pumpUntil(
         tester,
         () =>

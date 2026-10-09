@@ -41,6 +41,19 @@ final class SelfView {
 
   /// The first bytes of the Fingerprint, for a compact label.
   String get shortFingerprint => fingerprint.short();
+
+  /// What to call this Device on screen.
+  ///
+  /// The Alias when it has one, the Fingerprint otherwise — the same rule
+  /// [PeerView.displayName] follows for a peer, so that an unnamed Device
+  /// labels itself the way it labels everyone else. An Alias is a non-nullable
+  /// empty-able string here rather than a nullable one: the profile's own name
+  /// is always set, and `DeviceDescriptor.sanitiseAlias` is what decides
+  /// whether it is a real name.
+  String get displayName {
+    final name = alias;
+    return name.isEmpty ? shortFingerprint : name;
+  }
 }
 
 /// One Device in the list a UI shows.
@@ -145,6 +158,7 @@ final class TransferView {
     required this.names,
     required this.text,
     required this.offer,
+    this.localPath,
   });
 
   /// The Transfer's id, unique within the Session it belongs to.
@@ -185,6 +199,15 @@ final class TransferView {
   /// out here: the controller answers a text offer itself, on arrival, so there
   /// is never a decision for a UI to draw.
   final IncomingTransfer? offer;
+
+  /// Where this Transfer's bytes live on this machine, when they do.
+  ///
+  /// Set for an image — the sender's own file once it has been offered, the
+  /// receiver's landed copy once it has been written and verified — and null
+  /// for everything else. Null is also the honest answer for an image that has
+  /// been offered but not yet decided, which is what keeps a receiver from
+  /// trying to draw a picture that has not arrived.
+  final String? localPath;
 
   /// Whether this Device has to answer before anything moves.
   bool get needsDecision =>

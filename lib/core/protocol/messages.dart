@@ -18,6 +18,18 @@ enum PayloadKind {
   /// One or more files.
   file('file'),
 
+  /// One or more image files, sent from a conversation.
+  ///
+  /// A kind of its own rather than a flavour of [file] because the two are
+  /// *rendered* differently and that difference is the whole point: a file
+  /// message is a name and a receipt, an image message is the picture. The
+  /// bytes travel identically — an image is still a digest-checked byte stream
+  /// with a sink on the far side — so nothing in the engine branches on this,
+  /// and a receiver that did not know the word would still be able to place the
+  /// bytes. That is what keeps this an additive change to the wire rather than
+  /// a version bump.
+  image('image'),
+
   /// Clipboard content captured by Mirroring.
   clipboard('clipboard');
 

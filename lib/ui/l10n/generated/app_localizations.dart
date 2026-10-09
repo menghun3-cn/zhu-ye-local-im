@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get kindFiles;
 
+  /// No description provided for @kindImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get kindImages;
+
   /// No description provided for @kindClipboard.
   ///
   /// In en, this message translates to:
@@ -547,6 +553,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send a file'**
   String get menuSendFile;
+
+  /// No description provided for @menuSendImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send an image'**
+  String get menuSendImage;
+
+  /// No description provided for @dropToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Let go to send'**
+  String get dropToSend;
 
   /// No description provided for @trustDevice.
   ///

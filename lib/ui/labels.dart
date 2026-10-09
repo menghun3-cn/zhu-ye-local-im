@@ -21,6 +21,7 @@ import 'l10n/generated/app_localizations.dart';
 IconData iconForKind(PayloadKind kind) => switch (kind) {
   PayloadKind.text => Icons.notes,
   PayloadKind.file => Icons.description_outlined,
+  PayloadKind.image => Icons.image_outlined,
   PayloadKind.clipboard => Icons.content_paste,
 };
 
@@ -28,6 +29,7 @@ IconData iconForKind(PayloadKind kind) => switch (kind) {
 String labelForKind(PayloadKind kind, AppLocalizations l10n) => switch (kind) {
   PayloadKind.text => l10n.kindText,
   PayloadKind.file => l10n.kindFiles,
+  PayloadKind.image => l10n.kindImages,
   PayloadKind.clipboard => l10n.kindClipboard,
 };
 
