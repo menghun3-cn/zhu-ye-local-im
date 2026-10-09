@@ -9,6 +9,7 @@ import '../dialogs.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
+import '../wechat/theme.dart';
 import '../widgets.dart';
 import 'conversation_page.dart';
 
@@ -41,12 +42,12 @@ class DevicesPage extends StatelessWidget {
     final controller = ControllerScope.of(context);
     final peers = controller.peers;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: WeChat.pagePadding,
       children: [
         _SelfCard(controller: controller),
-        const SizedBox(height: 12),
+        const SizedBox(height: WeChat.cardGap),
         _PairingCard(controller: controller),
-        const SizedBox(height: 20),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(
           title: l10n.tabDevices,
           trailing: TextButton.icon(
@@ -83,7 +84,7 @@ class _SelfCard extends StatelessWidget {
     final port = controller.listenPort;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(WeChat.cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -142,7 +143,7 @@ class _PairingCard extends StatelessWidget {
     final paired = controller.isPaired;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(WeChat.cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

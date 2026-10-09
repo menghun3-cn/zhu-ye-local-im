@@ -321,12 +321,16 @@ class _ConversationTile extends StatelessWidget {
     // whole point of it is to bring a Device that is not in the group in.
     final canConnect = peer.isDiallable && peer.isInGroup;
     final canPair = !peer.isInGroup && peer.address != null;
-    final action = _actionFor(context, peer, canConnect, canPair);
-    // The trailing slot is shared between the action button and the summary, so
-    // whichever is drawn sets the width the other's absence leaves behind. An
-    // action is right-aligned against the same edge WeChat puts its timestamp
-    // on, so the two never look like different rows.
-    final trailing = action ?? _summary(context, peer, latest);
+    // The top-right corner is the clock, where the desktop client puts it: the
+    // time the last thing was said, or — for a conversation nobody has said
+    // anything in yet — when the Device was last heard from.
+    final stamp = _stampFor(peer, latest);
+    // Under it, the one thing there is to press, or else how the last exchange
+    // went. Never both: the row is 64 logical pixels tall, and two answers to
+    // "what is this conversation doing" would neither fit nor agree.
+    final lower =
+        _actionFor(context, peer, canConnect, canPair) ??
+        _summary(context, peer, latest);
 
     return ConversationRow(
       selected: selected,
@@ -337,7 +341,10 @@ class _ConversationTile extends StatelessWidget {
       // conversation it means.
       peer: peer.displayName,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeChat.conversationRowPadding,
+          vertical: 8,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -368,24 +375,55 @@ class _ConversationTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              // Bounded, because the fallback summary is a whole sentence
-              // ("Not accepting Sessions", or the address) and an unbounded one
-              // in a fixed-width row overflows instead of ellipsising. A third
-              // of the row is enough for a button or a state word and leaves
-              // the name the room it needs.
-              ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: WeChat.conversationListWidth * 0.42,
-                ),
-                child: trailing,
+            const SizedBox(width: 8),
+            // Bounded, because the fallback summary is a whole sentence
+            // ("Not accepting Sessions", or the address) and an unbounded one
+            // in a fixed-width row overflows instead of ellipsising. A third
+            // of the row is enough for a clock or a state word and leaves
+            // the name the room it needs.
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: WeChat.conversationListWidth * 0.42,
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (stamp != null)
+                    Text(
+                      stamp,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: WeChat.fontSizeMeta,
+                        color: WeChat.secondaryText,
+                      ),
+                    ),
+                  if (lower != null) ...[
+                    if (stamp != null) const SizedBox(height: 2),
+                    lower,
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// The time in a row's top-right corner.
+  ///
+  /// The last thing said, when anything has been said; otherwise when the
+  /// Device was last heard from, so that a conversation that has been picked
+  /// but not yet held still carries a time rather than a blank corner.
+  ///
+  /// Relative ("3 分钟前") rather than a clock face, because that is what every
+  /// other surface in this application says about time, and a list that
+  /// switched to `14:07` here would be the one place a user has to decode.
+  String? _stampFor(PeerView peer, TransferView? latest) {
+    final when = latest?.at ?? peer.lastSeen;
+    if (when == null) return null;
+    return describeLastSeen(when, l10n);
   }
 
   /// What the row says under the name: the last thing said, or where the peer
@@ -533,21 +571,41 @@ class _ConversationRowState extends State<ConversationRow> {
         child: Container(
           height: WeChat.conversationRowHeight,
           color: colour,
-          child: widget.child,
+          child: Column(
+            children: [
+              Expanded(child: widget.child),
+              // The hairline between two conversations. Inset so that it
+              // begins at the avatar's left edge rather than at the row's: a
+              // full-bleed line would cut the list into blocks, and the
+              // WeChat list reads as one surface with its rows merely
+              // separated. The row paints it rather than the list, because
+              // only the row knows the inset its own padding produced.
+              const Padding(
+                padding: EdgeInsets.only(left: WeChat.conversationRowPadding),
+                child: Divider(height: 1, thickness: 1, color: WeChat.divider),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// A small button on a conversation row.
+/// The small entry that starts a conversation, on the row of a Device that is
+/// not in one yet.
 ///
-/// A [TextButton] with every colour overridden, rather than a `Material` and an
-/// `InkWell`. A hand-rolled button would look the same and behave worse: it
-/// would have no focus ring, no keyboard activation, no `Tooltip` semantics and
-/// no `ButtonStyleButton` for a test to find. The desktop client's flat pill is
-/// a *style*, and Material expresses styles as `ButtonStyle` — which is the
-/// whole reason that class exists.
+/// A [TextButton] carrying a dot and a word, rather than a filled pill: a
+/// filled button is the loudest thing Material draws, and a list of found
+/// Devices would be a column of them. The desktop client marks "you can act
+/// here" with a spot of colour and a word, which is what this is — the dot is
+/// in the brand green for the straightforward action (connect) and grey for
+/// the one that needs the peer's consent first (pair).
+///
+/// Still a [TextButton] and not a hand-rolled `GestureDetector`: a hand-rolled
+/// one would look the same and behave worse — no focus ring, no keyboard
+/// activation, no `Tooltip` semantics — and the row has to stay reachable
+/// without a mouse.
 class _RowAction extends StatelessWidget {
   const _RowAction({
     required this.label,
@@ -556,31 +614,28 @@ class _RowAction extends StatelessWidget {
   });
 
   final String label;
+
+  /// Whether this is the straightforward action. Only the colour differs.
   final bool primary;
+
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final colour = primary ? WeChat.brand : WeChat.secondaryText;
     final style = ButtonStyle(
-      backgroundColor: WidgetStatePropertyAll(
-        primary ? WeChat.brand : Colors.transparent,
-      ),
-      foregroundColor: WidgetStatePropertyAll(
-        primary ? Colors.white : WeChat.bubbleText,
-      ),
-      // The hairline the outline variant needs, and nothing for the filled one.
-      side: primary
-          ? null
-          : const WidgetStatePropertyAll(BorderSide(color: WeChat.divider)),
-      // Square-ish, and small: a row is 64 logical pixels tall and a
+      backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+      foregroundColor: WidgetStatePropertyAll(colour),
+      overlayColor: const WidgetStatePropertyAll(WeChat.listHover),
+      // Square-ish and small: a row is 64 logical pixels tall, and a
       // Material-default button would fill a third of it.
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(4)),
+          borderRadius: BorderRadius.all(Radius.circular(WeChat.controlRadius)),
         ),
       ),
       padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       ),
       minimumSize: const WidgetStatePropertyAll(Size.zero),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -589,7 +644,22 @@ class _RowAction extends StatelessWidget {
         TextStyle(fontSize: WeChat.fontSizeMeta),
       ),
     );
-    return TextButton(onPressed: onPressed, style: style, child: Text(label));
+    return TextButton(
+      onPressed: onPressed,
+      style: style,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+    );
   }
 }
 

@@ -8,6 +8,7 @@ import '../controller_scope.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
+import '../wechat/theme.dart';
 import '../widgets.dart';
 
 /// How the clipboard is treated, and what is waiting in it.
@@ -66,12 +67,12 @@ class _ClipboardPageState extends State<ClipboardPage> {
     ];
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: WeChat.pagePadding,
       children: [
         SectionHeader(title: l10n.clipboardSyncHeader),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(WeChat.cardPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -103,10 +104,10 @@ class _ClipboardPageState extends State<ClipboardPage> {
           ),
         ),
         if (!controller.isPaired) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: WeChat.cardGap),
           HintText(l10n.clipboardNeedsGroup),
         ] else ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: WeChat.sectionGap),
           SectionHeader(title: l10n.clipboardPeersHeader),
           // The sharing whitelist. Group membership says a Device may hold a
           // Session; this list says which of those Devices the clipboard is
@@ -120,14 +121,14 @@ class _ClipboardPageState extends State<ClipboardPage> {
               _ClipboardPeerTile(peer: peer, controller: controller),
           ],
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.clipboardWaitingHeader),
         if (staged.isEmpty)
           HintText(l10n.clipboardNothingStaged)
         else
           for (final entry in staged)
             _EntryCard(entry: entry, controller: controller),
-        const SizedBox(height: 20),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.clipboardAppliedHeader),
         if (_applied.isEmpty)
           HintText(l10n.clipboardNothingApplied)

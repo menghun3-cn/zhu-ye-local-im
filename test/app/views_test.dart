@@ -29,6 +29,7 @@ void main() {
       direction: TransferDirection.incoming,
       kind: PayloadKind.file,
       peer: Fingerprint.ofPublicKey(const [1, 2, 3]),
+      at: DateTime.utc(2026, 10, 9, 12),
       state: TransferState.transferring,
       transferredBytes: moved,
       totalBytes: total,
