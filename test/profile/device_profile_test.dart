@@ -233,6 +233,75 @@ void main() {
       });
     });
 
+    group('the incoming folder', () {
+      test('starts unset, so the platform default applies', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        expect(profile.incomingDirectory, isNull);
+      });
+
+      test('remembers the folder the user chose', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setIncomingDirectory('D:/shared/inbox');
+        expect(profile.incomingDirectory, 'D:/shared/inbox');
+      });
+
+      test('trims, and an empty answer goes back to the default', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setIncomingDirectory('  D:/shared/inbox  ');
+        expect(profile.incomingDirectory, 'D:/shared/inbox');
+        // Whitespace is how the screen says "no choice". A null-and-empty
+        // distinction would be one the settings screen cannot show.
+        profile.setIncomingDirectory('   ');
+        expect(profile.incomingDirectory, isNull);
+        profile.setIncomingDirectory(null);
+        expect(profile.incomingDirectory, isNull);
+      });
+
+      test('a chosen folder survives a JSON round trip', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+          incomingDirectory: 'D:/shared/inbox',
+        );
+        final restored = DeviceProfile.fromJson(profile.toJson());
+        expect(restored.incomingDirectory, 'D:/shared/inbox');
+      });
+
+      test('an unset folder is written as absent, not as null', () {
+        // "Unset" and "cleared" are the same fact, so they get the same
+        // spelling: the key is left out, and any build reads it as the
+        // platform default.
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        expect(profile.toJson().containsKey('incomingDirectory'), isFalse);
+      });
+
+      test('a profile JSON missing the key decodes to unset', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.incomingDirectory, isNull);
+      });
+    });
+
     test('canMirrorTo follows group membership, not favorites', () {
       final self = _fp('a');
       final member = _fp('b');
@@ -259,6 +328,7 @@ void main() {
         group: OwnerGroup(self: self, members: [member]),
         favorites: {favourite},
         clipboardPeers: {_fp('e')},
+        incomingDirectory: 'D:/shared/inbox',
         known: {
           _fp('d').hex: KnownDevice(
             fingerprint: _fp('d'),
@@ -276,6 +346,7 @@ void main() {
       expect(restored.group, profile.group);
       expect(restored.favorites, [favourite]);
       expect(restored.clipboardPeers, [_fp('e')]);
+      expect(restored.incomingDirectory, 'D:/shared/inbox');
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);
       expect(known!.alias, 'Phone');

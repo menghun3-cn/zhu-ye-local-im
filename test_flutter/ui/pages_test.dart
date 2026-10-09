@@ -2,13 +2,19 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+// `flutter_test` has a `TestWindow` of its own — an unrelated handle on the
+// test's window — and the harness has one meaning a window under test. Only
+// the harness's is used here, so the other is hidden rather than renamed.
+import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/clipboard_paste.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
+import 'package:local_transfer/ui/pickers.dart';
 
 import '../support/ui_harness.dart';
 
@@ -730,6 +736,117 @@ void main() {
 
       await shutdown(tester, [device]);
     });
+
+    testWidgets('the folder is chosen from the platform, not typed', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
+      );
+      await pumpWindow(tester, device);
+      // The folder chooser is the operating system's own dialog, so a test
+      // cannot drive the real one — it runs outside Flutter's event loop and
+      // never returns to a `testWidgets` body. The stand-in drives the real
+      // button, which is the half that can go wrong.
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      picker.willChooseDirectory(r'D:\shared\inbox');
+
+      await openTab(tester, l10n.tabSettings, window: windowA);
+      await tester.tap(
+        onPage(windowA, SettingsPage, find.text(l10n.changeIncomingFolder)),
+      );
+      await settleRoute(tester);
+
+      expect(
+        windowA.within(find.text(l10n.chooseFolderTitle)),
+        findsOneWidget,
+        reason: 'the change opens the same dialog the accept flow does',
+      );
+      // Prefilled with what would be offered right now — the platform default,
+      // while nothing has been chosen — so the user edits a real answer rather
+      // than an empty box.
+      final field = windowA.within(find.byType(TextField));
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'C:/downloads/LocalTransfer',
+      );
+
+      await tester.tap(windowA.within(find.text(l10n.browseFolder)));
+      await pumpUntil(
+        tester,
+        () => picker.directoriesAsked == 1,
+        description: 'the platform folder chooser to be asked',
+      );
+      await tester.pump();
+      // The chooser's answer lands in the field rather than being committed
+      // outright: the field stays editable for a path no dialog can reach,
+      // and the user still confirms.
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        r'D:\shared\inbox',
+      );
+
+      await tapDialogButton(tester, l10n.save, window: windowA);
+      await pumpUntil(
+        tester,
+        () => device.controller.incomingDirectory == r'D:\shared\inbox',
+        description: 'the chosen folder to reach the controller',
+      );
+      expect(
+        onPage(windowA, SettingsPage, find.text(r'D:\shared\inbox')),
+        findsOneWidget,
+        reason: 'the surface has to report the folder it will actually use',
+      );
+      expect(
+        onPage(windowA, SettingsPage, find.text(l10n.incomingFolderHint)),
+        findsOneWidget,
+        reason: 'a chosen folder says so rather than saying "you are asked"',
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('backing out of the folder chooser changes nothing', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
+      );
+      await pumpWindow(tester, device);
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+
+      await openTab(tester, l10n.tabSettings, window: windowA);
+      await tester.tap(
+        onPage(windowA, SettingsPage, find.text(l10n.changeIncomingFolder)),
+      );
+      await settleRoute(tester);
+      await tapDialogButton(tester, l10n.cancel, window: windowA);
+      await pumpUntil(
+        tester,
+        () => !dialogIsOpen(windowA),
+        description: 'the dialog to close without answering',
+      );
+
+      // Nothing was chosen, so nothing is remembered: only a confirmed answer
+      // is a decision, and a cancelled dialog must not clear a folder the user
+      // already has.
+      expect(device.controller.incomingDirectory, isNull);
+      expect(picker.directoriesAsked, 0);
+      expect(
+        onPage(windowA, SettingsPage, find.text('C:/downloads/LocalTransfer')),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [device]);
+    });
   });
 
   group('the Conversations surface', () {
@@ -1063,10 +1180,18 @@ void main() {
       );
 
       // The box is empty and still has the caret, so the next message can be
-      // typed without reaching for the mouse.
+      // typed without reaching for the mouse. Waited for rather than asserted
+      // outright: the caret comes back on the frame *after* the send, because
+      // `_ConversationComposerState._send` re-requests focus from a post-frame
+      // callback — the send rebuilds the field, and asking for focus before
+      // that frame would ask a node the rebuild is about to replace.
       final field = tester.widget<TextField>(composer);
       expect(field.controller!.text, isEmpty);
-      expect(field.focusNode!.hasFocus, isTrue);
+      await pumpUntil(
+        tester,
+        () => field.focusNode!.hasFocus,
+        description: 'the caret to come back to the box',
+      );
 
       // And typing again lands in the same box rather than nowhere.
       await tester.enterText(composer, 'second');
@@ -1080,4 +1205,181 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
   });
+
+  group('pasting into the composer', () {
+    testWidgets('a file on the clipboard becomes a message', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      // Copying a file in Explorer puts the *file* on the clipboard, not its
+      // contents — which is precisely what Flutter's own text-only `Clipboard`
+      // cannot see, and why the composer reads through this seam instead.
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      final home = tempDirectory('local-transfer-paste-');
+      final source = File('${home.path}${Platform.pathSeparator}copied.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 32; i++) i]);
+      clipboard.holdingFiles([source.path]);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      // Focus the box, then press the real chord: the shortcut table is part
+      // of what is under test, not just what the shortcut does.
+      await tester.tap(onConversation(windowA, find.byType(TextField)));
+      await sendCtrlV(tester, windowA);
+
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.isNotEmpty,
+        description: 'the pasted file to become a message',
+      );
+      expect(alice.controller.transfers.single.kind, PayloadKind.file);
+      expect(
+        onConversation(windowA, find.text('copied.bin')),
+        findsOneWidget,
+        reason: 'the message names the file that was pasted',
+      );
+
+      // Answered before the test ends, so the send that is still waiting on it
+      // does not outlive the window.
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a screenshot on the clipboard is sent as a picture', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      // A screenshot arrives with no name at all — only bytes — so the app has
+      // to work out what it is from the bytes and write them somewhere the
+      // engine can stream from.
+      clipboard.holdingImage(onePixelPng);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      await tester.tap(onConversation(windowA, find.byType(TextField)));
+      await sendCtrlV(tester, windowA);
+
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.isNotEmpty,
+        description: 'the pasted picture to become a message',
+      );
+      expect(
+        alice.controller.transfers.single.kind,
+        PayloadKind.image,
+        reason: 'the bytes, not the clipboard, decide what the message is',
+      );
+
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the picture',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a clipboard holding only text still pastes as text', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      clipboard.holdingNothing();
+      fakeTextClipboard('from the clipboard');
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      final composer = onConversation(windowA, find.byType(TextField));
+      await tester.tap(composer);
+      await sendCtrlV(tester, windowA);
+
+      // The composer answers Ctrl+V itself, so the field's own paste never
+      // runs. Claiming the chord must not take ordinary text pasting away:
+      // when the clipboard holds no file and no picture, the fallback has to
+      // put the text in the box exactly as the field would have.
+      await pumpUntil(
+        tester,
+        () => composerText(tester, windowA) == 'from the clipboard',
+        description: 'the text to be pasted into the box',
+      );
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'text in the box is not a message until it is sent',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+  });
+}
+
+/// The text currently in [window]'s composer.
+String composerText(WidgetTester tester, TestWindow window) => tester
+    .widget<TextField>(onConversation(window, find.byType(TextField)))
+    .controller!
+    .text;
+
+/// Puts [text] on the text clipboard Flutter's own `Clipboard` reads.
+///
+/// The composer's paste falls back to the field's own, which is
+/// `Clipboard.getData` over a platform channel — and in a `testWidgets` body
+/// there is no engine behind that channel, so the answer is faked here rather
+/// than left to throw `MissingPluginException`.
+void fakeTextClipboard(String text) {
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'Clipboard.getData') {
+      return <String, dynamic>{'text': text};
+    }
+    return null;
+  });
+  addTearDown(
+    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+  );
 }

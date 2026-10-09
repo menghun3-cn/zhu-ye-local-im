@@ -462,6 +462,29 @@ final class LocalTransferController {
   bool isClipboardPeer(Fingerprint peer) =>
       _local?.profile.isClipboardPeer(peer) ?? false;
 
+  /// Where the user wants received files to land, or null for the platform's
+  /// own default.
+  ///
+  /// The convention the shell reads: a chosen folder wins, and the seam's
+  /// default is what "no choice" resolves to. The two are kept apart here
+  /// rather than collapsed into one value so that clearing the choice goes
+  /// back to the platform default instead of pinning whatever it was when the
+  /// screen was last opened.
+  String? get incomingDirectory => _local?.profile.incomingDirectory;
+
+  /// Sets where received files should land, and persists it.
+  ///
+  /// Takes [path] as the user gave it. Nothing is created or checked here: a
+  /// folder the user names may be on a drive that is not mounted yet, and a
+  /// settings screen that refused to remember it would be one that cannot be
+  /// set up before the drive is.
+  Future<void> setIncomingDirectory(String? path) async {
+    final local = _requireLocal();
+    local.profile.setIncomingDirectory(path);
+    await _persist();
+    _notify();
+  }
+
   /// Sets whether [peer] may share the clipboard with this Device, and
   /// persists it.
   ///

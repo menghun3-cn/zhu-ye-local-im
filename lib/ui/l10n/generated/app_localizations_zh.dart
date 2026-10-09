@@ -559,4 +559,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get acceptIntoFolder => '接收并保存到此文件夹';
+
+  @override
+  String get browseFolder => '选择文件夹…';
+
+  @override
+  String get chooseFolderTitle => '选择保存位置';
+
+  @override
+  String get changeIncomingFolder => '更改…';
+
+  @override
+  String get incomingFolderHint => '以后收到的文件默认保存在这里；每次接收时仍然可以另选一个文件夹。';
+
+  @override
+  String get incomingFolderUnset => '每次接收时都会问你保存在哪里。';
 }
