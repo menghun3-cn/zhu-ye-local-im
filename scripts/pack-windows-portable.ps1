@@ -226,8 +226,12 @@ if (-not $SkipBuild) {
     #   release_bundle_windows-x64_assets.stamp   仍停在 19:14:07  ← 这步压根没跑
     #   产出的字体            19:14:06，0xf090 在、0xef7f 不在
     # 也就是说：构建"成功"了、文案都在、新图标却是空的。
-    #   也不能靠删产物来逼它重跑：`BundleWindowsAssets.outputs` 是**空列表**，
-    #   缓存的输出侧只看 stamp 里记过的路径，不看输出文件在不在。
+    #   删产物其实也管用 —— 那个 target 自己没声明 outputs，但 Target.resolveOutputs
+    #   还会走它的 depfile（flutter_assets.d），把上一轮写出的每个文件都算进输出集合，
+    #   输出缺了照样失效（实测：只删 .otf、不动 stamp、重新构建，字体确实回来）。
+    #   只是那把把手看得见的就是「上一轮声明过的文件集」，而这一轮要处理的恰恰是
+    #   「上一轮的看法不对」。所以主力用删 stamp —— 它是那一步「我跑过」的自述，
+    #   删掉它等于说「再跑一遍」，不依赖那份自述里有什么。
     #
     # 真正管用的一招：**删掉那个 target 的 stamp 文件**。build_system.dart 的注释写明
     # 「If the stamp file is missing, the target's action is always rerun」。只删这一个
