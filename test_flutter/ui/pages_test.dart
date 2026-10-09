@@ -97,17 +97,17 @@ void main() {
         reason: 'connecting is not done from this surface any more',
       );
       expect(onPage(windowA, DevicesPage, find.text('Bob')), findsOneWidget);
-      expect(
-        onPage(windowA, DevicesPage, find.textContaining(l10n.sessionOpen)),
-        findsNothing,
-        reason: 'nothing is connected yet',
-      );
 
+      // Bob is paired and therefore in the Owner Group, so the two Devices
+      // connect on their own the moment Discovery places him: this surface is
+      // read without asking for anything, and there is no Connect here to ask
+      // with. The conversation list is where that state shows, and the test
+      // below covers it.
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => conversationConnectable(windowA, 'Bob'),
-        description: 'Bob to be offered as diallable in the conversation list',
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to appear in the conversation list',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -568,6 +568,10 @@ void main() {
       await pumpWindow(tester, bob);
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
+      // Both sides have added the other, the way two users do on this very
+      // surface: pairing alone shares no clipboard.
+      alice.controller.setClipboardPeer(bob.fingerprint, value: true);
+      bob.controller.setClipboardPeer(alice.fingerprint, value: true);
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
       await openTab(tester, l10n.tabClipboard, window: windowA);
@@ -577,8 +581,7 @@ void main() {
         findsOneWidget,
       );
 
-      alice.clipboard.copy('review me');
-      // This is the whole point of the surface: an entry that has arrived turns
+      alice.clipboard.copy('review me'); // This is the whole point of the surface: an entry that has arrived turns
       // up on its own, without the user navigating away and back to refresh it.
       await pumpUntil(
         tester,
@@ -599,6 +602,55 @@ void main() {
         tester,
         () => bob.clipboard.applied.contains('review me'),
         description: 'Bob to put the entry on his clipboard',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('lists the group and shares nothing until a box is ticked', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pumpWindow(tester, bob);
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await openTab(tester, l10n.tabClipboard, window: windowA);
+
+      // The list is what the fourth gate is edited from, so it has to be on the
+      // surface rather than inferred from the group: being paired is not the
+      // same as being allowed to read this clipboard.
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ClipboardPage,
+          find.text(l10n.clipboardPeersHeader),
+        ).evaluate().isNotEmpty,
+        description: 'the sharing list to be shown',
+      );
+      expect(
+        onPage(windowA, ClipboardPage, find.text(l10n.clipboardPeersHint)),
+        findsOneWidget,
+      );
+      final tile = onPage(
+        windowA,
+        ClipboardPage,
+        find.widgetWithText(CheckboxListTile, 'Alice'),
+      );
+      expect(tile, findsOneWidget, reason: 'the paired peer has to be listed');
+      expect(
+        tester.widget<CheckboxListTile>(tile).value,
+        isFalse,
+        reason: 'pairing a Device does not volunteer this clipboard',
+      );
+
+      await tester.tap(tile);
+      await pumpUntil(
+        tester,
+        () => bob.controller.isClipboardPeer(alice.fingerprint),
+        description: 'the tick to reach the controller',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -782,21 +834,24 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
-    testWidgets('a Device that has only been found is listed, with Connect', (
+    testWidgets('a paired Device connects on its own, needing no tap', (
       tester,
     ) async {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
       final bob = await startUiDevice(tester, hub.b, 'Bob');
-      // Paired, so the peer is in the group and therefore diallable, but never
-      // connected: this is the state a user is in when they have just opened
-      // the app and the other Device has announced itself.
+      // Paired, so the peer is in the Owner Group. Discovery then places it,
+      // and the connection follows without anybody asking for it: there is no
+      // "found but not connected" state left for a paired peer to sit in, and
+      // therefore no Connect button to look for. Connect is still offered for
+      // a peer that has been found and *not* paired, which the Pairing tests
+      // cover.
       await pairDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
       await openTab(tester, l10n.tabConversation, window: windowA);
 
-      // The whole point of the move: the Device shows up here on its own,
-      // because Discovery placed it — no trip to the Devices surface first.
+      // The Device shows up here on its own, because Discovery placed it — no
+      // trip to the Devices surface first.
       await pumpUntil(
         tester,
         () => onPage(
@@ -806,66 +861,93 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'the found Device to appear in the conversation list',
       );
+      // And it is a conversation rather than a row waiting for a tap: the
+      // Session came up by itself.
+      await pumpUntil(
+        tester,
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the two Devices to connect with nobody asking',
+      );
       expect(
-        conversationConnectable(windowA, 'Bob'),
-        isTrue,
-        reason: 'a found Device has to offer the one action that matters',
+        conversationHasButton(windowA, button: l10n.connect, name: 'Bob'),
+        isFalse,
+        reason: 'there is nothing left for a Connect button to do',
       );
 
       await shutdown(tester, [alice, bob]);
     });
 
-    testWidgets('tapping Connect on a listed Device is wired to the dial', (
+    testWidgets('a Device that announced no name is listed by Fingerprint', (
       tester,
     ) async {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');
-      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      // Bob's alias is the placeholder the wire substitutes for "no name at
+      // all", so this is a Device that announced nothing.
+      final bob = await startUiDevice(
+        tester,
+        hub.b,
+        DeviceDescriptor.fallbackAlias,
+      );
       await pairDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
       await openTab(tester, l10n.tabConversation, window: windowA);
 
       await pumpUntil(
         tester,
-        () => conversationConnectable(windowA, 'Bob'),
-        description: 'Bob to be offered as diallable',
+        () => conversationListed(windowA, bob.fingerprint.short()),
+        description: 'the nameless Device to be listed',
       );
-
-      // What this surface is answerable for: the row offers the one action, it
-      // is aimed at Bob rather than at a second peer on the same list, and the
-      // peer it points at has somewhere to dial. Everything the button needs is
-      // checked here, because whether the *socket* lands is not this test's
-      // question: a dial started from a tap runs on the widget test's clock and
-      // its continuations never return to a `testWidgets` body, so the Session
-      // is asserted where it can be — by [connectDevices], which dials on the
-      // real event loop, and by the two-window e2e test that pairs by clicking.
-      final connectButton = onPage(
-        windowA,
-        ConversationsPage,
-        find.descendant(
-          of: find.widgetWithText(ListTile, 'Bob'),
-          matching: find.bySubtype<ButtonStyleButton>(),
+      // Not the placeholder: a Device with no name is told apart from every
+      // other nameless Device by the Fingerprint it proved it holds, and the
+      // placeholder is not a name — it is the absence of one.
+      expect(
+        onPage(
+          windowA,
+          ConversationsPage,
+          find.text(DeviceDescriptor.fallbackAlias),
         ),
-      );
-      expect(
-        connectButton,
-        findsOneWidget,
-        reason: "Bob's row offers exactly one action",
+        findsNothing,
+        reason: 'the placeholder must never reach a screen',
       );
 
-      final bobView = alice.controller.peers.firstWhere(
-        (view) => view.displayName == 'Bob',
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a found Device that is not paired is offered as Pair', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      // Unpaired on purpose. A paired peer is connected to on its own, so the
+      // only row that still carries a button is one for a Device that has been
+      // found and not yet admitted — and there the action is Pair, because
+      // there is no secret to dial with.
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be discovered and listed',
       );
       expect(
-        bobView.isInGroup,
+        conversationHasButton(windowA, button: l10n.pair, name: 'Bob'),
         isTrue,
-        reason: 'Connect rather than Pair, because the Pairing is done',
+        reason: 'the one action for a Device that is not paired is Pair',
       );
-      expect(bobView.isConnected, isFalse, reason: 'nothing has dialled yet');
       expect(
-        bobView.isDiallable,
-        isTrue,
-        reason: 'the row only offers Connect when there is somewhere to dial',
+        conversationHasButton(windowA, button: l10n.connect, name: 'Bob'),
+        isFalse,
+        reason: 'Connect needs a secret, and a Pairing is what gives it one',
+      );
+      expect(
+        alice.controller.sessions,
+        isEmpty,
+        reason: 'an unpaired Device is not connected to behind its user',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -904,12 +986,12 @@ void main() {
 
       await pumpUntil(
         tester,
-        () => onConversation(
-          windowA,
-          // The bubble composes the two labels into one line, so this matches
-          // the line rather than either word on its own.
-          find.text('${l10n.kindText} · ${l10n.stateCompleted}'),
-        ).evaluate().isNotEmpty,
+        () =>
+            onConversation(
+              windowA,
+              find.text('straight through'),
+            ).evaluate().isNotEmpty &&
+            alice.controller.transfers.single.state.isSettled,
         description: 'the message to settle as sent',
       );
       // The receiver was never asked: text is not an offer, so nothing is
@@ -923,6 +1005,20 @@ void main() {
       expect(
         onConversation(windowA, find.text('straight through')),
         findsOneWidget,
+      );
+      // A conversation is not a transfer. The "kind · state" line belongs to a
+      // file, where it is the receipt the user reads; over a text bubble it
+      // would read "text · completed", which is transfer bookkeeping nobody
+      // asked for. What is asserted here is the absence of that line, not the
+      // absence of the words: the word "text" must not appear beside the
+      // message at all.
+      expect(
+        onConversation(
+          windowA,
+          find.text('${l10n.kindText} · ${l10n.stateCompleted}'),
+        ),
+        findsNothing,
+        reason: 'a text message carries no transfer status line',
       );
 
       await shutdown(tester, [alice, bob]);

@@ -437,6 +437,17 @@ Future<void> openTab(
   final control = rail.evaluate().isNotEmpty
       ? rail
       : window.within(find.byType(NavigationBar));
+  // A question that has just been answered is still on its way out: the pop
+  // animation leaves the dialog — and the modal barrier under it — in the tree
+  // for a few frames, and a tap aimed at a rail item lands on that barrier
+  // instead. `tester.tap` reports that as "would not hit test", a message about
+  // coordinates that says nothing about the dialog actually in the way, so it
+  // is worth waiting the question out rather than debugging the geometry.
+  await pumpUntil(
+    tester,
+    () => !dialogIsOpen(window),
+    description: 'the question on this window to finish closing',
+  );
   await tester.tap(find.descendant(of: control, matching: find.text(label)));
   await settleRoute(tester);
 }
@@ -643,18 +654,36 @@ Future<void> pairDevices(
 }
 
 /// Opens a Session from [from] to [to] over a real loopback socket.
+///
+/// Tolerates the Session already existing, and tolerates losing the race to
+/// create it: a peer in the Owner Group is connected to as soon as Discovery
+/// places it, so by the time a test asks for a Session the two Devices may
+/// already have one — and *which* of the two dials the LinkManager counts as
+/// the one that established it is not something a test can pin down. The two
+/// shapes of "already connected" are an `AppStateException` from the
+/// controller, which checks before it dials, and a `HandshakeException` from
+/// the LinkManager, which is what the slower of two simultaneous dials sees.
 Future<void> connectDevices(
   WidgetTester tester,
   UiDevice from,
   UiDevice to,
 ) async {
   await tester.runAsync(() async {
-    final port = to.controller.listenPort;
-    expect(port, isNotNull, reason: 'a paired Device listens');
-    await from.controller.connectTo(
-      address: InternetAddress.loopbackIPv4.address,
-      port: port,
-    );
+    if (from.controller.sessions.isEmpty) {
+      final port = to.controller.listenPort;
+      expect(port, isNotNull, reason: 'a paired Device listens');
+      try {
+        await from.controller.connectTo(
+          address: InternetAddress.loopbackIPv4.address,
+          port: port,
+        );
+      } on AppStateException {
+        // Already open, as the controller saw it.
+      } on HandshakeException {
+        // Already open, as the LinkManager saw it: the peer dialled us at the
+        // same instant and got there first.
+      }
+    }
     await untilTrue(
       () =>
           from.controller.sessions.isNotEmpty &&

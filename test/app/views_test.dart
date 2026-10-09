@@ -81,31 +81,54 @@ void main() {
         view(alias: 'Bob', address: '10.0.0.2', port: 53000).displayName,
         'Bob',
       );
+      expect(view(alias: 'Bob').hasRealAlias, isTrue);
     });
 
-    test('shows the address when no Alias was announced', () {
-      // A nameless peer used to read as the same Fingerprint-derived string as
-      // every other nameless peer; the address is the fact that tells them
-      // apart, and it is the one nobody on the far end chose.
+    test('treats the placeholder name as no name at all', () {
+      // A Device that announced nothing arrives as `fallbackAlias`, not as
+      // null: the wire substitutes it, so "no name" has to be recognised as
+      // that literal string or a nameless peer would be labelled "Unnamed
+      // device" on every screen — which is not a name, it is the absence of
+      // one wearing a name's clothes.
+      final peer = view(alias: DeviceDescriptor.fallbackAlias);
+      expect(peer.alias, DeviceDescriptor.fallbackAlias);
+      expect(peer.hasRealAlias, isFalse);
+      expect(peer.displayName, isNot(DeviceDescriptor.fallbackAlias));
+      expect(peer.displayName, peer.shortFingerprint);
+    });
+
+    test('falls back to the Fingerprint when no Alias was announced', () {
+      // The address is a fact about *where* a Device is, not who it is: two
+      // Devices that both announce nothing are told apart by the Fingerprint
+      // they proved they hold, and the address is shown beside it in every row
+      // anyway. Ordering the fallback the other way round would put a value
+      // nobody chose where a name belongs.
       final peer = view(address: '10.0.0.2', port: 53000);
       expect(peer.alias, isNull);
-      expect(peer.displayName, '10.0.0.2');
+      expect(peer.hasRealAlias, isFalse);
+      expect(peer.displayName, peer.shortFingerprint);
       expect(
         view(address: '10.0.0.7', port: 53000).displayName,
-        isNot(peer.displayName),
+        peer.displayName,
+        reason: 'the same Device, seen at a second address',
       );
     });
 
-    test('shows the address even when the peer accepts no Sessions', () {
-      // There is nothing to dial, but "where it is" is still worth more than a
-      // placeholder: a peer seen through Discovery and never connected to has
-      // an address and no port.
-      final peer = view(address: '10.0.0.2');
-      expect(peer.isDiallable, isFalse);
-      expect(peer.displayName, '10.0.0.2');
+    test('names a peer the same way whether or not it has an address', () {
+      // There is nothing to dial in the second case, but "who" does not depend
+      // on "where": a peer seen through Discovery and never connected to is
+      // still the same Device, and it reads the same.
+      final unreachable = view(address: '10.0.0.2');
+      expect(unreachable.isDiallable, isFalse);
+      expect(unreachable.displayName, unreachable.shortFingerprint);
+      expect(
+        view().displayName,
+        unreachable.displayName,
+        reason: 'the Fingerprint does not come from the address',
+      );
     });
 
-    test('falls back to the Fingerprint only when there is no address', () {
+    test('has something to show even with neither a name nor an address', () {
       final peer = view();
       expect(peer.alias, isNull);
       expect(peer.address, isNull);
