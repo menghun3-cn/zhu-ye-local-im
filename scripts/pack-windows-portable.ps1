@@ -94,13 +94,16 @@ $newProbes = @(
 # 这里直接读字体的 cmap，点名几个 2026-10-09 之后才用到的字形。
 # 0xf0b0 = Icons.forum_outlined（对话入口未选中态）
 # 0xe2c3 = Icons.forum（对话入口选中态）
-# 0xe571 = Icons.send（会话发送）
 # 0xe0b1 = Icons.attach_file（会话附加文件）
 # 0xf120 = Icons.image_outlined（会话「发送图片」按钮，2026-10-09 微信对齐那一轮加的）
+#
+# 0xe571 = Icons.send 曾经在这里，微信对齐那轮把它**删掉了**：发送控件从
+# IconButton 换成了写「发送」二字的 TextButton（见 conversation_view.dart 的
+# _SendButton），源码里再没有 `Icons.send`，tree-shaker 于是正确地把它从字体里
+# 子集化掉了。留着这个条目 = 在**正确的包**上永远红灯。
 $requiredGlyphs = @{
     '0xf0b0' = 'Icons.forum_outlined'
     '0xe2c3' = 'Icons.forum'
-    '0xe571' = 'Icons.send'
     '0xe0b1' = 'Icons.attach_file'
     '0xf120' = 'Icons.image_outlined'
 }
