@@ -96,7 +96,12 @@ $newProbes = @(
     # 2026-10-09 第三轮：选中的文件先在输入框里等着，点「发送」才发。
     # 这一轮几乎没有新文案 —— 它改的是时机 —— 唯一新增的是移除暂存项的
     # tooltip「移除」。整句没有可挑的，就用这个只出现一次的两字词。
-    '移除'
+    '移除',
+    # 2026-10-09 第四轮：产品改名「竹叶局域网传输」、新增「关于」页、无名设备
+    # 改回以 IP 为名。改名本身不挑探针（「竹叶局域网传输」也出现在
+    # aboutDescription 里，证明不了「关于」页在包里），挑「关于」页独有的整句。
+    '还没有发布过任何版本，暂时无从比较本机这版。',
+    '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -112,6 +117,10 @@ $newProbes = @(
 # 0xe16a = Icons.close（输入框里移除暂存文件的 ×，2026-10-09 第三轮加的
 #          附件托盘；图标字体是 tree-shaker 按用到的 codePoint 子集化的，
 #          它没进过字体的话，界面上就是一个空胶囊）
+# 0xe33d / 0xe33c = Icons.info_outline / Icons.info（「关于」导航项的两个态）
+# 0xe637 = Icons.system_update_alt（「关于」页的「检查更新」按钮）
+# 0xe45c = Icons.open_in_new（「关于」页的「打开下载页」按钮）——
+#          以上四个是 2026-10-09 第四轮加的「关于」页与它的导航项
 #
 # 0xe571 = Icons.send 曾经在这里，微信对齐那轮把它**删掉了**：发送控件从
 # IconButton 换成了写「发送」二字的 TextButton（见 conversation_view.dart 的
@@ -124,6 +133,15 @@ $requiredGlyphs = @{
     '0xf120' = 'Icons.image_outlined'
     '0xf090' = 'Icons.folder_open_outlined'
     '0xe16a' = 'Icons.close'
+    # 2026-10-09 第四轮：「关于」页与它的导航项用到的字形。
+    # 0xe33d = Icons.info_outline（「关于」导航项未选中态）
+    # 0xe33c = Icons.info（「关于」导航项选中态）
+    # 0xe637 = Icons.system_update_alt（「检查更新」按钮）
+    # 0xe45c = Icons.open_in_new（「打开下载页」按钮）
+    '0xe33d' = 'Icons.info_outline'
+    '0xe33c' = 'Icons.info'
+    '0xe637' = 'Icons.system_update_alt'
+    '0xe45c' = 'Icons.open_in_new'
 }
 
 function Step($m) { Write-Host "==> $m" }
