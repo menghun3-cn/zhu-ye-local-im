@@ -208,26 +208,58 @@ function Sync-Tree($source, $target, $extra = @()) {
 
 # ---------------------------------------------------------------- 1. 构建
 if (-not $SkipBuild) {
-    # 必须先让 assets 步骤失效。`flutter build windows --release` 是增量的，而
-    # Material Icons 的字形子集化只在整个 assets 步骤重跑时才会重做 —— 只加新图标、
-    # 不改 pubspec 的话那一步不会触发，新图标就永远切不进字体。2026-10-09 就是这么
-    # 出的事：出货的 MaterialIcons-Regular.otf 只有 4848 字节 / 36 个字形，对话功能
-    # 引入的 6 个图标（forum、forum_outlined、notes、send、attach_file、
-    # description_outlined）一个都不在里面，而每个更早就有的图标都在 —— 界面上
-    # 表现为「对话」入口是一个空的紫胶囊、对话列表头像是一个空圈。
+    # 必须先让 assets bundle 步骤失效。`flutter build windows --release` 是增量的，
+    # 而 Material Icons 的字形子集化只在 windows 的 assets bundle 步骤重跑时才会重做
+    # —— 只加新图标、别的不动的话那一步不会触发，新图标就永远切不进字体。
+    # 2026-10-09 第一版就是这么出的事：出货的 MaterialIcons-Regular.otf 只有 4848 字节
+    # / 36 个字形，对话功能引入的 6 个图标（forum、forum_outlined、notes、send、
+    # attach_file、description_outlined）一个都不在里面，而每个更早就有的图标都在 ——
+    # 界面上表现为「对话」入口是一个空的紫胶囊、对话列表头像是一个空圈。
     #
-    # 这里有一个坑：第一反应是 `flutter clean`，但本机沙箱的 safe-delete 会拦它。
+    # ⚠️ 2026-10-09 第二次更正：**「touch pubspec.yaml」那一招是错的，别再写回去。**
+    # Flutter 的构建缓存是按**内容哈希**判失效的（build_system.dart 的
+    # Node.computeChanges 比的是 fileStore.currentAssetKeys[path] 与上一次的哈希，
+    # mtime 一个字节都不算）。实测证据（同一份工作区）：
+    #   pubspec.yaml            被摸到 20:10:31        （哈希没变）
+    #   app.dill                20:11:07 重编，里面确实有 0xef7f（新图标）和 0xf090
+    #   app.so                  20:11:19
+    #   release_bundle_windows-x64_assets.stamp   仍停在 19:14:07  ← 这步压根没跑
+    #   产出的字体            19:14:06，0xf090 在、0xef7f 不在
+    # 也就是说：构建"成功"了、文案都在、新图标却是空的。
+    #   也不能靠删产物来逼它重跑：`BundleWindowsAssets.outputs` 是**空列表**，
+    #   缓存的输出侧只看 stamp 里记过的路径，不看输出文件在不在。
+    #
+    # 真正管用的一招：**删掉那个 target 的 stamp 文件**。build_system.dart 的注释写明
+    # 「If the stamp file is missing, the target's action is always rerun」。只删这一个
+    # stamp —— kernel snapshot / AOT 这些步骤有各自的 stamp，不受影响，代价最小。
+    # 顺带把上一次的产物字体也删掉：它既是保险，也是个探针 —— 构建完如果它没回来，
+    # 就说明这步又没跑，下面立刻会报出来。
+    #
+    # 另外别指望 `flutter clean`：本机沙箱的 safe-delete 会拦它。
     #   - 删除量 > 50 个文件 → SAFE_DELETE_BULK_CONFIRM_REQUIRED
     #   - 小目录 → SAFE_DELETE_FAIL_CLOSED (trash-failed)
-    # 实测 `flutter clean` 打印 "Failed to remove ...\build" 后仍然 exit 0，
-    # 而那个 4848 B 的字体原封不动 —— 看起来成功，其实什么都没清。
-    #
-    # 有效且更轻的办法：把 pubspec.yaml 的 mtime 摸一下。asset 步骤的缓存键包含
-    # pubspec，mtime 变了就会整步重跑，图标子树化跟着重做。代价是几十秒的
-    # `flutter pub get` + 重建，远小于 clean 全量重编。
-    Step '让 assets 步骤失效（touch pubspec.yaml）'
-    $pubspec = Join-Path $repo 'pubspec.yaml'
-    (Get-Item $pubspec).LastWriteTime = Get-Date
+    # 实测它打印 "Failed to remove ...\build" 后仍然 exit 0，那个旧字体原封不动 ——
+    # 看起来成功，其实什么都没清。
+    Step '让 assets bundle 步骤失效（删掉它的 stamp）'
+    $stampName = 'release_bundle_windows-x64_assets.stamp'
+    $buildRoot = Join-Path $repo '.dart_tool\flutter_build'
+    $stampsBefore = 0
+    if (Test-Path $buildRoot) {
+        $stampsBefore = @(Get-ChildItem -Path $buildRoot -Recurse -Filter $stampName -File -ErrorAction SilentlyContinue).Count
+        Get-ChildItem -Path $buildRoot -Recurse -Filter $stampName -File -ErrorAction SilentlyContinue | ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+    $stampsAfter = 0
+    if (Test-Path $buildRoot) {
+        $stampsAfter = @(Get-ChildItem -Path $buildRoot -Recurse -Filter $stampName -File -ErrorAction SilentlyContinue).Count
+    }
+    Write-Host "    $stampName : $stampsBefore -> $stampsAfter"
+    $staleFont = Join-Path $release 'data\flutter_assets\fonts\MaterialIcons-Regular.otf'
+    if (Test-Path $staleFont) {
+        Remove-Item -LiteralPath $staleFont -Force -ErrorAction SilentlyContinue
+        Write-Host "    已删掉上一次的子集字体（等构建把它做回来）"
+    }
 
     Step 'flutter pub get'
     & flutter pub get
@@ -236,6 +268,12 @@ if (-not $SkipBuild) {
     Step 'flutter build windows --release'
     & flutter build windows --release
     if ($LASTEXITCODE -ne 0) { throw "flutter build 失败 (exit $LASTEXITCODE)" }
+
+    # 字体回来了 = 上面那步真的跑了。没回来就说明 stamp 没删干净或缓存换了规则，
+    # 与其带着一个图标全空的包继续往下走，不如在这里就炸掉。
+    if (-not (Test-Path $staleFont)) {
+        throw "构建完了却没有 $staleFont —— assets bundle 步骤没有重跑。字形子集化不会发生，新图标会是空的。"
+    }
 } else {
     Step '跳过构建 (-SkipBuild)'
 }
@@ -433,7 +471,7 @@ try {
         }
     }
     if ($missing.Count -gt 0) {
-        throw "MaterialIcons-Regular.otf 里没有这些字形，界面上的图标会是空白的:`n      " + ($missing -join "`n      ") + "`n      多半是 assets 步骤没重跑（`flutter build` 是增量的）。本脚本默认会 touch pubspec.yaml 强制它重跑。"
+        throw "MaterialIcons-Regular.otf 里没有这些字形，界面上的图标会是空白的:`n      " + ($missing -join "`n      ") + "`n      多半是 assets bundle 步骤没重跑（`flutter build` 是增量的）。本脚本默认会删掉 release_bundle_windows-x64_assets.stamp 强制它重跑；删了还没用，就看是不是 Flutter 换了缓存规则。"
     }
     Write-Host "    MaterialIcons-Regular.otf $($font.Length) B，必备字形 $($requiredGlyphs.Count)/$($requiredGlyphs.Count) 命中"
 }
