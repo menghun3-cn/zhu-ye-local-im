@@ -152,6 +152,7 @@ final class TransferView {
     required this.direction,
     required this.kind,
     required this.peer,
+    required this.at,
     required this.state,
     required this.transferredBytes,
     required this.totalBytes,
@@ -172,6 +173,15 @@ final class TransferView {
 
   /// The Device on the other end.
   final Fingerprint peer;
+
+  /// When this Transfer entered the conversation.
+  ///
+  /// The app layer's clock, not the protocol's: the engine's own `Transfer`
+  /// has no timestamp, and one that read the wall clock at render time would
+  /// put a *different* time on the same message every time the list rebuilt.
+  /// Newest-first ordering already comes from the list, so this is only ever
+  /// read to *print*, and printing is the one job that needs a stored value.
+  final DateTime at;
 
   /// Where the Transfer has got to.
   final TransferState state;

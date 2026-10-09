@@ -8,6 +8,7 @@ import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../transfer_actions.dart';
+import '../wechat/theme.dart';
 import '../widgets.dart';
 
 /// Everything this Device has sent or been offered, newest first.
@@ -36,12 +37,12 @@ class TransfersPage extends StatelessWidget {
     ];
     if (transfers.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: WeChat.pagePadding,
         child: HintText(l10n.transfersEmptyHint),
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: WeChat.pagePadding,
       itemCount: transfers.length,
       itemBuilder: (context, index) {
         final view = transfers[index];
@@ -104,7 +105,7 @@ class _TransferCard extends StatelessWidget {
                 Icon(
                   outgoing ? Icons.north_east : Icons.south_west,
                   size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: WeChat.secondaryText,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

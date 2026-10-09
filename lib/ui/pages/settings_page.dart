@@ -7,6 +7,7 @@ import '../controller_scope.dart';
 import '../dialogs.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
+import '../wechat/theme.dart';
 import '../widgets.dart';
 
 /// Asks where received files should land, and remembers the answer.
@@ -45,7 +46,6 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final controller = ControllerScope.of(context);
     final self = controller.self;
     final port = controller.listenPort;
@@ -53,12 +53,12 @@ class SettingsPage extends StatelessWidget {
     final profilePath = seams.profilePath;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: WeChat.pagePadding,
       children: [
         SectionHeader(title: l10n.settingsThisDevice),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(WeChat.cardPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -96,11 +96,11 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.settingsWhereThingsGo),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(WeChat.cardPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -140,7 +140,7 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.settingsNotices),
         if (notices.isEmpty)
           HintText(l10n.nothingWentWrong)
@@ -162,8 +162,9 @@ class SettingsPage extends StatelessWidget {
         const SizedBox(height: 24),
         Text(
           l10n.settingsAbout,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          style: const TextStyle(
+            fontSize: WeChat.fontSizeMeta,
+            color: WeChat.secondaryText,
           ),
         ),
       ],
