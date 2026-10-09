@@ -54,11 +54,16 @@ class ConversationView extends StatefulWidget {
 
 class _ConversationViewState extends State<ConversationView> {
   final TextEditingController _message = TextEditingController();
+
+  /// Keeps the box focused across a send, so a conversation can be typed
+  /// without reaching for the mouse between messages.
+  final FocusNode _composerFocus = FocusNode();
   final ScrollController _scroll = ScrollController();
 
   @override
   void dispose() {
     _message.dispose();
+    _composerFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -91,6 +96,9 @@ class _ConversationViewState extends State<ConversationView> {
         _message.clear();
       }),
     );
+    // Enter drops the focus on desktop, so ask for it back. A button press
+    // never took it away, but re-requesting is harmless there.
+    _composerFocus.requestFocus();
   }
 
   @override
@@ -124,6 +132,7 @@ class _ConversationViewState extends State<ConversationView> {
         const Divider(height: 1),
         ConversationComposer(
           message: _message,
+          focusNode: _composerFocus,
           onSend: () => _sendMessage(controller),
           onAttach: peer == null
               ? null
@@ -147,12 +156,16 @@ class ConversationComposer extends StatelessWidget {
   const ConversationComposer({
     super.key,
     required this.message,
+    required this.focusNode,
     required this.onSend,
     required this.onAttach,
   });
 
   /// The text being typed. Owned by the caller so it survives a rebuild.
   final TextEditingController message;
+
+  /// Held by the caller so a send can put the caret back in the box.
+  final FocusNode focusNode;
 
   /// Sends what is in [message].
   final VoidCallback onSend;
@@ -178,6 +191,7 @@ class ConversationComposer extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: message,
+                focusNode: focusNode,
                 minLines: 1,
                 maxLines: 5,
                 textInputAction: TextInputAction.send,
