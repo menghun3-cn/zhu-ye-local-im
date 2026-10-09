@@ -179,6 +179,8 @@
   "refuse": "Refuse",
   "whereShouldFilesLand": "Where should these files land?",
   "whereShouldThisArrive": "Where should this arrive?",
+  "openContainingFolder": "Open containing folder",
+  "cannotOpenFolder": "Could not open that folder.",
 
   "clipboardSyncHeader": "Clipboard sync",
   "clipboardWaitingHeader": "Waiting for you",
@@ -256,7 +258,7 @@
   "portIsANumber": "A port is a number.",
   "manualAddressNote": "Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.",
   "openConversation": "Open conversation",
-  "conversationEmpty": "Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.",
+  "conversationEmpty": "Nothing has been sent or received here yet. Text and images arrive straight away; a file waits for the other Device to accept it.",
   "messageHint": "Type a message",
   "send": "Send",
   "removeAttachment": "Remove",

@@ -32,13 +32,16 @@ export 'views.dart';
 /// arrives on [incoming] and appears in [transfers] with [TransferView.offer]
 /// set; only [acceptInto] or [reject] settles it.
 ///
-/// Text is the exception, and deliberately so: a text offer is accepted the
-/// moment it arrives, without a prompt. There is nothing to decide — a text
-/// item carries its body inside the offer, takes no sink, and lands nowhere on
-/// disk, so accepting one asks the user a question with no consequence either
-/// way. Files stay prompted because they are the case the question exists for:
-/// they write bytes into the user's folders, and the answer is *where*, which
-/// only the user knows.
+/// Text and images are the exceptions, and deliberately so. Both are answered
+/// the moment they arrive, without a prompt, because neither raises a question
+/// the user could answer differently. A text item carries its body inside the
+/// offer, takes no sink, and lands nowhere on disk — accepting one asks about
+/// nothing. An image does stream bytes and does land on disk, but the folder is
+/// not a decision the arrival introduces: it is a setting this Device already
+/// has, and the dialog an image used to raise was pre-filled with the answer it
+/// was going to be given anyway. Files stay prompted because they are the case
+/// that question exists for — a file is something the user goes looking for
+/// later, and where it was filed is worth being asked about.
 ///
 /// It never answers a Pairing request on the user's behalf either. A Device that
 /// dialled this one arrives on [pairingRequests] and waits there; only
@@ -53,6 +56,14 @@ final class LocalTransferController {
   /// branch between the two. [sessionListenPort] and [pairingPort] accept 0,
   /// which binds any free port — what a test wants, and what a second copy of
   /// the app on one host would need.
+  ///
+  /// [defaultIncomingDirectory] is where an offer the controller answers on its
+  /// own lands when the profile names no folder of its own to prefer. It is
+  /// injected rather than looked up because where that is depends on the
+  /// platform — the user's Downloads folder on Windows, the app's private
+  /// directory on Android — and `lib/app` may not ask a platform anything.
+  /// Null therefore means "nowhere", which is exactly what the one desktop
+  /// platform this build has not implemented resolves to; see [_landingFor].
   LocalTransferController({
     required ProfileStore store,
     required BeaconTransport beaconTransport,
@@ -62,6 +73,7 @@ final class LocalTransferController {
     int sessionListenPort = defaultSessionPort,
     int pairingPort = defaultPairingPort,
     ClipboardMode clipboardMode = ClipboardMode.off,
+    String? defaultIncomingDirectory,
     DateTime Function()? clock,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
@@ -80,6 +92,8 @@ final class LocalTransferController {
        _pairingPort = pairingPort,
        // ignore: prefer_initializing_formals
        _clipboardMode = clipboardMode,
+       // ignore: prefer_initializing_formals
+       _defaultIncomingDirectory = defaultIncomingDirectory,
        _clock = clock ?? DateTime.now;
 
   final ProfileStore _store;
@@ -90,11 +104,17 @@ final class LocalTransferController {
   final int _sessionListenPort;
   final int _pairingPort;
   final ClipboardMode _clipboardMode;
+
+  /// Where a Transfer the controller answers by itself lands when the profile
+  /// has not been told where to put things.
+  final String? _defaultIncomingDirectory;
+
   final DateTime Function() _clock;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
-  /// Offers waiting for the user to answer them — a file, never a text.
+  /// Offers waiting for the user to answer them — a file, never a text or an
+  /// image.
   ///
   /// A broadcast controller does **not** hold on to an event that has not been
   /// delivered yet: the event is kept alive by whatever [add] captured, and
@@ -137,10 +157,10 @@ final class LocalTransferController {
   /// The live [IncomingTransfer] rather than a view, because answering one
   /// means calling it.
   ///
-  /// Text never reaches this stream: it is answered on arrival (see the class
-  /// doc), so by the time a listener could act the offer is already settled.
-  /// What arrives here is what genuinely needs an answer — files, whose
-  /// landing directory only the user can name.
+  /// Text and images never reach this stream: both are answered on arrival (see
+  /// the class doc), so by the time a listener could act the offer is already
+  /// settled. What arrives here is what genuinely needs an answer — a file,
+  /// whose landing directory only the user can name.
   Stream<IncomingTransfer> get incoming => _incoming.stream;
 
   /// Devices asking to pair with this one, in arrival order.
@@ -597,7 +617,10 @@ final class LocalTransferController {
       await source.close();
       rethrow;
     }
-    _track(transfer, target.peer);
+    // Recorded straight away, the way a sent image is: this file is the user's
+    // own and already whole on disk, so there is nothing to wait for, and it is
+    // what a "show me where this is" action resolves to.
+    _track(transfer, target.peer, localPath: file.path);
     return transfer;
   }
 
@@ -645,9 +668,12 @@ final class LocalTransferController {
   /// [incomingPathFor]; a name that would collide with an existing file is
   /// numbered rather than overwriting it.
   ///
-  /// This is the file path: a text offer is accepted by the controller on
-  /// arrival and is never awaiting a decision by the time a UI could call this,
-  /// so passing one throws [AppRefusal.offerAlreadyAnswered].
+  /// This is the answer a *file* is given, and it is also how the controller
+  /// files an image it accepts on arrival — the same road, reached with the
+  /// folder already decided (see [_acceptIntoDefault]). Text never arrives here:
+  /// the controller accepts it on arrival and it is never awaiting a decision by
+  /// the time a UI could call this, so passing one throws
+  /// [AppRefusal.offerAlreadyAnswered].
   Future<void> acceptInto(
     IncomingTransfer transfer,
     Directory directory,
@@ -981,20 +1007,68 @@ final class LocalTransferController {
 
   void _onOffer(Fingerprint peer, IncomingTransfer offer) {
     _track(offer, peer);
-    // Text settles itself: a text item carries its body in the offer and takes
-    // no sink, so accepting it commits nothing, writes nothing and has no
-    // answer the user could give differently. Prompting for it would be a
-    // question with one sensible answer, and the thing a conversation is made
-    // of would stall on a tap — so it does not.
-    //
-    // A file is the opposite in every one of those respects: it writes bytes
-    // into a folder the user picks, so it waits here like everything else.
-    if (offer.kind == PayloadKind.text) {
+    // Some offers are not the user's to answer, and the two that are not are
+    // answered here rather than by whatever draws them — the class doc says why
+    // each one is not a question. Text settles without touching the disk; an
+    // image is written into the folder this Device already saves to, which is
+    // the answer the dialog would have been given. A file is the opposite in
+    // every one of those respects: the user goes looking for it afterwards, so
+    // it waits here like everything else.
+    final landing = _landingFor(offer);
+    if (landing == null) {
+      if (!_incoming.isClosed) _incoming.add(offer);
+    } else if (landing.isEmpty) {
       unawaited(_acceptInline(offer, peer));
-    } else if (!_incoming.isClosed) {
-      _incoming.add(offer);
+    } else {
+      unawaited(_acceptIntoDefault(offer, peer, landing));
     }
     _notify();
+  }
+
+  /// Where [offer] lands without the user being asked, or null when it is the
+  /// user's to answer.
+  ///
+  /// The empty string is the third answer, and it is not a folder: a text item
+  /// carries its body in the offer, takes no sink and writes nothing, so it
+  /// lands *nowhere* — which is a fact worth telling apart from null, the
+  /// answer that means "ask the user".
+  String? _landingFor(IncomingTransfer offer) {
+    switch (offer.kind) {
+      case PayloadKind.text:
+        return '';
+      case PayloadKind.image:
+        // The folder is the one received files already go to: what the user
+        // chose, or the platform's own default. When there is no such folder
+        // — a platform with neither — there is nothing to write into, and the
+        // offer falls back to being the user's, which is the honest answer
+        // rather than a picture filed into a directory nobody named.
+        return _local?.profile.incomingDirectory ?? _defaultIncomingDirectory;
+      case PayloadKind.file:
+      case PayloadKind.clipboard:
+        return null;
+    }
+  }
+
+  /// Accepts an image offer into [directory], with no question asked.
+  ///
+  /// The same road [acceptInto] takes, reached without a dialog: the folder is
+  /// created first, because "the images go to Downloads/LocalTransfer" has to
+  /// be true the first time it is used.
+  Future<void> _acceptIntoDefault(
+    IncomingTransfer offer,
+    Fingerprint peer,
+    String directory,
+  ) async {
+    try {
+      final folder = Directory(directory);
+      folder.createSync(recursive: true);
+      await acceptInto(offer, folder);
+    } on Object catch (error) {
+      // Same reasoning as a text that would not accept: the sender learns
+      // through its own outcome, and there is nothing here for the user to
+      // answer. A failure is visible as a failed Transfer in the conversation.
+      _notice('an image from ${peer.short()} could not be accepted: $error');
+    }
   }
 
   /// Accepts an offer that carries its whole body inside itself.
@@ -1094,19 +1168,28 @@ final class LocalTransferController {
       names: [for (final item in transfer.items) item.name],
       text: transfer.text,
       localPath: tracked.localPath,
-      // Text is never handed out as a decision: it is answered on arrival, so
-      // an offer of it is either already settled or about to be, and a UI that
-      // drew a prompt for one would be drawing a question the controller has
-      // already answered. Belt beside the braces of `_onOffer` — this is the
-      // single place that decides what a UI is allowed to answer, so the rule
-      // lives here too.
-      offer:
-          transfer is IncomingTransfer &&
-              transfer.isDecidable &&
-              transfer.kind != PayloadKind.text
-          ? transfer
-          : null,
+      // Text and an image the controller can file are never handed out as a
+      // decision: it answers both on arrival, so an offer of one that still
+      // reads as decidable is an answer in flight rather than a question on
+      // screen, and a UI that drew Accept/Refuse for that frame would be
+      // drawing a question already being answered. Belt beside the braces of
+      // `_onOffer` — this is the single place that decides what a UI is
+      // allowed to answer, so the rule lives here too.
+      offer: _answerableOffer(transfer),
     );
+  }
+
+  /// [transfer] as an offer only the user can settle, or null for everything
+  /// else.
+  ///
+  /// Answerable means a *file* offer, which is what the two buttons in a bubble
+  /// and on a Transfers card exist for. Everything the controller settles on its
+  /// own answers null here: text, and an image it has a folder to put in. See
+  /// [_landingFor] — the rule the two share is consulted rather than restated, so
+  /// that a platform with no folder to offer keeps its image prompt.
+  IncomingTransfer? _answerableOffer(Transfer transfer) {
+    if (transfer is! IncomingTransfer || !transfer.isDecidable) return null;
+    return _landingFor(transfer) == null ? transfer : null;
   }
 
   /// The Session to send on, resolved from an optional peer.
@@ -1252,11 +1335,14 @@ final class _Tracked {
 
   /// Where this Transfer's bytes live on *this* machine, once they do.
   ///
-  /// Only ever set for an image, and only once the bytes are all present:
-  /// rendering a thumbnail means reading a file, and a path that is still being
-  /// written to would draw a half image or fail outright. Null for a text or
-  /// clipboard Transfer, which has no file, and for a file Transfer, which the
-  /// conversation shows by name rather than by content.
+  /// It answers two questions, and they have different rules about when it can
+  /// be believed. A conversation draws an image from it, so a *received* image
+  /// is given a path only when every byte is present — a path still being
+  /// written to would draw half a picture or fail outright. A "show me where
+  /// this went" action resolves it to a folder, so a received file names the
+  /// first item that landed and a file the user sent names the file they chose.
+  /// Null for a text or clipboard Transfer, which has no file, and for a
+  /// multi-item send, whose sources do not have to name a path.
   String? localPath;
 }
 

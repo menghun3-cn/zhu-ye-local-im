@@ -357,6 +357,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get whereShouldThisArrive => '保存到哪个文件夹？';
 
   @override
+  String get openContainingFolder => '打开所在目录';
+
+  @override
+  String get cannotOpenFolder => '没能打开那个文件夹。';
+
+  @override
   String get clipboardSyncHeader => '剪贴板同步';
 
   @override
@@ -537,7 +543,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openConversation => '打开会话';
 
   @override
-  String get conversationEmpty => '还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。';
+  String get conversationEmpty => '还没有收发过内容。文字和图片会直接送达，文件需要对方确认后才会接收。';
 
   @override
   String get messageHint => '输入要发送的文字';
