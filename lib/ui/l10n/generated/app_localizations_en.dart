@@ -369,6 +369,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whereShouldThisArrive => 'Where should this arrive?';
 
   @override
+  String get openContainingFolder => 'Open containing folder';
+
+  @override
+  String get cannotOpenFolder => 'Could not open that folder.';
+
+  @override
   String get clipboardSyncHeader => 'Clipboard sync';
 
   @override
@@ -561,7 +567,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationEmpty =>
-      'Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.';
+      'Nothing has been sent or received here yet. Text and images arrive straight away; a file waits for the other Device to accept it.';
 
   @override
   String get messageHint => 'Type a message';
