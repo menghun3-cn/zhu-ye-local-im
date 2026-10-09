@@ -1028,7 +1028,7 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
-    testWidgets('a Device that announced no name is listed by Fingerprint', (
+    testWidgets('a Device that announced no name is listed by its address', (
       tester,
     ) async {
       final hub = MemoryBeaconHub();
@@ -1044,14 +1044,23 @@ void main() {
       await pumpWindow(tester, alice);
       await openTab(tester, l10n.tabConversation, window: windowA);
 
+      // What the row is called is the address Discovery placed it at: the one
+      // fact that answers "which machine is this", and the same string a person
+      // would type into a router or into the peer's firewall.
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+      expect(bobView.displayName, bobView.address);
       await pumpUntil(
         tester,
-        () => conversationListed(windowA, bob.fingerprint.short()),
-        description: 'the nameless Device to be listed',
+        () => conversationListed(windowA, bobView.address!),
+        description: 'the nameless Device to be listed by its address',
       );
-      // Not the placeholder: a Device with no name is told apart from every
-      // other nameless Device by the Fingerprint it proved it holds, and the
-      // placeholder is not a name — it is the absence of one.
+      // Neither the placeholder nor the Fingerprint. The placeholder is the
+      // absence of a name wearing one's clothes, and the Fingerprint is the
+      // fallback for a peer that has no address either — which this one, having
+      // been found, does have.
       expect(
         onPage(
           windowA,
@@ -1060,6 +1069,27 @@ void main() {
         ),
         findsNothing,
         reason: 'the placeholder must never reach a screen',
+      );
+      expect(
+        onPage(windowA, ConversationsPage, find.text(bob.fingerprint.short())),
+        findsNothing,
+        reason: 'the Fingerprint is the last resort, not the name',
+      );
+
+      // And the avatar says the same thing the row does, in the one form that
+      // fits in a circle: the last octet. `1` is what every address in the list
+      // starts with, so an avatar drawn from the first character would be the
+      // same on every unnamed Device.
+      final octet = bobView.address!.split('.').last;
+      expect(
+        windowA.within(
+          find.descendant(
+            of: find.widgetWithText(ConversationRow, bobView.address!),
+            matching: find.text(octet),
+          ),
+        ),
+        findsOneWidget,
+        reason: 'the avatar carries $octet, not the leading digit',
       );
 
       await shutdown(tester, [alice, bob]);

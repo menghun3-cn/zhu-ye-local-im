@@ -12,4 +12,5 @@
 library;
 
 export 'app_controller.dart';
+export 'app_version.dart';
 export 'views.dart';

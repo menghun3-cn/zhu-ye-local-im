@@ -100,7 +100,7 @@ void main() {
   });
 
   group('the shell', () {
-    testWidgets('a wide window offers the four surfaces and switches', (
+    testWidgets('a wide window offers the six surfaces and switches', (
       tester,
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
@@ -150,7 +150,7 @@ void main() {
 
       final bar = windowA.within(find.byType(NavigationBar));
       final labels = [
-        // All five, Conversations first: a narrow window has no rail, so the
+        // All six, Conversations first: a narrow window has no rail, so the
         // bar is the only way to reach a surface and a missing entry is a
         // surface with no way in at all.
         l10n.tabConversation,
@@ -158,6 +158,7 @@ void main() {
         l10n.tabTransfers,
         l10n.tabClipboard,
         l10n.tabSettings,
+        l10n.tabAbout,
       ];
       for (final label in labels) {
         expect(
@@ -176,14 +177,30 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('names this Device and says it is unpaired', (tester) async {
+    testWidgets('puts no title bar above the surfaces', (tester) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
 
-      expect(windowA.within(find.text(l10n.appTitle)), findsOneWidget);
+      // The window's own title bar carries the application's name, and this
+      // Device's name belongs on the Devices surface with the rest of what this
+      // Device says about itself. What used to be an `AppBar` holding those two
+      // was a strip of chrome doing no work above six pages that had nothing to
+      // do with either.
+      expect(
+        windowA.within(find.byType(AppBar)),
+        findsNothing,
+        reason: 'the shell draws no app bar at all',
+      );
+      expect(
+        windowA.within(find.text(l10n.appTitle)),
+        findsNothing,
+        reason: 'the product name is in the title bar, not in the window',
+      );
+
+      // The Device's own name still has somewhere to be: the Devices surface,
+      // which is where everything about this Device already lives.
+      await openTab(tester, l10n.tabDevices, window: windowA);
       expect(windowA.within(find.text('Alice')), findsWidgets);
-      // The unpaired marker is what tells a user why nothing is reachable.
-      expect(windowA.within(find.byTooltip(l10n.notPairedYet)), findsOneWidget);
 
       // Renaming publishes a new descriptor and re-saves the profile, both of
       // which go through the real event loop, so this waits like the rest.
