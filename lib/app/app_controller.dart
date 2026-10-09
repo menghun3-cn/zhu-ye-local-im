@@ -223,6 +223,14 @@ final class LocalTransferController {
         facts.putIfAbsent(fingerprint.hex, () => _PeerFacts(fingerprint));
 
     // Weakest knowledge first; each later source overwrites what it knows.
+    //
+    // With one exception, and it is the whole reason `_PeerFacts.fromDiscovery`
+    // exists: a Session's handshake is the *oldest* thing here about a name —
+    // it is a snapshot taken when the Session opened and never refreshed — so
+    // it is applied last only for the facts a Session is the authority on
+    // (where the peer is, and that it is reachable there). For the name it
+    // yields to anything live, or a rename would be invisible to every peer
+    // already connected to the Device that renamed itself.
     for (final member in profile.group.members) {
       if (member == profile.self) continue;
       at(member);
@@ -242,14 +250,28 @@ final class LocalTransferController {
         ..platform = discovered.device.platform
         ..address = discovered.address.address
         ..sessionPort = discovered.sessionPort
-        ..lastSeen ??= discovered.lastSeen;
+        ..lastSeen ??= discovered.lastSeen
+        ..fromDiscovery = true;
     }
     for (final wired in _wired.values) {
       final session = wired.session;
       final entry = at(session.peer);
+      // A handshake is a *snapshot*: what the peer called itself at the moment
+      // the Session was opened. It does not change for as long as the Session
+      // lives, and `rename` documents that a peer's rename costs it every open
+      // Session precisely because of this. Discovery is the live answer — the
+      // peer re-announces every few seconds — so where Discovery has placed
+      // this Device, its name is the fresher of the two and wins. Without
+      // this, renaming a Device leaves the old name on every peer that still
+      // holds a Session to it, which is every peer that was connected when the
+      // rename happened, and the stale name outlives the rename by as long as
+      // that Session survives.
+      if (!entry.fromDiscovery) {
+        entry
+          ..alias = session.handshake.device.alias
+          ..platform = session.handshake.device.platform;
+      }
       entry
-        ..alias = session.handshake.device.alias
-        ..platform = session.handshake.device.platform
         // The address the Session is actually running on, which is the one
         // piece of knowledge here that is not a memory: Discovery may have
         // restarted and a Known Device record may never have been written, but
@@ -1234,4 +1256,13 @@ final class _PeerFacts {
   int? sessionPort;
   DateTime? lastSeen;
   bool connected = false;
+
+  /// Whether Discovery placed this Device, i.e. whether [alias] and [platform]
+  /// were read from a beacon this Device announced rather than from a memory.
+  ///
+  /// The distinction exists because a beacon is re-sent every few seconds and a
+  /// handshake never is. Anything a Session pinned at connect time is older
+  /// than the freshest beacon by construction, so the two cannot be ranked by
+  /// "which loop ran last" — this records which one actually knows more.
+  bool fromDiscovery = false;
 }
