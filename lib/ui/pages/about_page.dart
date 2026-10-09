@@ -52,8 +52,9 @@ class _AboutPageState extends State<AboutPage> {
   /// Where a newer build can be fetched, when one has been found.
   String? get _downloadUrl {
     final answer = _answer;
-    if (answer == null || answer.outcome != UpdateOutcome.available)
+    if (answer == null || answer.outcome != UpdateOutcome.available) {
       return null;
+    }
     return answer.url ?? updateReleasesPage;
   }
 
