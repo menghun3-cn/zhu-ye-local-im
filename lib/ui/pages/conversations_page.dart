@@ -353,7 +353,14 @@ class _ConversationTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Avatar(name: peer.displayName, seed: peer.fingerprint.hex),
+            // The one Device drawn from something other than the first letter
+            // of its name: a Device named by its address carries its last octet
+            // in the circle, because `1` is what every address starts with.
+            Avatar(
+              name: peer.displayName,
+              seed: peer.fingerprint.hex,
+              label: peer.avatarLabel,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(

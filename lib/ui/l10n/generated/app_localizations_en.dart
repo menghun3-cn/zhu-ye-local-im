@@ -10,10 +10,10 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Local Transfer';
+  String get appTitle => 'Zhuye Local Transfer';
 
   @override
-  String get startupFailureTitle => 'Local Transfer could not start';
+  String get startupFailureTitle => 'Zhuye Local Transfer could not start';
 
   @override
   String get tabDevices => 'Devices';
@@ -28,7 +28,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabSettings => 'Settings';
 
   @override
-  String get notPairedYet => 'Not paired with any Device yet';
+  String get tabAbout => 'About';
 
   @override
   String failureUnreachable(String detail) {
@@ -461,8 +461,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingWentWrong => 'Nothing has gone wrong.';
 
   @override
-  String get settingsAbout =>
-      'Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.';
+  String get aboutDescription =>
+      'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.';
+
+  @override
+  String aboutVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get aboutCheckForUpdates => 'Check for updates';
+
+  @override
+  String get aboutChecking => 'Checking…';
+
+  @override
+  String get aboutUpToDate => 'This is the latest version.';
+
+  @override
+  String aboutUpdateAvailable(String version) {
+    return 'Version $version is available.';
+  }
+
+  @override
+  String get aboutOpenDownload => 'Open the download page';
+
+  @override
+  String get aboutNoRelease =>
+      'No version has been published yet, so there is nothing to compare this build against.';
+
+  @override
+  String get aboutUnreachable =>
+      'The update server could not be reached. Check the network, or download the new version by hand.';
+
+  @override
+  String get aboutHowToUpgrade =>
+      'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.';
 
   @override
   String get aliasHelper => 'What other Devices show for this one';

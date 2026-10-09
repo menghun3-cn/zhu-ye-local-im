@@ -10,10 +10,10 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => '局域网传输';
+  String get appTitle => '竹叶局域网传输';
 
   @override
-  String get startupFailureTitle => '局域网传输无法启动';
+  String get startupFailureTitle => '竹叶局域网传输无法启动';
 
   @override
   String get tabDevices => '设备';
@@ -28,7 +28,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabSettings => '设置';
 
   @override
-  String get notPairedYet => '还没有和任何设备配对';
+  String get tabAbout => '关于';
 
   @override
   String failureUnreachable(String detail) {
@@ -441,8 +441,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nothingWentWrong => '一切正常。';
 
   @override
-  String get settingsAbout =>
-      '局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。';
+  String get aboutDescription =>
+      '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。';
+
+  @override
+  String aboutVersion(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String get aboutCheckForUpdates => '检查更新';
+
+  @override
+  String get aboutChecking => '正在检查…';
+
+  @override
+  String get aboutUpToDate => '已是最新版本。';
+
+  @override
+  String aboutUpdateAvailable(String version) {
+    return '有新版本 $version。';
+  }
+
+  @override
+  String get aboutOpenDownload => '打开下载页';
+
+  @override
+  String get aboutNoRelease => '还没有发布过任何版本，暂时无从比较本机这版。';
+
+  @override
+  String get aboutUnreachable => '连不上更新服务器。请检查网络，或手动下载新版本。';
+
+  @override
+  String get aboutHowToUpgrade =>
+      '升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。';
 
   @override
   String get aliasHelper => '其他设备上显示的名称';

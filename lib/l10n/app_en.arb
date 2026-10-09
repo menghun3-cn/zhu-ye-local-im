@@ -1,14 +1,14 @@
 {
   "@@locale": "en",
 
-  "appTitle": "Local Transfer",
-  "startupFailureTitle": "Local Transfer could not start",
+  "appTitle": "Zhuye Local Transfer",
+  "startupFailureTitle": "Zhuye Local Transfer could not start",
 
   "tabDevices": "Devices",
   "tabTransfers": "Transfers",
   "tabClipboard": "Clipboard",
   "tabSettings": "Settings",
-  "notPairedYet": "Not paired with any Device yet",
+  "tabAbout": "About",
 
   "failureUnreachable": "Could not reach the Device: {detail}",
   "@failureUnreachable": {
@@ -214,7 +214,23 @@
   "factReceivedFiles": "Received files",
   "noDefaultFolder": "no default folder",
   "nothingWentWrong": "Nothing has gone wrong.",
-  "settingsAbout": "Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.",
+
+  "aboutDescription": "Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.",
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "aboutCheckForUpdates": "Check for updates",
+  "aboutChecking": "Checking…",
+  "aboutUpToDate": "This is the latest version.",
+  "aboutUpdateAvailable": "Version {version} is available.",
+  "@aboutUpdateAvailable": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "aboutOpenDownload": "Open the download page",
+  "aboutNoRelease": "No version has been published yet, so there is nothing to compare this build against.",
+  "aboutUnreachable": "The update server could not be reached. Check the network, or download the new version by hand.",
+  "aboutHowToUpgrade": "To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device's identity and must not be touched.",
 
   "aliasHelper": "What other Devices show for this one",
   "cancel": "Cancel",
