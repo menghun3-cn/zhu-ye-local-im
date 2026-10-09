@@ -1045,6 +1045,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Accept into this folder'**
   String get acceptIntoFolder;
+
+  /// No description provided for @browseFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder…'**
+  String get browseFolder;
+
+  /// No description provided for @chooseFolderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where files are saved'**
+  String get chooseFolderTitle;
+
+  /// No description provided for @changeIncomingFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Change…'**
+  String get changeIncomingFolder;
+
+  /// No description provided for @incomingFolderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Received files are saved here by default. You can still pick another folder for each one.'**
+  String get incomingFolderHint;
+
+  /// No description provided for @incomingFolderUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'You are asked where to save each file as it arrives.'**
+  String get incomingFolderUnset;
 }
 
 class _AppLocalizationsDelegate

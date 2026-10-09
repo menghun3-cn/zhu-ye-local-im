@@ -58,6 +58,12 @@ dependencies:
   # Dart alone.
   desktop_drop: ^0.8.4
 
+  # Pasting a file or an image into the composer. Flutter's own `Clipboard`
+  # reads and writes *text* on every platform and nothing else, so a screenshot
+  # or a file copied in Explorer is invisible to it; this plugin reads the
+  # desktop clipboard's file list and its bitmap.
+  pasteboard: ^0.5.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

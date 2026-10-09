@@ -585,4 +585,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get acceptIntoFolder => 'Accept into this folder';
+
+  @override
+  String get browseFolder => 'Choose a folder…';
+
+  @override
+  String get chooseFolderTitle => 'Choose where files are saved';
+
+  @override
+  String get changeIncomingFolder => 'Change…';
+
+  @override
+  String get incomingFolderHint =>
+      'Received files are saved here by default. You can still pick another folder for each one.';
+
+  @override
+  String get incomingFolderUnset =>
+      'You are asked where to save each file as it arrives.';
 }

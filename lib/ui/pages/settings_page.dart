@@ -1,10 +1,38 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../app/app.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
 import '../widgets.dart';
+
+/// Asks where received files should land, and remembers the answer.
+///
+/// [askForDirectory] rather than the folder chooser directly, so the user gets
+/// both roads: the field they can type into and the platform's own dialog
+/// behind a button. That dialog is the same one the accept flow opens, which is
+/// the point — one folder is chosen the same way whether it is being set up in
+/// advance or answered at the moment a file arrives.
+Future<void> _chooseFolder(
+  BuildContext context,
+  LocalTransferController controller,
+  String? platformDefault,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final chosen = await askForDirectory(
+    context,
+    title: l10n.chooseFolderTitle,
+    initial: controller.incomingDirectory ?? platformDefault ?? '',
+    confirmLabel: l10n.save,
+  );
+  // Null means the user backed out, which must not clear a folder they already
+  // have: only a confirmed answer is a decision.
+  if (chosen == null) return;
+  await controller.setIncomingDirectory(chosen);
+}
 
 /// What this Device is, where it keeps things, and what has gone wrong.
 class SettingsPage extends StatelessWidget {
@@ -83,7 +111,30 @@ class SettingsPage extends StatelessWidget {
                 if (profilePath == null) HintText(l10n.noIdentityHint),
                 FactLine(
                   l10n.factReceivedFiles,
-                  seams.defaultIncomingDirectory ?? l10n.noDefaultFolder,
+                  // What will actually be offered: the user's choice, or the
+                  // platform's own answer, or the fact that there is neither.
+                  controller.incomingDirectory ??
+                      seams.defaultIncomingDirectory ??
+                      l10n.noDefaultFolder,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
+                  child: HintText(
+                    controller.incomingDirectory == null
+                        ? l10n.incomingFolderUnset
+                        : l10n.incomingFolderHint,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => unawaited(
+                    _chooseFolder(
+                      context,
+                      controller,
+                      seams.defaultIncomingDirectory,
+                    ),
+                  ),
+                  icon: const Icon(Icons.folder_open_outlined, size: 18),
+                  label: Text(l10n.changeIncomingFolder),
                 ),
               ],
             ),

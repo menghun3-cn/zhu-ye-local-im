@@ -3,10 +3,12 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/app/app.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/app.dart';
+import 'package:local_transfer/ui/clipboard_paste.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/home_shell.dart';
@@ -946,6 +948,7 @@ class ScriptedPicker implements FilePicker {
 
   List<String> _files = const [];
   String? _image;
+  String? _directory;
 
   /// How many times the file picker was opened.
   int filesAsked = 0;
@@ -953,11 +956,17 @@ class ScriptedPicker implements FilePicker {
   /// How many times the image picker was opened.
   int imagesAsked = 0;
 
+  /// How many times the folder chooser was opened.
+  int directoriesAsked = 0;
+
   /// What the next file picker answers with.
   void willOffer(List<String> paths) => _files = paths;
 
   /// What the next image picker answers with, or null to cancel.
   void willOfferImage(String? path) => _image = path;
+
+  /// What the next folder chooser answers with, or null to cancel.
+  void willChooseDirectory(String? path) => _directory = path;
 
   @override
   Future<List<XFile>> files() async {
@@ -971,4 +980,91 @@ class ScriptedPicker implements FilePicker {
     final path = _image;
     return path == null ? null : XFile(path);
   }
+
+  @override
+  Future<String?> directory() async {
+    directoriesAsked += 1;
+    return _directory;
+  }
+}
+
+/// A [ClipboardPaste] that hands back whatever the test put in it.
+///
+/// The same seam argument as [ScriptedPicker]: reading the real clipboard means
+/// a platform channel, and a method call to a channel with no engine behind it
+/// throws in a `testWidgets` body. A test installs this, presses the real
+/// Ctrl+V, and asserts on what the conversation did with the answer.
+///
+/// ```dart
+/// final clipboard = ScriptedClipboard.install();
+/// clipboard.holdingFiles([photo.path]);
+/// await sendCtrlV(tester, windowA);
+/// ```
+class ScriptedClipboard implements ClipboardPaste {
+  ScriptedClipboard._();
+
+  /// Installs a scripted clipboard in place of the system one.
+  ///
+  /// A test that calls this must also call [PasteResolution.reset] in a
+  /// `tearDown`, for the same reason [ScriptedPicker.install] insists on it.
+  static ScriptedClipboard install() {
+    final clipboard = ScriptedClipboard._();
+    PasteResolution.paste = clipboard;
+    return clipboard;
+  }
+
+  List<String> _files = const [];
+  Uint8List? _image;
+
+  /// What the next read of the clipboard answers with.
+  void holdingFiles(List<String> paths) {
+    _files = paths;
+    _image = null;
+  }
+
+  /// Puts an encoded picture on the clipboard.
+  void holdingImage(Uint8List bytes) {
+    _image = bytes;
+    _files = const [];
+  }
+
+  /// Empties it, so a paste falls through to text.
+  void holdingNothing() {
+    _files = const [];
+    _image = null;
+  }
+
+  @override
+  Future<List<String>> files() async => _files;
+
+  @override
+  Future<Uint8List?> image() async => _image;
+}
+
+/// A one-pixel PNG, for the tests that need the clipboard to hold a picture.
+///
+/// The smallest real PNG there is, so `imageExtensionOf` sees the signature it
+/// is looking for rather than a handful of made-up bytes: a test fixture that
+/// only looks like an image would pass a check the real thing could fail.
+final Uint8List onePixelPng = Uint8List.fromList(const [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // signature
+  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR, 13 bytes
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1 x 1
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, // 8-bit RGBA
+  0x89,
+  0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, // IDAT, 10 bytes
+  0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05,
+  0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4,
+  0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND
+  0xAE, 0x42, 0x60, 0x82,
+]);
+
+/// Presses Ctrl+V in [window]'s composer.
+///
+/// A real key event rather than a call to the handler, so the test covers the
+/// shortcut table as well as what the shortcut does.
+Future<void> sendCtrlV(WidgetTester tester, TestWindow window) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+  await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
 }
