@@ -680,6 +680,18 @@ abstract class AppLocalizations {
   /// **'Could not open that folder.'**
   String get cannotOpenFolder;
 
+  /// No description provided for @copyImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy image'**
+  String get copyImage;
+
+  /// No description provided for @cannotCopyImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy that image.'**
+  String get cannotCopyImage;
+
   /// No description provided for @clipboardSyncHeader.
   ///
   /// In en, this message translates to:

@@ -375,6 +375,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotOpenFolder => 'Could not open that folder.';
 
   @override
+  String get copyImage => 'Copy image';
+
+  @override
+  String get cannotCopyImage => 'Could not copy that image.';
+
+  @override
   String get clipboardSyncHeader => 'Clipboard sync';
 
   @override

@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-pictures-stand-on-their-own-and-can-be-copied.md
+#   git hash-object 2026-10-09-pictures-stand-on-their-own-and-can-be-copied.zh.md
+2026-10-09-pictures-stand-on-their-own-and-can-be-copied.md: 673514dfc7fafe511401448c5f1ddb9ed2afc784
+2026-10-09-pictures-stand-on-their-own-and-can-be-copied.zh.md: a5c3e35b668313b8430f1869f4f50d6b6b529ca2

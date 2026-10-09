@@ -363,6 +363,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cannotOpenFolder => '没能打开那个文件夹。';
 
   @override
+  String get copyImage => '复制图片';
+
+  @override
+  String get cannotCopyImage => '没能复制这张图片。';
+
+  @override
   String get clipboardSyncHeader => '剪贴板同步';
 
   @override

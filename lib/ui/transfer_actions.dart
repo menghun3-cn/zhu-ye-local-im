@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
 import '../core/core.dart';
+import 'clipboard_paste.dart';
 import 'dialogs.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -16,9 +18,9 @@ import 'reveal.dart';
 /// because every surface that shows one shows the same actions. An offer is
 /// answered from wherever the user is looking at it — the Transfers surface
 /// lists every Transfer, and a peer's conversation shows the ones between the
-/// two of them — so the folder question and the refusal live here; and a file
-/// that has already landed can be shown in its folder from either place too, so
-/// that action lives here beside them.
+/// two of them — so the folder question and the refusal live here; and what a
+/// *settled* Transfer offers — showing its file in its folder, and putting a
+/// picture back on the clipboard — lives here beside them for the same reason.
 
 /// Asks where [view]'s offer should land, then takes it.
 ///
@@ -90,16 +92,63 @@ Future<void> revealTransfer(BuildContext context, TransferView view) async {
   messenger.showSnackBar(SnackBar(content: Text(l10n.cannotOpenFolder)));
 }
 
-/// Offers what can be done with a file once it has landed, on a right-click.
+/// Whether [view] is a picture whose bytes are on this machine and can
+/// therefore be put on the clipboard.
+///
+/// An image and not a file, because "copy" means two different things to the
+/// two of them: a picture copied in Explorer is a picture, and a spreadsheet
+/// copied here would be a file list. False for an image still in flight — there
+/// is nothing to read yet — and false for a picture whose local copy has since
+/// been deleted, which is discovered on the read rather than guessed at here.
+bool canCopyImage(TransferView view) =>
+    view.kind == PayloadKind.image && view.localPath != null;
+
+/// Puts [view]'s picture on this machine's clipboard.
+///
+/// The bytes are read back from disk rather than carried in memory: a
+/// conversation holds however many pictures the user has exchanged, and the one
+/// being copied is the one the user pointed at, which is exactly the one the
+/// app does not have to keep decoded.
+///
+/// A failure is said out loud, for the same reason a failed reveal is: the
+/// platforms disagree about whether an app may write its own clipboard at all,
+/// and "nothing happened" is not something a user can act on. A success says
+/// nothing — the pasted picture is the confirmation.
+Future<void> copyTransferImage(BuildContext context, TransferView view) async {
+  final path = view.localPath;
+  if (path == null) return;
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = AppLocalizations.of(context);
+  final Uint8List bytes;
+  try {
+    bytes = await File(path).readAsBytes();
+  } on Object {
+    // The file the Transfer points at is not there any more. That is a copy
+    // that cannot happen rather than one that failed halfway.
+    messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyImage)));
+    return;
+  }
+  // Through the seam, so a widget test can assert the bytes that reached the
+  // clipboard without a `testWidgets` body ever touching a platform channel.
+  if (await PasteResolution.paste.writeImage(bytes)) return;
+  messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyImage)));
+}
+
+/// Offers what can be done with a Transfer once it has settled, on a
+/// right-click.
 ///
 /// The answers an *offer* needs — accept and refuse — are buttons in the open,
-/// because a decision behind a menu is a decision nobody finds. This is the
-/// other kind of action: something the user wants after a Transfer has settled,
-/// when the question is over and the file is somewhere on disk. A right-click
-/// keeps it reachable without putting a toolbar on a message.
+/// because a decision behind a menu is a decision nobody finds. These are the
+/// other kind of action: things the user wants after a Transfer has settled,
+/// when the question is over and the bytes are somewhere on disk. A right-click
+/// keeps them reachable without putting a toolbar on a message.
 ///
-/// [child] is wrapped rather than replaced — the bubble and the card are what is
-/// being pointed at, and they have to go on drawing exactly as they did.
+/// Which actions a given Transfer offers is decided by the two predicates above
+/// rather than by the caller, so the conversation, the Transfers list and any
+/// surface added later cannot each draw a different menu for the same message.
+///
+/// [child] is wrapped rather than replaced — the picture and the card are what
+/// is being pointed at, and they have to go on drawing exactly as they did.
 class TransferContextMenu extends StatelessWidget {
   /// Wraps [child] with the actions [view] offers.
   const TransferContextMenu({
@@ -118,7 +167,7 @@ class TransferContextMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     // Nothing to offer means nothing to intercept: a handler that opened an
     // empty menu would swallow the right-click that selects a name to copy.
-    if (!canRevealTransfer(view)) return child;
+    if (!canRevealTransfer(view) && !canCopyImage(view)) return child;
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           unawaited(_open(context, details.globalPosition)),
@@ -129,6 +178,11 @@ class TransferContextMenu extends StatelessWidget {
   /// Opens the menu where the pointer was.
   Future<void> _open(BuildContext context, Offset at) async {
     final l10n = AppLocalizations.of(context);
+    // Read once, before the await: the surface behind the menu can be gone by
+    // the time one of these is chosen, and the list must not change under the
+    // menu the user is looking at either.
+    final reveal = canRevealTransfer(view);
+    final copy = canCopyImage(view);
     // The overlay is what `showMenu` lays the menu out inside, so its size is
     // the one the margins below have to be measured against.
     final overlay = Overlay.of(context).context.findRenderObject();
@@ -147,24 +201,50 @@ class TransferContextMenu extends StatelessWidget {
         size.height - at.dy,
       ),
       items: [
-        PopupMenuItem<String>(
-          value: _revealAction,
-          // A row rather than a `ListTile`: a menu item is one line, and a tile
-          // brings its own padding, its own tap target and its own ripple.
-          child: Row(
-            children: [
-              const Icon(Icons.folder_open_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.openContainingFolder),
-            ],
+        if (reveal)
+          _item(
+            value: _revealAction,
+            icon: Icons.folder_open_outlined,
+            label: l10n.openContainingFolder,
           ),
-        ),
+        if (copy)
+          _item(
+            value: _copyAction,
+            icon: Icons.content_copy_outlined,
+            label: l10n.copyImage,
+          ),
       ],
     );
-    if (chosen != _revealAction || !context.mounted) return;
-    await revealTransfer(context, view);
+    if (!context.mounted) return;
+    switch (chosen) {
+      case _revealAction:
+        await revealTransfer(context, view);
+      case _copyAction:
+        await copyTransferImage(context, view);
+    }
+  }
+
+  /// One line of the menu.
+  ///
+  /// A row rather than a `ListTile`: a menu item is one line, and a tile brings
+  /// its own padding, its own tap target and its own ripple.
+  PopupMenuItem<String> _item({
+    required String value,
+    required IconData icon,
+    required String label,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [Icon(icon, size: 18), const SizedBox(width: 8), Text(label)],
+      ),
+    );
   }
 }
 
-/// The one value the context menu can come back with.
+/// Showing the file where it lives, and putting a picture on the clipboard.
+///
+/// Two values rather than none because `showMenu` answers with what was chosen,
+/// and `null` is what a dismissed menu answers with as well.
 const String _revealAction = 'reveal';
+const String _copyAction = 'copy';
