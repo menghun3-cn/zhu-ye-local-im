@@ -230,17 +230,24 @@ final class TransferView {
   ///
   /// Handed out so a UI can call `accept` or `reject` on it; the controller
   /// will not answer a *file* offer on the user's behalf. Text is never handed
-  /// out here: the controller answers a text offer itself, on arrival, so there
-  /// is never a decision for a UI to draw.
+  /// out here, and neither is an image the controller has a folder to put in:
+  /// it answers both itself, on arrival, so there is never a decision for a UI
+  /// to draw.
   final IncomingTransfer? offer;
 
   /// Where this Transfer's bytes live on this machine, when they do.
   ///
-  /// Set for an image — the sender's own file once it has been offered, the
-  /// receiver's landed copy once it has been written and verified — and null
-  /// for everything else. Null is also the honest answer for an image that has
-  /// been offered but not yet decided, which is what keeps a receiver from
-  /// trying to draw a picture that has not arrived.
+  /// Two features read it, and each has its own rule about when it is
+  /// trustworthy. A conversation draws an image from it, so a *received* image
+  /// is given a path only once its bytes are all present: rendering a
+  /// thumbnail means reading a file, and a path still being written to would
+  /// draw half a picture or fail outright. A "show me where this went" action
+  /// resolves it to a folder, so a received file names the first item that
+  /// landed and a file this Device sent names the file the user chose.
+  ///
+  /// Null for a text or clipboard Transfer, which has no file at all; for a
+  /// file offer not yet answered; and for a multi-item send, whose sources
+  /// stream from somewhere that is not required to name a path.
   final String? localPath;
 
   /// Whether this Device has to answer before anything moves.

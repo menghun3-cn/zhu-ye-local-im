@@ -46,11 +46,17 @@ class TransfersPage extends StatelessWidget {
       itemCount: transfers.length,
       itemBuilder: (context, index) {
         final view = transfers[index];
-        return _TransferCard(
+        // The card is what a right-click points at, so the actions a settled
+        // file offers belong around it — and a card that is still waiting for
+        // an answer gets the widget's own promise that nothing was intercepted.
+        return TransferContextMenu(
           view: view,
-          controller: controller,
-          peerName: _nameOf(controller, view.peer),
-          defaultIncomingDirectory: defaultIncomingDirectory,
+          child: _TransferCard(
+            view: view,
+            controller: controller,
+            peerName: _nameOf(controller, view.peer),
+            defaultIncomingDirectory: defaultIncomingDirectory,
+          ),
         );
       },
     );

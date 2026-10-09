@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
+import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
@@ -136,6 +138,12 @@ Future<UiDevice> startUiDevice(
       sessionListenPort: sessionListenPort,
       pairingPort: pairingPort,
       clipboardMode: clipboardMode,
+      // The same folder the pages are told about, handed to the controller as
+      // well — which is what the shipping wiring does. Without it here, a
+      // Device under test would answer an image offer differently from the
+      // Device a user runs: the pages would name a folder the controller had
+      // never heard of, and an image would be offered instead of filed.
+      defaultIncomingDirectory: defaultIncomingDirectory,
     );
     await controller.start();
     device = UiDevice(
@@ -1046,6 +1054,46 @@ class ScriptedClipboard implements ClipboardPaste {
   Future<Uint8List?> image() async => _image;
 }
 
+/// A [Revealer] that records what it was asked to show.
+///
+/// The same seam argument as [ScriptedPicker]: the real revealer hands over to
+/// the operating system's shell, so a test that drove it would open an Explorer
+/// window on the machine running the suite. A test installs this, right-clicks a
+/// settled Transfer, chooses the action, and asserts on the path it was handed.
+///
+/// ```dart
+/// final revealer = ScriptedRevealer.install();
+/// await rightClick(tester, onConversation(windowA, find.text('holiday.png')));
+/// await tester.tap(find.text(l10n.openContainingFolder));
+/// expect(revealer.revealed.single, landedPath);
+/// ```
+class ScriptedRevealer implements Revealer {
+  ScriptedRevealer._();
+
+  /// Installs a scripted revealer in place of the system one.
+  ///
+  /// A test that calls this must also call [RevealResolution.reset] in a
+  /// `tearDown`, for the same reason [ScriptedPicker.install] insists on it.
+  static ScriptedRevealer install() {
+    final revealer = ScriptedRevealer._();
+    RevealResolution.revealer = revealer;
+    return revealer;
+  }
+
+  /// Every path the action was asked to show, in order.
+  final List<String> revealed = [];
+
+  /// What the next call answers — false stands in for a machine with no file
+  /// manager, which is what the failure sentence exists for.
+  bool answers = true;
+
+  @override
+  Future<bool> reveal(String path) async {
+    revealed.add(path);
+    return answers;
+  }
+}
+
 /// A one-pixel PNG, for the tests that need the clipboard to hold a picture.
 ///
 /// The smallest real PNG there is, so `imageExtensionOf` sees the signature it
@@ -1072,6 +1120,24 @@ Future<void> sendCtrlV(WidgetTester tester, TestWindow window) async {
   await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
   await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
   await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+}
+
+/// Right-clicks [matching], the way a user opens a context menu.
+///
+/// A secondary *mouse* button rather than a `tester.tap`: `onSecondaryTapDown`
+/// only fires for the secondary button, so a plain tap would satisfy a finder
+/// and still leave the menu shut — a test that passed while the feature it named
+/// did nothing. The gesture is held from `down` so the button is reported for
+/// the whole press, which is what the recognizer keys on.
+Future<void> rightClick(WidgetTester tester, Finder matching) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(matching),
+    kind: PointerDeviceKind.mouse,
+    buttons: kSecondaryMouseButton,
+  );
+  await gesture.up();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 /// A real PNG of [width] × [height] pixels, written to [file].

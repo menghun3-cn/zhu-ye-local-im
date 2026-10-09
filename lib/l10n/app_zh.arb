@@ -110,6 +110,8 @@
   "refuse": "拒绝",
   "whereShouldFilesLand": "这些文件保存到哪个文件夹？",
   "whereShouldThisArrive": "保存到哪个文件夹？",
+  "openContainingFolder": "打开所在目录",
+  "cannotOpenFolder": "没能打开那个文件夹。",
 
   "clipboardSyncHeader": "剪贴板同步",
   "clipboardWaitingHeader": "等待你处理",
@@ -169,7 +171,7 @@
   "portIsANumber": "端口必须是数字。",
   "manualAddressNote": "事先并不知道这台设备的任何信息，因此要靠连接握手来证明它属于同一个设备组；属于其他设备组的会被拒绝。",
   "openConversation": "打开会话",
-  "conversationEmpty": "还没有收发过内容。文字会直接送达，文件需要对方确认后才会接收。",
+  "conversationEmpty": "还没有收发过内容。文字和图片会直接送达，文件需要对方确认后才会接收。",
   "messageHint": "输入要发送的文字",
   "send": "发送",
   "removeAttachment": "移除",

@@ -668,6 +668,18 @@ abstract class AppLocalizations {
   /// **'Where should this arrive?'**
   String get whereShouldThisArrive;
 
+  /// No description provided for @openContainingFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Open containing folder'**
+  String get openContainingFolder;
+
+  /// No description provided for @cannotOpenFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open that folder.'**
+  String get cannotOpenFolder;
+
   /// No description provided for @clipboardSyncHeader.
   ///
   /// In en, this message translates to:
@@ -1001,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @conversationEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Nothing has been sent or received here yet. Text arrives straight away; a file waits for the other Device to accept it.'**
+  /// **'Nothing has been sent or received here yet. Text and images arrive straight away; a file waits for the other Device to accept it.'**
   String get conversationEmpty;
 
   /// No description provided for @messageHint.

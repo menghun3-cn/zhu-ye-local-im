@@ -15,7 +15,9 @@ import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
+import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/wechat/bubble.dart';
+import 'package:local_transfer/ui/wechat/image_bubble.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -1748,6 +1750,171 @@ void main() {
         isEmpty,
         reason: 'nothing was staged by the time 发送 was pressed',
       );
+
+      await shutdown(tester, [alice, bob]);
+    });
+  });
+
+  group('showing a landed file in its folder', () {
+    testWidgets('a received file offers its folder on a right-click', (
+      tester,
+    ) async {
+      // The real revealer hands over to Explorer, so the seam stands in for it:
+      // what is under test is that the menu appears and the *path* it carries is
+      // the file that landed, not that this machine can open a window.
+      final revealer = ScriptedRevealer.install();
+      addTearDown(RevealResolution.reset);
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      final home = tempDirectory('local-transfer-reveal-out-');
+      final source = File('${home.path}${Platform.pathSeparator}report.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      final inbox = tempDirectory('local-transfer-reveal-in-');
+
+      await offerFile(tester, alice, source);
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      // Answered through the controller rather than the dialog: what this test
+      // needs is a Transfer that has *landed*, and the folder question is the
+      // subject of its own test elsewhere.
+      await tester.runAsync(
+        () => bob.controller.acceptInto(bob.offers.single, inbox),
+      );
+      await pumpUntil(
+        tester,
+        () => bob.controller.transfers.any((view) => view.localPath != null),
+        description: 'the file to land on Bob',
+      );
+      // The path the action will be handed: the file the user received, in the
+      // folder they chose.
+      final landed = bob.controller.transfers.single.localPath;
+      expect(landed, isNotNull);
+      expect(File(landed!).parent.path, inbox.path);
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabTransfers, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          TransfersPage,
+          find.text('report.bin'),
+        ).evaluate().isNotEmpty,
+        description: 'the landed file to appear on the Transfers surface',
+      );
+
+      // Nothing is offered while the file is still a question, and this one is
+      // not — so the only menu a right-click can raise is the folder action.
+      await rightClick(
+        tester,
+        onPage(windowA, TransfersPage, find.text('report.bin')),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.openContainingFolder))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the context menu to open',
+      );
+
+      await tester.tap(windowA.within(find.text(l10n.openContainingFolder)));
+      await pumpUntil(
+        tester,
+        () => revealer.revealed.isNotEmpty,
+        description: 'the folder to be opened',
+      );
+      expect(revealer.revealed.single, landed);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a picture arrives on its own and can show its folder', (
+      tester,
+    ) async {
+      final revealer = ScriptedRevealer.install();
+      addTearDown(RevealResolution.reset);
+      final hub = MemoryBeaconHub();
+      final inbox = tempDirectory('local-transfer-reveal-photo-in-');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      // Told where things go, the way the Windows build is told Downloads. That
+      // is the whole difference between an image and a file: the picture has an
+      // answer already.
+      final bob = await startUiDevice(
+        tester,
+        hub.b,
+        'Bob',
+        defaultIncomingDirectory: inbox.path,
+      );
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      final home = tempDirectory('local-transfer-reveal-photo-out-');
+      final source = File('${home.path}${Platform.pathSeparator}holiday.png');
+      await writePng(tester, source, width: 8, height: 8);
+
+      await tester.runAsync(() => alice.controller.sendImage(source));
+      await pumpUntil(
+        tester,
+        () =>
+            bob.controller.transfers.isNotEmpty &&
+            bob.controller.transfers.single.localPath != null,
+        description: 'the picture to land with nobody answering anything',
+      );
+      expect(
+        bob.offers,
+        isEmpty,
+        reason: 'a picture with a folder to go in is not a question',
+      );
+      final landed = bob.controller.transfers.single.localPath;
+      expect(landed, isNotNull);
+      expect(File(landed!).parent.path, inbox.path);
+
+      // Bob's window, on the conversation with Alice: the picture is a message,
+      // so the conversation is where a user looks for it.
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Alice');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.byType(ImageBubble),
+        ).evaluate().isNotEmpty,
+        description: 'the picture to be drawn in the conversation',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.byType(ImageBubble)),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.openContainingFolder))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the bubble to offer its folder',
+      );
+      await tester.tap(windowA.within(find.text(l10n.openContainingFolder)));
+      await pumpUntil(
+        tester,
+        () => revealer.revealed.isNotEmpty,
+        description: 'the folder to be opened',
+      );
+      expect(revealer.revealed.single, landed);
 
       await shutdown(tester, [alice, bob]);
     });
