@@ -889,10 +889,16 @@ class MessageBubble extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                MessageBubbleShape(
-                  colour: background,
-                  outgoing: outgoing,
-                  child: _contents(context, l10n),
+                // A right-click on a bubble is where "show me that file" lives,
+                // and it is offered by the same widget the Transfers list uses
+                // so the two surfaces cannot drift apart.
+                TransferContextMenu(
+                  view: view,
+                  child: MessageBubbleShape(
+                    colour: background,
+                    outgoing: outgoing,
+                    child: _contents(context, l10n),
+                  ),
                 ),
                 // A conversation is not a transfer: for a message that *is* its
                 // own content the "kind · state" line would read

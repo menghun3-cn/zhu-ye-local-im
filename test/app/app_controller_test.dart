@@ -33,6 +33,7 @@ Future<TestDevice> startDevice(
   BeaconTransport transport,
   String alias, {
   ClipboardMode clipboardMode = ClipboardMode.off,
+  String? defaultIncomingDirectory,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -45,6 +46,10 @@ Future<TestDevice> startDevice(
     sessionListenPort: 0,
     pairingPort: 0,
     clipboardMode: clipboardMode,
+    // Null unless a test says otherwise, and null is a real answer here: a
+    // platform that offers no folder is the one case where an image is still
+    // asked about rather than filed on arrival.
+    defaultIncomingDirectory: defaultIncomingDirectory,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -531,6 +536,122 @@ void main() {
       expect(bob.offers, isEmpty, reason: 'there was nothing to ask');
       expect(bob.controller.transfers.single.state, TransferState.completed);
       expect(bob.controller.transfers.single.offer, isNull);
+    });
+
+    test('an image with nowhere to go is asked about after all', () async {
+      // An image is the case that looks like a file and behaves like a text: it
+      // does stream bytes and does land on disk, but the folder is not a
+      // question the arrival raises — it is a setting this Device already has.
+      // Both Devices here were started with no default folder, which is the one
+      // configuration where that stops being true, so this test is the fallback:
+      // with nowhere to write, the picture is asked about like a file.
+      final home = tempDirectory('local-transfer-image-out-');
+      final source = File('${home.path}${Platform.pathSeparator}photo.png');
+      source.writeAsBytesSync(
+        List<int>.generate(24, (index) => (index * 3) % 256),
+      );
+
+      final sent = await alice.controller.sendImage(source);
+
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be asked about the picture',
+      );
+      expect(bob.offers.single.kind, PayloadKind.image);
+      expect(bob.controller.transfers.single.needsDecision, isTrue);
+
+      final inbox = tempDirectory('local-transfer-image-in-');
+      await bob.controller.acceptInto(bob.offers.single, inbox);
+      await until(
+        () => sent.state == TransferState.completed,
+        description: 'the transfer to finish once it is answered',
+      );
+    });
+  });
+
+  group('an image with somewhere to go', () {
+    late MemoryBeaconHub hub;
+    late TestDevice alice;
+    late TestDevice bob;
+    late Directory inbox;
+
+    setUp(() async {
+      hub = MemoryBeaconHub();
+      inbox = tempDirectory('local-transfer-image-inbox-');
+      alice = await startDevice(hub.a, 'Alice');
+      // Bob is told where things go, the way the Windows build is told
+      // Downloads. That is the whole difference between an image and a file: an
+      // image has an answer already and a file does not.
+      bob = await startDevice(
+        hub.b,
+        'Bob',
+        defaultIncomingDirectory: inbox.path,
+      );
+      await pairUp(alice, bob);
+      await connect(alice, bob);
+    });
+
+    test('an image lands without the user being asked', () async {
+      final home = tempDirectory('local-transfer-image-out-');
+      final source = File('${home.path}${Platform.pathSeparator}photo.png');
+      final bytes = Uint8List.fromList(
+        List<int>.generate(96, (index) => (index * 7) % 256),
+      );
+      source.writeAsBytesSync(bytes);
+
+      final sent = await alice.controller.sendImage(source);
+
+      await until(
+        () => sent.state == TransferState.completed,
+        description: 'the picture to arrive with nobody answering anything',
+      );
+      expect(
+        bob.offers,
+        isEmpty,
+        reason: 'an image is not a question, so nothing is offered',
+      );
+
+      final received = bob.controller.transfers.single;
+      expect(received.kind, PayloadKind.image);
+      expect(received.state, TransferState.completed);
+      expect(received.needsDecision, isFalse);
+      expect(received.offer, isNull);
+
+      // Both halves of what the conversation needs: a path to draw from, and
+      // bytes on disk that hash to what was sent.
+      final landed = received.localPath;
+      expect(landed, isNotNull, reason: 'the receiver can draw it');
+      expect(File(landed!).readAsBytesSync(), bytes);
+      expect(
+        File(landed).parent.path,
+        inbox.path,
+        reason: 'it goes where this Device already puts received things',
+      );
+      // The sender named the file; where it lands is this side's setting.
+      expect(fileNameOf(landed), 'photo.png');
+    });
+
+    test('a folder the user chose wins over the platform default', () async {
+      final chosen = tempDirectory('local-transfer-image-chosen-');
+      await bob.controller.setIncomingDirectory(chosen.path);
+
+      final home = tempDirectory('local-transfer-image-out-');
+      final source = File('${home.path}${Platform.pathSeparator}holiday.png');
+      source.writeAsBytesSync(List<int>.generate(32, (index) => index));
+
+      final sent = await alice.controller.sendImage(source);
+      await until(
+        () => sent.state.isSettled,
+        description: 'the picture to arrive',
+      );
+
+      final landed = bob.controller.transfers.single.localPath;
+      expect(landed, isNotNull);
+      expect(
+        File(landed!).parent.path,
+        chosen.path,
+        reason: 'the setting the user made beats the one the platform offered',
+      );
     });
   });
 

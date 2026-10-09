@@ -62,6 +62,11 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       beaconTransport: seams.beacon,
       clipboard: seams.clipboard,
       platform: seams.platform,
+      // Where a Transfer the controller answers on its own lands when the
+      // profile names no folder of its own. Passed in because only the platform
+      // layer knows it — and because the pages resolve the same fallback for
+      // the accept dialog, so "where do received things go" has one answer.
+      defaultIncomingDirectory: seams.defaultIncomingDirectory,
     );
     try {
       await controller.start();
