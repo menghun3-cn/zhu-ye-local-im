@@ -8,6 +8,7 @@ import 'feedback.dart';
 import 'home_shell.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'seams.dart';
+import 'wechat/theme.dart';
 
 /// The languages this application speaks, in **fallback order**.
 ///
@@ -98,9 +99,10 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       locale: appLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appLocales,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      // The one theme the whole app runs on. Not seeded from a colour: a seeded
+      // scheme invents its own greens, and the conversation surfaces are held
+      // to WeChat's specific `#07C160`.
+      theme: WeChat.theme(),
       // A `Builder`, because this widget's own context sits *above* the
       // MaterialApp and therefore above the localizations it installs:
       // everything below reads its strings off this inner context instead.
@@ -177,9 +179,10 @@ class StartupFailureApp extends StatelessWidget {
       locale: appLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appLocales,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      // The same theme as the running app: a failure screen drawn in a
+      // different scheme would look like a different program, and the moment a
+      // user most needs to trust what they are reading is the moment it broke.
+      theme: WeChat.theme(),
       home: Builder(
         builder: (context) => StartupFailureScreen(
           title: AppLocalizations.of(context).startupFailureTitle,
