@@ -9,14 +9,23 @@ import 'theme.dart';
 /// The bytes are read from disk rather than held in memory. A conversation is a
 /// list that is rebuilt on every progress tick of every live Transfer, so an
 /// image cached in a widget field would be re-decoded many times a second while
-/// something else is transferring; [Image.file] decodes once and keeps its own
-/// cache keyed on the file's path, mtime and size.
+/// something else is transferring; resolving through [FileImage] keeps the
+/// decode in Flutter's own cache, keyed on the file's path and the display's
+/// pixel ratio.
+///
+/// The thumbnail keeps the picture's own shape. Its size is read once from the
+/// decoded image and the box is then made that shape, bounded by [_maxSide] on
+/// both sides — a wide screenshot comes out wide and short, a portrait
+/// photograph tall and narrow, and neither is cut down to a square. A fixed
+/// square with `BoxFit.cover` would show the middle of every picture and
+/// nothing else, which is a preview of the picture's centre rather than of the
+/// picture.
 ///
 /// A picture that cannot be read — deleted between the message arriving and the
 /// user scrolling to it, or a format the platform's decoder does not know —
 /// falls back to its name rather than to an exception. A chat history is not a
 /// place where one bad file should take the screen down.
-class ImageBubble extends StatelessWidget {
+class ImageBubble extends StatefulWidget {
   /// Draws the image at [path].
   const ImageBubble({
     super.key,
@@ -34,37 +43,165 @@ class ImageBubble extends StatelessWidget {
   /// Opens the full-size view. Null when there is nothing to open into.
   final VoidCallback? onOpen;
 
+  @override
+  State<ImageBubble> createState() => _ImageBubbleState();
+}
+
+class _ImageBubbleState extends State<ImageBubble> {
   /// The largest a thumbnail is allowed to be, on either side.
   ///
-  /// A square bound rather than a width: a portrait photograph at a fixed
+  /// A square *bound* rather than a width: a portrait photograph at a fixed
   /// width would be a column of pixels taller than the window, and WeChat
   /// bounds both sides for exactly that reason.
   static const double _maxSide = 200;
 
+  /// What is drawn between the message appearing and the picture being ready.
+  ///
+  /// Roughly a landscape photograph's shape, so that the common case grows only
+  /// a little when the real size arrives. The alternative — a zero-sized box —
+  /// makes the bubble collapse and spring back, which reads as a glitch rather
+  /// than as loading.
+  static const Size _placeholder = Size(_maxSide, _maxSide * 0.66);
+
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+
+  /// The thumbnail's size once the picture has been decoded, else null.
+  Size? _thumbnail;
+
+  /// Whether the picture could not be read at all.
+  bool _unreadable = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // In `didChangeDependencies` rather than `initState`: the pixel ratio the
+    // decode is keyed on comes from the [ImageConfiguration], which is only
+    // available once the widget is in a tree.
+    _follow(widget.path);
+  }
+
+  @override
+  void didUpdateWidget(ImageBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) _follow(widget.path);
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
+  /// Stops following the picture currently being resolved.
+  void _detach() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    _listener = null;
+    _stream = null;
+  }
+
+  /// Starts following the picture at [path], if it is not already following it.
+  void _follow(String path) {
+    final stream = FileImage(File(path))
+        .resolve(createLocalImageConfiguration(context));
+    // The same provider resolves to the same stream, and re-adding a listener
+    // to it would be pointless work on every dependency change.
+    if (stream.key == _stream?.key) return;
+    _detach();
+    _stream = stream;
+    _thumbnail = null;
+    _unreadable = false;
+    _listener = ImageStreamListener(_onImage, onError: (_, _) => _onError());
+    stream.addListener(_listener!);
+  }
+
+  void _onImage(ImageInfo info, bool synchronousCall) {
+    if (!mounted) return;
+    final size = Size(
+      info.image.width / info.scale,
+      info.image.height / info.scale,
+    );
+    final thumbnail = _fitWithin(size);
+    // A cached picture is handed over *during* `addListener`, which is to say
+    // during `didChangeDependencies` — a phase where `setState` is an error.
+    // There is a build immediately after, so writing the field is enough.
+    if (synchronousCall) {
+      _thumbnail = thumbnail;
+      _unreadable = false;
+      return;
+    }
+    if (_thumbnail == thumbnail && !_unreadable) return;
+    setState(() {
+      _thumbnail = thumbnail;
+      _unreadable = false;
+    });
+  }
+
+  void _onError() {
+    if (!mounted || _unreadable) return;
+    setState(() => _unreadable = true);
+  }
+
+  /// [size] scaled down to fit [_maxSide] on both sides — never up.
+  ///
+  /// A small picture stays small: blowing a 32-pixel icon up to 200 would be a
+  /// preview of the decoder's guesswork rather than of the file.
+  static Size _fitWithin(Size size) {
+    if (size.width <= 0 || size.height <= 0) return _placeholder;
+    final fit = (size.width <= _maxSide && size.height <= _maxSide)
+        ? 1.0
+        : (_maxSide / size.width < _maxSide / size.height
+              ? _maxSide / size.width
+              : _maxSide / size.height);
+    return Size(size.width * fit, size.height * fit);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final image = ClipRRect(
+    final picture = ClipRRect(
       borderRadius: BorderRadius.circular(WeChat.bubbleRadius),
-      child: Image.file(
-        File(path),
-        width: _maxSide,
-        fit: BoxFit.cover,
-        // Bounded on both sides: without a height the layout has to resolve
-        // through the decode, which makes a tall image push the conversation
-        // around as it loads.
-        height: _maxSide,
-        errorBuilder: (_, _, _) => _unreadable(),
-      ),
+      child: _picture(),
     );
-    if (onOpen == null) return image;
+    // Nothing to open into when the picture could not be read, so the bubble is
+    // not made to look clickable either.
+    final open = widget.onOpen;
+    if (open == null || _unreadable) return picture;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(onTap: onOpen, child: image),
+      child: GestureDetector(onTap: open, child: picture),
+    );
+  }
+
+  Widget _picture() {
+    if (_unreadable) return _unreadableBox();
+    final thumbnail = _thumbnail;
+    if (thumbnail == null) return _placeholderBox();
+    return SizedBox(
+      width: thumbnail.width,
+      height: thumbnail.height,
+      // `cover` against a box of exactly this shape crops nothing; it only
+      // rules out the hairline the layout would otherwise leave when rounding
+      // the fitted size to a whole number of pixels.
+      child: Image(
+        image: FileImage(File(widget.path)),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _unreadableBox(),
+      ),
+    );
+  }
+
+  /// What is drawn while the picture is being read.
+  Widget _placeholderBox() {
+    return Container(
+      width: _placeholder.width,
+      height: _placeholder.height,
+      color: WeChat.pageBackground,
     );
   }
 
   /// What an image that cannot be decoded shows instead.
-  Widget _unreadable() {
+  Widget _unreadableBox() {
     return Container(
       width: _maxSide,
       height: _maxSide,
@@ -81,7 +218,7 @@ class ImageBubble extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            name,
+            widget.name,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
