@@ -705,12 +705,26 @@ final class LocalTransferController {
         }
       }
     }
-    // The bytes are verified and closed by now — `accept` does not return until
-    // they are — so it is only here that a received image has a path worth
-    // drawing. Recorded for the first landed item because that is what an image
-    // message carries; a multi-file offer leaves this null and keeps its names.
+    // `accept` returns once the answer is on the wire, not once the bytes are —
+    // those are still to cross, and a path recorded here would name a file that
+    // is empty or half written. A UI that drew from it would try to decode a
+    // picture that is not there yet, fail, and have nothing to re-trigger the
+    // decode when the bytes finally landed. So the path is held back until the
+    // digests verify — the same standard [_Tracked]'s own doc sets — and
+    // recorded then. It is kept for the first landed item because that is what
+    // an image message carries; a multi-file offer leaves this null and keeps
+    // its names. A Transfer that never completes never reports a path, which is
+    // the honest answer about a file that never arrived.
     if (landed.isNotEmpty) {
-      _recordLocalPath(transfer, landed.values.first);
+      final path = landed.values.first;
+      unawaited(
+        transfer.outcome.then((outcome) {
+          if (outcome is TransferCompleted &&
+              _recordLocalPath(transfer, path)) {
+            _notify();
+          }
+        }),
+      );
     }
     _notify();
   }
@@ -719,13 +733,15 @@ final class LocalTransferController {
   ///
   /// The record is looked up rather than passed in because `acceptInto` takes
   /// the [IncomingTransfer] the UI holds, not the wrapper the controller made.
-  void _recordLocalPath(Transfer transfer, String path) {
+  /// Answers whether a record was found, because the caller notifies only then.
+  bool _recordLocalPath(Transfer transfer, String path) {
     for (final tracked in _transfers) {
       if (identical(tracked.transfer, transfer)) {
         tracked.localPath = path;
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   /// Refuses [transfer].
