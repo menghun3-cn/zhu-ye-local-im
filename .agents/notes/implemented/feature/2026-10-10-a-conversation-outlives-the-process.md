@@ -171,3 +171,10 @@ shared `TransferContextMenu` has always been for.
 it replaces it with is `Copy text`, which copies all of it and works on a message read back from
 disk as readily as on one sent a moment ago. Worth knowing rather than discovering: Ctrl+C over a
 dragged selection inside a bubble no longer does anything.
+
+**The packaged bundle is checked for the new strings, and for the new icon.**
+`scripts/pack-windows-portable.ps1` grew three probes — `删除`, `复制文字`, `没能复制这段文字。` —
+and one required glyph, `0xe1bb` (`Icons.delete_outline`). The glyph matters more than usual here:
+an icon font is subset by the tree-shaker and is only rebuilt when the assets step re-runs, so a
+stale font would draw the Delete line as an empty pill while every string inside `app.so` was
+correct — a red gate that only the artifact itself can catch.
