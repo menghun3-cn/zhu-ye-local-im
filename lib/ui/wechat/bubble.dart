@@ -107,12 +107,12 @@ class Avatar extends StatelessWidget {
 /// a corner says the same thing with no extra shape at all. Only the corner
 /// beside the avatar tucks; the other three take `WeChat.bubbleRadius`.
 ///
-/// A received bubble is drawn with a hairline as well as a fill, because on the
-/// light page its fill is the conversation board's own white and without the
-/// line there would be nothing to see. An outgoing bubble sits in its own green
-/// and needs none. On a dark page both relationships turn over — the received
-/// bubble is a notch *brighter* than the board — but the line stays, and reads
-/// as an edge rather than as the only thing separating two identical fills.
+/// A received bubble carries a hairline as well as a fill, in both themes. The
+/// line is an edge, not the thing that makes the bubble visible: on the light
+/// page the fill is a soft grey against the board's white, and on the dark page
+/// it is a grey *lighter* than the board — so the fill alone separates the two,
+/// and the hairline only crisps the boundary. An outgoing bubble sits in its own
+/// green and needs no line at all.
 class MessageBubbleShape extends StatelessWidget {
   /// Wraps [child] in a bubble of [colour], tucked towards the avatar when
   /// [outgoing] is false and away from it when [outgoing] is true.
