@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app.dart';
 import '../core/core.dart';
 import 'clipboard_paste.dart';
+import 'controller_scope.dart';
 import 'dialogs.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -157,18 +158,57 @@ Future<void> copyTransferImage(BuildContext context, TransferView view) async {
   messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyImage)));
 }
 
-/// Offers what can be done with a Transfer once it has settled, on a
-/// right-click.
+/// Whether [view] is a text message whose words can be put on the clipboard.
+///
+/// Text and not "anything with something to copy", because a file's body is a
+/// name and a picture's is pixels: what a person wants from a message that
+/// *says* something is the sentence, and the two other kinds have their own
+/// answers below.
+bool canCopyText(TransferView view) =>
+    view.kind == PayloadKind.text && view.text != null;
+
+/// Puts [view]'s words on this machine's clipboard.
+///
+/// Through Flutter's own `Clipboard` rather than through [ClipboardPaste]: text
+/// is the one thing every platform's clipboard channel reads and writes, which
+/// is the whole reason the seam exists for everything else.
+///
+/// A failure is said out loud for the same reason a failed picture copy is: a
+/// copy that did not happen and says nothing is indistinguishable from one that
+/// did, and the user pastes nothing and does not know why.
+Future<void> copyTransferText(BuildContext context, TransferView view) async {
+  final text = view.text;
+  if (text == null) return;
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = AppLocalizations.of(context);
+  try {
+    await Clipboard.setData(ClipboardData(text: text));
+  } on Object {
+    messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyText)));
+  }
+}
+
+/// Offers what can be done with a Transfer, on a right-click.
 ///
 /// The answers an *offer* needs — accept and refuse — are buttons in the open,
 /// because a decision behind a menu is a decision nobody finds. These are the
-/// other kind of action: things the user wants after a Transfer has settled,
-/// when the question is over and the bytes are somewhere on disk. A right-click
-/// keeps them reachable without putting a toolbar on a message.
+/// other kind of action: things the user wants once the question is over and
+/// the bytes are somewhere on disk, plus the one thing that is wanted from a
+/// message of any kind at all — taking it off the screen. A right-click keeps
+/// them reachable without putting a toolbar on a message.
 ///
-/// Which actions a given Transfer offers is decided by the predicates above
-/// rather than by the caller, so the conversation, the Transfers list and any
-/// surface added later cannot each draw a different menu for the same message.
+/// Which of the byte-actions a given Transfer offers is decided by the
+/// predicates above rather than by the caller, so the conversation, the
+/// Transfers list and any surface added later cannot each draw a different menu
+/// for the same message. Deleting is not one of them: it is offered by
+/// everything, settled or not, which is why the menu is never empty and the
+/// right-click is always intercepted.
+///
+/// For a text message this menu is also where copying the words lives. The
+/// bubble draws its words as plain text rather than as a selectable field, so
+/// there is no second menu on a secondary click to argue with this one; the
+/// line is in the menu instead, and it copies the whole message rather than
+/// whichever words the pointer was over.
 ///
 /// [child] is wrapped rather than replaced — the picture and the card are what
 /// is being pointed at, and they have to go on drawing exactly as they did.
@@ -188,13 +228,12 @@ class TransferContextMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Nothing to offer means nothing to intercept: a handler that opened an
-    // empty menu would swallow the right-click that selects a name to copy.
-    if (!canRevealTransfer(view) &&
-        !canCopyImage(view) &&
-        !canCancelTransfer(view)) {
-      return child;
-    }
+    // Every message offers at least one thing, because deleting one is
+    // something a user can want from any of them — including a message that
+    // never moved a byte. So the right-click is always intercepted, and the
+    // guard that used to stand here — a handler that opened an empty menu would
+    // have swallowed the right-click that selects a name to copy — has no case
+    // left to apply to.
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           unawaited(_open(context, details.globalPosition)),
@@ -209,8 +248,13 @@ class TransferContextMenu extends StatelessWidget {
     // the time one of these is chosen, and the list must not change under the
     // menu the user is looking at either.
     final reveal = canRevealTransfer(view);
-    final copy = canCopyImage(view);
+    final copyImage = canCopyImage(view);
+    final copyText = canCopyText(view);
     final cancel = canCancelTransfer(view);
+    // The controller is read here for the same reason, and `ControllerScope.of`
+    // throws rather than returning null when the scope above is gone — which is
+    // why it is asked before the menu opens rather than after a line is chosen.
+    final controller = ControllerScope.of(context);
     // The overlay is what `showMenu` lays the menu out inside, so its size is
     // the one the margins below have to be measured against.
     final overlay = Overlay.of(context).context.findRenderObject();
@@ -241,12 +285,27 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.folder_open_outlined,
             label: l10n.openContainingFolder,
           ),
-        if (copy)
+        if (copyImage)
           _item(
             value: _copyAction,
             icon: Icons.content_copy_outlined,
             label: l10n.copyImage,
           ),
+        if (copyText)
+          _item(
+            value: _copyTextAction,
+            icon: Icons.content_copy_outlined,
+            label: l10n.copyText,
+          ),
+        // Last, and unconditional. Everything above reaches for the bytes
+        // somewhere on this machine or stops them moving; this is the line that
+        // takes the message itself away, and it is the one thing a user can
+        // want from a message of any kind.
+        _item(
+          value: _deleteAction,
+          icon: Icons.delete_outline,
+          label: l10n.deleteMessage,
+        ),
       ],
     );
     if (!context.mounted) return;
@@ -257,6 +316,10 @@ class TransferContextMenu extends StatelessWidget {
         await revealTransfer(context, view);
       case _copyAction:
         await copyTransferImage(context, view);
+      case _copyTextAction:
+        await copyTransferText(context, view);
+      case _deleteAction:
+        await controller.deleteMessage(view);
     }
   }
 
@@ -278,10 +341,14 @@ class TransferContextMenu extends StatelessWidget {
   }
 }
 
-/// Showing the file where it lives, and putting a picture on the clipboard.
+/// What a menu line answers with.
 ///
-/// Three values rather than two because `showMenu` answers with what was
-/// chosen, and `null` is what a dismissed menu answers with as well.
+/// One value per line rather than a nullable, because `showMenu` answers with
+/// what was chosen and `null` is *also* what a dismissed menu answers with — so
+/// "nothing was chosen" has to be told apart from "the line that was chosen
+/// happens to be first".
 const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _copyAction = 'copy';
+const String _copyTextAction = 'copy-text';
+const String _deleteAction = 'delete';

@@ -409,6 +409,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotCopyImage => 'Could not copy that image.';
 
   @override
+  String get copyText => 'Copy text';
+
+  @override
+  String get cannotCopyText => 'Could not copy that text.';
+
+  @override
+  String get deleteMessage => 'Delete';
+
+  @override
   String get clipboardSyncHeader => 'Clipboard sync';
 
   @override

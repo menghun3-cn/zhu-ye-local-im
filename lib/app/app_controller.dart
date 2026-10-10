@@ -64,6 +64,14 @@ final class LocalTransferController {
   /// directory on Android — and `lib/app` may not ask a platform anything.
   /// Null therefore means "nowhere", which is exactly what the one desktop
   /// platform this build has not implemented resolves to; see [_landingFor].
+  ///
+  /// [messageStore] is where the conversation is remembered between runs, and
+  /// null is a real answer there too: a Device with nowhere durable to write
+  /// keeps its conversation for as long as the process, exactly as it keeps its
+  /// identity. It is a store of its own rather than the profile's because the
+  /// two have nothing to do with each other — losing a conversation must not
+  /// cost a Device its identity, and the profile is rewritten rarely while a
+  /// conversation changes every time somebody types.
   LocalTransferController({
     required ProfileStore store,
     required BeaconTransport beaconTransport,
@@ -74,6 +82,7 @@ final class LocalTransferController {
     int pairingPort = defaultPairingPort,
     ClipboardMode clipboardMode = ClipboardMode.off,
     String? defaultIncomingDirectory,
+    MessageStore? messageStore,
     DateTime Function()? clock,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
@@ -94,6 +103,8 @@ final class LocalTransferController {
        _clipboardMode = clipboardMode,
        // ignore: prefer_initializing_formals
        _defaultIncomingDirectory = defaultIncomingDirectory,
+       // ignore: prefer_initializing_formals
+       _messages = messageStore,
        _clock = clock ?? DateTime.now;
 
   final ProfileStore _store;
@@ -108,6 +119,16 @@ final class LocalTransferController {
   /// Where a Transfer the controller answers by itself lands when the profile
   /// has not been told where to put things.
   final String? _defaultIncomingDirectory;
+
+  /// Where the conversation is kept between runs, or null for nowhere.
+  ///
+  /// Held as an optional rather than a mandatory store with an in-memory
+  /// fallback, because "this Device has nowhere to write" and "this Device is
+  /// a test" are the same case and both are served by remembering nothing:
+  /// with no store there is no history to load, nothing is archived, and the
+  /// live list is the whole of the conversation — which is what every test
+  /// that predates the history was written against.
+  final MessageStore? _messages;
 
   final DateTime Function() _clock;
 
@@ -128,6 +149,7 @@ final class LocalTransferController {
       StreamController<PairingRequest>.broadcast();
   final Map<String, _WiredSession> _wired = {};
   final List<_Tracked> _transfers = [];
+  final List<MessageRecord> _history = [];
   final List<StreamSubscription<Object?>> _watch = [];
   final List<String> _notices = [];
 
@@ -327,10 +349,47 @@ final class LocalTransferController {
     return views;
   }
 
-  /// Every Transfer this Device has taken part in, newest first.
-  List<TransferView> get transfers => [
-    for (final tracked in _transfers.reversed) _viewOf(tracked),
-  ];
+  /// Every message in every conversation this Device has had, newest first.
+  ///
+  /// Two sources, and the live one wins. A Transfer this process took part in
+  /// is a [_Tracked] with real state and real byte counts, so a UI draws it
+  /// from there — including after it ends, which is when it is archived:
+  /// settling is what turns a Transfer into history, and the record stays in
+  /// both lists until the live one is pruned. A message remembered from an
+  /// earlier run has no live state at all, and is drawn from the record.
+  ///
+  /// The two are joined on [TransferView.handle] rather than by position,
+  /// because for a settled message in the current run they describe the same
+  /// thing and drawing it twice would be the visible bug.
+  ///
+  /// Newest first, because the conversation list draws itself reversed — the
+  /// newest message is at the bottom, which is where a conversation is read
+  /// from.
+  List<TransferView> get transfers {
+    final live = <String, TransferView>{};
+    for (final tracked in _transfers) {
+      live[_handleOf(tracked)] = _viewOf(tracked);
+    }
+    final views = <TransferView>[
+      for (final record in _history)
+        if (!live.containsKey(record.handle)) _viewOfRecord(record),
+      ...live.values,
+    ];
+    views.sort(_newestFirst);
+    return views;
+  }
+
+  /// Orders two messages the way a conversation reads.
+  ///
+  /// The tie-break is not decoration: `List.sort` is not stable, so two
+  /// messages stamped in the same millisecond — which a resumed Transfer and
+  /// the message beside it can be — would swap places from one rebuild to the
+  /// next without it, and a list that reorders itself while somebody reads it
+  /// is a bug whatever order the two "should" be in.
+  static int _newestFirst(TransferView a, TransferView b) {
+    final byTime = b.at.compareTo(a.at);
+    return byTime != 0 ? byTime : b.id.compareTo(a.id);
+  }
 
   /// Loads or mints this Device's identity and brings the layers up.
   ///
@@ -345,6 +404,11 @@ final class LocalTransferController {
       alias: _alias,
     );
     _local = local;
+    // The conversation is read before anything can add to it. Both the load
+    // and the archive work on `_history`, and a Transfer that settled while the
+    // file was still being read would be appended to a list that was about to
+    // be replaced by what the file holds.
+    await _loadHistory();
     final clipboard =
         ClipboardMirror(
             group: local.profile.group,
@@ -805,6 +869,39 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// Removes [view]'s message from this Device's record of the conversation.
+  ///
+  /// One-sided, and deliberately so. "Delete a message" means "take it off my
+  /// screen" in every messaging application a user has met: the file this
+  /// Device received stays where it landed, and the peer is told nothing.
+  /// There is no wire message for this and there should not be one — a
+  /// conversation that either end could edit is a conversation nobody can
+  /// trust, and the whole product rests on the two Devices reporting the same
+  /// bytes.
+  ///
+  /// A message that is still in flight goes as well, and *without* cancelling
+  /// it. Stopping a send is a different thing, and it is offered a line above
+  /// in the same menu; deleting is about this Device's record rather than
+  /// about the wire. The record is flagged instead, so that the ending — which
+  /// arrives a moment later, from a Transfer the engine still owns — does not
+  /// put the message back on screen.
+  ///
+  /// Written out before returning, so a message a user watched disappear does
+  /// not come back after a restart. A failure to write is a notice rather than
+  /// an exception, for the same reason every other failure to write is: the
+  /// message is gone from the screen, which is what was asked for, and the
+  /// only part at risk is whether it stays gone across runs.
+  Future<void> deleteMessage(TransferView view) async {
+    final handle = view.handle;
+    for (final tracked in _transfers) {
+      if (_handleOf(tracked) == handle) tracked.dismissed = true;
+    }
+    _transfers.removeWhere((tracked) => _handleOf(tracked) == handle);
+    _history.removeWhere((record) => record.handle == handle);
+    _notify();
+    await _persistHistory();
+  }
+
   /// Changes how the clipboard is treated, starting or stopping the watcher.
   void setClipboardMode(ClipboardMode mode) {
     _mirror.setMode(mode);
@@ -1196,6 +1293,15 @@ final class LocalTransferController {
           // whenever the list next happened to rebuild.
           tracked.settledAt = _clock();
           await progress.cancel();
+          // An ending is what turns a message into history, and it is archived
+          // here rather than when the Transfer was tracked because a Transfer
+          // that never ended has nothing to remember: a question nobody
+          // answered is a connection's state, not something that happened.
+          //
+          // Unless the user deleted it while it was still going. Deleting is
+          // the whole of what they asked for, and writing the message back the
+          // moment it ended would undo the delete a breath after it was made.
+          if (!tracked.dismissed) await _remember(tracked);
           _notify();
         },
       ),
@@ -1334,6 +1440,113 @@ final class LocalTransferController {
     }
   }
 
+  /// Reads the remembered conversation back, if there is one to read.
+  ///
+  /// A history that cannot be decoded is reported and then left empty rather
+  /// than raised: the file is a record of things that already happened, and a
+  /// Device that refused to start over one would be trading the ability to talk
+  /// for the ability to scroll back. Nothing is lost by it either — the store
+  /// moves the damaged bytes aside before this returns — and the sentence in
+  /// [notices] is what tells the user that something happened at all.
+  Future<void> _loadHistory() async {
+    final store = _messages;
+    if (store == null) return;
+    try {
+      final remembered = await loadMessages(store);
+      _history
+        ..clear()
+        ..addAll(remembered);
+    } on Object catch (error) {
+      _history.clear();
+      _notice('the conversation could not be read back: $error');
+    }
+  }
+
+  /// Remembers a settled Transfer, and writes the conversation out.
+  ///
+  /// Called once per Transfer, when it ends. Bounded by [maxRememberedMessages]
+  /// from the oldest end, which is the end a person scrolls away from first.
+  Future<void> _remember(_Tracked tracked) async {
+    final store = _messages;
+    if (store == null) return;
+    final record = _recordOf(tracked);
+    // Replaced rather than appended when the handle is already known. The two
+    // lists are joined on that handle, so a second copy would be a message that
+    // draws once and whose deletion removes one of two entries.
+    _history.removeWhere((existing) => existing.handle == record.handle);
+    _history.add(record);
+    if (_history.length > maxRememberedMessages) {
+      _history.removeRange(0, _history.length - maxRememberedMessages);
+    }
+    await _persistHistory();
+  }
+
+  /// Writes the conversation out through the store.
+  ///
+  /// A failure is a notice rather than an exception, for the same reason a
+  /// failed profile save is one: the messages are still in memory and still on
+  /// screen, and what the user has lost is the part that would have outlived
+  /// the process. Saying so is the honest answer; failing the Transfer that
+  /// just completed over it would blame the wrong thing.
+  Future<void> _persistHistory() async {
+    final store = _messages;
+    if (store == null) return;
+    try {
+      await saveMessages(_history, store);
+    } on Object catch (error) {
+      _notice('the conversation could not be saved: $error');
+    }
+  }
+
+  /// Whether the conversation is kept between runs at all.
+  bool get remembersConversation => _messages != null;
+
+  /// [tracked] as the message that will be remembered.
+  MessageRecord _recordOf(_Tracked tracked) {
+    final transfer = tracked.transfer;
+    return MessageRecord(
+      peer: tracked.peer,
+      id: transfer.id,
+      direction: transfer.direction,
+      kind: transfer.kind,
+      at: tracked.at,
+      settledAt: tracked.settledAt,
+      state: transfer.state,
+      names: [for (final item in transfer.items) item.name],
+      totalBytes: transfer.totalBytes,
+      text: transfer.text,
+      localPath: tracked.localPath,
+    );
+  }
+
+  /// A remembered message, as a UI renders it.
+  ///
+  /// The live parts are absent because they no longer exist: this message
+  /// belonged to a Session that ended with an earlier run of the program, and
+  /// there is nothing left to answer or to stop. Everything else is either
+  /// stored or implied by the ending — a settled Transfer has every accepted
+  /// byte, which is why the fraction below is one rather than derived.
+  TransferView _viewOfRecord(MessageRecord record) => TransferView(
+    id: record.id,
+    direction: record.direction,
+    kind: record.kind,
+    peer: record.peer,
+    at: record.at,
+    settledAt: record.settledAt,
+    state: record.state,
+    transferredBytes: record.totalBytes,
+    totalBytes: record.totalBytes,
+    names: record.names,
+    text: record.text,
+    localPath: record.localPath,
+    offer: null,
+    send: null,
+  );
+
+  /// What names [tracked]'s message for as long as it is remembered.
+  String _handleOf(_Tracked tracked) =>
+      messageHandle(tracked.peer, tracked.transfer.id);
+
   void _notice(String message) {
     _notices.add(message);
     _notify();
@@ -1457,6 +1670,17 @@ final class _Tracked {
   /// Null for a text or clipboard Transfer, which has no file, and for a
   /// multi-item send, whose sources do not have to name a path.
   String? localPath;
+
+  /// Whether the user removed this message from the conversation.
+  ///
+  /// Set by [deleteMessage], which drops the message from the live list and
+  /// the history at once. A Transfer that is still in flight outlives that —
+  /// the engine owns it until it ends, and this wrapper is one of the places
+  /// that reaches it from — so the flag is what keeps the ending of a deleted
+  /// message from putting it back on screen. Nothing else reads it: a message
+  /// deleted after it settled is simply gone, and the callback that would have
+  /// archived it has already run.
+  bool dismissed = false;
 }
 
 /// What is known about one peer, gathered from every source before being

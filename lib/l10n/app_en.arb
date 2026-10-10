@@ -211,6 +211,9 @@
   "cannotOpenFolder": "Could not open that folder.",
   "copyImage": "Copy image",
   "cannotCopyImage": "Could not copy that image.",
+  "copyText": "Copy text",
+  "cannotCopyText": "Could not copy that text.",
+  "deleteMessage": "Delete",
 
   "clipboardSyncHeader": "Clipboard sync",
   "clipboardWaitingHeader": "Waiting for you",

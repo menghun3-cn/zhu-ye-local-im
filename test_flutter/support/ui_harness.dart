@@ -74,6 +74,7 @@ final class UiDevice {
     required this.controller,
     required this.clipboard,
     required this.store,
+    required this.messageStore,
     required this.seams,
   });
 
@@ -85,6 +86,12 @@ final class UiDevice {
 
   /// Where the profile is kept — in memory, so nothing is left on disk.
   final MemoryProfileStore store;
+
+  /// Where the conversation is kept — in memory too, and handed back so that a
+  /// test can stand a second Device up over the same one. That is the only way
+  /// to assert "this message is still here after a restart" without a real file
+  /// and a real second process.
+  final MessageStore messageStore;
 
   /// What the pages are told about the platform.
   final PlatformSeams seams;
@@ -125,11 +132,15 @@ Future<UiDevice> startUiDevice(
   String? profilePath,
   String? defaultIncomingDirectory,
   DevicePlatform platform = DevicePlatform.windows,
+  MessageStore? messageStore,
 }) async {
   late final UiDevice device;
   await tester.runAsync(() async {
     final store = MemoryProfileStore();
     final clipboard = MemorySystemClipboard();
+    // Handed in when a test wants a conversation to survive a restart: the
+    // second Device over the same store is the restart.
+    final conversation = messageStore ?? MemoryMessageStore();
     final controller = LocalTransferController(
       store: store,
       beaconTransport: transport,
@@ -144,17 +155,21 @@ Future<UiDevice> startUiDevice(
       // Device a user runs: the pages would name a folder the controller had
       // never heard of, and an image would be offered instead of filed.
       defaultIncomingDirectory: defaultIncomingDirectory,
+      messageStore: conversation,
     );
     await controller.start();
     device = UiDevice(
       controller: controller,
       clipboard: clipboard,
       store: store,
+      messageStore: conversation,
       // The same objects the controller was built on, plus the two facts the
       // pages need but the controller does not carry.
       seams: PlatformSeams(
         store: store,
         profilePath: profilePath,
+        messageStore: conversation,
+        messagePath: null,
         beacon: transport,
         clipboard: clipboard,
         platform: platform,

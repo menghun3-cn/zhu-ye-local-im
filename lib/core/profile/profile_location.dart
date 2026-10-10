@@ -31,6 +31,31 @@ String? profileFilePath({
   return directory == null ? null : '$directory/profile.json';
 }
 
+/// Where this Device keeps the record of its conversations.
+///
+/// The same directory as the profile, and a file of its own inside it. The
+/// directory because a conversation is per-user state belonging to this
+/// installation — not something to carry to another machine, and not the user's
+/// documents either — and a separate file because the two have nothing to do
+/// with each other: the profile is read and written rarely and holds an
+/// identity nobody can afford to lose, while the conversation is rewritten
+/// every time somebody types and could be rebuilt by talking again.
+///
+/// A null answer means what it means for [profileFilePath]: nowhere durable to
+/// write, and so a conversation that lasts as long as the process does.
+String? messageFilePath({
+  required DevicePlatform platform,
+  required Map<String, String> environment,
+  String? appDataDirectory,
+}) {
+  final directory = _dataDirectory(
+    platform: platform,
+    environment: environment,
+    appDataDirectory: appDataDirectory,
+  );
+  return directory == null ? null : '$directory/messages.json';
+}
+
 /// Where a Transfer with no destination chosen yet should land, or null when
 /// the host has no such place.
 ///

@@ -728,6 +728,24 @@ abstract class AppLocalizations {
   /// **'Could not copy that image.'**
   String get cannotCopyImage;
 
+  /// No description provided for @copyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy text'**
+  String get copyText;
+
+  /// No description provided for @cannotCopyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy that text.'**
+  String get cannotCopyText;
+
+  /// No description provided for @deleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteMessage;
+
   /// No description provided for @clipboardSyncHeader.
   ///
   /// In en, this message translates to:
