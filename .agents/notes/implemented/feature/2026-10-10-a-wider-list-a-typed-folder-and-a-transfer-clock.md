@@ -127,6 +127,22 @@ before the next assertion on a long page is debugged as a logic failure.
 placeholders, which is why it is the one the packaging probe can use; the
 duration strings exist in `app.so` only as fragments.
 
+**One localisation key was removed, and the packaging probe lost a sentence.**
+`chooseFolderTitle` ("选择保存位置") was the *title of the folder dialog
+settings used to open*, and that dialog was its only caller — the accept flow
+passes `whereShouldFilesLand` / `whereShouldThisArrive` instead. Removing the
+settings dialog therefore left the key with no call sites, and the AOT
+tree-shaker dropped the sentence from `app.so` on the next release build. The
+packaging script had been probing for exactly that sentence since a ninth of
+October, so it failed the pack with *"app.so 里找不到这些新文案: 选择保存位置"* —
+correctly: a probe for a sentence no correct build can contain is a permanent
+red light. Both the probe and the key are gone.
+
+The general rule the script states about replaced sentences applies to
+**unreachable** ones too: a probe is a claim about what the shipped binary
+contains, so it has to be re-derived whenever the caller graph moves, not only
+when the wording changes.
+
 **A stale local branch and a green suite hid a flaky test.** The end-to-end
 assertion had been passing by luck; making the suite's heaviest test run beside
 the others exposed it. It is fixed here rather than in its own PR because the fix
