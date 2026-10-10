@@ -351,6 +351,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get refuse => '拒绝';
 
   @override
+  String get cancelSend => '取消发送';
+
+  @override
   String get whereShouldFilesLand => '这些文件保存到哪个文件夹？';
 
   @override

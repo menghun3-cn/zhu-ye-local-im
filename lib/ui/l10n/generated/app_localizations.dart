@@ -656,6 +656,12 @@ abstract class AppLocalizations {
   /// **'Refuse'**
   String get refuse;
 
+  /// No description provided for @cancelSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sending'**
+  String get cancelSend;
+
   /// No description provided for @whereShouldFilesLand.
   ///
   /// In en, this message translates to:

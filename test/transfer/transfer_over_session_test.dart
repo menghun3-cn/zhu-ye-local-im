@@ -133,6 +133,10 @@ void main() {
           acceptanceTimeout: Duration(milliseconds: 80),
         ),
       );
+      // Subscribed before the send, so the Offer the receiver never answers is
+      // in hand to be inspected after the sender gives up on it.
+      final incoming = <IncomingTransfer>[];
+      peers.bob.engine.incoming.listen(incoming.add);
 
       final sent = await peers.alice.engine.sendText('anyone there?');
       final outcome = await sent.outcome;
@@ -141,6 +145,17 @@ void main() {
       // No wire reason applies to a wait this Device gave up on itself.
       expect((outcome as TransferFailed).reason, isNull);
       expect(outcome.detail, contains('did not answer'));
+
+      // Giving up is not silent. A receiver keeps no clock of its own by
+      // design — its Transfer can be cancelled, never timed out — so a sender
+      // that stops waiting is the only thing that can end the question the
+      // far side is still looking at. The cancel message is what keeps that
+      // side from holding an unanswered Offer forever.
+      await until(
+        () => incoming.isNotEmpty && incoming.single.isSettled,
+        description: 'the receiver to hear that the sender gave up',
+      );
+      expect(await incoming.single.outcome, isA<TransferCancelled>());
 
       await peers.close();
     });
