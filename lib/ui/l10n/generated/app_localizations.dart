@@ -1172,12 +1172,6 @@ abstract class AppLocalizations {
   /// **'Choose a folder…'**
   String get browseFolder;
 
-  /// No description provided for @chooseFolderTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose where files are saved'**
-  String get chooseFolderTitle;
-
   /// No description provided for @changeIncomingFolder.
   ///
   /// In en, this message translates to:

@@ -639,9 +639,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browseFolder => '选择文件夹…';
 
   @override
-  String get chooseFolderTitle => '选择保存位置';
-
-  @override
   String get changeIncomingFolder => '更改…';
 
   @override

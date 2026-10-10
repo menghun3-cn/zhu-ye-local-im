@@ -667,9 +667,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseFolder => 'Choose a folder…';
 
   @override
-  String get chooseFolderTitle => 'Choose where files are saved';
-
-  @override
   String get changeIncomingFolder => 'Change…';
 
   @override
