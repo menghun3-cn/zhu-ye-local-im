@@ -199,10 +199,17 @@ class WeChat {
   static const double transferBubbleMaxWidth = 280;
 
   /// 会话列表宽度。
-  static const double conversationListWidth = 250;
+  ///
+  /// 300 而不是 250：1280 宽的窗口里，250 会让「最后一句话」那一行截断得
+  /// 太频繁 —— 摘要刚说半句就上省略号，列表就不再能扫读。
+  static const double conversationListWidth = 300;
 
-  /// 会话列表里一行的高度。
-  static const double conversationRowHeight = 64;
+  /// 会话列表一行的上下内边距。
+  ///
+  /// 一行的**高度不是固定值**，是由内容撑出来的：两行文字（名字 + 摘要）和
+  /// 头像谁高听谁的。从前写死一个 64，字号一改行里就会多出或挤掉几像素的
+  /// 空白 —— 而这一行的正确高度本来就是它内容的高度。
+  static const double conversationRowVPadding = 10;
 
   /// 会话列表一行的左右内边距。
   ///

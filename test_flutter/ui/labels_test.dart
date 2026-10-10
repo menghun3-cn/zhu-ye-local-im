@@ -134,4 +134,101 @@ void main() {
       );
     });
   });
+
+  group('how long a transfer took', () {
+    final started = DateTime.utc(2026, 10, 10, 12);
+
+    TransferView view(TransferState state, {DateTime? settledAt}) =>
+        TransferView(
+          id: 't1',
+          direction: TransferDirection.outgoing,
+          kind: PayloadKind.file,
+          peer: Fingerprint.ofPublicKey(const [7, 8, 9]),
+          at: started,
+          settledAt: settledAt,
+          state: state,
+          transferredBytes: 10,
+          totalBytes: 100,
+          names: const ['a.bin'],
+          text: null,
+          offer: null,
+        );
+
+    test('says nothing before a byte has moved', () {
+      // A question nobody has answered has no duration, and "0 秒" printed
+      // under it would be a number pretending to be one.
+      expect(
+        describeTransferDuration(
+          view(TransferState.awaitingDecision),
+          started,
+          l10n,
+        ),
+        isNull,
+      );
+      expect(
+        describeTransferDuration(
+          view(TransferState.rejected, settledAt: started),
+          started.add(const Duration(minutes: 5)),
+          l10n,
+        ),
+        isNull,
+      );
+    });
+
+    test('counts up while it is still going', () {
+      expect(
+        describeTransferDuration(
+          view(TransferState.transferring),
+          started.add(const Duration(seconds: 12)),
+          l10n,
+        ),
+        l10n.transferElapsed(l10n.durationSeconds(12)),
+      );
+    });
+
+    test('reports the interval it took once it has settled', () {
+      expect(
+        describeTransferDuration(
+          view(
+            TransferState.completed,
+            settledAt: started.add(const Duration(minutes: 3, seconds: 12)),
+          ),
+          started.add(const Duration(hours: 2)),
+          l10n,
+        ),
+        l10n.transferTook(l10n.durationMinutes(3, 12)),
+        reason: 'a finished duration does not keep growing with the clock',
+      );
+    });
+
+    test('rolls over into hours', () {
+      expect(
+        describeTransferDuration(
+          view(
+            TransferState.completed,
+            settledAt: started.add(
+              const Duration(hours: 1, minutes: 5, seconds: 40),
+            ),
+          ),
+          started,
+          l10n,
+        ),
+        l10n.transferTook(l10n.durationHours(1, 5)),
+      );
+    });
+
+    test('says nothing when it settled in a run that never watched it', () {
+      // A Transfer restored from a previous run lands here: the far end of the
+      // interval was never recorded, and measuring to `now` would report the
+      // application's uptime as the Transfer's duration.
+      expect(
+        describeTransferDuration(
+          view(TransferState.completed),
+          started.add(const Duration(hours: 4)),
+          l10n,
+        ),
+        isNull,
+      );
+    });
+  });
 }

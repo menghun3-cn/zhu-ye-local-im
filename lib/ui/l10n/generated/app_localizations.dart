@@ -284,6 +284,36 @@ abstract class AppLocalizations {
   /// **'Failed'**
   String get stateFailed;
 
+  /// No description provided for @transferElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed {duration}'**
+  String transferElapsed(String duration);
+
+  /// No description provided for @transferTook.
+  ///
+  /// In en, this message translates to:
+  /// **'Took {duration}'**
+  String transferTook(String duration);
+
+  /// No description provided for @durationSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String durationSeconds(int seconds);
+
+  /// No description provided for @durationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m {seconds}s'**
+  String durationMinutes(int minutes, int seconds);
+
+  /// No description provided for @durationHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m'**
+  String durationHours(int hours, int minutes);
+
   /// No description provided for @clipboardModeOff.
   ///
   /// In en, this message translates to:
@@ -1165,6 +1195,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You are asked where to save each file as it arrives.'**
   String get incomingFolderUnset;
+
+  /// No description provided for @folderNotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved — press Enter, or click away, to keep this folder.'**
+  String get folderNotSaved;
 }
 
 class _AppLocalizationsDelegate

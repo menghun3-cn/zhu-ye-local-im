@@ -119,6 +119,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stateFailed => '失败';
 
   @override
+  String transferElapsed(String duration) {
+    return '已用 $duration';
+  }
+
+  @override
+  String transferTook(String duration) {
+    return '用时 $duration';
+  }
+
+  @override
+  String durationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String durationMinutes(int minutes, int seconds) {
+    return '$minutes 分 $seconds 秒';
+  }
+
+  @override
+  String durationHours(int hours, int minutes) {
+    return '$hours 小时 $minutes 分';
+  }
+
+  @override
   String get clipboardModeOff => '关闭';
 
   @override
@@ -624,4 +649,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get incomingFolderUnset => '每次接收时都会问你保存在哪里。';
+
+  @override
+  String get folderNotSaved => '未保存 —— 按回车，或点开别处，就会记下这个文件夹。';
 }

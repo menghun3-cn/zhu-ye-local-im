@@ -122,6 +122,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stateFailed => 'Failed';
 
   @override
+  String transferElapsed(String duration) {
+    return 'Elapsed $duration';
+  }
+
+  @override
+  String transferTook(String duration) {
+    return 'Took $duration';
+  }
+
+  @override
+  String durationSeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String durationMinutes(int minutes, int seconds) {
+    return '${minutes}m ${seconds}s';
+  }
+
+  @override
+  String durationHours(int hours, int minutes) {
+    return '${hours}h ${minutes}m';
+  }
+
+  @override
   String get clipboardModeOff => 'Off';
 
   @override
@@ -654,4 +679,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get incomingFolderUnset =>
       'You are asked where to save each file as it arrives.';
+
+  @override
+  String get folderNotSaved =>
+      'Not saved — press Enter, or click away, to keep this folder.';
 }

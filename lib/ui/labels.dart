@@ -146,6 +146,59 @@ String describeLastSeen(DateTime? when, AppLocalizations l10n) {
   return l10n.timeDaysAgo(elapsed.inDays);
 }
 
+/// How long a Transfer has taken, as a person reads it — or null when there is
+/// nothing honest to say yet.
+///
+/// Three cases, and the differences between them are the whole point. A
+/// Transfer that is still moving gets a *running* count measured to [now]
+/// ("已用 12 秒"), because a finished number for something unfinished would be a
+/// lie. One that has settled gets the interval it actually took ("用时 3 分
+/// 12 秒"). And one that never started — still waiting for an answer, or
+/// refused before a byte moved — gets nothing at all: "用时 0 秒" printed
+/// under a question nobody ever answered is worse than a blank.
+///
+/// [now] is handed in rather than read here so a test can pin it, and so this
+/// stays a pure mapping like everything else in this file.
+String? describeTransferDuration(
+  TransferView view,
+  DateTime now,
+  AppLocalizations l10n,
+) {
+  final (interval, running) = switch (view.state) {
+    TransferState.awaitingDecision || TransferState.rejected => (null, false),
+    TransferState.transferring ||
+    TransferState.verifying => (now.toUtc().difference(view.at.toUtc()), true),
+    TransferState.completed ||
+    TransferState.failed ||
+    TransferState.cancelled => (
+      view.settledAt?.toUtc().difference(view.at.toUtc()),
+      false,
+    ),
+  };
+  // A settled Transfer with no end stamped is one this run never watched finish
+  // — the app was restarted while it was in flight — and measuring it to `now`
+  // would report the application's uptime as the Transfer's duration.
+  if (interval == null || interval.isNegative) return null;
+  return running
+      ? l10n.transferElapsed(_describeInterval(interval, l10n))
+      : l10n.transferTook(_describeInterval(interval, l10n));
+}
+
+/// A span of time in the largest two units it needs.
+///
+/// Seconds under a minute, then minutes and seconds, then hours and minutes:
+/// a duration is read to answer "was that quick or slow", and the smaller unit
+/// stops mattering as soon as the larger one is big enough to answer it.
+String _describeInterval(Duration interval, AppLocalizations l10n) {
+  if (interval.inHours >= 1) {
+    return l10n.durationHours(interval.inHours, interval.inMinutes % 60);
+  }
+  if (interval.inMinutes >= 1) {
+    return l10n.durationMinutes(interval.inMinutes, interval.inSeconds % 60);
+  }
+  return l10n.durationSeconds(interval.inSeconds);
+}
+
 /// What this Device can do with a clipboard, as a pair of facts.
 String describeClipboardFacts(
   ClipboardCapability capability,
