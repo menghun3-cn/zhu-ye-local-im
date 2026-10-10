@@ -363,6 +363,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refuse => 'Refuse';
 
   @override
+  String get cancelSend => 'Cancel sending';
+
+  @override
   String get whereShouldFilesLand => 'Where should these files land?';
 
   @override

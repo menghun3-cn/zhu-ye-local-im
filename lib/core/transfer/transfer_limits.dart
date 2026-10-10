@@ -13,13 +13,16 @@ import '../protocol/messages.dart';
 /// The two timeouts are the sender's, not the receiver's. A sender that hears
 /// nothing back has to stop waiting eventually; a receiver that is mid-write
 /// has a Transfer the user can cancel, and a silent timeout there would turn a
-/// slow link into a failed transfer for no reason.
+/// slow link into a failed transfer for no reason. When one of them does fire,
+/// the sender tells the peer before it goes: a receiver still looking at the
+/// question deserves to hear that the answer is never coming, rather than
+/// being left with a bubble that fills in forever.
 final class TransferLimits {
   const TransferLimits({
     this.maxItems = 4096,
     this.maxItemBytes = 4 << 30,
     this.maxTotalBytes = 8 << 30,
-    this.acceptanceTimeout = const Duration(seconds: 60),
+    this.acceptanceTimeout = const Duration(hours: 24),
     this.verificationTimeout = const Duration(seconds: 120),
   });
 
@@ -36,10 +39,20 @@ final class TransferLimits {
   final int maxTotalBytes;
 
   /// How long a sender waits for its Offer to be answered.
+  ///
+  /// A workday, not a tick: the question sits in a dialog on the far side, and
+  /// the person it is for may be at lunch, or away until tomorrow. A sender
+  /// that gave up sooner would fail a transfer its user still means to send —
+  /// and since the sender can always cancel by hand, waiting costs the
+  /// impatient nothing.
   final Duration acceptanceTimeout;
 
   /// How long a sender waits, after its last byte, to hear that the receiver
   /// verified what it wrote.
+  ///
+  /// Short, on purpose: verification is hashing, which is seconds of work, and
+  /// a sender whose receiver went silent here has been hung up on — waiting a
+  /// day to learn that would be a day the file sat in limbo.
   final Duration verificationTimeout;
 
   /// Why [offer] cannot be accepted, or null if it can.
