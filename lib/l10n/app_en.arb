@@ -177,6 +177,7 @@
   },
   "accept": "Accept",
   "refuse": "Refuse",
+  "cancelSend": "Cancel sending",
   "whereShouldFilesLand": "Where should these files land?",
   "whereShouldThisArrive": "Where should this arrive?",
   "openContainingFolder": "Open containing folder",

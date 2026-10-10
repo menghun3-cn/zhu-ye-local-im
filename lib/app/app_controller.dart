@@ -1192,6 +1192,9 @@ final class LocalTransferController {
       // `_onOffer` — this is the single place that decides what a UI is
       // allowed to answer, so the rule lives here too.
       offer: _answerableOffer(transfer),
+      send: transfer is OutgoingTransfer && !transfer.isSettled
+          ? transfer
+          : null,
     );
   }
 

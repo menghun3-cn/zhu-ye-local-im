@@ -150,6 +150,19 @@ class WeChat {
   /// 而固定 460 像素在 2560 宽的窗口里显得很短，在 600 宽的窗口里又过长。
   static const double bubbleMaxWidthFactor = 0.6;
 
+  /// 文件传输气泡宽度随内容自适应时的**下限**。
+  ///
+  /// 一个名字只有三个字符的文件，气泡也不能窄到进度条读不出来——这个下限
+  /// 就是「还能看清一条 3 像素进度线和『0 B / 4.0 MB』」的最小宽度。
+  static const double transferBubbleMinWidth = 160;
+
+  /// 文件传输气泡宽度自适应时的**上限**。
+  ///
+  /// 名字再长，气泡也不跟着长到通栏：超过这条线的名字用省略号截断，
+  /// 完整名字放在气泡的提示里。微信的文件卡片也是这个手感——宽得有限，
+  /// 从不撑满。
+  static const double transferBubbleMaxWidth = 280;
+
   /// 会话列表宽度。
   static const double conversationListWidth = 250;
 
