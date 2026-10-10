@@ -1286,6 +1286,14 @@ class MessageBubble extends StatelessWidget {
   /// (the whole of it is on the tooltip) instead of stretching the bubble;
   /// given none — a text message, whose bubble already hugs its words — the
   /// block takes its natural width.
+  ///
+  /// A message's words are drawn as plain text, not as a `SelectableText`. A
+  /// selectable body brings its own gesture recognizer, and Flutter gives the
+  /// innermost one the gesture: a secondary click on the words would open the
+  /// platform's copy/select-all toolbar and never reach the message's own menu,
+  /// which is where Delete lives. Copying what a message says is one line of
+  /// that menu instead, for the whole message rather than for the range the
+  /// pointer happened to be over.
   Widget _body(
     AppLocalizations l10n,
     double? contentWidth,
@@ -1293,7 +1301,7 @@ class MessageBubble extends StatelessWidget {
   ) {
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
-      return SelectableText(
+      return Text(
         text,
         style: TextStyle(
           fontSize: WeChat.fontSizeBody,

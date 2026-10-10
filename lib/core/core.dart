@@ -17,6 +17,8 @@ export 'discovery/beacon_transport.dart';
 export 'discovery/discovery_service.dart';
 export 'discovery/peer_registry.dart';
 export 'discovery/udp_beacon_transport.dart';
+export 'history/message_record.dart';
+export 'history/message_store.dart';
 export 'identity/device_descriptor.dart';
 export 'identity/fingerprint.dart';
 export 'identity/owner_group.dart';

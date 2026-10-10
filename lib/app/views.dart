@@ -279,6 +279,14 @@ final class TransferView {
   /// message from drawing a button for it.
   final OutgoingTransfer? send;
 
+  /// What names this message for as long as this Device keeps it.
+  ///
+  /// [id] alone is unique only within the Session that carried the Transfer,
+  /// and a conversation outlives every Session that wrote to it — so a message
+  /// that has to be found again after a restart is named by the pair. See
+  /// [messageHandle].
+  String get handle => messageHandle(peer, id);
+
   /// Whether this Device has to answer before anything moves.
   bool get needsDecision =>
       offer != null && state == TransferState.awaitingDecision;

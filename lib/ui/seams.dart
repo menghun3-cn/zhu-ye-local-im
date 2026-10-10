@@ -7,10 +7,11 @@ import '../core/core.dart';
 
 /// The platform seams, as Flutter provides them.
 ///
-/// `lib/core` and `lib/app` talk to a [ProfileStore], a [BeaconTransport] and a
-/// [SystemClipboard], and never ask what they are running on. This file is
-/// where those three get their real answers, and it is the only place in the
-/// application that reaches for the Flutter platform channels.
+/// `lib/core` and `lib/app` talk to a [ProfileStore], a [MessageStore], a
+/// [BeaconTransport] and a [SystemClipboard], and never ask what they are
+/// running on. This file is where those four get their real answers, and it is
+/// the only place in the application that reaches for the Flutter platform
+/// channels.
 
 /// The system clipboard of the running app.
 ///
@@ -59,6 +60,8 @@ final class PlatformSeams {
   const PlatformSeams({
     required this.store,
     required this.profilePath,
+    required this.messageStore,
+    required this.messagePath,
     required this.beacon,
     required this.clipboard,
     required this.platform,
@@ -70,6 +73,16 @@ final class PlatformSeams {
 
   /// The file [store] writes to, or null when nothing is persisted.
   final String? profilePath;
+
+  /// Where this Device's conversations are kept, or an in-memory stand-in.
+  ///
+  /// Separate from [store] rather than folded into it: the two are written at
+  /// very different rates, and a conversation that filled the profile file with
+  /// itself would be a conversation that could cost a Device its identity.
+  final MessageStore messageStore;
+
+  /// The file [messageStore] writes to, or null when nothing is persisted.
+  final String? messagePath;
 
   /// How Discovery sends and receives.
   final BeaconTransport beacon;
@@ -141,12 +154,23 @@ Future<PlatformSeams> openPlatformSeams({
     environment: host,
     appDataDirectory: appDataDirectory,
   );
+  final conversationPath = messageFilePath(
+    platform: running,
+    environment: host,
+    appDataDirectory: appDataDirectory,
+  );
   return PlatformSeams(
     // A Device with nowhere to write runs with its identity in memory: it
     // still pairs and transfers, and it has to be paired again after a
     // restart. Saying so beats pretending the file was saved.
     store: path == null ? MemoryProfileStore() : FileProfileStore(path),
     profilePath: path,
+    // The same rule for the conversation, resolved from the same directory:
+    // nowhere to write means it is kept until the process ends.
+    messageStore: conversationPath == null
+        ? MemoryMessageStore()
+        : FileMessageStore(conversationPath),
+    messagePath: conversationPath,
     beacon: beacon ?? await UdpBeaconTransport.bind(),
     clipboard: FlutterSystemClipboard(),
     platform: running,
