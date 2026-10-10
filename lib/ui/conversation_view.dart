@@ -367,7 +367,7 @@ class StagedAttachment {
   /// Where the bytes are, as the engine will read them.
   final String path;
 
-  /// What the chip says — the file's own name, not its folder.
+  /// What the tray says it is — a file chip's label, a thumbnail's tooltip.
   final String name;
 
   /// Whether the far side will draw it as a picture.
@@ -742,10 +742,10 @@ class _AttachmentTray extends StatelessWidget {
       runSpacing: 6,
       children: [
         for (var index = 0; index < attachments.length; index++)
-          _AttachmentChip(
+          _AttachmentTile(
             attachment: attachments[index],
             // Indexed rather than keyed by name: two files can share a name —
-            // one picked from two folders — and the chip is positional anyway.
+            // one picked from two folders — and the tile is positional anyway.
             onRemove: onRemove == null ? null : () => onRemove!(index),
             removeTooltip: removeTooltip,
           ),
@@ -754,7 +754,121 @@ class _AttachmentTray extends StatelessWidget {
   }
 }
 
-/// One staged file or picture, waiting for 发送.
+/// One staged attachment, as the tray draws it.
+///
+/// A picture is a **thumbnail** — a square preview of its own bytes, the way
+/// the composer shows it. A name beside a picture glyph is what a *file* gets,
+/// because a file's name is the only thing it can be previewed by; a picture
+/// can be previewed by itself, and a screenshot the user just pasted is
+/// identified at a glance by what it shows rather than by `pasted-179…png`.
+/// The name is not lost — it is on the thumbnail's tooltip.
+class _AttachmentTile extends StatelessWidget {
+  const _AttachmentTile({
+    required this.attachment,
+    required this.onRemove,
+    required this.removeTooltip,
+  });
+
+  final StagedAttachment attachment;
+
+  /// Null when the composer cannot stage anything in the first place.
+  final VoidCallback? onRemove;
+
+  final String removeTooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!attachment.isImage) {
+      return _AttachmentChip(
+        attachment: attachment,
+        onRemove: onRemove,
+        removeTooltip: removeTooltip,
+      );
+    }
+    final colors = WeChatColors.of(context);
+    final picture = ClipRRect(
+      borderRadius: BorderRadius.circular(WeChat.attachmentThumbRadius),
+      child: Tooltip(
+        message: attachment.name,
+        child: GestureDetector(
+          // The same lightbox a sent picture opens into: the tray's preview
+          // and the conversation's message are previews of the same bytes, so
+          // they answer a click the same way.
+          onTap: () => unawaited(
+            showImagePreview(
+              context,
+              path: attachment.path,
+              name: attachment.name,
+            ),
+          ),
+          child: Container(
+            width: WeChat.attachmentThumbSide,
+            height: WeChat.attachmentThumbSide,
+            // The grey a hole in the composer is drawn in — the same choice
+            // [ImageBubble] makes for its loading picture, and for the same
+            // reason: the box has to read as "a picture arriving", not as a
+            // white patch on the toolbar.
+            color: colors.pageBackground,
+            alignment: Alignment.center,
+            child: Image(
+              // Decoded at the size it is drawn — a tray of five screenshots
+              // is five previews, not five full-size decodes sitting in the
+              // image cache.
+              image: ResizeImage(
+                FileImage(File(attachment.path)),
+                width:
+                    (MediaQuery.devicePixelRatioOf(context) *
+                            WeChat.attachmentThumbSide)
+                        .round(),
+                allowUpscaling: false,
+              ),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Icon(
+                Icons.broken_image_outlined,
+                size: 20,
+                color: colors.secondaryText,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return Stack(
+      children: [
+        picture,
+        Positioned(
+          top: 2,
+          right: 2,
+          // A real [IconButton] rather than a tappable glyph: it keeps the
+          // focus ring, the keyboard activation and the semantic label that a
+          // hand-rolled gesture detector would drop. On the thumbnail the
+          // button is the badge itself — a translucent dark circle with a
+          // white ×, which is what WeChat draws and what reads on any picture
+          // a user can paste, on either theme.
+          child: IconButton(
+            onPressed: onRemove,
+            tooltip: removeTooltip,
+            icon: const Icon(Icons.close, size: 12),
+            color: Colors.white,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(
+              width: WeChat.attachmentThumbBadge,
+              height: WeChat.attachmentThumbBadge,
+            ),
+            style: IconButton.styleFrom(backgroundColor: colors.scrim),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One staged **file**, waiting for 发送 — the tray's chip, for the things that
+/// can only be previewed by their name.
+///
+/// A picture does not come here any more: it is drawn by [_AttachmentTile] as
+/// a thumbnail of its own bytes.
 class _AttachmentChip extends StatelessWidget {
   const _AttachmentChip({
     required this.attachment,
@@ -782,11 +896,7 @@ class _AttachmentChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            attachment.isImage ? Icons.image_outlined : Icons.attach_file,
-            size: 16,
-            color: colors.secondaryText,
-          ),
+          Icon(Icons.attach_file, size: 16, color: colors.secondaryText),
           const SizedBox(width: 6),
           // Bounded so that one long name cannot push 发送 off the row; the
           // tooltip keeps the whole of it reachable.
