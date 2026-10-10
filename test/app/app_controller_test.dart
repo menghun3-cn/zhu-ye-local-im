@@ -34,6 +34,7 @@ Future<TestDevice> startDevice(
   String alias, {
   ClipboardMode clipboardMode = ClipboardMode.off,
   String? defaultIncomingDirectory,
+  MessageStore? messageStore,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -50,6 +51,12 @@ Future<TestDevice> startDevice(
     // platform that offers no folder is the one case where an image is still
     // asked about rather than filed on arrival.
     defaultIncomingDirectory: defaultIncomingDirectory,
+    // Null as well by default, which is what every other test in this file
+    // wants: with no store there is no conversation to keep, and the live
+    // list is the whole of it. A test about history hands in a store it keeps,
+    // and then stands a second Device up over the same one — which is a
+    // restart, as far as the conversation is concerned.
+    messageStore: messageStore,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -1061,6 +1068,267 @@ void main() {
       );
       expect(carol.controller.sessions, isEmpty);
       expect(bob.controller.sessions, isEmpty);
+    });
+  });
+
+  group('the conversation outlives the process', () {
+    late MemoryBeaconHub hub;
+    late MemoryMessageStore kept;
+
+    setUp(() {
+      hub = MemoryBeaconHub();
+      kept = MemoryMessageStore();
+    });
+
+    /// Two paired Devices, the second of which keeps its conversation in
+    /// [kept], and a Session already up between them.
+    ///
+    /// The store is the only part of a Device that survives a restart, so
+    /// handing the same one to a second Device is what a restart *is* on one
+    /// host, and it is how the tests below assert that a message comes back.
+    ///
+    /// The Session is dialled rather than left to the automatic connect a
+    /// discovered group member gets: pairing says a Device *may* hold a
+    /// Session, and every test here sends the moment it is paired, so one that
+    /// arrived before the dial won would fail on `noPeerConnected` — about the
+    /// weather rather than about the conversation.
+    Future<(TestDevice, TestDevice)> paired() async {
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob', messageStore: kept);
+      await pairUp(alice, bob);
+      await connect(alice, bob);
+      return (alice, bob);
+    }
+
+    /// The conversation as a restart would read it, once [done] holds.
+    ///
+    /// Polled rather than awaited, because archiving happens inside the
+    /// callback that ends a Transfer and nothing hands out a future for it:
+    /// what a test can wait for is the file, and this waits for the file.
+    Future<List<MessageRecord>> remembered(
+      bool Function(List<MessageRecord> messages) done, {
+      String description = 'the conversation to be written out',
+    }) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      var messages = await loadMessages(kept);
+      while (!done(messages) && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        messages = await loadMessages(kept);
+      }
+      expect(done(messages), isTrue, reason: '$description: $messages');
+      return messages;
+    }
+
+    test('a message that settled is still there after a restart', () async {
+      final (alice, bob) = await paired();
+
+      final sent = await alice.controller.sendText('see you at six');
+      await until(
+        () => sent.state.isSettled && bob.controller.transfers.length == 1,
+        description: 'the text to settle on both sides',
+      );
+      expect(
+        (await remembered((messages) => messages.isNotEmpty)).single.text,
+        'see you at six',
+      );
+
+      // The restart. The old Device is stopped first so that two Devices are
+      // not announcing themselves on one transport at the same time.
+      await bob.controller.close();
+      final restarted = await startDevice(hub.b, 'Bob', messageStore: kept);
+
+      final restored = restarted.controller.transfers.single;
+      expect(restored.text, 'see you at six');
+      expect(restored.kind, PayloadKind.text);
+      expect(restored.direction, TransferDirection.incoming);
+      expect(restored.state, TransferState.completed);
+      expect(restored.peer, alice.fingerprint);
+      expect(restored.at, isNotNull);
+      expect(
+        restored.settledAt,
+        isNotNull,
+        reason: 'a message that ended says when, or a duration is unprintable',
+      );
+      expect(
+        restored.offer,
+        isNull,
+        reason: 'nothing about a remembered message is still a question',
+      );
+      expect(restored.send, isNull);
+      expect(restored.localPath, isNull, reason: 'a text has no file');
+    });
+
+    test(
+      'deleting a message takes it off the screen and off the disk',
+      () async {
+        final (alice, bob) = await paired();
+        final sent = await alice.controller.sendText('forget me');
+        await until(
+          () => sent.state.isSettled && bob.controller.transfers.length == 1,
+          description: 'the text to settle',
+        );
+        await remembered((messages) => messages.isNotEmpty);
+
+        await bob.controller.deleteMessage(bob.controller.transfers.single);
+
+        expect(bob.controller.transfers, isEmpty);
+        expect(
+          await loadMessages(kept),
+          isEmpty,
+          reason: 'a message that came back after a restart was not deleted',
+        );
+        // And the peer is told nothing: deleting is about this Device's record.
+        expect(
+          alice.controller.transfers.single.state,
+          TransferState.completed,
+        );
+      },
+    );
+
+    test('deleting one message leaves the rest of the conversation', () async {
+      final (alice, bob) = await paired();
+      final first = await alice.controller.sendText('the first one');
+      await until(
+        () => first.state.isSettled,
+        description: 'the first text to settle',
+      );
+      final second = await alice.controller.sendText('the second one');
+      await until(
+        () => second.state.isSettled && bob.controller.transfers.length == 2,
+        description: 'the second text to settle',
+      );
+      await remembered((messages) => messages.length == 2);
+
+      // Newest first, which is how a conversation is drawn.
+      expect(bob.controller.transfers.first.text, 'the second one');
+      await bob.controller.deleteMessage(bob.controller.transfers.first);
+
+      final left = bob.controller.transfers.single;
+      expect(left.text, 'the first one');
+      expect(
+        [for (final message in await loadMessages(kept)) message.text],
+        ['the first one'],
+      );
+    });
+
+    test('a question nobody answered is not remembered', () async {
+      // An ending is what makes a message history. An offer still waiting is a
+      // connection's state, and the connection does not outlive the process —
+      // so restoring one would put a question on screen that nobody, on either
+      // end, is waiting for an answer to.
+      final (alice, bob) = await paired();
+      final home = tempDirectory('local-transfer-history-out-');
+      final source = File('${home.path}${Platform.pathSeparator}payload.bin')
+        ..writeAsBytesSync(List<int>.filled(1024, 7));
+
+      final sending = alice.controller.sendFile(source);
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+
+      expect(bob.controller.transfers.single.needsDecision, isTrue);
+      expect(await loadMessages(kept), isEmpty);
+
+      // Answered, and the sender waited out to its own ending: an unanswered
+      // Transfer holds its source file open, and the teardown that deletes the
+      // directory it lives in cannot run while it does.
+      await bob.controller.reject(bob.offers.single);
+      await (await sending).outcome;
+
+      // A refusal is an ending too, so this one *is* remembered — which is the
+      // other half of the rule: what is not remembered is a question still
+      // waiting for an answer, not every Transfer that went wrong.
+      expect(await loadMessages(kept), isNotEmpty);
+    });
+
+    test('a message deleted while it was still moving stays deleted', () async {
+      final (alice, bob) = await paired();
+      final home = tempDirectory('local-transfer-history-out-');
+      final source = File('${home.path}${Platform.pathSeparator}payload.bin')
+        ..writeAsBytesSync(List<int>.filled(1024, 9));
+
+      final sending = alice.controller.sendFile(source);
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+
+      // Deleted before it was answered. The Transfer keeps running — stopping
+      // it is the cancel action, not this one — so its ending arrives after
+      // the delete, and the ending must not put the message back.
+      await bob.controller.deleteMessage(bob.controller.transfers.single);
+      expect(bob.controller.transfers, isEmpty);
+
+      await bob.controller.reject(bob.offers.single);
+      // Waited out to the sender's own ending, so the source file it holds
+      // open is released before the test tears its directory down.
+      await (await sending).outcome;
+      await until(
+        () => bob.offers.single.isSettled,
+        description: 'the rejected Transfer to have ended',
+      );
+      // The ending is handled in a callback of its own, so give it the moment
+      // it needs before asking what it did.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(
+        bob.controller.transfers,
+        isEmpty,
+        reason: 'the ending of a deleted message must not restore it',
+      );
+      expect(await loadMessages(kept), isEmpty);
+    });
+
+    test('the record is bounded, and drops the oldest first', () async {
+      // Pre-loaded, because filling it honestly would mean sending a thousand
+      // messages, and what is under test is the ceiling rather than the send.
+      final base = DateTime.utc(2026, 10, 10);
+      await saveMessages([
+        for (var index = 0; index < maxRememberedMessages + 5; index++)
+          MessageRecord(
+            peer: fingerprintOf('Peer $index'),
+            id: 'm$index',
+            direction: TransferDirection.incoming,
+            kind: PayloadKind.text,
+            at: base.add(Duration(seconds: index)),
+            settledAt: base.add(Duration(seconds: index + 1)),
+            state: TransferState.completed,
+            names: const ['text'],
+            totalBytes: 1,
+            text: 'message $index',
+          ),
+      ], kept);
+      expect((await loadMessages(kept)).length, maxRememberedMessages + 5);
+
+      final (alice, bob) = await paired();
+      final sent = await alice.controller.sendText('the newest one');
+      await until(
+        () => sent.state.isSettled,
+        description: 'the text to settle',
+      );
+      // Archiving happens in the callback that ends the Transfer and trims to
+      // the ceiling on the way through, so "the file holds exactly the ceiling
+      // and its newest message is the one just sent" is what says it has run.
+      final messages = await remembered(
+        (messages) =>
+            messages.length == maxRememberedMessages &&
+            messages.last.text == 'the newest one',
+        description: 'the record to be trimmed to its ceiling',
+      );
+
+      expect(messages.length, maxRememberedMessages);
+      expect(messages.last.text, 'the newest one');
+      // Six, not five: the pre-loaded list is already five over the ceiling, and
+      // the message just sent is the sixth thing that has to go somewhere. The
+      // ones that go are the ones that were already oldest, which is the end a
+      // person has scrolled away from.
+      expect(
+        messages.first.text,
+        'message 6',
+        reason: 'the six that go are the six that were already oldest',
+      );
+      expect(bob.controller.transfers, isNotEmpty);
     });
   });
 }

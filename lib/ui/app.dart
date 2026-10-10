@@ -67,6 +67,10 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       // layer knows it — and because the pages resolve the same fallback for
       // the accept dialog, so "where do received things go" has one answer.
       defaultIncomingDirectory: seams.defaultIncomingDirectory,
+      // Where the conversation is kept between runs. A Device with nowhere to
+      // write passes an in-memory store, which behaves the same way and simply
+      // forgets everything on exit.
+      messageStore: seams.messageStore,
     );
     try {
       await controller.start();

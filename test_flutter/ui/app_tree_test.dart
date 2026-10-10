@@ -34,6 +34,8 @@ void main() {
       final seams = PlatformSeams(
         store: MemoryProfileStore(),
         profilePath: null,
+        messageStore: MemoryMessageStore(),
+        messagePath: null,
         beacon: MemoryBeaconHub().a,
         clipboard: MemorySystemClipboard(),
         platform: DevicePlatform.windows,

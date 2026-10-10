@@ -397,6 +397,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cannotCopyImage => '没能复制这张图片。';
 
   @override
+  String get copyText => '复制文字';
+
+  @override
+  String get cannotCopyText => '没能复制这段文字。';
+
+  @override
+  String get deleteMessage => '删除';
+
+  @override
   String get clipboardSyncHeader => '剪贴板同步';
 
   @override
