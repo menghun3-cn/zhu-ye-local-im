@@ -127,6 +127,7 @@ final class FilePayloadSink implements PayloadSink {
   final RunningDigest _digest;
   int _written;
   bool _closed = false;
+  Future<void>? _closing;
 
   /// Whether [close] has been called.
   bool get isClosed => _closed;
@@ -151,9 +152,19 @@ final class FilePayloadSink implements PayloadSink {
   @override
   Future<String> digest() async => _digest.finish();
 
+  /// Closes the handle, once.
+  ///
+  /// Every caller gets the same future back, so awaiting this means the file is
+  /// really released — which is what a caller that wants to *move* the file
+  /// needs. There is more than one such caller: a Transfer closes its sinks as
+  /// it settles, and whoever owns the landing renames the file out of its
+  /// staging name. On Windows a handle that is still open cannot be renamed, so
+  /// a second, independent close that reported before the first had finished
+  /// would hand back a file that could not be touched yet.
   @override
-  Future<void> close() async {
-    if (_closed) return;
+  Future<void> close() => _closing ??= _closeHandle();
+
+  Future<void> _closeHandle() async {
     _closed = true;
     await _handle.close();
   }

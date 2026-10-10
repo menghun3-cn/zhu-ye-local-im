@@ -406,18 +406,89 @@ void main() {
 
       final incoming = tempDirectory('local-transfer-in-');
       await bob.controller.acceptInto(offer, incoming);
-      await until(
-        () =>
-            offer.state == TransferState.completed &&
-            sent.state == TransferState.completed,
-        description: 'both sides to settle as completed',
-      );
-
       final written = File(
         '${incoming.path}${Platform.pathSeparator}payload.bin',
       );
-      expect(written.existsSync(), isTrue);
+      // The file appears once its bytes have been verified and moved out of the
+      // staging name the receive wrote them under.
+      await until(
+        () =>
+            offer.state == TransferState.completed &&
+            sent.state == TransferState.completed &&
+            written.existsSync(),
+        description: 'both sides to settle as completed and the file to land',
+      );
+
       expect(written.readAsBytesSync(), bytes);
+      expect(
+        incoming.listSync().map((entry) => fileNameOf(entry.path)),
+        ['payload.bin'],
+        reason:
+            'the staging name the bytes were written under is gone once '
+            'they have a name of their own',
+      );
+    });
+
+    test('a receive that dies leaves no file, and frees its name', () async {
+      // Writing straight to the final name made a dead Transfer look like a
+      // received file: an empty "report.pdf" nobody could open, and — worse —
+      // an occupied name, so the next attempt at the same file came out as
+      // "report (2).pdf" beside it. The bytes are staged under a name of this
+      // Device's own making now, and a Transfer that dies takes that name with
+      // it.
+      final home = tempDirectory('local-transfer-abandon-out-');
+      final source = File('${home.path}${Platform.pathSeparator}report.pdf');
+      // Several chunks, so the receive is genuinely still in flight when it is
+      // given up on rather than a race this test might lose.
+      final bytes = Uint8List.fromList(
+        List<int>.generate(2 * 1024 * 1024, (index) => (index * 13) % 256),
+      );
+      source.writeAsBytesSync(bytes);
+
+      final sent = await alice.controller.sendFile(source);
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      final offer = bob.offers.single;
+
+      final incoming = tempDirectory('local-transfer-abandon-in-');
+      await bob.controller.acceptInto(offer, incoming);
+      // Give up at once, which is what a cancel from either end looks like from
+      // this side of the wire.
+      await offer.cancel();
+      // The outcomes, not the states: the sender finishing with the Transfer is
+      // what releases the handle on the file it was sending, and a state that
+      // has settled does not promise that yet.
+      await Future.wait([offer.outcome, sent.outcome]);
+      expect(offer.state, TransferState.cancelled);
+      await until(
+        () => incoming.listSync().isEmpty,
+        description: 'the half-written file to be cleared away',
+      );
+
+      // Retry the same file. The name it asks for is still free, which is what
+      // the staging name bought.
+      final retry = await alice.controller.sendFile(source);
+      await until(
+        () => bob.offers.length == 2,
+        description: 'Bob to be offered it again',
+      );
+      await bob.controller.acceptInto(bob.offers.last, incoming);
+      final published = File(
+        '${incoming.path}${Platform.pathSeparator}report.pdf',
+      );
+      await until(
+        () => published.existsSync(),
+        description: 'the retry to land',
+      );
+      await retry.outcome;
+      expect(retry.state, TransferState.completed);
+
+      expect(incoming.listSync().map((entry) => fileNameOf(entry.path)), [
+        'report.pdf',
+      ], reason: 'the attempt that never arrived must not occupy the name');
+      expect(published.readAsBytesSync(), bytes);
     });
 
     test('a received picture keeps a path worth drawing', () async {
@@ -457,8 +528,10 @@ void main() {
             'a path now would name a file that is empty or half written',
       );
       await until(
-        () => offer.state == TransferState.completed,
-        description: 'the picture to land',
+        () =>
+            offer.state == TransferState.completed &&
+            bob.controller.transfers.single.localPath != null,
+        description: 'the picture to land under its own name',
       );
 
       final landed = bob.controller.transfers.single.localPath;
@@ -625,8 +698,14 @@ void main() {
       expect(received.offer, isNull);
 
       // Both halves of what the conversation needs: a path to draw from, and
-      // bytes on disk that hash to what was sent.
-      final landed = received.localPath;
+      // bytes on disk that hash to what was sent. The path does not appear the
+      // instant the Transfer completes — the bytes are moved out of their
+      // staging name first, and the conversation waits the moment out.
+      await until(
+        () => bob.controller.transfers.single.localPath != null,
+        description: 'the picture to be published under its own name',
+      );
+      final landed = bob.controller.transfers.single.localPath;
       expect(landed, isNotNull, reason: 'the receiver can draw it');
       expect(File(landed!).readAsBytesSync(), bytes);
       expect(
@@ -650,6 +729,10 @@ void main() {
       await until(
         () => sent.state.isSettled,
         description: 'the picture to arrive',
+      );
+      await until(
+        () => bob.controller.transfers.single.localPath != null,
+        description: 'the picture to be published under its own name',
       );
 
       final landed = bob.controller.transfers.single.localPath;
