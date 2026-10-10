@@ -67,6 +67,29 @@ void rejectOffer(
   unawaited(guarded(context, () => controller.reject(offer)));
 }
 
+/// Whether [view] is a send this Device is still making and can still stop.
+///
+/// True from the moment an Offer goes out — waiting for an answer counts, which
+/// is the whole point: a file picked by mistake should be stoppable during the
+/// seconds the peer leaves the question on screen, not only once bytes move.
+/// The controller hands the live send out on [TransferView.send] precisely
+/// while a stop would change something.
+bool canCancelTransfer(TransferView view) => view.send != null;
+
+/// Abandons [view]'s send and tells the peer why.
+///
+/// Telling the peer is not a courtesy — it is what un-sticks the other side.
+/// A receiver whose sender vanished would otherwise sit on a bubble that fills
+/// in forever, because a receiver keeps no clock of its own. The send itself
+/// goes out through the same quiet road every ending takes: a Transfer is over
+/// either way, so a link that died before the news arrived is not a second
+/// error for the user to read.
+Future<void> cancelSend(BuildContext context, TransferView view) {
+  final send = view.send;
+  if (send == null) return Future.value();
+  return guarded(context, send.cancel);
+}
+
 /// Whether [view] names a file on this machine whose folder can be opened.
 ///
 /// True for a file this Device received, for one it sent, and for an image
@@ -143,7 +166,7 @@ Future<void> copyTransferImage(BuildContext context, TransferView view) async {
 /// when the question is over and the bytes are somewhere on disk. A right-click
 /// keeps them reachable without putting a toolbar on a message.
 ///
-/// Which actions a given Transfer offers is decided by the two predicates above
+/// Which actions a given Transfer offers is decided by the predicates above
 /// rather than by the caller, so the conversation, the Transfers list and any
 /// surface added later cannot each draw a different menu for the same message.
 ///
@@ -167,7 +190,11 @@ class TransferContextMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     // Nothing to offer means nothing to intercept: a handler that opened an
     // empty menu would swallow the right-click that selects a name to copy.
-    if (!canRevealTransfer(view) && !canCopyImage(view)) return child;
+    if (!canRevealTransfer(view) &&
+        !canCopyImage(view) &&
+        !canCancelTransfer(view)) {
+      return child;
+    }
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           unawaited(_open(context, details.globalPosition)),
@@ -183,6 +210,7 @@ class TransferContextMenu extends StatelessWidget {
     // menu the user is looking at either.
     final reveal = canRevealTransfer(view);
     final copy = canCopyImage(view);
+    final cancel = canCancelTransfer(view);
     // The overlay is what `showMenu` lays the menu out inside, so its size is
     // the one the margins below have to be measured against.
     final overlay = Overlay.of(context).context.findRenderObject();
@@ -201,6 +229,12 @@ class TransferContextMenu extends StatelessWidget {
         size.height - at.dy,
       ),
       items: [
+        if (cancel)
+          _item(
+            value: _cancelAction,
+            icon: Icons.close,
+            label: l10n.cancelSend,
+          ),
         if (reveal)
           _item(
             value: _revealAction,
@@ -217,6 +251,8 @@ class TransferContextMenu extends StatelessWidget {
     );
     if (!context.mounted) return;
     switch (chosen) {
+      case _cancelAction:
+        await cancelSend(context, view);
       case _revealAction:
         await revealTransfer(context, view);
       case _copyAction:
@@ -244,7 +280,8 @@ class TransferContextMenu extends StatelessWidget {
 
 /// Showing the file where it lives, and putting a picture on the clipboard.
 ///
-/// Two values rather than none because `showMenu` answers with what was chosen,
-/// and `null` is what a dismissed menu answers with as well.
+/// Three values rather than two because `showMenu` answers with what was
+/// chosen, and `null` is what a dismissed menu answers with as well.
+const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _copyAction = 'copy';

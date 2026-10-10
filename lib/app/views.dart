@@ -184,6 +184,7 @@ final class TransferView {
     required this.text,
     required this.offer,
     this.localPath,
+    this.send,
   });
 
   /// The Transfer's id, unique within the Session it belongs to.
@@ -250,6 +251,22 @@ final class TransferView {
   /// on the wire; and for a multi-item send, whose sources stream from
   /// somewhere that is not required to name a path.
   final String? localPath;
+
+  /// The live send this Device is making, while it can still be abandoned.
+  ///
+  /// Handed out for the same reason [offer] is: a UI needs a handle on the
+  /// object itself to act on it, and the sender's own Transfer is the one thing
+  /// whose "stop" the user can press — an offer nobody answers, a payload
+  /// crawling over a dead link, a file picked by mistake a breath too late.
+  /// The peer is told, so its side settles too rather than filling forever.
+  ///
+  /// Null for a received Transfer — the receiver's counterpart is [reject] on
+  /// an offer it has not answered, and a transfer already under way is the
+  /// sender's to stop — and for anything settled, which includes everything
+  /// this Device sends that already ended. A `cancel()` on a settled send
+  /// would be a no-op anyway; handing out null is what keeps a settled
+  /// message from drawing a button for it.
+  final OutgoingTransfer? send;
 
   /// Whether this Device has to answer before anything moves.
   bool get needsDecision =>

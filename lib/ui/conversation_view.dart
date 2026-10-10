@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
@@ -1007,18 +1008,45 @@ class MessageBubble extends StatelessWidget {
   /// Everything inside the bubble: the message, its progress, and the answers
   /// an offer needs.
   Widget _contents(BuildContext context, AppLocalizations l10n) {
+    // A file in flight is the one bubble whose width is a decision rather than
+    // a consequence. Left alone, the progress bar inside it would expand to
+    // every pixel the conversation has left, and a bubble holding a short name
+    // would stretch across the whole pane. So the block that belongs to the
+    // file — its name, its size, its bar — is drawn at the width the *name*
+    // actually takes, and only the answer buttons sit outside that measure.
+    final contentWidth = _namesAFile
+        ? _transferBubbleWidth(context, l10n)
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _body(l10n),
+        _body(l10n, contentWidth),
         if (!view.state.isSettled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: LinearProgressIndicator(
-              value: view.fraction,
-              minHeight: 3,
-              backgroundColor: Colors.black12,
+            child: SizedBox(
+              width: contentWidth,
+              child: LinearProgressIndicator(
+                value: view.fraction,
+                minHeight: 3,
+                backgroundColor: Colors.black12,
+              ),
+            ),
+          ),
+        // The one answer a *sender* has: stop. It sits where the receiver's
+        // Accept and Refuse sit, because it is the same kind of thing — a
+        // question the transfer is asking that only the person looking at the
+        // bubble can settle. An offer that was never answered, a payload
+        // crawling over a dead link, a file picked by mistake: all of them end
+        // here, and the peer is told, so its side settles too.
+        if (view.send != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _BubbleAction(
+              label: l10n.cancelSend,
+              onPressed: () => unawaited(cancelSend(context, view)),
+              primary: false,
             ),
           ),
         if (view.needsDecision)
@@ -1052,6 +1080,58 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Whether this bubble names a file or a picture still on the wire — the two
+  /// kinds whose bubble is drawn to the name's width rather than left to grow.
+  bool get _namesAFile =>
+      view.kind == PayloadKind.file ||
+      (view.kind == PayloadKind.image && view.localPath == null);
+
+  /// How wide a file bubble's fixed block is drawn.
+  ///
+  /// The width the longest name *actually takes* — measured, not guessed —
+  /// with the icon and the gap it shares its row with, floored so that a
+  /// three-character name still leaves a progress bar worth reading, and
+  /// capped so that a pathological one cannot push the bubble across the pane.
+  /// For a file the size line is measured too, because on a short name it is
+  /// the wider of the two.
+  double _transferBubbleWidth(BuildContext context, AppLocalizations l10n) {
+    var width = 0.0;
+    for (final name in view.names) {
+      width = math.max(
+        width,
+        18 + 6 + _textWidth(context, name, WeChat.fontSizeBody),
+      );
+    }
+    if (view.kind == PayloadKind.file) {
+      final sizeLine = l10n.bytesOf(
+        formatBytes(view.transferredBytes),
+        formatBytes(view.totalBytes),
+      );
+      width = math.max(
+        width,
+        _textWidth(context, sizeLine, WeChat.fontSizeMeta),
+      );
+    }
+    return width.clamp(
+      WeChat.transferBubbleMinWidth,
+      WeChat.transferBubbleMaxWidth,
+    );
+  }
+
+  /// The width [text] takes on one line at [fontSize], measured the way the
+  /// widgets below will draw it.
+  double _textWidth(BuildContext context, String text, double fontSize) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(fontSize: fontSize),
+      ),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
+
   /// Whether the "kind · state" line belongs under this bubble.
   ///
   /// Only for a file: everything else in a conversation is its own content, and
@@ -1064,7 +1144,14 @@ class MessageBubble extends StatelessWidget {
   /// A picture never arrives here. One this machine holds is drawn by
   /// [_bareImage], outside the bubble this is the inside of, and one it does
   /// not hold is a name and a progress bar, which is [_image].
-  Widget _body(AppLocalizations l10n) {
+  ///
+  /// [contentWidth] is the measure [_contents] decided on — the width the
+  /// names actually take, floored and capped. Given one, the file block is
+  /// drawn at exactly that width, so a long name cuts off with an ellipsis
+  /// (the whole of it is on the tooltip) instead of stretching the bubble;
+  /// given none — a text message, whose bubble already hugs its words — the
+  /// block takes its natural width.
+  Widget _body(AppLocalizations l10n, double? contentWidth) {
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
       return SelectableText(
@@ -1076,7 +1163,7 @@ class MessageBubble extends StatelessWidget {
         ),
       );
     }
-    if (view.kind == PayloadKind.image) return _image();
+    if (view.kind == PayloadKind.image) return _image(contentWidth);
     final lines = <Widget>[
       for (final name in view.names)
         Row(
@@ -1085,12 +1172,16 @@ class MessageBubble extends StatelessWidget {
             Icon(iconForKind(view.kind), size: 18, color: WeChat.bubbleText),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: WeChat.fontSizeBody,
-                  color: WeChat.bubbleText,
+              child: Tooltip(
+                message: name,
+                child: Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: WeChat.fontSizeBody,
+                    color: WeChat.bubbleText,
+                  ),
                 ),
               ),
             ),
@@ -1111,10 +1202,13 @@ class MessageBubble extends StatelessWidget {
           ),
         ),
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: lines,
+    return SizedBox(
+      width: contentWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: lines,
+      ),
     );
   }
 
@@ -1129,29 +1223,37 @@ class MessageBubble extends StatelessWidget {
   /// A name beside a picture glyph is all that can honestly be drawn for
   /// either: it is the same thing a file message draws, because at this point
   /// the two *are* the same thing — a transfer with a name — and the progress
-  /// bar underneath says how long that will take.
+  /// bar underneath says how long that will take. [contentWidth] is the same
+  /// measure [_body] draws its file block at.
   ///
   /// A path that no longer reads is not a third case: that is a picture whose
   /// bytes are here, drawn by [_bareImage], and [ImageBubble] falls back to the
   /// name itself when the decode fails.
-  Widget _image() {
+  Widget _image(double? contentWidth) {
     final name = view.names.isEmpty ? '' : view.names.first;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.image_outlined, size: 18, color: WeChat.bubbleText),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: WeChat.fontSizeBody,
-              color: WeChat.bubbleText,
+    return SizedBox(
+      width: contentWidth,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.image_outlined, size: 18, color: WeChat.bubbleText),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Tooltip(
+              message: name,
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: WeChat.fontSizeBody,
+                  color: WeChat.bubbleText,
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

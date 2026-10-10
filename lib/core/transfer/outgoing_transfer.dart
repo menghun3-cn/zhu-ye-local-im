@@ -50,15 +50,38 @@ final class OutgoingTransfer extends Transfer {
   void watchAcceptance() {
     _timer = Timer(_limits.acceptanceTimeout, () {
       if (state == TransferState.awaitingDecision) {
-        finish(
-          TransferFailed(
-            detail:
-                'the peer did not answer the offer within '
-                '${_limits.acceptanceTimeout.inSeconds}s',
+        unawaited(
+          _expire(
+            'the peer did not answer the offer within '
+            '${_describe(_limits.acceptanceTimeout)}',
           ),
         );
       }
     });
+  }
+
+  /// Fails this Transfer for good — and tells the peer.
+  ///
+  /// A timeout is this Device giving up, but the other side may still be
+  /// showing the question: an Offer nobody will ever answer, or a payload it
+  /// is still waiting for the rest of. Without the cancel message, the peer's
+  /// Transfer sits in its unfinished state forever, because only the receiver
+  /// has no clock of its own by design. The reason is `declined`, because the
+  /// wire has no finer word for "the sender walked away".
+  Future<void> _expire(String detail) async {
+    finish(TransferFailed(detail: detail));
+    await sendQuietly(
+      _channel,
+      CancelMessage(transferId: id, reason: RejectionReason.declined),
+    );
+  }
+
+  /// A [Duration] the way a failure detail reads it: `24h`, `90s`, `80ms`.
+  static String _describe(Duration d) {
+    if (d.inHours >= 1) return '${d.inHours}h';
+    if (d.inMinutes >= 1) return '${d.inMinutes}min';
+    if (d.inSeconds >= 1) return '${d.inSeconds}s';
+    return '${d.inMilliseconds}ms';
   }
 
   /// Internal: the receiver answered the Offer.
@@ -253,11 +276,10 @@ final class OutgoingTransfer extends Transfer {
       await _channel.send(CompleteMessage(transferId: id));
       _timer = Timer(_limits.verificationTimeout, () {
         if (state == TransferState.verifying) {
-          finish(
-            TransferFailed(
-              detail:
-                  'the receiver did not confirm the transfer within '
-                  '${_limits.verificationTimeout.inSeconds}s',
+          unawaited(
+            _expire(
+              'the receiver did not confirm the transfer within '
+              '${_describe(_limits.verificationTimeout)}',
             ),
           );
         }

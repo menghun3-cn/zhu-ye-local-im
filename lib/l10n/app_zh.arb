@@ -108,6 +108,7 @@
   "bytesOf": "{transferred} / {total}",
   "accept": "接收",
   "refuse": "拒绝",
+  "cancelSend": "取消发送",
   "whereShouldFilesLand": "这些文件保存到哪个文件夹？",
   "whereShouldThisArrive": "保存到哪个文件夹？",
   "openContainingFolder": "打开所在目录",
