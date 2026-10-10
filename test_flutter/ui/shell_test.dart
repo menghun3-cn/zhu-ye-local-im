@@ -38,7 +38,9 @@ void main() {
       expect(scheme.onSurfaceVariant, WeChat.secondaryText);
 
       expect(theme.cardTheme.color, WeChat.surface);
-      expect(theme.cardTheme.elevation, 0);
+      // The scale's first shadow step: a card sitting perfectly flush on the
+      // page reads as a table row, and one step is what lifts it off.
+      expect(theme.cardTheme.elevation, 1);
       expect(theme.scaffoldBackgroundColor, WeChat.pageBackground);
       expect(theme.dividerColor, WeChat.divider);
       // The Chinese-first stack: Material's Roboto carries no Han glyphs, so
@@ -49,13 +51,13 @@ void main() {
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
     });
 
-    test('the conversation board and a received bubble have traded fills', () {
-      // The arrangement is WeChat's own inverted: the board is white and a
-      // received message is grey, where WeChat has a grey board and a white
-      // bubble. What is asserted is therefore the *relationship* between the
-      // tokens rather than any one value — the point of the change is that the
-      // two fills changed places, and a later tweak that moved one without the
-      // other would silently undo it.
+    test('a received bubble is the board\'s white, told apart by its line', () {
+      // The board and a received bubble used to take each other's fills: a
+      // white board, a grey bubble. The redesign gives the bubble the board's
+      // own white and draws a hairline around it instead — a grey fill reads
+      // as *disabled*, while a bordered white card is what a message looks
+      // like. What is asserted is the new relationship, so that a later tweak
+      // cannot leave a white bubble on a white board with nothing to see.
       expect(
         WeChat.conversationBackground,
         WeChat.surface,
@@ -63,16 +65,16 @@ void main() {
       );
       expect(
         WeChat.bubbleIn,
-        WeChat.pageBackground,
-        reason: 'a received bubble took exactly the grey the board gave up',
+        WeChat.conversationBackground,
+        reason: 'a received bubble is the board\'s own white now',
       );
       expect(
-        WeChat.conversationBackground,
+        WeChat.divider,
         isNot(WeChat.bubbleIn),
-        reason: 'a received bubble has to be visible on the board it sits on',
+        reason: 'the hairline is the only thing keeping the bubble visible',
       );
 
-      // A panel is still a panel: the bubble's grey must not have leaked into
+      // A panel is still a panel: the bubble's fill must not have leaked into
       // the card, the dialog or the scheme's surface, which is what would
       // happen if the two roles still shared one token.
       final theme = WeChat.theme();
@@ -86,7 +88,10 @@ void main() {
 
       final rail = theme.navigationRailTheme;
       expect(rail.backgroundColor, WeChat.sidebarBackground);
-      expect(rail.selectedIconTheme?.color, WeChat.brand);
+      // The current surface wears the *action* green, the one every pressable
+      // control uses, on a soft green pill.
+      expect(rail.selectedIconTheme?.color, WeChat.brandStrong);
+      expect(rail.indicatorColor, WeChat.brandSoft);
       expect(rail.unselectedIconTheme?.color, WeChat.secondaryText);
 
       final bar = theme.navigationBarTheme;

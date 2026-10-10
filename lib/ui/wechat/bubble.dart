@@ -60,7 +60,7 @@ class Avatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: _colourFor(seed),
-        borderRadius: BorderRadius.circular(WeChat.bubbleRadius),
+        borderRadius: BorderRadius.circular(WeChat.avatarRadius),
       ),
       child: Text(
         initial,
@@ -98,15 +98,21 @@ class Avatar extends StatelessWidget {
   }
 }
 
-/// The bubble a message is drawn in: a rounded rectangle with a tail.
+/// The bubble a message is drawn in: a rounded rectangle whose corner by the
+/// avatar is tucked in.
 ///
-/// The tail points at the avatar, which is what makes a WeChat bubble readable
-/// as *from* somebody rather than merely *on* a side. It is drawn as a small
-/// rotated square tucked behind the bubble's corner, which is cheaper than a
-/// `CustomPainter` and antialiases correctly — a `CustomPainter` triangle in
-/// the same place shows a seam against the rounded corner.
+/// The tucked corner is what makes a bubble readable as *from* somebody rather
+/// than merely *on* a side. It replaced a tail — a small rotated square tucked
+/// behind the corner — because a tail reads as a cartoon speech balloon, while
+/// a corner says the same thing with no extra shape at all. Only the corner
+/// beside the avatar tucks; the other three take `WeChat.bubbleRadius`.
+///
+/// A received bubble is drawn with a hairline as well as a fill, because its
+/// fill is the conversation board's own white and without the line there would
+/// be nothing to see. An outgoing bubble sits in its own green and needs none.
 class MessageBubbleShape extends StatelessWidget {
-  /// Wraps [child] in a bubble of [colour], tail [outgoing] or not.
+  /// Wraps [child] in a bubble of [colour], tucked towards the avatar when
+  /// [outgoing] is false and away from it when [outgoing] is true.
   const MessageBubbleShape({
     super.key,
     required this.colour,
@@ -117,59 +123,43 @@ class MessageBubbleShape extends StatelessWidget {
   /// The bubble's fill.
   final Color colour;
 
-  /// Which side the tail is on.
+  /// Which side the tucked corner is on.
   final bool outgoing;
 
   /// The bubble's contents.
   final Widget child;
 
-  /// How far the tail sticks out.
-  static const double _tail = 6;
-
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(WeChat.bubbleRadius);
-    // 4 rather than 6: the tail is set *into* the corner by its own width so
-    // that its outer edge lines up with the bubble's edge, not past it.
-    final tail = Transform.rotate(
-      angle: 0.785398, // 45°
-      child: Container(
-        width: _tail * 1.4,
-        height: _tail * 1.4,
-        decoration: BoxDecoration(
-          color: colour,
-          borderRadius: BorderRadius.circular(1.5),
-        ),
-      ),
+    const round = Radius.circular(WeChat.bubbleRadius);
+    const tucked = Radius.circular(WeChat.bubbleTuckRadius);
+    // The corner nearest the avatar is the one that tucks: the left when the
+    // message came in (the peer's avatar is on the left), the right when it
+    // went out.
+    final radius = BorderRadius.only(
+      topLeft: outgoing ? round : tucked,
+      topRight: outgoing ? tucked : round,
+      bottomLeft: round,
+      bottomRight: round,
     );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!outgoing)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, right: 0),
-            child: Transform.translate(
-              offset: const Offset(_tail * 0.7, 0),
-              child: tail,
-            ),
-          ),
         Flexible(
           child: Container(
             padding: WeChat.bubblePadding,
-            decoration: BoxDecoration(color: colour, borderRadius: radius),
+            decoration: BoxDecoration(
+              color: colour,
+              borderRadius: radius,
+              border: outgoing
+                  ? null
+                  : Border.all(color: WeChat.divider, width: 1),
+            ),
             child: child,
           ),
         ),
-        if (outgoing)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, left: 0),
-            child: Transform.translate(
-              offset: const Offset(-_tail * 0.7, 0),
-              child: tail,
-            ),
-          ),
       ],
     );
   }
