@@ -664,9 +664,11 @@ final class LocalTransferController {
 
   /// Accepts everything [transfer] offers, writing file bytes under [directory].
   ///
-  /// Names come from the peer and are therefore sanitised by
-  /// [incomingPathFor]; a name that would collide with an existing file is
-  /// numbered rather than overwriting it.
+  /// The bytes are written to a staging name this Device makes up and only
+  /// renamed to the peer's name once every byte has been verified — see
+  /// [stagingPathFor] for what that buys. The final name is decided at that
+  /// moment by [incomingPathFor], so a name that would collide with an existing
+  /// file is numbered rather than overwritten.
   ///
   /// This is the answer a *file* is given, and it is also how the controller
   /// files an image it accepts on arrival — the same road, reached with the
@@ -682,16 +684,24 @@ final class LocalTransferController {
       throw const AppStateException(AppRefusal.offerAlreadyAnswered);
     }
     final sinks = <String, PayloadSink>{};
-    final landed = <String, String>{};
+    final landings = <_Landing>[];
     var accepted = false;
     try {
       for (final item in transfer.items) {
         // Only an item with a digest carries a byte stream to write; a text or
         // clipboard item arrives inline and takes no sink.
         if (!item.hasDigest) continue;
-        final path = incomingPathFor(directory, item.name);
-        sinks[item.id] = await FilePayloadSink.open(path);
-        landed[item.id] = path.path;
+        final staged = stagingPathFor(directory, item.name);
+        final sink = await FilePayloadSink.open(staged);
+        sinks[item.id] = sink;
+        landings.add(
+          _Landing(
+            sink: sink,
+            staged: staged,
+            directory: directory,
+            name: item.name,
+          ),
+        );
       }
       await transfer.accept(
         itemIds: [for (final item in transfer.items) item.id],
@@ -699,11 +709,7 @@ final class LocalTransferController {
       );
       accepted = true;
     } finally {
-      if (!accepted) {
-        for (final sink in sinks.values) {
-          await sink.close();
-        }
-      }
+      if (!accepted) await _abandonLandings(landings);
     }
     // `accept` returns once the answer is on the wire, not once the bytes are —
     // those are still to cross, and a path recorded here would name a file that
@@ -713,35 +719,81 @@ final class LocalTransferController {
     // digests verify — the same standard [_Tracked]'s own doc sets — and
     // recorded then. It is kept for the first landed item because that is what
     // an image message carries; a multi-file offer leaves this null and keeps
-    // its names. A Transfer that never completes never reports a path, which is
-    // the honest answer about a file that never arrived.
-    if (landed.isNotEmpty) {
-      final path = landed.values.first;
+    // its names.
+    //
+    // A Transfer that never completes reports no path and leaves nothing
+    // behind: what it staged is deleted, because a file that never arrived
+    // should not be found later under a name that says it did.
+    if (landings.isNotEmpty) {
       unawaited(
-        transfer.outcome.then((outcome) {
-          if (outcome is TransferCompleted &&
-              _recordLocalPath(transfer, path)) {
-            _notify();
+        transfer.outcome.then((outcome) async {
+          if (outcome is TransferCompleted) {
+            final landed = await _publishLandings(landings);
+            if (landed != null) _recordLocalPath(transfer, landed);
+          } else {
+            await _abandonLandings(landings);
           }
+          _notify();
         }),
       );
     }
     _notify();
   }
 
+  /// Moves [landings] out of their staging names and into the names they keep.
+  ///
+  /// Answers the first one's path — the one an image message carries — or null
+  /// when none of them could be moved.
+  Future<String?> _publishLandings(List<_Landing> landings) async {
+    String? first;
+    for (final landing in landings) {
+      // A rename needs the handle gone, and awaiting the close is what makes
+      // sure of it — a Transfer closes its sinks as it settles, but that runs
+      // alongside this and may not have finished.
+      await landing.sink.close();
+      try {
+        final finalPath = incomingPathFor(landing.directory, landing.name);
+        await landing.staged.rename(finalPath.path);
+        first ??= finalPath.path;
+      } on Object {
+        // A file that could not be given its name cannot be kept under a name
+        // nobody chose either, and leaving it behind would be the litter this
+        // arrangement exists to remove. The Transfer has already ended, so all
+        // that is left to do is not litter.
+        await _discardStaged(landing.staged);
+      }
+    }
+    return first;
+  }
+
+  /// Closes and deletes everything [landings] staged.
+  Future<void> _abandonLandings(List<_Landing> landings) async {
+    for (final landing in landings) {
+      await landing.sink.close();
+      await _discardStaged(landing.staged);
+    }
+  }
+
+  Future<void> _discardStaged(File staged) async {
+    try {
+      if (await staged.exists()) await staged.delete();
+    } on Object {
+      // Best effort: a staging file that will not delete is not worth turning
+      // anything else into a failure, and it is named as what it is.
+    }
+  }
+
   /// Points the tracked record for [transfer] at [path], if one exists.
   ///
   /// The record is looked up rather than passed in because `acceptInto` takes
   /// the [IncomingTransfer] the UI holds, not the wrapper the controller made.
-  /// Answers whether a record was found, because the caller notifies only then.
-  bool _recordLocalPath(Transfer transfer, String path) {
+  void _recordLocalPath(Transfer transfer, String path) {
     for (final tracked in _transfers) {
       if (identical(tracked.transfer, transfer)) {
         tracked.localPath = path;
-        return true;
+        return;
       }
     }
-    return false;
   }
 
   /// Refuses [transfer].
@@ -1333,6 +1385,34 @@ final class _WiredSession {
     _subscriptions.clear();
     await engine.close();
   }
+}
+
+/// One item's bytes on their way to the name they will keep.
+///
+/// A received file has two names: the one it wears while its bytes are crossing
+/// — [staged], which this Device made up and which says it is unfinished — and
+/// the one it ends up under, decided when the bytes have been verified. Keeping
+/// both here, rather than recomputing the second, is what makes the rename a
+/// single step with nothing to re-derive in between.
+final class _Landing {
+  _Landing({
+    required this.sink,
+    required this.staged,
+    required this.directory,
+    required this.name,
+  });
+
+  /// Where the bytes are being written.
+  final PayloadSink sink;
+
+  /// The file they are being written into.
+  final File staged;
+
+  /// The folder that will hold the finished file.
+  final Directory directory;
+
+  /// The peer's name for the item, before sanitising and any numbering.
+  final String name;
 }
 
 /// A Transfer and the Device it is with.
