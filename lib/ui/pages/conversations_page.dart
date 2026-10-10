@@ -496,7 +496,7 @@ class _ConversationTile extends StatelessWidget {
     if (entry.waiting) {
       return Badge(
         label: const Icon(Icons.download, size: 12),
-        backgroundColor: WeChat.badge,
+        backgroundColor: WeChat.danger,
         child: const SizedBox(width: 24),
       );
     }
