@@ -1190,6 +1190,11 @@ final class LocalTransferController {
     unawaited(
       transfer.outcome.then<void>((_) {}, onError: (Object _) {}).whenComplete(
         () async {
+          // The Transfer has settled, so stamp the clock here — before anything
+          // else that this callback does — so the duration a screen prints is
+          // the interval the Transfer actually took, not the interval up to
+          // whenever the list next happened to rebuild.
+          tracked.settledAt = _clock();
           await progress.cancel();
           _notify();
         },
@@ -1230,6 +1235,7 @@ final class LocalTransferController {
       kind: transfer.kind,
       peer: tracked.peer,
       at: tracked.at,
+      settledAt: tracked.settledAt,
       state: transfer.state,
       transferredBytes: transfer.transferredBytes,
       totalBytes: transfer.totalBytes,
@@ -1431,6 +1437,14 @@ final class _Tracked {
   /// is decided, and a conversation list that wants to print a time reads it
   /// from here rather than inventing one at render time.
   final DateTime at;
+
+  /// When this Transfer ended, or null while it is still going.
+  ///
+  /// Written once, from the controller's clock, at the moment the Transfer
+  /// settles. A duration is the one thing a finished Transfer has to say that
+  /// nothing else does, and it cannot be recovered after the fact: the engine
+  /// keeps no time of its own, so the interval needs both of its ends stored.
+  DateTime? settledAt;
 
   /// Where this Transfer's bytes live on *this* machine, once they do.
   ///

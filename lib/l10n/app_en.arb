@@ -62,6 +62,33 @@
   "stateCancelled": "Cancelled",
   "stateFailed": "Failed",
 
+  "transferElapsed": "Elapsed {duration}",
+  "@transferElapsed": {
+    "placeholders": { "duration": { "type": "String" } }
+  },
+  "transferTook": "Took {duration}",
+  "@transferTook": {
+    "placeholders": { "duration": { "type": "String" } }
+  },
+  "durationSeconds": "{seconds}s",
+  "@durationSeconds": {
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "durationMinutes": "{minutes}m {seconds}s",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" },
+      "seconds": { "type": "int" }
+    }
+  },
+  "durationHours": "{hours}h {minutes}m",
+  "@durationHours": {
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+
   "clipboardModeOff": "Off",
   "clipboardModeStage": "Ask me",
   "clipboardModeMirror": "Mirror",
@@ -289,5 +316,6 @@
   "chooseFolderTitle": "Choose where files are saved",
   "changeIncomingFolder": "Change…",
   "incomingFolderHint": "Received files are saved here by default. You can still pick another folder for each one.",
-  "incomingFolderUnset": "You are asked where to save each file as it arrives."
+  "incomingFolderUnset": "You are asked where to save each file as it arrives.",
+  "folderNotSaved": "Not saved — press Enter, or click away, to keep this folder."
 }

@@ -38,6 +38,12 @@
   "stateCancelled": "已取消",
   "stateFailed": "失败",
 
+  "transferElapsed": "已用 {duration}",
+  "transferTook": "用时 {duration}",
+  "durationSeconds": "{seconds} 秒",
+  "durationMinutes": "{minutes} 分 {seconds} 秒",
+  "durationHours": "{hours} 小时 {minutes} 分",
+
   "clipboardModeOff": "关闭",
   "clipboardModeStage": "问我",
   "clipboardModeMirror": "镜像",
@@ -196,5 +202,6 @@
   "chooseFolderTitle": "选择保存位置",
   "changeIncomingFolder": "更改…",
   "incomingFolderHint": "以后收到的文件默认保存在这里；每次接收时仍然可以另选一个文件夹。",
-  "incomingFolderUnset": "每次接收时都会问你保存在哪里。"
+  "incomingFolderUnset": "每次接收时都会问你保存在哪里。",
+  "folderNotSaved": "未保存 —— 按回车，或点开别处，就会记下这个文件夹。"
 }
