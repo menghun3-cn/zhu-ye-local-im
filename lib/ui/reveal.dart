@@ -37,13 +37,37 @@ final class SystemRevealer implements Revealer {
       // The shell, not a themed window: this hands over to the same Explorer the
       // user already has open, which is the whole point of showing them where
       // the file went.
-      await Process.run('explorer', [folder]);
+      await Process.run('explorer', [explorerArgument(folder)]);
       return true;
     } on Object {
       return false;
     }
   }
 }
+
+/// The one argument [folder] becomes on `explorer`'s command line.
+///
+/// **Explorer reads every `/` in an argument as one of its own switches.**
+/// `/e`, `/select` and `/root` are the ones it documents, and it resolves the
+/// argument first and the switches after: `C:/Users/me/Downloads` is read as the
+/// drive `C:` followed by two switches nobody sent, no path token is left, and
+/// Explorer opens its *fallback* folder — the user's Documents — without saying
+/// so. Only `/` is affected; `\` is what it expects, and it is also what a path
+/// typed into Explorer's own address bar arrives as.
+///
+/// That rule would not matter if the folder were always spelled with `\`, but it
+/// is not: the folder this app fills in by default is built with `/`, because
+/// paths in this project are joined the same way on every platform (see
+/// `defaultIncomingDirectory`, which has to answer for Android with the same
+/// function). So the conversion belongs here, at the one place a path stops
+/// being a Dart string and becomes an argument to somebody else's parser — and
+/// it covers a folder the user typed with `/` into the accept dialog as well,
+/// which no amount of care in the path builders would have.
+///
+/// Only the argument is converted. The folder itself goes on being the string
+/// the rest of the app uses, because `\` is not a fact about the folder, it is a
+/// fact about Explorer.
+String explorerArgument(String folder) => folder.replaceAll('/', r'\');
 
 /// Which revealer the surfaces use.
 ///
@@ -67,7 +91,9 @@ abstract final class RevealResolution {
 /// in an argument quotes the whole of it, which breaks the pairing. A path with
 /// a space in it is the ordinary case on Windows, so the reliable half is taken:
 /// the folder opens, and the file is in it. "Where is this" is answered either
-/// way, and it is answered the same way for every path.
+/// way, and it is answered the same way for every path. What the folder then has
+/// to look like before `explorer` will accept it is [explorerArgument]'s
+/// business, and it is the other half of the same parser.
 ///
 /// A bare name — `photo.png`, with no directory part at all — resolves to `.`,
 /// which is this process's working directory rather than anything the user
