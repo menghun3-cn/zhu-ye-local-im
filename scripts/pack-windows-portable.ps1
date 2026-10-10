@@ -125,6 +125,13 @@ $newProbes = @(
     # **非参数化**的新整句就是它；耗时那几条（已用/用时、N 秒、N 分 N 秒）都带
     # 占位符，app.so 里只剩下片段，挑不出整句来当探针。
     '未保存 —— 按回车，或点开别处，就会记下这个文件夹。'
+    # 2026-10-10 · 对话持久化与右键删除（PR #45）：右键菜单多了「删除」这一条，
+    # 而文本消息的正文从可选择的 SelectableText 改回普通 Text，它原本靠平台
+    # 工具条提供的「复制」因此搬进了同一个菜单（copyText / cannotCopyText）。
+    # 三条都是这一轮独有的、不带占位符的字符串。
+    '删除',
+    '复制文字',
+    '没能复制这段文字。'
 )
 
 # 新图标必须真的在字体里。字形子集化是 tree-shaker 按源码里用到的 codePoint 切出来
@@ -169,6 +176,10 @@ $requiredGlyphs = @{
     # 2026-10-09 第六轮：右键菜单里「复制图片」那一条的图标。
     # 0xef7f = Icons.content_copy_outlined
     '0xef7f' = 'Icons.content_copy_outlined'
+    # 2026-10-10 · 对话持久化与右键删除（PR #45）：右键菜单里「删除」那一条的
+    # 图标是这个功能**唯一**新用到的 codePoint（「复制文字」复用了上面那条）。
+    # 0xe1bb = Icons.delete_outline
+    '0xe1bb' = 'Icons.delete_outline'
 }
 
 function Step($m) { Write-Host "==> $m" }
