@@ -109,4 +109,55 @@ void main() {
       );
     });
   });
+
+  // The name a file wears while its bytes are crossing. It exists so that a
+  // Transfer that dies takes nothing with it: no empty file under a name that
+  // looks received, and no occupied name for the next attempt to number around.
+  group('stagingPathFor', () {
+    late Directory directory;
+
+    setUp(() {
+      directory = Directory.systemTemp.createTempSync('local-transfer-stage-');
+    });
+
+    tearDown(() {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+    });
+
+    test('stages inside the directory, under a name that says what it is', () {
+      final staged = stagingPathFor(directory, 'report.pdf');
+      expect(staged.parent.absolute.path, directory.absolute.path);
+      expect(staged.path, endsWith('.part'));
+      expect(fileNameOf(staged.path), contains('report.pdf'));
+    });
+
+    test('never takes the name the file will finally have', () {
+      final staged = stagingPathFor(directory, 'report.pdf');
+      expect(
+        staged.path,
+        isNot(incomingPathFor(directory, 'report.pdf').path),
+        reason:
+            'the whole point is that the final name stays free until it is '
+            'earned',
+      );
+    });
+
+    test('a traversal attempt still stages inside the directory', () {
+      final staged = stagingPathFor(directory, '../../escape.pdf');
+      expect(
+        staged.absolute.path.startsWith(
+          '${directory.absolute.path}${Platform.pathSeparator}',
+        ),
+        isTrue,
+        reason: '${staged.path} escaped ${directory.path}',
+      );
+    });
+
+    test('two attempts at one name stage apart', () {
+      expect(
+        stagingPathFor(directory, 'report.pdf').path,
+        isNot(stagingPathFor(directory, 'report.pdf').path),
+      );
+    });
+  });
 }

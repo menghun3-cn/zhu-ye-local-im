@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import '../core/core.dart';
 
@@ -379,6 +380,11 @@ String sanitiseIncomingName(String raw) {
 /// [name] is peer-supplied and is sanitised first; a clash is resolved by
 /// numbering rather than by overwriting, because the existing file may be the
 /// user's.
+///
+/// This decides the name a received file *finally* has, so it is asked at the
+/// moment the bytes are published rather than when the Transfer is answered:
+/// a name that was free when the Offer was accepted may have been taken by the
+/// time the bytes arrive, and numbering is still better than overwriting.
 File incomingPathFor(Directory directory, String name) {
   final safe = sanitiseIncomingName(name);
   var candidate = File('${directory.path}${Platform.pathSeparator}$safe');
@@ -393,6 +399,44 @@ File incomingPathFor(Directory directory, String name) {
     if (!candidate.existsSync()) return candidate;
   }
   throw AppStateException(AppRefusal.noFreeFileName, safe);
+}
+
+/// A path inside [directory] for bytes that are still on their way.
+///
+/// A Transfer writes here, not to its final name, and is renamed once every byte
+/// has been verified. Two things follow, and both are the point.
+///
+/// A Transfer that dies leaves a name that says what it is — `.part` — rather
+/// than an empty file wearing the peer's name, which is a thing users read as
+/// "the file arrived and is broken".
+///
+/// And it never takes a name the next attempt would then have to number around.
+/// Writing straight to the final name made a failed transfer look like an
+/// existing file, so the retry of a file that never arrived came out as
+/// "report (2).pdf" beside a zero-byte "report.pdf" nobody could open.
+///
+/// The token keeps two attempts at the same name apart, so a live transfer is
+/// not disturbed by a second one for a file of the same name, and the staged
+/// file cannot itself collide with a name the user already owns.
+File stagingPathFor(Directory directory, String name) {
+  final safe = sanitiseIncomingName(name);
+  final token = _stagingToken();
+  return File('${directory.path}${Platform.pathSeparator}$safe.$token.part');
+}
+
+/// Four random 16-bit words as hex.
+///
+/// Random rather than derived from the Transfer's id because the id comes from
+/// the peer: a name built from it would be peer-influenced, and this name is
+/// ours alone. Sixteen hex digits also make a collision between two concurrent
+/// attempts at one name something that does not happen by accident.
+String _stagingToken() {
+  final random = math.Random.secure();
+  final buffer = StringBuffer();
+  for (var word = 0; word < 4; word++) {
+    buffer.write(random.nextInt(0x10000).toRadixString(16).padLeft(4, '0'));
+  }
+  return buffer.toString();
 }
 
 /// The kinds of thing the app layer refuses.

@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-10-a-receive-that-failed-left-a-file-behind.md
+#   git hash-object 2026-10-10-a-receive-that-failed-left-a-file-behind.zh.md
+2026-10-10-a-receive-that-failed-left-a-file-behind.md: d5a42841957b7a2c62e9ff7eeb2a4277f9a7942f
+2026-10-10-a-receive-that-failed-left-a-file-behind.zh.md: f2d7be2fe35ca4e90c9ac79d3dc99d2095c0a0ba
