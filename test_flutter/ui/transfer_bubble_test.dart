@@ -99,6 +99,17 @@ void main() {
       source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
       final (:alice, :bob) = await wiredWithUnansweredOffer(tester, source);
 
+      // The file has to be in Bob's hands *before* it is taken away. What this
+      // test is for is that a cancel reaches the side that is holding the
+      // question; without this wait the tap can outrun the Offer, Bob is never
+      // handed anything to hear about, and the assertion below fails on an
+      // empty list rather than on the behaviour it is meant to pin.
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be handed the offer',
+      );
+
       await tester.tap(onConversation(windowA, find.text(l10n.cancelSend)));
 
       await pumpUntil(
