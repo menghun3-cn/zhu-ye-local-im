@@ -449,6 +449,13 @@ void main() {
 
       final incoming = tempDirectory('local-transfer-picture-in-');
       await bob.controller.acceptInto(offer, incoming);
+      expect(
+        bob.controller.transfers.single.localPath,
+        isNull,
+        reason:
+            'the answer is on the wire but the bytes are not here yet, so '
+            'a path now would name a file that is empty or half written',
+      );
       await until(
         () => offer.state == TransferState.completed,
         description: 'the picture to land',

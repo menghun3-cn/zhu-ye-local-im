@@ -246,8 +246,9 @@ final class TransferView {
   /// landed and a file this Device sent names the file the user chose.
   ///
   /// Null for a text or clipboard Transfer, which has no file at all; for a
-  /// file offer not yet answered; and for a multi-item send, whose sources
-  /// stream from somewhere that is not required to name a path.
+  /// file offer not yet answered; for a received Transfer whose bytes are still
+  /// on the wire; and for a multi-item send, whose sources stream from
+  /// somewhere that is not required to name a path.
   final String? localPath;
 
   /// Whether this Device has to answer before anything moves.

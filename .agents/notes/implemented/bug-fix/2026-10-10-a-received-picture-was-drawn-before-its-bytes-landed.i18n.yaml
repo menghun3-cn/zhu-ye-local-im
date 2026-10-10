@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-10-a-received-picture-was-drawn-before-its-bytes-landed.md
+#   git hash-object 2026-10-10-a-received-picture-was-drawn-before-its-bytes-landed.zh.md
+2026-10-10-a-received-picture-was-drawn-before-its-bytes-landed.md: 04070547e0b4f75ef40a5e543ac85213150688fc
+2026-10-10-a-received-picture-was-drawn-before-its-bytes-landed.zh.md: e871531a2901710dc24dcf5538d143ef5aa5cac4
