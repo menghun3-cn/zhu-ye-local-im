@@ -218,7 +218,10 @@ class _HomeShellState extends State<HomeShell> {
                       ),
                   ],
                 ),
-                const VerticalDivider(width: 1, color: WeChat.divider),
+                VerticalDivider(
+                  width: 1,
+                  color: WeChatColors.of(context).divider,
+                ),
                 Expanded(child: content),
               ],
             )

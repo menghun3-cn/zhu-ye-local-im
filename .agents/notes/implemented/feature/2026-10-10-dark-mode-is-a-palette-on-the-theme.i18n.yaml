@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-10-dark-mode-is-a-palette-on-the-theme.md
+#   git hash-object 2026-10-10-dark-mode-is-a-palette-on-the-theme.zh.md
+2026-10-10-dark-mode-is-a-palette-on-the-theme.md: ce75498882939cd7e94ada86a58cc7183204ac8c
+2026-10-10-dark-mode-is-a-palette-on-the-theme.zh.md: 0d862b292e71fe592a74fa87b502c76b340d44ae
