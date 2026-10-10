@@ -50,6 +50,11 @@ from the page-background grey to `#FFFFFF`, and `MessageBubbleShape` draws a one
 layer could not make on its own: white on the board's white with no line is a message
 nobody can see. It also retires a documented invariant — see the test note below.
 
+Superseded the same day by `2026-10-10-a-received-bubble-is-a-soft-grey.md`: the white
+fill read in a window as an outlined empty box, and a grey one step below the panel
+turned out not to be the page-background grey this paragraph rejected. The fill, not
+the line, is what has to carry the bubble.
+
 **The tail is gone; a tucked corner says the same thing.** The bubble had a rotated
 square behind its corner, which is cheap and antialiases well but reads as a cartoon
 speech balloon. `MessageBubbleShape` now rounds three corners at `bubbleRadius` (14)
