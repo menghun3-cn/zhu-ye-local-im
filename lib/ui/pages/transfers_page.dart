@@ -98,6 +98,11 @@ class _TransferCard extends StatelessWidget {
         ? labelForKind(view.kind, l10n)
         : view.names.first;
     final alsoNamed = view.names.length - 1;
+    // Read here from the wall clock, like every other "how long" line in the
+    // app: a running count is the one number that has to move while the thing
+    // it measures does. Null for a Transfer that has not started or has nothing
+    // honest to report, which is what keeps a blank from becoming a zero.
+    final duration = describeTransferDuration(view, DateTime.now(), l10n);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -141,6 +146,7 @@ class _TransferCard extends StatelessWidget {
                     formatBytes(view.transferredBytes),
                     formatBytes(view.totalBytes),
                   ),
+                ?duration,
               ].join(' · '),
               style: theme.textTheme.bodySmall,
             ),

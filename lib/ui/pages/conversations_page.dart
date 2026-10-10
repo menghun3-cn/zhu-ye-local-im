@@ -331,7 +331,7 @@ class _ConversationTile extends StatelessWidget {
     // anything in yet — when the Device was last heard from.
     final stamp = _stampFor(peer, latest);
     // Under it, the one thing there is to press, or else how the last exchange
-    // went. Never both: the row is 64 logical pixels tall, and two answers to
+    // went. Never both: a row holds two lines and no more, and two answers to
     // "what is this conversation doing" would neither fit nor agree.
     final lower =
         _actionFor(context, peer, canConnect, canPair) ??
@@ -348,7 +348,7 @@ class _ConversationTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: WeChat.conversationRowPadding,
-          vertical: 8,
+          vertical: WeChat.conversationRowVPadding,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -581,11 +581,15 @@ class _ConversationRowState extends State<ConversationRow> {
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
         child: Container(
-          height: WeChat.conversationRowHeight,
           color: colour,
+          // The row sizes to its content — the avatar, or the two lines of
+          // text beside it, whichever is taller — rather than to a number
+          // somebody guessed. A fixed height had to be re-guessed every time a
+          // font size moved, and was wrong in between.
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(child: widget.child),
+              widget.child,
               // The hairline between two conversations. Inset so that it
               // begins at the avatar's left edge rather than at the row's: a
               // full-bleed line would cut the list into blocks, and the
@@ -639,7 +643,7 @@ class _RowAction extends StatelessWidget {
       backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
       foregroundColor: WidgetStatePropertyAll(colour),
       overlayColor: const WidgetStatePropertyAll(WeChat.listHover),
-      // Square-ish and small: a row is 64 logical pixels tall, and a
+      // Square-ish and small: a row is only two lines tall, and a
       // Material-default button would fill a third of it.
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(

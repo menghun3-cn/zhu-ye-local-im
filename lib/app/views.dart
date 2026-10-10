@@ -185,6 +185,7 @@ final class TransferView {
     required this.text,
     required this.offer,
     this.localPath,
+    this.settledAt,
     this.send,
   });
 
@@ -208,6 +209,15 @@ final class TransferView {
   /// Newest-first ordering already comes from the list, so this is only ever
   /// read to *print*, and printing is the one job that needs a stored value.
   final DateTime at;
+
+  /// When this Transfer ended, or null while it is still going.
+  ///
+  /// The far end of the interval [at] opens, read from the same clock and
+  /// stored for the same reason: a duration worked out at render time would
+  /// keep ticking after the thing it measures has stopped. Null until the
+  /// Transfer settles, which is also what tells a screen there is a finished
+  /// interval to print rather than a live one to count.
+  final DateTime? settledAt;
 
   /// Where the Transfer has got to.
   final TransferState state;
