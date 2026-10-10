@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-10-a-folder-spelled-with-the-wrong-slash-opened-documents.md
+#   git hash-object 2026-10-10-a-folder-spelled-with-the-wrong-slash-opened-documents.zh.md
+2026-10-10-a-folder-spelled-with-the-wrong-slash-opened-documents.md: b4237360dd1f2ddc29565951b3e1b823f0c2bb01
+2026-10-10-a-folder-spelled-with-the-wrong-slash-opened-documents.zh.md: 9716838250a654f7fcede86f38663551ec8ffc9d
