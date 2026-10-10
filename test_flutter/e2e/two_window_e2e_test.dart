@@ -142,6 +142,21 @@ void main() {
         () => bob.offers.single.state == TransferState.completed,
         description: 'the Transfer to complete',
       );
+      // The bytes land *after* the Transfer reports itself complete: the sink
+      // is closed and the staged file renamed once the outcome is known, so
+      // `completed` is the start of the last step rather than the end of it.
+      // Reading the file straight after the state therefore races that step —
+      // under load the assertion loses, which is a flake and not a defect.
+      // Wait for the side effect itself rather than for the state that precedes
+      // it, and the race is gone.
+      final written = File(
+        '${incoming.path}${Platform.pathSeparator}payload.bin',
+      );
+      await pumpUntil(
+        tester,
+        () => written.existsSync(),
+        description: 'the bytes to be published under their final name',
+      );
       await pumpUntil(
         tester,
         () => onPage(
@@ -154,9 +169,6 @@ void main() {
 
       // The assertion that matters: the bytes that arrived are the bytes that
       // left, on the other side of a real socket.
-      final written = File(
-        '${incoming.path}${Platform.pathSeparator}payload.bin',
-      );
       expect(written.existsSync(), isTrue);
       expect(written.readAsBytesSync(), bytes);
 

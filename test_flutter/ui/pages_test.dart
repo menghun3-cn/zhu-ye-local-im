@@ -741,7 +741,7 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('the folder is chosen from the platform, not typed', (
+    testWidgets('the folder is typed on the page, or chosen from the platform', (
       tester,
     ) async {
       final device = await startUiDevice(
@@ -760,53 +760,67 @@ void main() {
       picker.willChooseDirectory(r'D:\shared\inbox');
 
       await openTab(tester, l10n.tabSettings, window: windowA);
-      await tester.tap(
-        onPage(windowA, SettingsPage, find.text(l10n.changeIncomingFolder)),
-      );
-      await settleRoute(tester);
 
-      expect(
-        windowA.within(find.text(l10n.chooseFolderTitle)),
-        findsOneWidget,
-        reason: 'the change opens the same dialog the accept flow does',
-      );
-      // Prefilled with what would be offered right now — the platform default,
-      // while nothing has been chosen — so the user edits a real answer rather
-      // than an empty box.
-      final field = windowA.within(find.byType(TextField));
+      // The field belongs to the page rather than to a dialog: the path can be
+      // read and edited without opening anything first.
+      final field = onPage(windowA, SettingsPage, find.byType(TextField));
       expect(
         tester.widget<TextField>(field).controller!.text,
         'C:/downloads/LocalTransfer',
+        reason: 'the platform default is shown while nothing has been chosen',
       );
 
-      await tester.tap(windowA.within(find.text(l10n.browseFolder)));
+      // Typing decides nothing on its own, and the line under the box says so.
+      await tester.enterText(field, r'D:\typed\by\hand');
+      await tester.pump();
+      expect(
+        onPage(windowA, SettingsPage, find.text(l10n.folderNotSaved)),
+        findsOneWidget,
+        reason: 'a box holding something untaken has to admit it',
+      );
+      expect(device.controller.incomingDirectory, isNull);
+
+      // Enter is the decision.
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await pumpUntil(
+        tester,
+        () => device.controller.incomingDirectory == r'D:\typed\by\hand',
+        description: 'the typed folder to reach the controller',
+      );
+
+      // And the platform's own chooser writes the same value, from the same box.
+      await tester.tap(
+        onPage(
+          windowA,
+          SettingsPage,
+          find.byTooltip(l10n.changeIncomingFolder),
+        ),
+      );
       await pumpUntil(
         tester,
         () => picker.directoriesAsked == 1,
         description: 'the platform folder chooser to be asked',
       );
-      await tester.pump();
-      // The chooser's answer lands in the field rather than being committed
-      // outright: the field stays editable for a path no dialog can reach,
-      // and the user still confirms.
-      expect(
-        tester.widget<TextField>(field).controller!.text,
-        r'D:\shared\inbox',
-      );
-
-      await tapDialogButton(tester, l10n.save, window: windowA);
       await pumpUntil(
         tester,
         () => device.controller.incomingDirectory == r'D:\shared\inbox',
         description: 'the chosen folder to reach the controller',
       );
       expect(
-        onPage(windowA, SettingsPage, find.text(r'D:\shared\inbox')),
-        findsOneWidget,
-        reason: 'the surface has to report the folder it will actually use',
+        tester.widget<TextField>(field).controller!.text,
+        r'D:\shared\inbox',
+        reason: 'the chooser answers into the box the user is looking at',
       );
+      // The line under the box is the last thing in its card and sits below the
+      // fold in a short window, so it is read where the page keeps it rather
+      // than where the viewport happens to end.
+      await tester.pump();
       expect(
-        onPage(windowA, SettingsPage, find.text(l10n.incomingFolderHint)),
+        find.descendant(
+          of: windowA.within(find.byType(SettingsPage)),
+          matching: find.text(l10n.incomingFolderHint, skipOffstage: false),
+          skipOffstage: false,
+        ),
         findsOneWidget,
         reason: 'a chosen folder says so rather than saying "you are asked"',
       );
@@ -824,26 +838,29 @@ void main() {
         defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
       );
       await pumpWindow(tester, device);
+      // A stand-in told nothing answers null, which is what backing out of the
+      // platform's own chooser looks like from here.
       final picker = ScriptedPicker.install();
       addTearDown(PickerResolution.reset);
 
       await openTab(tester, l10n.tabSettings, window: windowA);
       await tester.tap(
-        onPage(windowA, SettingsPage, find.text(l10n.changeIncomingFolder)),
+        onPage(
+          windowA,
+          SettingsPage,
+          find.byTooltip(l10n.changeIncomingFolder),
+        ),
       );
-      await settleRoute(tester);
-      await tapDialogButton(tester, l10n.cancel, window: windowA);
       await pumpUntil(
         tester,
-        () => !dialogIsOpen(windowA),
-        description: 'the dialog to close without answering',
+        () => picker.directoriesAsked == 1,
+        description: 'the platform folder chooser to be asked',
       );
 
-      // Nothing was chosen, so nothing is remembered: only a confirmed answer
-      // is a decision, and a cancelled dialog must not clear a folder the user
-      // already has.
+      // Nothing was chosen, so nothing is remembered: a cancelled chooser must
+      // not clear a folder the user already has, nor take a name they did not
+      // pick.
       expect(device.controller.incomingDirectory, isNull);
-      expect(picker.directoriesAsked, 0);
       expect(
         onPage(windowA, SettingsPage, find.text('C:/downloads/LocalTransfer')),
         findsOneWidget,
