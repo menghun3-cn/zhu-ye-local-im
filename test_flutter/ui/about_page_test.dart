@@ -54,7 +54,7 @@ void main() {
         locale: appLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: appLocales,
-        theme: WeChat.theme(),
+        theme: WeChat.theme(WeChatColors.light),
         home: const Scaffold(body: AboutPage()),
       ),
     );

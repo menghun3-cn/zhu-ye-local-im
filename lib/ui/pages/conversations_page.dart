@@ -130,6 +130,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     final controller = ControllerScope.of(context);
     final conversations = _conversationsOf(controller);
 
@@ -183,16 +184,16 @@ class _ConversationsPageState extends State<ConversationsPage> {
       children: [
         Container(
           width: WeChat.conversationListWidth,
-          color: WeChat.sidebarBackground,
+          color: colors.sidebarBackground,
           child: _list(context, l10n, conversations, selected: selected),
         ),
-        const VerticalDivider(width: 1, color: WeChat.divider),
+        VerticalDivider(width: 1, color: colors.divider),
         Expanded(
           child: selected == null
               // The pane a conversation would open into, so it wears the
               // conversation's own white rather than the page's grey.
               ? ColoredBox(
-                  color: WeChat.conversationBackground,
+                  color: colors.conversationBackground,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: HintText(l10n.conversationPickOne),
@@ -318,6 +319,7 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     final peer = entry.peer;
     final latest = entry.latest;
     // Dialling needs both an address to dial and a peer in the group: a Device
@@ -370,18 +372,18 @@ class _ConversationTile extends StatelessWidget {
                   Text(
                     peer.displayName,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: WeChat.fontSizeTitle,
-                      color: WeChat.bubbleText,
+                      color: colors.bubbleText,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _previewFor(peer, latest),
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: WeChat.fontSizePreview,
-                      color: WeChat.secondaryText,
+                      color: colors.secondaryText,
                     ),
                   ),
                 ],
@@ -405,9 +407,9 @@ class _ConversationTile extends StatelessWidget {
                     Text(
                       stamp,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: WeChat.fontSizeMeta,
-                        color: WeChat.secondaryText,
+                        color: colors.secondaryText,
                       ),
                     ),
                   if (lower != null) ...[
@@ -493,10 +495,11 @@ class _ConversationTile extends StatelessWidget {
   /// What sits at the end of the row when there is nothing to press: how the
   /// last exchange went, or a badge when something is waiting to be let in.
   Widget? _summary(BuildContext context, PeerView peer, TransferView? latest) {
+    final colors = WeChatColors.of(context);
     if (entry.waiting) {
       return Badge(
         label: const Icon(Icons.download, size: 12),
-        backgroundColor: WeChat.danger,
+        backgroundColor: colors.danger,
         child: const SizedBox(width: 24),
       );
     }
@@ -506,9 +509,9 @@ class _ConversationTile extends StatelessWidget {
       if (peer.isConnected) return null;
       return Text(
         peer.isDiallable ? l10n.nothingKnownAboutPeer : l10n.nothingToDialYet,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: WeChat.fontSizeMeta,
-          color: WeChat.secondaryText,
+          color: colors.secondaryText,
         ),
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.end,
@@ -516,9 +519,9 @@ class _ConversationTile extends StatelessWidget {
     }
     return Text(
       labelForState(latest.state, l10n),
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: WeChat.fontSizeMeta,
-        color: WeChat.secondaryText,
+        color: colors.secondaryText,
       ),
     );
   }
@@ -536,9 +539,10 @@ class _ConversationTile extends StatelessWidget {
 /// A row that answers the mouse the way the desktop client's list does.
 ///
 /// [ListTile] is not used here because its selected and hover colours come from
-/// the colour scheme, and the scheme's colours are the seed's, not WeChat's —
-/// the whole point of this list is that a hovered row is `#E9E9E9` and a
-/// selected one is `#C9C9C9`, both of which the scheme has no slot for.
+/// the colour scheme, and the scheme's colours are the seed's, not this
+/// design's — the whole point of this list is that a hovered row is
+/// `listHover` and a selected one is `listSelected` (a soft brand tint), both
+/// of which the scheme has no slot for.
 ///
 /// Public, and named by [peer], so that the widget tests can find one row and
 /// not its neighbours. `find.widgetWithText(ListTile, name)` used to do that
@@ -568,10 +572,11 @@ class _ConversationRowState extends State<ConversationRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     final colour = widget.selected
-        ? WeChat.listSelected
+        ? colors.listSelected
         : _hovered
-        ? WeChat.listHover
+        ? colors.listHover
         : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -596,9 +601,11 @@ class _ConversationRowState extends State<ConversationRow> {
               // WeChat list reads as one surface with its rows merely
               // separated. The row paints it rather than the list, because
               // only the row knows the inset its own padding produced.
-              const Padding(
-                padding: EdgeInsets.only(left: WeChat.conversationRowPadding),
-                child: Divider(height: 1, thickness: 1, color: WeChat.divider),
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: WeChat.conversationRowPadding,
+                ),
+                child: Divider(height: 1, thickness: 1, color: colors.divider),
               ),
             ],
           ),
@@ -638,11 +645,12 @@ class _RowAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colour = primary ? WeChat.brand : WeChat.secondaryText;
+    final colors = WeChatColors.of(context);
+    final colour = primary ? colors.brandStrong : colors.secondaryText;
     final style = ButtonStyle(
       backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
       foregroundColor: WidgetStatePropertyAll(colour),
-      overlayColor: const WidgetStatePropertyAll(WeChat.listHover),
+      overlayColor: WidgetStatePropertyAll(colors.listHover),
       // Square-ish and small: a row is only two lines tall, and a
       // Material-default button would fill a third of it.
       shape: const WidgetStatePropertyAll(
@@ -701,12 +709,13 @@ class _PaneHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     final subtitle = this.subtitle;
     return Material(
-      color: WeChat.toolbarBackground,
+      color: colors.toolbarBackground,
       child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: WeChat.divider)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: colors.divider)),
         ),
         padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
         child: Row(
@@ -716,7 +725,7 @@ class _PaneHeader extends StatelessWidget {
                 onPressed: onBack,
                 icon: const Icon(Icons.arrow_back),
                 tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                color: WeChat.secondaryText,
+                color: colors.secondaryText,
                 visualDensity: VisualDensity.compact,
               ),
             Expanded(
@@ -729,19 +738,19 @@ class _PaneHeader extends StatelessWidget {
                       Flexible(
                         child: Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: WeChat.fontSizeTitle,
-                            color: WeChat.bubbleText,
+                            color: colors.bubbleText,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (offline) ...[
                         const SizedBox(width: 6),
-                        const Icon(
+                        Icon(
                           Icons.link_off,
                           size: 16,
-                          color: WeChat.secondaryText,
+                          color: colors.secondaryText,
                         ),
                       ],
                     ],
@@ -749,9 +758,9 @@ class _PaneHeader extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: WeChat.fontSizeMeta,
-                        color: WeChat.secondaryText,
+                        color: colors.secondaryText,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

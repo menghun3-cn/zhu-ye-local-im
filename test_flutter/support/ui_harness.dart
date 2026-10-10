@@ -284,7 +284,8 @@ Widget _pane(Key key, UiDevice device, Size size) {
           // can hold it to what it claims. Only the route transition is
           // replaced, because a real one is still sliding while a test awaits a
           // socket on the real event loop.
-          theme: WeChat.theme().copyWith(pageTransitionsTheme: _instantTheme),
+          theme: WeChat.theme(WeChatColors.light)
+              .copyWith(pageTransitionsTheme: _instantTheme),
           home: HomeShell(seams: device.seams),
         ),
       ),
