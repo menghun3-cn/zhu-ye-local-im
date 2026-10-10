@@ -1139,6 +1139,16 @@ class MessageBubble extends StatelessWidget {
   /// bookkeeping to show.
   bool get _showsReceipt => view.kind == PayloadKind.file;
 
+  /// The ink inside this bubble.
+  ///
+  /// Two near-blacks rather than one. An outgoing bubble is a pale green, and
+  /// text on a tinted fill wants that tint's own dark — a neutral black on
+  /// green reads faintly blue. A received bubble is white, so it takes the
+  /// plain near-black.
+  Color get _bubbleInk => view.direction == TransferDirection.outgoing
+      ? WeChat.bubbleOutText
+      : WeChat.bubbleText;
+
   /// What the message actually says: its words, or the files it carries.
   ///
   /// A picture never arrives here. One this machine holds is drawn by
@@ -1156,10 +1166,10 @@ class MessageBubble extends StatelessWidget {
     if (view.kind == PayloadKind.text && text != null) {
       return SelectableText(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: WeChat.fontSizeBody,
           height: WeChat.lineHeightBody,
-          color: WeChat.bubbleText,
+          color: _bubbleInk,
         ),
       );
     }
@@ -1169,7 +1179,7 @@ class MessageBubble extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(iconForKind(view.kind), size: 18, color: WeChat.bubbleText),
+            Icon(iconForKind(view.kind), size: 18, color: _bubbleInk),
             const SizedBox(width: 6),
             Flexible(
               child: Tooltip(
@@ -1178,9 +1188,9 @@ class MessageBubble extends StatelessWidget {
                   name,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: WeChat.fontSizeBody,
-                    color: WeChat.bubbleText,
+                    color: _bubbleInk,
                   ),
                 ),
               ),
@@ -1236,7 +1246,7 @@ class MessageBubble extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.image_outlined, size: 18, color: WeChat.bubbleText),
+          Icon(Icons.image_outlined, size: 18, color: _bubbleInk),
           const SizedBox(width: 6),
           Flexible(
             child: Tooltip(
@@ -1245,9 +1255,9 @@ class MessageBubble extends StatelessWidget {
                 name,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
-                  color: WeChat.bubbleText,
+                  color: _bubbleInk,
                 ),
               ),
             ),
