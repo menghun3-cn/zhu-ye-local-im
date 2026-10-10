@@ -35,4 +35,34 @@ void main() {
       expect(folderOf(['a', 'b', 'c.png'].join(sep)), ['a', 'b'].join(sep));
     });
   });
+
+  // `explorer` is the one consumer of a path that will not read it as a string:
+  // it parses `/` as the start of a switch of its own, so the folder has to be
+  // spelled its way before it goes out.
+  group('explorerArgument', () {
+    test('a slash-spelled folder becomes the one Explorer expects', () {
+      expect(
+        explorerArgument(r'C:\Users\me/Downloads/LocalTransfer'),
+        r'C:\Users\me\Downloads\LocalTransfer',
+      );
+    });
+
+    test('a folder already spelled for Windows is left alone', () {
+      expect(explorerArgument(r'D:\inbox'), r'D:\inbox');
+    });
+
+    test('a whole path end to end: a received file resolves to its folder', () {
+      // The shape the app actually builds for a received file: the folder comes
+      // from `defaultIncomingDirectory` (joined with `/`) and the name from
+      // `incomingPathFor` (joined with the host separator). Explorer given that
+      // folder verbatim reads `C:` and two switches, and opens Documents.
+      final received = [
+        'C:/Users/me/Downloads/LocalTransfer',
+        'report.bin',
+      ].join(Platform.pathSeparator);
+      final folder = folderOf(received);
+      expect(folder, isNotNull);
+      expect(explorerArgument(folder!), r'C:\Users\me\Downloads\LocalTransfer');
+    });
+  });
 }
