@@ -51,13 +51,14 @@ void main() {
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
     });
 
-    test('a received bubble is the board\'s white, told apart by its line', () {
-      // The board and a received bubble used to take each other's fills: a
-      // white board, a grey bubble. The redesign gives the bubble the board's
-      // own white and draws a hairline around it instead — a grey fill reads
-      // as *disabled*, while a bordered white card is what a message looks
-      // like. What is asserted is the new relationship, so that a later tweak
-      // cannot leave a white bubble on a white board with nothing to see.
+    test('a received bubble is a soft grey on the board\'s white', () {
+      // The two fills were the same white once, told apart by a hairline only —
+      // which in a real window read as an outlined empty box rather than as a
+      // message. The bubble now takes the palette's sunken step, so the fill
+      // sets it off from the board on its own and the hairline is an edge
+      // rather than the only evidence there is a bubble here. What is asserted
+      // is the *relationship*, not the hex, so a later tweak cannot quietly put
+      // the bubble back onto the board's own white.
       expect(
         WeChatColors.light.conversationBackground,
         WeChatColors.light.surface,
@@ -65,13 +66,25 @@ void main() {
       );
       expect(
         WeChatColors.light.bubbleIn,
-        WeChatColors.light.conversationBackground,
-        reason: 'a received bubble is the board\'s own white now',
+        isNot(WeChatColors.light.conversationBackground),
+        reason: 'a received bubble is no longer the board\'s own white',
+      );
+      expect(
+        WeChatColors.light.bubbleIn.computeLuminance(),
+        lessThan(WeChatColors.light.conversationBackground.computeLuminance()),
+        reason: 'against a white board the bubble sits a step below it',
+      );
+      expect(
+        WeChatColors.light.bubbleIn,
+        isNot(WeChatColors.light.pageBackground),
+        reason:
+            'nor is it the page\'s grey, which is the alias that was tried '
+            'and read as disabled',
       );
       expect(
         WeChatColors.light.divider,
         isNot(WeChatColors.light.bubbleIn),
-        reason: 'the hairline is the only thing keeping the bubble visible',
+        reason: 'the hairline is still an edge, not the bubble itself',
       );
 
       // A panel is still a panel: the bubble's fill must not have leaked into
@@ -139,28 +152,58 @@ void main() {
       );
     });
 
-    test('flips the bubble rule: the board is lighter than its page', () {
+    test('flips the bubble rule: set off from the board, either way', () {
       const dark = WeChatColors.dark;
       const light = WeChatColors.light;
 
-      // A received bubble is *brighter* than the board under it in dark mode —
-      // the opposite of the light page, where the white bubble needs a hairline
-      // to be seen on a white board. The fill does the work here instead.
+      // The same job done in opposite directions, because the paper differs. On
+      // dark paper a received bubble is *brighter* than the board under it; on
+      // light paper it is *darker*, since the board is already the brightest
+      // value the palette has and a bubble that matched it would be left to its
+      // hairline. In both themes the fill is what separates the two.
       expect(
         dark.bubbleIn.computeLuminance(),
         greaterThan(dark.conversationBackground.computeLuminance()),
-        reason: 'a received bubble is a notch brighter than the board',
+        reason: 'on dark paper the bubble is a notch brighter than the board',
+      );
+      expect(
+        light.bubbleIn.computeLuminance(),
+        lessThan(light.conversationBackground.computeLuminance()),
+        reason: 'on white paper the bubble is a step darker than the board',
       );
       expect(
         dark.divider,
         isNot(dark.bubbleIn),
         reason: 'the hairline is still a line, not the bubble itself',
       );
-      expect(
-        light.bubbleIn.computeLuminance(),
-        equals(light.conversationBackground.computeLuminance()),
-        reason: 'in light mode the two are the same white, told apart by line',
-      );
+    });
+
+    test('a progress track is legible on every bubble it is drawn on', () {
+      // The in-bubble track is the bubble's *own ink*, thinned, and this is why:
+      // it lands on four different fills — the received and outgoing bubble in
+      // each theme — and no single palette grey survives all four. The received
+      // bubble simply *is* `surfaceSunken` in the light palette, so a track in
+      // that colour disappears inside one, and on the dark page `surfaceSunken`
+      // is within a step of `bubbleIn`, which is the same bug in a form nobody
+      // had noticed. Derived from the ink, the track is a fixed distance from
+      // whatever the bubble happens to be.
+      for (final colors in [WeChatColors.light, WeChatColors.dark]) {
+        final fills = {
+          colors.bubbleIn: colors.bubbleText,
+          colors.bubbleOut: colors.bubbleOutText,
+        };
+        fills.forEach((fill, ink) {
+          final track = Color.alphaBlend(
+            ink.withValues(alpha: WeChat.progressTrackAlpha),
+            fill,
+          );
+          expect(
+            (track.computeLuminance() - fill.computeLuminance()).abs(),
+            greaterThan(0.02),
+            reason: 'a track composited over $fill has to be visible on it',
+          );
+        });
+      }
     });
 
     test('the ink on the bright green flips with the paper', () {
