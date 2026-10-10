@@ -8,10 +8,11 @@ import 'wechat/theme.dart';
 /// line, and a quiet line where a list would be. They exist because several
 /// pages need them and that many copies would drift.
 ///
-/// They read their colours from [WeChat] rather than from the `ColorScheme`,
-/// even though the scheme carries the same values: a widget that says
-/// `WeChat.secondaryText` states which grey it means, and a later re-theming
-/// has one obvious place to look.
+/// They read their colours from [WeChatColors] rather than from the
+/// `ColorScheme`, even though the scheme carries the same values: a widget that
+/// says `WeChatColors.of(context).secondaryText` states which grey it means,
+/// *and* takes the one the running theme actually chose, which a colour read
+/// off the scheme by role would leave to Material's judgement.
 
 /// A titled divider between the groups of a page, with an optional action.
 class SectionHeader extends StatelessWidget {
@@ -26,6 +27,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     final trailing = this.trailing;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -38,9 +40,9 @@ class SectionHeader extends StatelessWidget {
               // Deliberately not `titleSmall`: that slot is the *content*
               // title, and a section heading and a file's name are two
               // different ranks that must not share one size.
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: WeChat.fontSizePreview,
-                color: WeChat.secondaryText,
+                color: colors.secondaryText,
               ),
             ),
           ),
@@ -73,9 +75,9 @@ class FactLine extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: WeChat.fontSizePreview,
-                color: WeChat.secondaryText,
+                color: WeChatColors.of(context).secondaryText,
               ),
             ),
           ),
@@ -96,13 +98,14 @@ class HintText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: WeChat.fontSizePreview,
-          color: WeChat.secondaryText,
+          color: colors.secondaryText,
         ),
       ),
     );

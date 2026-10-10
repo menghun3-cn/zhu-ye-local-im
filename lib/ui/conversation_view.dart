@@ -237,31 +237,28 @@ class _ConversationViewState extends State<ConversationView> {
   /// tell whether letting go will do anything.
   Widget _dropOverlay() {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     return IgnorePointer(
       child: Container(
-        color: WeChat.brand.withValues(alpha: 0.08),
+        color: colors.brand.withValues(alpha: 0.08),
         alignment: Alignment.center,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: WeChat.surface,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(WeChat.bubbleRadius),
-            border: Border.all(color: WeChat.brand, width: 1.5),
+            border: Border.all(color: colors.brand, width: 1.5),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.file_download_outlined,
-                color: WeChat.brand,
-                size: 28,
-              ),
+              Icon(Icons.file_download_outlined, color: colors.brand, size: 28),
               const SizedBox(height: 8),
               Text(
                 l10n.dropToSend,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
-                  color: WeChat.bubbleText,
+                  color: colors.bubbleText,
                 ),
               ),
             ],
@@ -317,7 +314,7 @@ class _ConversationViewState extends State<ConversationView> {
           // fills trading places means. The header and the composer keep their
           // own greys, so only this pane moves.
           child: ColoredBox(
-            color: WeChat.conversationBackground,
+            color: WeChatColors.of(context).conversationBackground,
             child: DropTarget(
               // Only registered when there is a peer: a target that accepted a
               // drop it could not send would swallow the file silently.
@@ -459,15 +456,16 @@ class _ConversationComposerState extends State<ConversationComposer> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     return SafeArea(
       top: false,
       child: Container(
         // A hairline rather than a [Divider]: the composer sits on its own
         // slightly-grey panel in WeChat, and a full-width rule between the two
         // greys would draw a line the reference does not have.
-        decoration: const BoxDecoration(
-          color: WeChat.toolbarBackground,
-          border: Border(top: BorderSide(color: WeChat.divider)),
+        decoration: BoxDecoration(
+          color: colors.toolbarBackground,
+          border: Border(top: BorderSide(color: colors.divider)),
         ),
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Column(
@@ -489,14 +487,14 @@ class _ConversationComposerState extends State<ConversationComposer> {
                   onPressed: widget.onAttach,
                   tooltip: l10n.menuSendFile,
                   icon: const Icon(Icons.attach_file, size: 20),
-                  color: WeChat.secondaryText,
+                  color: colors.secondaryText,
                   visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
                   onPressed: widget.onPickImage,
                   tooltip: l10n.menuSendImage,
                   icon: const Icon(Icons.image_outlined, size: 20),
-                  color: WeChat.secondaryText,
+                  color: colors.secondaryText,
                   visualDensity: VisualDensity.compact,
                 ),
                 const SizedBox(width: 4),
@@ -508,7 +506,7 @@ class _ConversationComposerState extends State<ConversationComposer> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: WeChat.surface,
+                      color: colors.surface,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: _ComposerField(
@@ -605,6 +603,7 @@ class _ComposerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter): SendMessageIntent(),
@@ -647,9 +646,9 @@ class _ComposerField extends StatelessWidget {
           // this — it is answered by the [Shortcuts] layer above.
           textInputAction: TextInputAction.send,
           onSubmitted: (_) => onSend(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: WeChat.fontSizeInput,
-            color: WeChat.bubbleText,
+            color: colors.bubbleText,
           ),
           decoration: InputDecoration(
             hintText: hint,
@@ -658,9 +657,9 @@ class _ComposerField extends StatelessWidget {
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             contentPadding: EdgeInsets.zero,
-            hintStyle: const TextStyle(
+            hintStyle: TextStyle(
               fontSize: WeChat.fontSizeInput,
-              color: WeChat.secondaryText,
+              color: colors.secondaryText,
             ),
           ),
         ),
@@ -694,11 +693,12 @@ class _SendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     return TextButton(
       onPressed: onPressed,
       style: ButtonStyle(
-        backgroundColor: const WidgetStatePropertyAll(WeChat.brand),
-        foregroundColor: const WidgetStatePropertyAll(Colors.white),
+        backgroundColor: WidgetStatePropertyAll(colors.brandStrong),
+        foregroundColor: WidgetStatePropertyAll(colors.onBrandStrong),
         shape: const WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(4)),
@@ -771,12 +771,13 @@ class _AttachmentChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     return Container(
       padding: const EdgeInsets.only(left: 8, right: 2, top: 2, bottom: 2),
       decoration: BoxDecoration(
-        color: WeChat.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: WeChat.divider),
+        border: Border.all(color: colors.divider),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -784,7 +785,7 @@ class _AttachmentChip extends StatelessWidget {
           Icon(
             attachment.isImage ? Icons.image_outlined : Icons.attach_file,
             size: 16,
-            color: WeChat.secondaryText,
+            color: colors.secondaryText,
           ),
           const SizedBox(width: 6),
           // Bounded so that one long name cannot push 发送 off the row; the
@@ -796,9 +797,9 @@ class _AttachmentChip extends StatelessWidget {
               child: Text(
                 attachment.name,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: WeChat.fontSizePreview,
-                  color: WeChat.bubbleText,
+                  color: colors.bubbleText,
                 ),
               ),
             ),
@@ -810,7 +811,7 @@ class _AttachmentChip extends StatelessWidget {
             onPressed: onRemove,
             tooltip: removeTooltip,
             icon: const Icon(Icons.close, size: 14),
-            color: WeChat.secondaryText,
+            color: colors.secondaryText,
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints.tightFor(width: 26, height: 26),
@@ -875,8 +876,9 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     final outgoing = view.direction == TransferDirection.outgoing;
-    final background = outgoing ? WeChat.bubbleOut : WeChat.bubbleIn;
+    final background = outgoing ? colors.bubbleOut : colors.bubbleIn;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: WeChat.messageGap),
@@ -931,9 +933,9 @@ class MessageBubble extends StatelessWidget {
                         labelForKind(view.kind, l10n),
                         labelForState(view.state, l10n),
                       ].join(' · '),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: WeChat.fontSizeMeta,
-                        color: WeChat.secondaryText,
+                        color: colors.secondaryText,
                       ),
                     ),
                   ),
@@ -973,6 +975,7 @@ class MessageBubble extends StatelessWidget {
   /// that a bar drawn under a wide screenshot cannot outrun the picture it is
   /// a bar for.
   Widget _bareImage(BuildContext context) {
+    final colors = WeChatColors.of(context);
     // Non-null by [_drawsBareImage], which is what decides this is called.
     final path = view.localPath!;
     final name = view.names.isEmpty ? '' : view.names.first;
@@ -997,7 +1000,7 @@ class MessageBubble extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: view.fraction,
                 minHeight: 3,
-                backgroundColor: Colors.black12,
+                backgroundColor: colors.surfaceSunken,
               ),
             ),
           ),
@@ -1008,6 +1011,7 @@ class MessageBubble extends StatelessWidget {
   /// Everything inside the bubble: the message, its progress, and the answers
   /// an offer needs.
   Widget _contents(BuildContext context, AppLocalizations l10n) {
+    final colors = WeChatColors.of(context);
     // A file in flight is the one bubble whose width is a decision rather than
     // a consequence. Left alone, the progress bar inside it would expand to
     // every pixel the conversation has left, and a bubble holding a short name
@@ -1021,7 +1025,7 @@ class MessageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _body(l10n, contentWidth),
+        _body(l10n, contentWidth, colors),
         if (!view.state.isSettled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -1030,7 +1034,7 @@ class MessageBubble extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: view.fraction,
                 minHeight: 3,
-                backgroundColor: Colors.black12,
+                backgroundColor: colors.surfaceSunken,
               ),
             ),
           ),
@@ -1145,9 +1149,10 @@ class MessageBubble extends StatelessWidget {
   /// text on a tinted fill wants that tint's own dark — a neutral black on
   /// green reads faintly blue. A received bubble is white, so it takes the
   /// plain near-black.
-  Color get _bubbleInk => view.direction == TransferDirection.outgoing
-      ? WeChat.bubbleOutText
-      : WeChat.bubbleText;
+  Color _bubbleInk(WeChatColors colors) =>
+      view.direction == TransferDirection.outgoing
+      ? colors.bubbleOutText
+      : colors.bubbleText;
 
   /// What the message actually says: its words, or the files it carries.
   ///
@@ -1161,7 +1166,11 @@ class MessageBubble extends StatelessWidget {
   /// (the whole of it is on the tooltip) instead of stretching the bubble;
   /// given none — a text message, whose bubble already hugs its words — the
   /// block takes its natural width.
-  Widget _body(AppLocalizations l10n, double? contentWidth) {
+  Widget _body(
+    AppLocalizations l10n,
+    double? contentWidth,
+    WeChatColors colors,
+  ) {
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
       return SelectableText(
@@ -1169,17 +1178,17 @@ class MessageBubble extends StatelessWidget {
         style: TextStyle(
           fontSize: WeChat.fontSizeBody,
           height: WeChat.lineHeightBody,
-          color: _bubbleInk,
+          color: _bubbleInk(colors),
         ),
       );
     }
-    if (view.kind == PayloadKind.image) return _image(contentWidth);
+    if (view.kind == PayloadKind.image) return _image(contentWidth, colors);
     final lines = <Widget>[
       for (final name in view.names)
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(iconForKind(view.kind), size: 18, color: _bubbleInk),
+            Icon(iconForKind(view.kind), size: 18, color: _bubbleInk(colors)),
             const SizedBox(width: 6),
             Flexible(
               child: Tooltip(
@@ -1190,7 +1199,7 @@ class MessageBubble extends StatelessWidget {
                   maxLines: 1,
                   style: TextStyle(
                     fontSize: WeChat.fontSizeBody,
-                    color: _bubbleInk,
+                    color: _bubbleInk(colors),
                   ),
                 ),
               ),
@@ -1205,9 +1214,9 @@ class MessageBubble extends StatelessWidget {
               formatBytes(view.transferredBytes),
               formatBytes(view.totalBytes),
             ),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: WeChat.fontSizeMeta,
-              color: WeChat.secondaryText,
+              color: colors.secondaryText,
             ),
           ),
         ),
@@ -1239,14 +1248,14 @@ class MessageBubble extends StatelessWidget {
   /// A path that no longer reads is not a third case: that is a picture whose
   /// bytes are here, drawn by [_bareImage], and [ImageBubble] falls back to the
   /// name itself when the decode fails.
-  Widget _image(double? contentWidth) {
+  Widget _image(double? contentWidth, WeChatColors colors) {
     final name = view.names.isEmpty ? '' : view.names.first;
     return SizedBox(
       width: contentWidth,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.image_outlined, size: 18, color: _bubbleInk),
+          Icon(Icons.image_outlined, size: 18, color: _bubbleInk(colors)),
           const SizedBox(width: 6),
           Flexible(
             child: Tooltip(
@@ -1257,7 +1266,7 @@ class MessageBubble extends StatelessWidget {
                 maxLines: 1,
                 style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
-                  color: _bubbleInk,
+                  color: _bubbleInk(colors),
                 ),
               ),
             ),
@@ -1292,19 +1301,27 @@ class _BubbleAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
     final style = ButtonStyle(
       backgroundColor: WidgetStatePropertyAll(
-        primary ? WeChat.brand : Colors.transparent,
+        primary ? colors.brandStrong : Colors.transparent,
       ),
-      // Inside an incoming bubble this sits on white and inside an outgoing one
-      // on the bubble green; the outlined variant is drawn in `divider`, which
-      // reads as a hairline against both.
+      // Inside an incoming bubble this sits on the bubble and inside an
+      // outgoing one on the bubble green; the outlined variant is drawn in
+      // `divider`, which reads as a hairline against both.
+      //
+      // The filled variant is a *button*, so it wears the action green
+      // (`brandStrong`) and the ink defined for it — white on the deep
+      // light-mode green, near-black on the bright dark-theme one. The
+      // identifying green (`brand`) is deliberately not used here: it is a
+      // fill colour for the progress bar and the selected dot, and white on it
+      // is 2.4:1, which is why the design never puts white text on it.
       foregroundColor: WidgetStatePropertyAll(
-        primary ? Colors.white : WeChat.bubbleText,
+        primary ? colors.onBrandStrong : colors.bubbleText,
       ),
       side: primary
           ? null
-          : const WidgetStatePropertyAll(BorderSide(color: WeChat.divider)),
+          : WidgetStatePropertyAll(BorderSide(color: colors.divider)),
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(4)),

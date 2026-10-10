@@ -196,16 +196,17 @@ class _ImageBubbleState extends State<ImageBubble> {
 
   /// What is drawn while the picture is being read.
   ///
-  /// [WeChat.pageBackground] rather than [WeChat.surface], because there is no
-  /// longer a bubble around this box: a thumbnail stands on the conversation's
-  /// white, and a white box on white is an invisible one. The page grey is what
-  /// the rest of the interface uses for "a surface darker than the page", so a
-  /// hole waiting to be filled by a picture reads as one.
+  /// [WeChatColors.pageBackground] rather than [WeChatColors.surface], because
+  /// there is no longer a bubble around this box: a thumbnail stands on the
+  /// conversation's own panel, and a box in that panel's colour would be an
+  /// invisible one. The page colour is what the rest of the interface uses for
+  /// "a surface below the panel", so a hole waiting to be filled by a picture
+  /// reads as one — on either page.
   Widget _placeholderBox() {
     return Container(
       width: _placeholder.width,
       height: _placeholder.height,
-      color: WeChat.pageBackground,
+      color: WeChatColors.of(context).pageBackground,
     );
   }
 
@@ -220,13 +221,13 @@ class _ImageBubbleState extends State<ImageBubble> {
       height: WeChat.imageMaxSide,
       alignment: Alignment.center,
       padding: const EdgeInsets.all(12),
-      color: WeChat.pageBackground,
+      color: WeChatColors.of(context).pageBackground,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.broken_image_outlined,
-            color: WeChat.secondaryText,
+            color: WeChatColors.of(context).secondaryText,
             size: 32,
           ),
           const SizedBox(height: 8),
@@ -235,9 +236,9 @@ class _ImageBubbleState extends State<ImageBubble> {
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: WeChat.fontSizeMeta,
-              color: WeChat.secondaryText,
+              color: WeChatColors.of(context).secondaryText,
             ),
           ),
         ],

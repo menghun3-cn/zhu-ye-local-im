@@ -62,6 +62,7 @@ class _AboutPageState extends State<AboutPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final colors = WeChatColors.of(context);
     final answer = _answer;
     final url = _downloadUrl;
 
@@ -83,9 +84,9 @@ class _AboutPageState extends State<AboutPage> {
                     const SizedBox(width: 8),
                     Text(
                       l10n.aboutVersion(appVersion),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: WeChat.fontSizeMeta,
-                        color: WeChat.secondaryText,
+                        color: colors.secondaryText,
                       ),
                     ),
                   ],
@@ -120,8 +121,8 @@ class _AboutPageState extends State<AboutPage> {
                       style: TextStyle(
                         fontSize: WeChat.fontSizePreview,
                         color: answer.outcome == UpdateOutcome.available
-                            ? WeChat.brand
-                            : WeChat.secondaryText,
+                            ? colors.brand
+                            : colors.secondaryText,
                       ),
                     ),
                   ),
@@ -133,9 +134,9 @@ class _AboutPageState extends State<AboutPage> {
                     padding: const EdgeInsets.only(top: 4),
                     child: SelectableText(
                       url,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: WeChat.fontSizeMeta,
-                        color: WeChat.secondaryText,
+                        color: colors.secondaryText,
                       ),
                     ),
                   ),

@@ -945,7 +945,7 @@ void main() {
         matching: find.byWidgetPredicate(
           (widget) =>
               widget is ColoredBox &&
-              widget.color == WeChat.conversationBackground,
+              widget.color == WeChatColors.light.conversationBackground,
           description: 'the conversation board',
         ),
       );
@@ -1219,7 +1219,7 @@ void main() {
               onConversation(windowA, find.byType(MessageBubbleShape)),
             )
             .colour,
-        WeChat.bubbleOut,
+        WeChatColors.light.bubbleOut,
       );
       // A conversation is not a transfer. The "kind · state" line belongs to a
       // file, where it is the receipt the user reads; over a text bubble it
@@ -1345,7 +1345,7 @@ void main() {
         matching: find.byType(Divider),
       );
       expect(line, findsOneWidget);
-      expect(tester.widget<Divider>(line).color, WeChat.divider);
+      expect(tester.widget<Divider>(line).color, WeChatColors.light.divider);
 
       // Inset to the avatar rather than to the row: a full-bleed line would cut
       // the list into blocks, and the row's own padding is what puts the avatar
@@ -1395,7 +1395,7 @@ void main() {
       );
       expect(
         style.foregroundColor?.resolve(const <WidgetState>{}),
-        WeChat.secondaryText,
+        WeChatColors.light.secondaryText,
       );
       // And the dot in front of the word, which is the mark the desktop client
       // uses for "you can act here".

@@ -106,15 +106,16 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     final chosen = _chosen;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           l10n.factReceivedFiles,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: WeChat.fontSizePreview,
-            color: WeChat.secondaryText,
+            color: WeChatColors.of(context).secondaryText,
           ),
         ),
         const SizedBox(height: 6),
@@ -129,7 +130,7 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
           decoration: InputDecoration(
             isDense: true,
             filled: true,
-            fillColor: WeChat.surfaceSunken,
+            fillColor: colors.surfaceSunken,
             hintText: l10n.noDefaultFolder,
             suffixIcon: IconButton(
               tooltip: l10n.changeIncomingFolder,
@@ -138,11 +139,11 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(WeChat.controlRadius),
-              borderSide: const BorderSide(color: WeChat.divider),
+              borderSide: BorderSide(color: colors.divider),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(WeChat.controlRadius),
-              borderSide: const BorderSide(color: WeChat.brandStrong),
+              borderSide: BorderSide(color: colors.brandStrong),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 10,
