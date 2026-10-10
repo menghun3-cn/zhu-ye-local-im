@@ -433,6 +433,20 @@ class WeChat {
   /// 也用它当宽度上限 —— 进度条不该比它所描述的那张图还长。
   static const double imageMaxSide = 200;
 
+  /// 输入框附件托盘里，一张已暂存图片的正方形缩略图的边长。
+  ///
+  /// **正方形**是刻意的：会话里的图片要保持原图的构图（见 [imageMaxSide] 的
+  /// 注释），而托盘是「即将发出的东西一览」——一格一格对齐的预览比每格各自
+  /// 的构图更重要，微信的托盘也正是方格。构图在这里让位给可扫读。
+  static const double attachmentThumbSide = 64;
+
+  /// 附件托盘缩略图的圆角。比会话里的 [imageRadius] 小一档：它是一块还没
+  /// 发出去的预览，不是一条已经说出口的消息。
+  static const double attachmentThumbRadius = 4;
+
+  /// 附件托盘缩略图右上角那个移除角标（× 所在的圆）的直径。
+  static const double attachmentThumbBadge = 18;
+
   /// 气泡到头像的间距。
   static const double bubbleAvatarGap = 10;
 
