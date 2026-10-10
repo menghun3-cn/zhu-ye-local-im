@@ -1526,7 +1526,15 @@ void main() {
         tester,
         () => onConversation(
           windowA,
-          find.textContaining('pasted'),
+          // The staged picture waits as a thumbnail, so its name lives on a
+          // tooltip rather than in a Text: the tray shows the picture's own
+          // bytes, not `pasted-179….png`.
+          find.byWidgetPredicate(
+            (w) =>
+                w is Tooltip &&
+                w.message != null &&
+                w.message!.startsWith('pasted'),
+          ),
         ).evaluate().isNotEmpty,
         description: 'the pasted picture to appear in the composer',
       );
