@@ -104,10 +104,20 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       locale: appLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appLocales,
-      // The one theme the whole app runs on. Not seeded from a colour: a seeded
-      // scheme invents its own greens, and the conversation surfaces are held
-      // to WeChat's specific `#07C160`.
-      theme: WeChat.theme(),
+      // Both pages, and the platform's own answer for which to show. Neither
+      // theme is seeded from a colour: a seeded scheme invents its own greens,
+      // and these surfaces are held to this design's specific `#07C160`.
+      //
+      // The palette travels on each [ThemeData], so `WeChatColors.of(context)`
+      // anywhere below this point resolves to whichever is in force — and
+      // resolves *again* when it changes, which is what follows a user who
+      // flips the system setting with the window open. `ThemeMode.system` is
+      // Material's own default; it is written out because "we follow the
+      // operating system" is a decision, and a default is not a decision
+      // anybody can read.
+      theme: WeChat.theme(WeChatColors.light),
+      darkTheme: WeChat.theme(WeChatColors.dark),
+      themeMode: ThemeMode.system,
       // A `Builder`, because this widget's own context sits *above* the
       // MaterialApp and therefore above the localizations it installs:
       // everything below reads its strings off this inner context instead.
@@ -184,10 +194,12 @@ class StartupFailureApp extends StatelessWidget {
       locale: appLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appLocales,
-      // The same theme as the running app: a failure screen drawn in a
+      // The same themes as the running app: a failure screen drawn in a
       // different scheme would look like a different program, and the moment a
       // user most needs to trust what they are reading is the moment it broke.
-      theme: WeChat.theme(),
+      theme: WeChat.theme(WeChatColors.light),
+      darkTheme: WeChat.theme(WeChatColors.dark),
+      themeMode: ThemeMode.system,
       home: Builder(
         builder: (context) => StartupFailureScreen(
           title: AppLocalizations.of(context).startupFailureTitle,

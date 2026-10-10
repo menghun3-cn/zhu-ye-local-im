@@ -116,7 +116,7 @@ class _TransferCard extends StatelessWidget {
                 Icon(
                   outgoing ? Icons.north_east : Icons.south_west,
                   size: 18,
-                  color: WeChat.secondaryText,
+                  color: WeChatColors.of(context).secondaryText,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
