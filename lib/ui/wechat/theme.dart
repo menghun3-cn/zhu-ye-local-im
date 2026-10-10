@@ -104,9 +104,18 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
 
   /// 收到的消息气泡底色。
   ///
-  /// 浅色下是白，靠一圈发丝线（[divider]）从白板上浮起来 —— 一档灰读起来像
-  /// 「不可用」，而一张描边的白卡才像一条消息。深色下反过来：气泡比它所在的
-  /// 板子**亮**一档，于是填充自己就把它说清楚了，发丝线只是补一道边。
+  /// 两个主题里做的是同一件事——**用填充把气泡从板子上分出来**——只是方向相反。
+  /// 浅色下它比白板低一档（`#F0F1F4`，即 [surfaceSunken] 那一档），深色下它比
+  /// 板子**亮**一档。发丝线（[divider]）两处都留着，但它现在是补一道边，而不是
+  /// 唯一让人看出「这里有个气泡」的东西。
+  ///
+  /// 浅色下它一度是纯白加一圈发丝线，理由是「灰读起来像不可用」。那句话针对的是
+  /// **旧调色板里那档中灰**：一档几乎看不出来的浅灰只会读成浅底，不会读成禁用；
+  /// 而白上白的气泡在真实窗口里读成了一个描边空框。见
+  /// `2026-10-10-a-received-bubble-is-a-soft-grey.md`。
+  ///
+  /// 注意这个填充会**圈住别的填充**：气泡里的进度条轨道不能再取 [surfaceSunken]，
+  /// 那正好是这个颜色。铺轨道的地方因此取 [divider]——见 `conversation_view.dart`。
   final Color bubbleIn;
 
   /// 卡片、对话框、输入框、附件托盘、分段控件，以及 Material 各种 `surface`
@@ -195,7 +204,7 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     onDanger: Colors.white,
     bubbleOut: Color(0xFFA9EA7C),
     bubbleOutText: Color(0xFF17240F),
-    bubbleIn: Color(0xFFFFFFFF),
+    bubbleIn: Color(0xFFF0F1F4),
     surface: Color(0xFFFFFFFF),
     surfaceSunken: Color(0xFFF0F1F4),
     bubbleText: Color(0xFF171A21),
@@ -471,6 +480,13 @@ class WeChat {
   /// 完整名字放在气泡的提示里。微信的文件卡片也是这个手感——宽得有限，
   /// 从不撑满。
   static const double transferBubbleMaxWidth = 280;
+
+  /// 气泡里那条进度**轨道**的不透明度：轨道 = 气泡自己的墨色 × 这个值。
+  ///
+  /// 轨道要同时落在四种底色上（两个主题 × 收/发两种气泡填充），没有任何一个固定
+  /// 的调色板灰同时成立——浅色接收气泡本身就是 `surfaceSunken`，深色下它又和
+  /// `bubbleIn` 只差一步。从墨色派生，轨道与气泡之间就恒是一个固定距离。
+  static const double progressTrackAlpha = 0.16;
 
   /// 会话列表宽度。
   ///

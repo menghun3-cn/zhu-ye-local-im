@@ -1144,7 +1144,17 @@ class MessageBubble extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: view.fraction,
                 minHeight: 3,
-                backgroundColor: colors.surfaceSunken,
+                // The track is the bubble's own ink, thinned — not a palette
+                // grey. It has to read on four fills (`bubbleIn` and `bubbleOut`
+                // in each theme) and no single fixed colour does: the received
+                // bubble *is* `surfaceSunken` in the light palette, so a track
+                // in that colour would vanish inside one, and `divider` is only
+                // about ΔRGB 8 off it — and within a step of `bubbleIn` on the
+                // dark page, where that bug already existed silently. Derived
+                // from the ink, the track is a fixed *distance* from whatever
+                // the bubble is, in every combination.
+                backgroundColor: _bubbleInk(colors)
+                    .withValues(alpha: WeChat.progressTrackAlpha),
               ),
             ),
           ),
