@@ -12,11 +12,13 @@ import '../support/ui_harness.dart';
 
 /// The bubble a file transfer is drawn in, and the one action a send has.
 ///
-/// Two facts under test here, both of them about a bubble that belongs to a
+/// Three facts under test here, all of them about a bubble that belongs to a
 /// *transfer in progress*: that it is drawn to the width its name actually
-/// takes rather than to whatever the pane has left, and that a send the user
-/// is watching can be stopped from the bubble itself — with the far end told,
-/// because a receiver keeps no clock and would otherwise wait forever.
+/// takes rather than to whatever the pane has left; that a name too long for
+/// that width **wraps** inside the bubble rather than being cut down to an
+/// ellipsis; and that a send the user is watching can be stopped from the
+/// bubble itself — with the far end told, because a receiver keeps no clock
+/// and would otherwise wait forever.
 void main() {
   /// Two paired, connected Devices, [alice] holding a window on the
   /// conversation with [bob], and one file offered but not yet answered.
@@ -88,8 +90,62 @@ void main() {
       reason: 'the whole point: the bar is not the width of the conversation',
     );
 
+    // The other half of that decision: because the width came from this name's
+    // own measure, the name still sits on one line. A cap on its own would not
+    // tell a short name from a long one.
+    final shortName = tester.getSize(
+      onConversation(windowA, find.text('a.bin')),
+    );
+    expect(
+      shortName.height,
+      lessThanOrEqualTo(WeChat.fontSizeBody * WeChat.lineHeightBody * 1.5),
+      reason: 'a name that fits is not given lines it does not need',
+    );
+
     await shutdown(tester, [alice, bob]);
   });
+
+  testWidgets(
+    'a name too long for the bubble wraps instead of losing its end',
+    (tester) async {
+      final home = tempDirectory('local-transfer-bubble-wrap-');
+      // Named the way a real file is: a project, a version, a platform, an
+      // architecture, an extension. Each of those is a fact the user opened the
+      // bubble to read, and the ones a single ellipsised line throws away are
+      // exactly the ones at the end.
+      const name = 'local-transfer-1.0.0-windows-x64-portable-full.zip';
+      final source = File('${home.path}${Platform.pathSeparator}$name');
+      source.writeAsBytesSync([1, 2, 3]);
+      final (:alice, :bob) = await wiredWithUnansweredOffer(tester, source);
+
+      final label = onConversation(windowA, find.text(name));
+      final text = tester.widget<Text>(label);
+      expect(
+        text.maxLines,
+        WeChat.transferNameMaxLines,
+        reason: 'a name is allowed more than the one line the cap gives it',
+      );
+      expect(
+        text.overflow,
+        TextOverflow.ellipsis,
+        reason: 'and still has to stop somewhere, for a pathological one',
+      );
+
+      final size = tester.getSize(label);
+      expect(
+        size.width,
+        lessThanOrEqualTo(WeChat.transferBubbleMaxWidth),
+        reason: 'wrapping must not push the bubble past its cap',
+      );
+      expect(
+        size.height,
+        greaterThan(WeChat.fontSizeBody * WeChat.lineHeightBody * 1.5),
+        reason: 'a name this long really is drawn on more than one line',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    },
+  );
 
   testWidgets(
     'a send can be cancelled from its bubble, and the peer hears it',
