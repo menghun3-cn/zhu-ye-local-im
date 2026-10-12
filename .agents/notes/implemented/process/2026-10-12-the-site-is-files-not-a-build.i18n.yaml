@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-12-the-site-is-files-not-a-build.md
+#   git hash-object 2026-10-12-the-site-is-files-not-a-build.zh.md
+2026-10-12-the-site-is-files-not-a-build.md: 9de4a8e22df3df5f42647c36b21354adeb9ace33
+2026-10-12-the-site-is-files-not-a-build.zh.md: 8fffd0c7d29f6a0bea0d29ae20b5120e3c43e1d1

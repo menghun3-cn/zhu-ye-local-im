@@ -148,6 +148,7 @@ flutter test test_flutter
   skills/         项目内技能（git-publish、文档规范等）
 docs/             架构与平台事实文档
 packaging/        随包发布的文件（两种装法各自的使用说明、Inno Setup 安装包定义）
+site/             官网（纯静态 HTML/CSS/JS，由 .github/workflows/pages.yml 部署到 Pages）
 scripts/          门禁与工具脚本（PowerShell）
 lib/              Flutter 源码
 test/             纯 Dart 测试（由 dart test 跑）
@@ -184,6 +185,21 @@ test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 
 两个脚本的版本号都从 `pubspec.yaml` 读，不写死 —— 写死等于每次发版要记得改多处，
 而改漏了不报错，只会产出一个文件名骗人的包。
+
+### 6.3 官网
+
+`site/` 是官网，**纯静态**：一个 `index.html`、一份 `styles.css`、一份 `app.js`，
+没有构建步骤、没有依赖、不加载任何第三方脚本或字体 —— 所以
+`upload-pages-artifact` 原样上传该目录即可，工作流里没有任何编译动作。
+设计语言与 `design-preview/styles.css` 同源（同一套令牌），改配色时两边要一起改。
+
+`.github/workflows/pages.yml` 在 `site/**` 随 PR 合入 `master` 时部署；`develop` 上的
+改动不会上线，要立刻看一眼就用 `workflow_dispatch` 手动跑。仓库的
+Settings → Pages → Source 必须是 **GitHub Actions**（不是「从分支部署」），
+否则这个工作流跑完也没人接管产物。
+
+页面上的下载按钮默认指向 `releases/latest`，能读到 GitHub API 时替换成具体产物、
+读不到就退回那个链接 —— 官网不会因为一次限流或离线而给出死链。
 
 ## 7. 平台事实约束
 
