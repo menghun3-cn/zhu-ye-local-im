@@ -277,6 +277,14 @@
         首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息」→「仍要运行」即可。
         介意的话可以读源码自行构建 —— 仓库里有完整的构建与打包脚本。
       </div>
+
+      <div class="callout reveal">
+        <strong>要写脚本自动拉包，就用这两个固定地址。</strong>
+        它们永远指向最新一版的产物，脚本里不用写版本号，外网的机器照样能用：
+        <br><code>https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest/download/LocalTransfer-latest-windows-x64-setup.exe</code>
+        <br><code>https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest/download/LocalTransfer-latest-windows-x64-portable.zip</code>
+        <br>旁边各有一个同名的 <code>.sha256</code>，下载后一句 <code>sha256sum -c</code> 就能验完整性。
+      </div>
     </section>
 
     <section class="section block" id="notes">
