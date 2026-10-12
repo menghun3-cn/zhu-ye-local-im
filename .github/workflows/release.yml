@@ -88,13 +88,17 @@ jobs:
         shell: pwsh
         run: ./scripts/pack-windows-installer.ps1
 
+      # 这里按版本号**显式列出**两个产物，不要写成 `build/dist/*-portable.zip` 这类通配：
+      # 打包脚本还会在同一个目录里留一份固定名（latest）别名给局域网里的脚本拉取，通配会
+      # 顺手把它也算成产物 —— Release 上就变成 5 个附件，其中两对内容完全一样。
+      # Release 上的「最新」由 tag 决定（`releases/latest` 就是它），别名那份是本机分发用的。
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           if-no-files-found: error
           path: |
-            build/dist/*-portable.zip
-            build/dist/*-setup.exe
+            build/dist/LocalTransfer-${{ needs.version.outputs.version }}-windows-x64-portable.zip
+            build/dist/LocalTransfer-${{ needs.version.outputs.version }}-windows-x64-setup.exe
 
   android:
     name: Android APK
