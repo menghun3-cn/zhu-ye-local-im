@@ -147,7 +147,7 @@ flutter test test_flutter
   notes/          Agent Notes（决策记录）
   skills/         项目内技能（git-publish、文档规范等）
 docs/             架构与平台事实文档
-packaging/        随包发布的文件（使用说明模板），由 scripts/pack-windows-portable.ps1 消费
+packaging/        随包发布的文件（两种装法各自的使用说明、Inno Setup 安装包定义）
 scripts/          门禁与工具脚本（PowerShell）
 lib/              Flutter 源码
 test/             纯 Dart 测试（由 dart test 跑）
@@ -168,6 +168,23 @@ test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 文案、解压后可启动并绑上端口）。见
 [.agents/notes/implemented/process/2026-10-08-packaging-is-a-script-not-a-ritual.md](.agents/notes/implemented/process/2026-10-08-packaging-is-a-script-not-a-ritual.md)。
 
+### 6.2 Windows 安装包
+
+同一份 `build/windows/x64/runner/Release` 有两种分发方式，两种都要重新构建后才算数：
+
+| 分发方式 | 命令 | 产物 |
+| --- | --- | --- |
+| 绿色免安装 | `.\scripts\pack-windows-portable.ps1 -Smoke` | `LocalTransfer-<版本>-windows-x64-portable.zip` |
+| 安装包 | 先跑上面那条，再 `.\scripts\pack-windows-installer.ps1` | `LocalTransfer-<版本>-windows-x64-setup.exe` |
+
+安装包脚本**不重新构建**，它复用绿色包脚本组装并验证过的那份目录（含 VC++ 运行库
+与使用说明）；目录不存在或不完整时它直接报错，不会去猜、也不会在背后替你构建。
+它是每用户安装（`%LOCALAPPDATA%\Programs\LocalTransfer`，不需要管理员权限）。
+本机没装 Inno Setup 时它会告诉你装法（`choco install innosetup`，需要 6.3 或更高）。
+
+两个脚本的版本号都从 `pubspec.yaml` 读，不写死 —— 写死等于每次发版要记得改多处，
+而改漏了不报错，只会产出一个文件名骗人的包。
+
 ## 7. 平台事实约束
 
 以下事实已核实并记录，改动相关代码前先读：
@@ -182,3 +199,31 @@ test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 
 - Flutter 需为当前稳定版（本项目起始于 3.47.x / Dart 3.13.x）；开发机原有 3.29.2 必须先升级，原因见 [.agents/notes/](.agents/notes/) 中的升级决策笔记。
 - 目标平台：Windows、Android。
+
+## 9. 版本号与发版节奏
+
+版本号只有两个来源，必须一致：`pubspec.yaml` 的 `version:` 与
+`lib/app/app_version.dart` 的 `appVersion`（`test/app/app_version_test.dart` 读 pubspec
+来守着）。`version:` 里 `+` 之后的构建号不进 `appVersion` —— 同一份源码构建两次，
+对使用者而言是同一个版本。
+
+AI 辅助开发下迭代很快，发版节奏按「小步快跑」定：
+
+- **第三位（补丁）**：日常的功能与 bug 修复**都只加这一位** —— `0.1.0` → `0.1.1` →
+  `0.1.2`。绝大多数发布走这里。
+- **第二位（次版本）**：只有**明确**决定「这是一次成规模的里程碑」时才动，
+  不因为「这轮加的功能比较多」就动。
+- **第一位**：`1.0.0` 之前不动。
+
+发布按 §2.2 的流转执行（`release/vX.Y.Z` → PR 合入 `master` → 在 `master` tip 打 tag）。
+tag 推上去之后 `.github/workflows/release.yml` 负责剩下的事：
+
+1. **校验** tag `vX.Y.Z`、`pubspec.yaml`、`appVersion` 三者一致，任何一处对不上一律失败；
+2. 产出三个产物：Windows 安装包（`*-setup.exe`）、Windows 绿色包（`*-portable.zip`）、
+   Android APK（`*-android.apk`）；
+3. 用 `CHANGELOG.md` 里该版本的条目作为 Release 说明（没有条目时退回自动生成的说明），
+   并把三个产物附上去。
+
+因此**发版前必须先写好 CHANGELOG 条目**，且版本号三处（pubspec / appVersion / tag）
+要在 release 分支上一次性对齐再合入 `master`。产物由 tag 决定，不由谁的本地机器决定 ——
+本地打包脚本仍然是「自己先看一眼」的手段，不是发布通道。
