@@ -92,9 +92,26 @@ error but a wizard and a shortcut quietly named gibberish. The script reads the
 first three bytes and refuses to compile without `EF BB BF`.
 
 **Version numbers are read, never repeated.** Both packaging scripts derive the
-version from `pubspec.yaml`; the hard-coded one is gone. §9 of `AGENTS.md` states
-the policy that goes with it — patch digit for ordinary features and fixes, minor
-digit only for a deliberate milestone, major untouched before 1.0.0.
+version from `pubspec.yaml`; the hard-coded one in the package name is gone. Four
+things still carry a version, and each has exactly one source:
+
+- the package name, and the `.iss`'s `LTVersion` — read from `pubspec.yaml` by the
+  two scripts;
+- the readme the portable package carries — the pack rewrites its **title line**
+  from the same value, and fails outright if the rewritten line does not contain
+  it;
+- the Windows executable's version resource — `windows/runner/CMakeLists.txt`
+  passes Flutter's `FLUTTER_VERSION*` into `Runner.rc`, so the `1.0.0` still
+  visible in that file is only the template's `#else` fallback;
+- Android's `versionName` and `versionCode`, injected by Flutter from the same
+  file.
+
+The readme's title was the one that stayed hardcoded, and only the first real
+release could have shown it: the `v0.1.0` package's readme opened with
+「竹叶局域网传输 1.0.0」, because the pack rewrote the two lines that change every
+build and not the one that changes every release. §9 of `AGENTS.md` states the
+policy that goes with all of this — patch digit for ordinary features and fixes,
+minor digit only for a deliberate milestone, major untouched before 1.0.0.
 
 ## Testing
 
