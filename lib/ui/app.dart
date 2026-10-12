@@ -71,6 +71,11 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       // write passes an in-memory store, which behaves the same way and simply
       // forgets everything on exit.
       messageStore: seams.messageStore,
+      // What the window and the system start-up entry are told to do, on the
+      // one platform that has them. The controller pushes the close button's
+      // setting and reads the start-up one as it starts; a platform without a
+      // window simply never hears about either.
+      hostShell: seams.hostShell,
     );
     try {
       await controller.start();

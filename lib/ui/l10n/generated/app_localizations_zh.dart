@@ -463,6 +463,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNotices => '提示';
 
   @override
+  String get settingsWindowAndStartup => '窗口与启动';
+
+  @override
+  String get settingsStartWithWindows => '开机自启动';
+
+  @override
+  String get settingsStartWithWindowsOn => '登录系统后自动运行。';
+
+  @override
+  String get settingsStartWithWindowsOff => '需要手动启动。';
+
+  @override
+  String get settingsCloseButton => '点击关闭按钮时';
+
+  @override
+  String get settingsCloseToTray => '最小化到托盘';
+
+  @override
+  String get settingsCloseQuit => '直接退出';
+
+  @override
+  String get settingsCloseToTrayHint => '窗口隐藏，程序继续在后台运行，仍能接收内容。';
+
+  @override
+  String get settingsCloseQuitHint => '关闭窗口就结束程序。';
+
+  @override
   String get factAlias => '名称';
 
   @override

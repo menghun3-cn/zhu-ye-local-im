@@ -1,4 +1,5 @@
 import '../clipboard/clipboard_capability.dart';
+import '../host/close_behaviour.dart';
 import '../identity/device_descriptor.dart';
 import '../identity/fingerprint.dart';
 import '../identity/owner_group.dart';
@@ -130,6 +131,10 @@ final class KnownDevice {
 ///   the app's directory on Android) applies. This is a *preference*, not
 ///   permission: it decides the folder offered in the accept dialog, and
 ///   nothing about whether a Transfer may be accepted at all;
+/// * `closeBehaviour` — what the window's close button does. Here rather than
+///   in the window because the window cannot remember anything: it is the thing
+///   that goes away. The host is told which one is in force as the app starts
+///   and whenever it changes;
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -147,6 +152,7 @@ final class DeviceProfile {
     Map<String, KnownDevice> known = const {},
     this.acceptsPairingRequests = true,
     this.incomingDirectory,
+    this.closeBehaviour = CloseBehaviour.minimiseToTray,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
@@ -188,6 +194,13 @@ final class DeviceProfile {
   /// resolving it here would turn a choice into a failure on a machine where
   /// the drive is not mounted right now.
   String? incomingDirectory;
+
+  /// What the window's close button does.
+  ///
+  /// Mutable and persisted, unlike the window itself: this outlives the thing
+  /// it describes, and is read at startup to tell the host what to do — see
+  /// [CloseBehaviour].
+  CloseBehaviour closeBehaviour;
 
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
@@ -274,6 +287,7 @@ final class DeviceProfile {
     'favorites': [for (final favorite in favorites) favorite.hex],
     'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
+    'closeBehaviour': closeBehaviour.wireName,
     'known': [for (final device in knownDevices) device.toJson()],
   };
 
@@ -326,6 +340,7 @@ final class DeviceProfile {
       // diallable after an upgrade would be a Device nobody can add.
       acceptsPairingRequests: rawAccepts is bool ? rawAccepts : true,
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
+      closeBehaviour: _closeBehaviour(json['closeBehaviour']),
     );
   }
 
@@ -335,7 +350,8 @@ final class DeviceProfile {
       '${group.length} group, ${_favorites.length} favorites, '
       '${_clipboardPeers.length} clipboard peers, '
       '${_known.length} known, '
-      '${acceptsPairingRequests ? 'answering requests' : 'not answering'})';
+      '${acceptsPairingRequests ? 'answering requests' : 'not answering'}, '
+      'close ${closeBehaviour.wireName})';
 
   /// Delegated to [DeviceDescriptor.sanitiseAlias], so a name is sanitised
   /// identically wherever it enters the system: a name typed into this
@@ -366,4 +382,16 @@ Map<String, Object?> _object(Object? value, String where) {
     throw FormatException('$where must be an object, got ${value.runtimeType}');
   }
   return value.cast<String, Object?>();
+}
+
+/// Reads the close-button preference, falling back to the default.
+///
+/// Tolerant in both directions, the same way `acceptPairingRequests` is: a
+/// profile written before this key existed has none, and a value a *newer*
+/// version invented is not damage to an older one. Both of those mean "the user
+/// has not said otherwise", which is exactly what the default is for — and a
+/// preference is not worth refusing to open a Device's identity file over.
+CloseBehaviour _closeBehaviour(Object? value) {
+  if (value is! String) return CloseBehaviour.minimiseToTray;
+  return CloseBehaviour.fromWireName(value) ?? CloseBehaviour.minimiseToTray;
 }
