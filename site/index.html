@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>竹叶局域网传输 · Local Transfer</title>
+<meta name="description" content="在同一个局域网里的设备之间传文件、传文字、同步剪贴板。没有服务端、没有账号、没有云端。">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="styles.css">
+<!-- 主题在首屏之前定下来，避免浅色闪一下再切深色 -->
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem('lt-theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', stored || (prefersDark ? 'dark' : 'light'));
+    } catch (e) {
+      // 隐私模式下 localStorage 会抛；跟随系统即可。
+    }
+  })();
+</script>
+</head>
+<body class="atmosphere">
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="#top">
+        <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.6c4.2 3.4 6.3 7.2 6.3 10.9a6.3 6.3 0 0 1-12.6 0C5.7 9.8 7.8 6 12 2.6Z"
+                fill="currentColor" opacity=".18"/>
+          <path d="M12 2.6c4.2 3.4 6.3 7.2 6.3 10.9a6.3 6.3 0 0 1-12.6 0C5.7 9.8 7.8 6 12 2.6Z"
+                fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 7.4v10.2M12 9.8l3-2M12 13.2l3.2-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>
+          <span class="brand__name">竹叶局域网传输</span>
+          <span class="brand__sub mono"> Local Transfer</span>
+        </span>
+      </a>
+      <nav class="topbar__nav">
+        <a href="#features">功能</a>
+        <a href="#downloads">下载</a>
+        <a href="#notes">说明</a>
+        <a href="https://github.com/menghun3-cn/zhu-ye-local-im" target="_blank" rel="noopener">源码</a>
+      </nav>
+      <button class="theme-toggle" type="button" id="themeToggle" aria-label="切换深色模式">
+        <svg class="i-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/>
+        </svg>
+        <svg class="i-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 14.4A8.4 8.4 0 0 1 9.6 4a8.4 8.4 0 1 0 10.4 10.4Z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <section class="section hero">
+      <p class="eyebrow reveal">局域网直连 · 无服务端</p>
+      <h1 class="reveal">两台设备之间传东西，<br>走你自己的<em>局域网</em>。</h1>
+      <p class="lede reveal">
+        在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板。
+        没有服务端、没有账号、没有云端 —— 程序平时只和局域网说话，
+        唯一一次访问外网，是你亲自点「检查更新」的时候。
+      </p>
+      <div class="hero__actions reveal">
+        <a class="btn btn--primary" id="heroDownload"
+           href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
+           target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12M7 11l5 5 5-5M4 20h16"/>
+          </svg>
+          下载 Windows 版
+        </a>
+        <a class="btn btn--ghost" href="#downloads">全部下载</a>
+        <span class="muted" style="font-size:var(--fs-meta)" id="heroVersion"></span>
+      </div>
+      <div class="hero__meta reveal">
+        <span><i class="dot" style="color:var(--brand)"></i>Windows 10 1809+ / x64</span>
+        <span><i class="dot" style="color:var(--text-3)"></i>Android（试用）</span>
+        <span><i class="dot" style="color:var(--text-3)"></i>免安装可用 · 不写注册表</span>
+      </div>
+
+      <div class="facts reveal">
+        <div><div class="fact__k">服务器</div><div class="fact__v">没有</div></div>
+        <div><div class="fact__k">账号</div><div class="fact__v">没有</div></div>
+        <div><div class="fact__k">云端</div><div class="fact__v">没有</div></div>
+        <div><div class="fact__k">外网请求</div><div class="fact__v">仅「检查更新」</div></div>
+      </div>
+    </section>
+
+    <section class="section block" id="features">
+      <div class="block__head">
+        <h2>它做什么</h2>
+        <span class="tag tag--brand">v1 · Windows 与 Android</span>
+      </div>
+      <p class="block__lede">
+        六件事，每一件都只发生在你自己的网络里。点开任意一张看它到底怎么工作。
+      </p>
+
+      <div class="grid grid--features">
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/>
+            </svg>
+          </div>
+          <h3>局域网里直连</h3>
+          <p>设备互相发现，然后直接开一条 TCP 连接。数据不经过任何第三方。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>UDP 47654 自动发现，两台设备出现在彼此的列表里</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>TCP 47655 承载文件、消息与剪贴板</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>发现不到时，可以手动填对方 IP 直连</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 12.6 5a3.9 3.9 0 0 1 5.5 5.5l-1.6 1.6"/>
+              <path d="M13 17.5 11.4 19A3.9 3.9 0 0 1 5.9 13.5l1.6-1.6"/>
+            </svg>
+          </div>
+          <h3>配对一次，之后自动连上</h3>
+          <p>配对就是把两台设备放进同一个「设备组」。整件事只有两次点击。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>一边点「配对」，另一边点「接受」，当场完成</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>没有配对码 —— 不需要读一串数字给对方听</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>只做一次，重启后仍然有效</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="14" rx="2.4"/><path d="M3 15.5l4.6-3.4 3.4 2.6 3-2.2L21 15.5"/>
+              <circle cx="8.5" cy="8.5" r="1.3"/>
+            </svg>
+          </div>
+          <h3>图片到达即显，文件要你点头</h3>
+          <p>两者待遇不同，是有意的：图片像消息一样「到了就到」，文件要你亲自同意才落盘。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>图片与文字直接送达，不弹确认；但文件每次都要点「接收」</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>点了「接收」就直接收下，不再追问存到哪个文件夹</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>类型按扩展名自动分辨，图片不裹气泡、点击可放大</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="4" width="12" height="15" rx="2.2"/><path d="M15.5 6.5h1.5"/>
+              <path d="M4 8v11a2 2 0 0 0 2 2h9"/>
+            </svg>
+          </div>
+          <h3>剪贴板镜像</h3>
+          <p>在一台设备上复制，另一台上直接粘贴 —— 只在你自己的设备组里发生。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>三档：关闭 / 问我 / 镜像</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>默认拒绝所有人，要按设备逐个勾选</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>界面如实标出每台设备「能读 / 能写」的实际能力</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 12.5c0 3.6-3.6 6.5-8 6.5-1 0-2-.15-2.9-.43L4.5 20l1.3-3.4A6.2 6.2 0 0 1 4 12.5C4 8.9 7.6 6 12 6s8 2.9 8 6.5Z"/>
+            </svg>
+          </div>
+          <h3>微信式的对话</h3>
+          <p>左列会话、右侧消息流。传文件、发图片、聊天在同一个地方完成。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>回车发送、Shift+回车换行；长文件名折行显示，不会被截断</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>右键「打开所在目录」「复制图片」</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>别人发来的文件就地显示「接受 / 拒绝」，不用换页</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3.2 4.5 6.6v6c0 4.2 3 7.2 7.5 8.2 4.5-1 7.5-4 7.5-8.2v-6L12 3.2Z"/>
+              <path d="M9 12.3l2.1 2.1 4-4.2"/>
+            </svg>
+          </div>
+          <h3>桌面端该有的细节</h3>
+          <p>该安静的安静，该听话的听话。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>单实例：重复启动只会叫出已在运行的那个窗口</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>关闭按钮最小化到托盘，也可以设成直接退出</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>可以开机自启（默认关闭），侧栏底部会提示新版本</li>
+          </ul>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="section block" id="downloads">
+      <div class="block__head">
+        <h2>下载</h2>
+        <span class="tag" id="releaseTag">读取最新版本…</span>
+      </div>
+      <p class="block__lede">
+        三种装法用同一份程序文件，选一种就行 —— 不要两份都装还同时开着。
+        所有产物由打 tag 的流水线自动构建，附在
+        <a href="https://github.com/menghun3-cn/zhu-ye-local-im/releases" target="_blank" rel="noopener">GitHub Releases</a> 上。
+      </p>
+
+      <div class="grid grid--downloads">
+
+        <article class="card download reveal">
+          <div class="download__top">
+            <span class="download__name">Windows 安装包</span>
+            <span class="tag tag--brand download__rec">推荐</span>
+          </div>
+          <p class="download__note">
+            装到用户目录，带开始菜单项与卸载项，不需要管理员权限。
+          </p>
+          <div class="download__name-file" data-asset-label="setup.exe">LocalTransfer-…-windows-x64-setup.exe</div>
+          <a class="btn btn--primary" data-asset="setup.exe"
+             href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
+             target="_blank" rel="noopener">下载安装包</a>
+        </article>
+
+        <article class="card download reveal">
+          <div class="download__top">
+            <span class="download__name">Windows 绿色包</span>
+            <span class="tag">免安装</span>
+          </div>
+          <p class="download__note">
+            解压到任意位置，双击即用；不写注册表，想删就删掉整个文件夹。
+          </p>
+          <div class="download__name-file" data-asset-label="portable.zip">LocalTransfer-…-windows-x64-portable.zip</div>
+          <a class="btn btn--primary" data-asset="portable.zip"
+             href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
+             target="_blank" rel="noopener">下载压缩包</a>
+        </article>
+
+        <article class="card download reveal">
+          <div class="download__top">
+            <span class="download__name">Android</span>
+            <span class="tag">试用</span>
+          </div>
+          <p class="download__note">
+            直装 APK。移动端尚未做过充分的真机验证，请按试用预期看待。
+          </p>
+          <div class="download__name-file" data-asset-label=".apk">LocalTransfer-….apk</div>
+          <a class="btn btn--primary" data-asset=".apk"
+             href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
+             target="_blank" rel="noopener">下载 APK</a>
+        </article>
+
+      </div>
+
+      <div class="callout reveal">
+        <strong>装完第一次运行，记得放行防火墙。</strong>
+        Windows 会弹出询问，请勾上「专用网络」再点「允许访问」。当时点了取消，
+        或者机器上装了别的安全软件，就会出现「设备列表里看不到对方」或者点「配对」超时。
+        要用的三个端口是 UDP 47654、TCP 47656、TCP 47655，全部只在本局域网内。
+      </div>
+
+      <div class="callout reveal">
+        <strong>未做代码签名。</strong>
+        首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息」→「仍要运行」即可。
+        介意的话可以读源码自行构建 —— 仓库里有完整的构建与打包脚本。
+      </div>
+    </section>
+
+    <section class="section block" id="notes">
+      <div class="block__head">
+        <h2>说明</h2>
+      </div>
+
+      <div class="split reveal">
+        <dt>系统要求</dt>
+        <dd>
+          Windows 10 1809 或更高版本，64 位。VC++ 运行库已随包附带（就放在 exe 旁边），
+          目标机器不需要另外安装任何东西。
+        </dd>
+
+        <dt>数据写在哪</dt>
+        <dd>
+          设备身份与配对信息在 <code class="mono">%APPDATA%\LocalTransfer\profile.json</code>
+          —— 它含本机密钥，删掉等于恢复出厂、需要重新配对。
+          收到的文件与图片默认落在
+          <code class="mono">%USERPROFILE%\Downloads\LocalTransfer\</code>，可以在设置页改。
+        </dd>
+
+        <dt>外网</dt>
+        <dd>
+          程序平时只和局域网说话。唯一一次访问外网是你点「检查更新」的时候：
+          它会去 GitHub 查这个项目有没有发布过更新的版本，然后把版本号显示在侧栏底部。
+          不点，就不会发生。
+        </dd>
+
+        <dt>已知限制</dt>
+        <dd>
+          会话历史只存在内存里，关掉程序就清空；剪贴板镜像是约 0.7 秒一次的轮询实现，
+          会有轻微延迟；同一台机器上不要同时开两个本程序（发现用的 UDP 端口只能被一个进程持有）。
+        </dd>
+
+        <dt>许可与源码</dt>
+        <dd>
+          源码在
+          <a href="https://github.com/menghun3-cn/zhu-ye-local-im" target="_blank" rel="noopener">GitHub</a>，
+          用 Flutter 写成。分支模型、提交规范与质量门禁都写在仓库的
+          <code class="mono">AGENTS.md</code> 里。
+        </dd>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div>
+        <div class="footer__brand">
+          <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px">
+            <path d="M12 2.6c4.2 3.4 6.3 7.2 6.3 10.9a6.3 6.3 0 0 1-12.6 0C5.7 9.8 7.8 6 12 2.6Z"
+                  fill="currentColor" opacity=".18"/>
+            <path d="M12 2.6c4.2 3.4 6.3 7.2 6.3 10.9a6.3 6.3 0 0 1-12.6 0C5.7 9.8 7.8 6 12 2.6Z"
+                  fill="none" stroke="currentColor" stroke-width="1.6"/>
+          </svg>
+          <span class="brand__name" style="font-size:var(--fs-label)">竹叶局域网传输</span>
+        </div>
+        <p class="footer__note" style="margin-top:10px">
+          不做服务端，不做账号，不做云端。页面本身不加载任何第三方脚本或字体，
+          也没有访问统计。
+        </p>
+      </div>
+      <nav class="footer__links">
+        <a href="https://github.com/menghun3-cn/zhu-ye-local-im" target="_blank" rel="noopener">源码</a>
+        <a href="https://github.com/menghun3-cn/zhu-ye-local-im/releases" target="_blank" rel="noopener">发布记录</a>
+        <a href="https://github.com/menghun3-cn/zhu-ye-local-im/blob/master/CHANGELOG.md" target="_blank" rel="noopener">更新日志</a>
+      </nav>
+    </div>
+  </footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
