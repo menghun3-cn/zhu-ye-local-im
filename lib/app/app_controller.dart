@@ -83,6 +83,7 @@ final class LocalTransferController {
     ClipboardMode clipboardMode = ClipboardMode.off,
     String? defaultIncomingDirectory,
     MessageStore? messageStore,
+    HostShell? hostShell,
     DateTime Function()? clock,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
@@ -105,6 +106,8 @@ final class LocalTransferController {
        _defaultIncomingDirectory = defaultIncomingDirectory,
        // ignore: prefer_initializing_formals
        _messages = messageStore,
+       // ignore: prefer_initializing_formals
+       _hostShell = hostShell,
        _clock = clock ?? DateTime.now;
 
   final ProfileStore _store;
@@ -129,6 +132,15 @@ final class LocalTransferController {
   /// live list is the whole of the conversation — which is what every test
   /// that predates the history was written against.
   final MessageStore? _messages;
+
+  /// The window and startup facts this host will change, or null on a platform
+  /// that has none.
+  ///
+  /// Optional for the same reason [MessageStore] is: "this Device has no window
+  /// to control" and "this Device is a test" are the same case, and both are
+  /// served by doing nothing. A platform that has one answers every call, so
+  /// there is no branch on the platform anywhere below here.
+  final HostShell? _hostShell;
 
   final DateTime Function() _clock;
 
@@ -166,6 +178,14 @@ final class LocalTransferController {
   List<DiscoveredPeer> _discovered = const [];
   bool _started = false;
   bool _closed = false;
+
+  /// Whether this app is set to start with the system, as the host last
+  /// reported it.
+  ///
+  /// Cached here rather than written to the profile because the operating
+  /// system is where the entry lives; this is a reading of it, taken at
+  /// startup and again after every change. See [setAutostart].
+  bool _autostart = false;
 
   /// Fires whenever anything a UI renders has changed.
   ///
@@ -404,6 +424,17 @@ final class LocalTransferController {
       alias: _alias,
     );
     _local = local;
+    // The window is clickable from the first frame, so the close button is told
+    // what to do before anything slower happens. The runner starts out hiding
+    // the window — the default — and this is the answer for a user who chose
+    // otherwise; see [CloseBehaviour].
+    await _hostShell?.setCloseToTray(
+      local.profile.closeBehaviour == CloseBehaviour.minimiseToTray,
+    );
+    // Read rather than remembered: the operating system holds the entry, so
+    // this one call reports both what the app last wrote and what a user has
+    // changed behind its back.
+    _autostart = await _hostShell?.autostartEnabled() ?? false;
     // The conversation is read before anything can add to it. Both the load
     // and the archive work on `_history`, and a Transfer that settled while the
     // file was still being read would be appended to a list that was about to
@@ -588,6 +619,47 @@ final class LocalTransferController {
     final local = _requireLocal();
     local.profile.setIncomingDirectory(path);
     await _persist();
+    _notify();
+  }
+
+  /// What the window's close button does.
+  CloseBehaviour get closeBehaviour =>
+      _local?.profile.closeBehaviour ?? CloseBehaviour.minimiseToTray;
+
+  /// Sets what the window's close button does, tells the host, and persists it.
+  ///
+  /// All three, in that order. The running window first because that is what
+  /// the user is looking at; the profile second because that is what a restart
+  /// reads. A setter that wrote one and not the other would leave the setting
+  /// describing a window other than the one on screen — and the window is the
+  /// one thing that cannot remember a choice about itself.
+  Future<void> setCloseBehaviour(CloseBehaviour value) async {
+    final local = _requireLocal();
+    if (local.profile.closeBehaviour == value) return;
+    local.profile.closeBehaviour = value;
+    await _hostShell?.setCloseToTray(value == CloseBehaviour.minimiseToTray);
+    await _persist();
+    _notify();
+  }
+
+  /// Whether this app starts with the system.
+  bool get autostartEnabled => _autostart;
+
+  /// Turns starting with the system on or off.
+  ///
+  /// Nothing is written to the profile: the operating system holds the entry,
+  /// and a second copy of that fact could only disagree with it. What ends up
+  /// in [_autostart] is read off the host *after* the change, so the switch
+  /// reports what will happen rather than what was asked for — a write that
+  /// failed and a user who removed the entry by hand both show up as the truth,
+  /// which is what a switch with nothing behind it cannot do.
+  Future<void> setAutostart(bool value) async {
+    final shell = _hostShell;
+    if (shell == null) return;
+    await shell.setAutostart(value);
+    final real = await shell.autostartEnabled();
+    if (real == _autostart) return;
+    _autostart = real;
     _notify();
   }
 

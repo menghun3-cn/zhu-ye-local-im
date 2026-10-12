@@ -55,6 +55,69 @@ final class FlutterSystemClipboard implements SystemClipboard {
   Stream<String> get changes => _watcher.changes;
 }
 
+/// The host services, as the Windows runner implements them.
+///
+/// One channel for the three facts in [HostShell], rather than one channel per
+/// fact: they are all answered by the same window, and a channel per setting
+/// would make the runner's message handling a lookup table of one.
+///
+/// Nothing here throws. A host that has not implemented the channel — every
+/// platform except the one runner that does — answers [MissingPluginException],
+/// and a call that quietly does nothing is the right answer: the user asked for
+/// a setting on a surface that should not have been offering it. Failures are
+/// swallowed for the same reason. The one thing that must not happen is a
+/// settings screen that cannot be drawn because a tray icon is unavailable.
+final class PlatformHostShell implements HostShell {
+  /// Talks to the running host.
+  const PlatformHostShell();
+
+  @override
+  Future<void> setCloseToTray(bool value) =>
+      _ask(hostShellChannel, arg: value, method: _setCloseToTrayMethod);
+
+  @override
+  Future<bool> autostartEnabled() async {
+    final answer = await _ask(
+      hostShellChannel,
+      method: _autostartEnabledMethod,
+    );
+    return answer is bool && answer;
+  }
+
+  @override
+  Future<void> setAutostart(bool enabled) =>
+      _ask(hostShellChannel, arg: enabled, method: _setAutostartMethod);
+
+  static Future<Object?> _ask(
+    MethodChannel channel, {
+    required String method,
+    Object? arg,
+  }) async {
+    try {
+      return await channel.invokeMethod<Object?>(method, arg);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+}
+
+/// The host services channel, implemented by `windows/runner/host_shell.cpp`.
+const MethodChannel hostShellChannel = MethodChannel(
+  'cn.hnasct.local_transfer/host',
+);
+
+/// What the close button does from now on. Takes a bool: true hides the window
+/// and keeps the app running.
+const String _setCloseToTrayMethod = 'setCloseToTray';
+
+/// Whether this app starts with the system. Answers a bool.
+const String _autostartEnabledMethod = 'autostartEnabled';
+
+/// Makes starting with the system true or false. Takes a bool.
+const String _setAutostartMethod = 'setAutostart';
+
 /// Everything the application needs from the platform it runs on.
 final class PlatformSeams {
   const PlatformSeams({
@@ -66,6 +129,7 @@ final class PlatformSeams {
     required this.clipboard,
     required this.platform,
     required this.defaultIncomingDirectory,
+    required this.hostShell,
   });
 
   /// Where this Device's identity is kept, or an in-memory stand-in.
@@ -95,6 +159,26 @@ final class PlatformSeams {
 
   /// Where a Transfer lands when the user has not said otherwise.
   final String? defaultIncomingDirectory;
+
+  /// The window and startup facts this host will change for the app.
+  ///
+  /// Always present, even on a platform that implements none of it: the
+  /// implementation is what decides whether an answer exists, and a null here
+  /// would push that question into every caller. See [controlsWindow] for the
+  /// other half — whether the surface that offers these settings is drawn at
+  /// all.
+  final HostShell hostShell;
+
+  /// Whether this build can change its own window.
+  ///
+  /// A different question from whether [hostShell] answers, and a cheaper one:
+  /// this decides whether the Settings surface *offers* "start with the system"
+  /// and "what the close button does", and it is known before anything is
+  /// awaited. Android answers no — it has no notification area and no close
+  /// button, so both settings would be rows with nothing behind them. Only the
+  /// platform whose runner implements the channel answers yes; see
+  /// `windows/runner/host_shell.cpp`.
+  final bool controlsWindow;
 }
 
 /// The platform this binary is running on.
@@ -179,6 +263,15 @@ Future<PlatformSeams> openPlatformSeams({
       environment: host,
       appDataDirectory: appDataDirectory,
     ),
+    // Not branched on the platform. Every platform gets the same object, and
+    // the one that has not implemented the channel answers "nothing happened"
+    // — which is the truth, and is also what a platform with no window should
+    // do with a question about a tray icon.
+    hostShell: const PlatformHostShell(),
+    // The one platform whose runner implements the channel. Written as a
+    // comparison rather than as a list so that adding a platform is a decision
+    // somebody has to make here, next to the reason it is not in the list.
+    controlsWindow: running == DevicePlatform.windows,
   );
 }
 

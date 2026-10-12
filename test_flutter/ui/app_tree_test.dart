@@ -40,6 +40,12 @@ void main() {
         clipboard: MemorySystemClipboard(),
         platform: DevicePlatform.windows,
         defaultIncomingDirectory: null,
+        // A recorded host rather than the real one, and a Windows-shaped
+        // answer: this test pumps the tree `main` builds, and what it is
+        // checking is that a pushed route can reach the controller, not what
+        // the runner does with a close button.
+        hostShell: ScriptedHostShell(),
+        controlsWindow: true,
       );
       // Two clocks have to be driven at once, which is the whole difficulty of
       // testing this widget. `LocalTransferApp._open` binds a real
