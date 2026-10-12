@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
+import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
+import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../pickers.dart';
 import '../seams.dart';
@@ -178,6 +180,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
+    final colors = WeChatColors.of(context);
     final self = controller.self;
     final port = controller.listenPort;
     final notices = controller.notices;
@@ -249,6 +252,71 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: WeChat.sectionGap),
+        // Absent, not disabled, on a platform without a window: Android has no
+        // notification area and no close button, so both rows would be switches
+        // with nothing behind them. A surface that lists what a platform cannot
+        // do is a surface that reads as broken.
+        if (seams.controlsWindow) ...[
+          SectionHeader(title: l10n.settingsWindowAndStartup),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(WeChat.cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: controller.autostartEnabled,
+                    onChanged: (value) => unawaited(
+                      guarded(context, () => controller.setAutostart(value)),
+                    ),
+                    title: Text(l10n.settingsStartWithWindows),
+                    subtitle: Text(
+                      controller.autostartEnabled
+                          ? l10n.settingsStartWithWindowsOn
+                          : l10n.settingsStartWithWindowsOff,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsCloseButton,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizePreview,
+                      color: colors.secondaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SegmentedButton<CloseBehaviour>(
+                    segments: [
+                      ButtonSegment<CloseBehaviour>(
+                        value: CloseBehaviour.minimiseToTray,
+                        label: Text(l10n.settingsCloseToTray),
+                      ),
+                      ButtonSegment<CloseBehaviour>(
+                        value: CloseBehaviour.quit,
+                        label: Text(l10n.settingsCloseQuit),
+                      ),
+                    ],
+                    selected: {controller.closeBehaviour},
+                    onSelectionChanged: (selection) => unawaited(
+                      guarded(
+                        context,
+                        () => controller.setCloseBehaviour(selection.first),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  HintText(
+                    controller.closeBehaviour == CloseBehaviour.minimiseToTray
+                        ? l10n.settingsCloseToTrayHint
+                        : l10n.settingsCloseQuitHint,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.settingsNotices),
         if (notices.isEmpty)

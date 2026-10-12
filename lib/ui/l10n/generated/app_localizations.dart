@@ -854,6 +854,60 @@ abstract class AppLocalizations {
   /// **'Notices'**
   String get settingsNotices;
 
+  /// No description provided for @settingsWindowAndStartup.
+  ///
+  /// In en, this message translates to:
+  /// **'Window and startup'**
+  String get settingsWindowAndStartup;
+
+  /// No description provided for @settingsStartWithWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with Windows'**
+  String get settingsStartWithWindows;
+
+  /// No description provided for @settingsStartWithWindowsOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts by itself when you sign in.'**
+  String get settingsStartWithWindowsOn;
+
+  /// No description provided for @settingsStartWithWindowsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'You start it yourself.'**
+  String get settingsStartWithWindowsOff;
+
+  /// No description provided for @settingsCloseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'When the close button is clicked'**
+  String get settingsCloseButton;
+
+  /// No description provided for @settingsCloseToTray.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimise to the notification area'**
+  String get settingsCloseToTray;
+
+  /// No description provided for @settingsCloseQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get settingsCloseQuit;
+
+  /// No description provided for @settingsCloseToTrayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The window is hidden and the app keeps running in the background, so it can still receive things.'**
+  String get settingsCloseToTrayHint;
+
+  /// No description provided for @settingsCloseQuitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing the window ends the app.'**
+  String get settingsCloseQuitHint;
+
   /// No description provided for @factAlias.
   ///
   /// In en, this message translates to:

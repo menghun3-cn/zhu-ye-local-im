@@ -1,6 +1,9 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+
 #include <optional>
+#include <string>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -27,6 +30,16 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  host_shell_.Attach(GetHandle());
+  host_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), kHostChannelName,
+          &flutter::StandardMethodCodec::GetInstance());
+  host_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) { HandleHostMethodCall(call, std::move(result)); });
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -40,6 +53,14 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  // Before anything else: the notification-area icon refers to this window and
+  // has to be gone by the time the window is.
+  host_shell_.Detach();
+
+  if (host_channel_) {
+    host_channel_ = nullptr;
+  }
+
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -47,10 +68,53 @@ void FlutterWindow::OnDestroy() {
   Win32Window::OnDestroy();
 }
 
+void FlutterWindow::HandleHostMethodCall(
+    const flutter::MethodCall<flutter::EncodableValue>& call,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const std::string& method = call.method_name();
+
+  if (method == "setCloseToTray") {
+    const bool* value = std::get_if<bool>(call.arguments());
+    if (value == nullptr) {
+      result->Error("bad_arguments", "setCloseToTray expects a bool");
+      return;
+    }
+    host_shell_.set_close_to_tray(*value);
+    result->Success();
+    return;
+  }
+
+  if (method == "autostartEnabled") {
+    result->Success(
+        flutter::EncodableValue(host_shell_.autostart_enabled()));
+    return;
+  }
+
+  if (method == "setAutostart") {
+    const bool* value = std::get_if<bool>(call.arguments());
+    if (value == nullptr) {
+      result->Error("bad_arguments", "setAutostart expects a bool");
+      return;
+    }
+    host_shell_.set_autostart(*value);
+    result->Success();
+    return;
+  }
+
+  result->NotImplemented();
+}
+
 LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // The host's own behaviour gets first refusal, and for a reason: a window that
+  // has been closed to the notification area is hidden, not closed, and the
+  // framework must not be told that a close happened when it did not.
+  if (host_shell_.HandleMessage(hwnd, message, wparam, lparam)) {
+    return 0;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
