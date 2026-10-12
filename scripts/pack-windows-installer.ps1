@@ -115,6 +115,16 @@ $candidates = @()
 $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 if ($onPath) { $candidates += $onPath.Source }
 $candidates += @(
+    # 用户级安装（Inno Setup 自身的安装程序支持 /CURRENTUSER）：装到
+    # %LOCALAPPDATA%\Programs，**不需要管理员权限**，是免 UAC 的那条路。
+    # CI 上是 choco 装的全机器一份（下面的 Program Files），本地则多半是这个，
+    # 所以两条都要认 —— 否则本机永远走不到「真的跑一次 ISCC」，而这一步恰恰是
+    # 六道门禁都不进、只能靠跑一次才能发现问题的那种。
+    # 用字符串插值而不是 Join-Path：32 位系统上 ProgramFiles(x86) 不存在，
+    # Join-Path 收到 $null 会直接抛错，而插值只会拼出一个 Test-Path 返回 false 的串。
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
     'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
     'C:\Program Files\Inno Setup 6\ISCC.exe',
     'D:\Program Files (x86)\Inno Setup 6\ISCC.exe',
@@ -125,11 +135,15 @@ if (-not $iscc) {
     throw @"
 找不到 ISCC.exe（Inno Setup 的编译器）。
 
-装一个即可：
+装一个即可 —— 两种都行：
 
+    # 免管理员（装到 %LOCALAPPDATA%\Programs，推荐本地开发机用）
+    # 从 https://jrsoftware.org/isdl.php 下载 innosetup-6.x.x.exe 后：
+    .\innosetup-6.7.3.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART
+
+    # 需要管理员
     choco install innosetup -y
 
-或从 https://jrsoftware.org/isdl.php 下载安装。
 本仓库需要 **Inno Setup 6.3 或更高**：packaging\local_transfer.iss 里用了
 6.3 才有的 ArchitecturesAllowed=x64compatible。
 "@
@@ -164,9 +178,42 @@ $isccArgs = @(
     "/DLTVersion=$version",
     "/DLTOut=$dist",
     "/DLTIcon=$icon",
-    "/LTDocs=$(Join-Path $repo 'packaging')",
+    "/DLTDocs=$(Join-Path $repo 'packaging')",
     $iss
 )
+
+# ISCC 的参数是 `/D名字=值`：「/D」才是「定义一个预处理变量」的开关，名字里没有它。
+# 少写那个 D（如 `/LTDocs=…`）时 ISCC 把它当成一个不认识的开关：往 **stderr** 写一行
+# `Unknown option: /LTDocs=…`，然后**立刻以 1 退出，`.iss` 一个字都不解析**
+# （本机实测 0.021 秒、7 行输出、一行 `Parsing` 都没有，上一轮的 setup.exe 原封不动）。
+# 崩得够响（下面的 $LASTEXITCODE 接得住），但**报的是「这个选项不认识」，不是
+# 「你少定义了一个 LTDocs」**；而 stderr 与 stdout 是无序交织的，CI 抓下来的日志里
+# 那行甚至排在同一次输出最前面的 banner 之上 —— 看着像编译器已经开工了。
+# 2026-10-12 第一次真正发版就栽在这里，而且六个定义里**只有这一个**少写了 D。
+# 根因是这类参数平时谁都不跑：本仓库六道门禁一步也不进 packaging\，本地也跑不起来，
+# 所以「记得跑一次」不是能靠自觉保证的事 —— 让脚本自己比对：
+# 把 .iss 里所有 `{#名字}` 抠出来，逐个要求 $isccArgs 里有对应的 `/D名字`。
+$defined = @{}
+foreach ($a in $isccArgs) {
+    if ($a -match '^/D([A-Za-z_][A-Za-z0-9_]*)=') { $defined[$Matches[1]] = $true }
+}
+$issText = Get-Content -Path $iss -Raw -Encoding UTF8
+$used = @(
+    [regex]::Matches($issText, '\{#([A-Za-z_][A-Za-z0-9_]*)\}') |
+        ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+)
+$undefined = @($used | Where-Object { -not $defined.ContainsKey($_) })
+if ($undefined.Count -gt 0) {
+    throw @"
+packaging\local_transfer.iss 用了这些占位符，却没有对应的 /D 定义: $($undefined -join ', ')
+
+传给 ISCC 的是: $($isccArgs -join ' ')
+（`/D名字=值` 才定义变量。漏了 D 的话 ISCC 只会往 stderr 写一行 Unknown option
+就以 1 退出 —— 它不会告诉你少了哪个定义。）
+"@
+}
+Write-Host "    .iss 的 $($used.Count) 个占位符都有 /D 定义：$($used -join ', ')"
+
 & $iscc @isccArgs
 if ($LASTEXITCODE -ne 0) { throw "ISCC 失败 (exit $LASTEXITCODE)" }
 
