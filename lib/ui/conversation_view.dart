@@ -1261,6 +1261,12 @@ class MessageBubble extends StatelessWidget {
   /// capped so that a pathological one cannot push the bubble across the pane.
   /// For a file the size line is measured too, because on a short name it is
   /// the wider of the two.
+  ///
+  /// Always measured as one line, even for a name that will end up on three:
+  /// the cap is what *makes* a long name wrap, so the unwrapped width is
+  /// precisely what decides whether the cap applies at all. Measuring the
+  /// wrapped height instead would be circular — the width would depend on
+  /// where the lines break, and the breaks on the width.
   double _transferBubbleWidth(BuildContext context, AppLocalizations l10n) {
     var width = 0.0;
     for (final name in view.names) {
@@ -1325,10 +1331,13 @@ class MessageBubble extends StatelessWidget {
   ///
   /// [contentWidth] is the measure [_contents] decided on — the width the
   /// names actually take, floored and capped. Given one, the file block is
-  /// drawn at exactly that width, so a long name cuts off with an ellipsis
-  /// (the whole of it is on the tooltip) instead of stretching the bubble;
-  /// given none — a text message, whose bubble already hugs its words — the
-  /// block takes its natural width.
+  /// drawn at exactly that width, so a name that does not fit **wraps** onto
+  /// the next line — up to [WeChat.transferNameMaxLines] of them — instead of
+  /// stretching the bubble, and only one longer than that cuts off with an
+  /// ellipsis (the whole of it is on the tooltip). A name short enough to fit
+  /// on one line still takes one line, because the cap was measured from its
+  /// own width. Given none — a text message, whose bubble already hugs its
+  /// words — the block takes its natural width.
   ///
   /// A message's words are drawn as plain text, not as a `SelectableText`. A
   /// selectable body brings its own gesture recognizer, and Flutter gives the
@@ -1367,9 +1376,10 @@ class MessageBubble extends StatelessWidget {
                 child: Text(
                   name,
                   overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                  maxLines: WeChat.transferNameMaxLines,
                   style: TextStyle(
                     fontSize: WeChat.fontSizeBody,
+                    height: WeChat.lineHeightBody,
                     color: _bubbleInk(colors),
                   ),
                 ),
@@ -1434,9 +1444,10 @@ class MessageBubble extends StatelessWidget {
               child: Text(
                 name,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+                maxLines: WeChat.transferNameMaxLines,
                 style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
+                  height: WeChat.lineHeightBody,
                   color: _bubbleInk(colors),
                 ),
               ),
