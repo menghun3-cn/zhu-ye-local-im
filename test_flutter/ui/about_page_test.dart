@@ -5,6 +5,7 @@ import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/pages/about_page.dart';
 import 'package:local_transfer/ui/update_check.dart';
+import 'package:local_transfer/ui/update_install.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -21,6 +22,13 @@ import '../support/ui_harness.dart';
 /// `test_flutter/ui/update_rail_test.dart`'s subject. What is asserted here is
 /// narrower and unchanged: *this page* asks nothing until it is asked, so that
 /// looking at the About card is not itself a request.
+///
+/// The second half is the one-click install: that it is offered exactly when
+/// this build can replace itself *and* there is something to replace it with,
+/// that the folder is only handed over once somebody presses the button, and
+/// that each way it can fail arrives as its own sentence. What an install does
+/// to the folder — the download, the checksum, the renames — is not here: it
+/// needs no widgets, and it is `test/ui/update_install_test.dart`.
 void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
@@ -44,6 +52,28 @@ void main() {
     await tester.tap(find.text(label));
     await tester.pumpAndSettle();
   }
+
+  /// Presses the button showing [label] and draws the frames it causes.
+  ///
+  /// `pumpAndSettle` cannot be used for the hand-over, and the reason is worth
+  /// writing down: the last thing this card draws is a bar whose length is not
+  /// known, and an indeterminate [LinearProgressIndicator] animates for as long
+  /// as it is on screen. Waiting for the tree to go quiet is therefore waiting
+  /// for a process that is on its way out — which never happens. Two frames
+  /// instead of one, because the first is the press and the second is the state
+  /// the callbacks left behind.
+  Future<void> pressAndDraw(WidgetTester tester, String label) async {
+    await tester.tap(find.text(label));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  /// The answer that says a newer build exists.
+  const available = UpdateCheck(
+    UpdateOutcome.available,
+    version: '9.9.9',
+    url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
+  );
 
   testWidgets('names the build that is running', (tester) async {
     final checker = ScriptedUpdateChecker.install(
@@ -78,13 +108,10 @@ void main() {
   testWidgets('offers the download page when there is a newer version', (
     tester,
   ) async {
-    final checker = ScriptedUpdateChecker.install(
-      const UpdateCheck(
-        UpdateOutcome.available,
-        version: '9.9.9',
-        url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
-      ),
-    );
+    final checker = ScriptedUpdateChecker.install(available);
+    // Not about installing: what this test is about is the page's answer to a
+    // newer version, and the plain download path is the same on every platform.
+    ScriptedUpdateInstaller.replace();
     await show(tester);
 
     await press(tester, l10n.aboutCheckForUpdates);
@@ -105,13 +132,8 @@ void main() {
   testWidgets('hands the download address to the platform to open', (
     tester,
   ) async {
-    ScriptedUpdateChecker.install(
-      const UpdateCheck(
-        UpdateOutcome.available,
-        version: '9.9.9',
-        url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
-      ),
-    );
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace();
     // Installed rather than driven: the real opener starts the machine's
     // browser, and this test is about which address the page hands over.
     final links = ScriptedLinkOpener.install();
@@ -155,5 +177,129 @@ void main() {
 
     // Whatever the network did, the way that needs no network is on the card.
     expect(find.text(l10n.aboutHowToUpgrade), findsOneWidget);
+  });
+
+  testWidgets('offers the one-click update once a newer version is known', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    final installer = ScriptedUpdateInstaller.replace(supported: true);
+    await show(tester);
+
+    // Not before the question has been answered: there would be nothing to
+    // install, and a download that has no version behind it is not an offer.
+    expect(find.text(l10n.aboutUpdateInstall), findsNothing);
+
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+    // The sentence that explains the button replaces the by-hand one, which is
+    // still offered — by the button beside it rather than in words.
+    expect(find.text(l10n.aboutUpdateInstallHint), findsOneWidget);
+    expect(installer.askedFor, isEmpty);
+  });
+
+  testWidgets('leaves the one-click update out where this build cannot '
+      'replace itself', (tester) async {
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace();
+    await show(tester);
+
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    expect(find.text(l10n.aboutUpdateInstall), findsNothing);
+    expect(find.text(l10n.aboutHowToUpgrade), findsOneWidget);
+    // The way that needs no help from the page is still there.
+    expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
+  });
+
+  testWidgets('installs the newer build when the button is pressed', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    final installer = ScriptedUpdateInstaller.replace(
+      supported: true,
+      progress: const [
+        UpdateInstallProgress(
+          UpdateInstallStage.downloading,
+          received: 1048576,
+          total: 2097152,
+        ),
+        UpdateInstallProgress(UpdateInstallStage.verifying),
+        UpdateInstallProgress(UpdateInstallStage.staging),
+        UpdateInstallProgress(UpdateInstallStage.handingOver),
+      ],
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+
+    expect(installer.askedFor.single.version, '9.9.9');
+    // The last thing the old build draws. The real installer ends the process
+    // rather than returning, so this is the state the user is left looking at.
+    expect(find.text(l10n.aboutUpdateHandingOver), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('shows the bytes while a download is running', (tester) async {
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      progress: const [
+        UpdateInstallProgress(
+          UpdateInstallStage.downloading,
+          received: 1048576,
+          total: 4194304,
+        ),
+      ],
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    await press(tester, l10n.aboutUpdateInstall);
+
+    expect(find.textContaining(l10n.aboutUpdateDownloading), findsOneWidget);
+    // Both halves of the pair come from the Transfers surface's own formatter,
+    // so a download reads like every other byte count in the app.
+    expect(
+      find.textContaining(
+        l10n.bytesOf(formatBytes(1048576), formatBytes(4194304)),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('says why an update did not happen, and offers it again', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      result: const UpdateInstallResult.failed(UpdateInstallFailure.checksum),
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    await press(tester, l10n.aboutUpdateInstall);
+
+    expect(find.text(l10n.updateFailureChecksum), findsOneWidget);
+    // Nothing is in flight any more, and the same button is how it is retried:
+    // "try again" and "do it" are one action with one name.
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+  });
+
+  testWidgets('says when a replacement never finished', (tester) async {
+    // The trace of a hand-over that died: the build that failed was the new
+    // one, and all it left behind is a window that came and went.
+    ScriptedUpdateChecker.install(UpdateCheck.unreachable);
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      leftOver: UpdateInstallFailure.handover,
+    );
+    await show(tester);
+
+    expect(find.text(l10n.updateFailureHandover), findsOneWidget);
   });
 }
