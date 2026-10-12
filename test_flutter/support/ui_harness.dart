@@ -13,6 +13,7 @@ import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/ui/clipboard_paste.dart';
 import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/conversation_view.dart';
+import 'package:local_transfer/ui/external_links.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
@@ -20,6 +21,8 @@ import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
+import 'package:local_transfer/ui/update_check.dart';
+import 'package:local_transfer/ui/update_notice.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 /// Shared scaffolding for the tests that need a widget tree.
@@ -301,7 +304,7 @@ const _instantTheme = PageTransitionsTheme(
 /// the shipping tree. Without the delegates every `AppLocalizations.of` below
 /// throws, and a window built with the platform's locale instead would show a
 /// different language from the window a user gets.
-Widget _pane(Key key, UiDevice device, Size size) {
+Widget _pane(Key key, UiDevice device, Size size, UpdateNotice? update) {
   return SizedBox(
     key: key,
     child: MediaQuery(
@@ -321,7 +324,7 @@ Widget _pane(Key key, UiDevice device, Size size) {
           // socket on the real event loop.
           theme: WeChat.theme(WeChatColors.light)
               .copyWith(pageTransitionsTheme: _instantTheme),
-          home: HomeShell(seams: device.seams),
+          home: HomeShell(seams: device.seams, update: update),
         ),
       ),
     ),
@@ -335,16 +338,23 @@ void _resizeView(WidgetTester tester, Size size) {
 }
 
 /// Pumps one Device's window into the first window slot.
+///
+/// [update] is the shell's update notice. Left null — which is what almost
+/// every test wants — the shell draws no update entry at all and asks the
+/// network nothing: the notice is a constructor argument rather than something
+/// the shell makes for itself precisely so that a test which is not about
+/// updates does not pay for one.
 Future<void> pumpWindow(
   WidgetTester tester,
   UiDevice device, {
   Size size = wideWindow,
+  UpdateNotice? update,
 }) async {
   _resizeView(tester, size);
   await tester.pumpWidget(
     Directionality(
       textDirection: TextDirection.ltr,
-      child: _pane(windowAKey, device, size),
+      child: _pane(windowAKey, device, size, update),
     ),
   );
   await tester.pump();
@@ -367,9 +377,9 @@ Future<void> pumpTwoWindows(
       textDirection: TextDirection.ltr,
       child: Row(
         children: [
-          Expanded(child: _pane(windowAKey, left, paneSize)),
+          Expanded(child: _pane(windowAKey, left, paneSize, null)),
           const VerticalDivider(width: 1),
-          Expanded(child: _pane(windowBKey, right, paneSize)),
+          Expanded(child: _pane(windowBKey, right, paneSize, null)),
         ],
       ),
     ),
@@ -927,6 +937,20 @@ Finder onConversation(TestWindow window, Finder matching) => window.within(
   find.descendant(of: find.byType(ConversationView), matching: matching),
 );
 
+/// The rail's update entry in [window], as the thing to tap.
+///
+/// Found through the label rather than by index: the entry is pinned under the
+/// destinations rather than listed with them, so there is no position to name
+/// it by — and if there were, a test would then be asserting the position
+/// twice over. A window whose rail has no entry matches nothing.
+Finder updateEntry(TestWindow window) => find.descendant(
+  of: window.within(find.byType(NavigationRail)),
+  matching: find.ancestor(
+    of: find.text(l10n.railUpdate),
+    matching: find.byType(TextButton),
+  ),
+);
+
 /// The composer's send button in [window]'s open conversation.
 ///
 /// Found by the label the user reads rather than by a tooltip: the send control
@@ -1150,6 +1174,96 @@ class ScriptedRevealer implements Revealer {
   }
 }
 
+/// An [UpdateChecker] that answers what the test tells it to, and counts how
+/// often it was asked.
+///
+/// The same seam argument as [ScriptedPicker]: asking GitHub is the one thing a
+/// widget test cannot do. What makes this one worth having even where the
+/// answer does not matter is that the question is no longer asked only by a
+/// button — the application asks it once as it comes up — so every test that
+/// pumps `LocalTransferApp` has to hand in an answer or leave a real socket
+/// attempt behind.
+///
+/// ```dart
+/// final checker = ScriptedUpdateChecker.install(
+///   const UpdateCheck(UpdateOutcome.available, version: '9.9.9'),
+/// );
+/// ```
+class ScriptedUpdateChecker implements UpdateChecker {
+  /// Answers [answer] to every question.
+  ScriptedUpdateChecker(this.answer);
+
+  /// What [latest] answers with. Settable, so a test can change its mind
+  /// between two presses.
+  UpdateCheck answer;
+
+  /// How many times it was asked.
+  int asked = 0;
+
+  /// Installs a scripted checker in place of the real one.
+  ///
+  /// Registers [UpdateResolution.reset] with `addTearDown` itself, rather than
+  /// leaving it to the caller as [ScriptedPicker.install] does: a static
+  /// resolution left pointing at a stand-in would silently answer for the next
+  /// test in the file, and that is worth making impossible rather than
+  /// documented.
+  static ScriptedUpdateChecker install(UpdateCheck answer) {
+    final checker = ScriptedUpdateChecker(answer);
+    UpdateResolution.checker = checker;
+    addTearDown(UpdateResolution.reset);
+    return checker;
+  }
+
+  @override
+  Future<UpdateCheck> latest() async {
+    asked += 1;
+    return answer;
+  }
+}
+
+/// A [LinkOpener] that records the addresses it was asked to open.
+///
+/// The same seam argument as [ScriptedRevealer]: the real opener hands the
+/// address to the operating system's shell, so a test that drove it would open
+/// a browser window on the machine running the suite — and a `<cmd>` that has
+/// been started never returns to the test body, so the failure would be a hang
+/// rather than a report.
+///
+/// ```dart
+/// final links = ScriptedLinkOpener.install();
+/// await tester.tap(updateEntry(windowA));
+/// expect(links.opened.single, updateReleasesPage);
+/// ```
+class ScriptedLinkOpener implements LinkOpener {
+  ScriptedLinkOpener._();
+
+  /// Installs a scripted opener in place of the system one.
+  ///
+  /// Registers [LinkResolution.reset] with `addTearDown` itself: a static
+  /// resolution left pointing at a stand-in would silently answer for the next
+  /// test in the file, and the only way to make that impossible is to not rely
+  /// on the test remembering.
+  static ScriptedLinkOpener install() {
+    final opener = ScriptedLinkOpener._();
+    LinkResolution.opener = opener;
+    addTearDown(LinkResolution.reset);
+    return opener;
+  }
+
+  /// Every address the app asked to open, in order.
+  final List<String> opened = [];
+
+  /// What the next call answers — false stands in for a machine with no
+  /// browser, which is what the caller's own reporting exists for.
+  bool answers = true;
+
+  @override
+  Future<bool> open(String url) async {
+    opened.add(url);
+    return answers;
+  }
+}
+
 /// A host that writes down what it was told instead of doing it.
 ///
 /// Passed to a Device the way the real one is, rather than installed as a
@@ -1248,6 +1362,29 @@ Future<void> rightClick(WidgetTester tester, Finder matching) async {
   await gesture.up();
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+/// Moves a mouse pointer onto [matching], the way a hover is made.
+///
+/// A real pointer rather than a call to whatever the widget does on hover: a
+/// tooltip is shown by a `MouseRegion` seeing an enter event, so a test that
+/// asserted on the widget's own message property would pass while nothing a
+/// user could see ever appeared. The pointer has to *be added* before it moves,
+/// because moving a pointer the binding has never heard of is an event about
+/// nothing.
+///
+/// The two pumps are the tooltip's own timing rather than padding: `Tooltip`
+/// shows immediately for a mouse (`waitDuration` defaults to zero) and fades in
+/// over 150ms, so one frame is not enough for the text to be in the tree. Well
+/// under the 1500ms it stays up for, which is the other edge to stay clear of.
+Future<void> hoverOver(WidgetTester tester, Finder matching) async {
+  final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+  await pointer.addPointer(location: Offset.zero);
+  addTearDown(pointer.removePointer);
+  await tester.pump();
+  await pointer.moveTo(tester.getCenter(matching));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
 }
 
 /// A real PNG of [width] × [height] pixels, written to [file].
