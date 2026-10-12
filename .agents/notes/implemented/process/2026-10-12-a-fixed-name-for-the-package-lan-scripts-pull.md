@@ -77,9 +77,17 @@ same kind of rule.
 `build/dist/*-portable.zip` and `build/dist/*-setup.exe`, and the aliases match both
 globs; left alone, a release would have carried five attachments instead of three,
 two of them byte-identical duplicates of the pair beside them. The paths now name
-the version explicitly. The count on the Releases page stays at three, which is what
+the version explicitly. The count on the Releases page stayed at three, which is what
 [the released-artifacts note](2026-10-12-a-tag-builds-the-three-packages.md) and
-`AGENTS.md` §9 both say.
+`AGENTS.md` §9 both said.
+
+That exclusion was **reversed** in
+[the release-attachment note](2026-10-12-the-fixed-name-goes-out-with-the-release.md):
+the same two aliases now ship as release assets as well, because a machine outside
+the LAN has no other way to reach them. Everything else decided here — the ordering
+that makes the alias mean "a package passed every check", the atomic rename, the
+after-copy hash check, the sidecar format, the single implementation of the rule —
+still holds, and the two notes are meant to be read together.
 
 ## Verification
 
