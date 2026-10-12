@@ -7,47 +7,25 @@ import 'package:local_transfer/ui/pages/about_page.dart';
 import 'package:local_transfer/ui/update_check.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
-/// An update checker that answers what the test tells it to, and counts how
-/// often it was asked.
-///
-/// The same seam argument as `ScriptedPicker` in the harness: asking GitHub is
-/// the one thing a widget test cannot do, and there would otherwise be no way
-/// to reach the "there is a newer version" screen at all.
-class _StubUpdateChecker implements UpdateChecker {
-  _StubUpdateChecker._(this.answer);
+import '../support/ui_harness.dart';
 
-  /// What [latest] answers with.
-  final UpdateCheck answer;
-
-  /// How many times the page asked.
-  int asked = 0;
-
-  /// Puts a stub in force for one test, and takes it out afterwards.
-  static _StubUpdateChecker install(UpdateCheck answer) {
-    final checker = _StubUpdateChecker._(answer);
-    UpdateResolution.checker = checker;
-    addTearDown(UpdateResolution.reset);
-    return checker;
-  }
-
-  @override
-  Future<UpdateCheck> latest() async {
-    asked += 1;
-    return answer;
-  }
-}
-
-/// What the About surface says, and what pressing its button does.
+/// What the About surface says, and what pressing its buttons does.
 ///
 /// What is under test is the page: that it names the build it is running, that
-/// nothing reaches the network until somebody asks, and that each of the four
-/// answers an [UpdateCheck] can carry arrives as a different sentence rather
-/// than as a shared "it failed".
+/// nothing leaves this page for the network until somebody asks, and that each
+/// of the four answers an [UpdateCheck] can carry arrives as a different
+/// sentence rather than as a shared "it failed".
+///
+/// The page's own button is not the only thing that asks — the application asks
+/// once as it comes up, which is what the rail's update entry reads, and that is
+/// `test_flutter/ui/update_rail_test.dart`'s subject. What is asserted here is
+/// narrower and unchanged: *this page* asks nothing until it is asked, so that
+/// looking at the About card is not itself a request.
 void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
-  /// Shows the page over [checker], in the theme and language the app uses.
-  Future<void> show(WidgetTester tester, UpdateChecker checker) async {
+  /// Shows the page in the theme and language the app uses.
+  Future<void> show(WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -61,17 +39,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Presses the button and lets the answer land.
-  Future<void> pressCheck(WidgetTester tester) async {
-    await tester.tap(find.text(l10n.aboutCheckForUpdates));
+  /// Presses the button showing [label] and lets whatever it starts land.
+  Future<void> press(WidgetTester tester, String label) async {
+    await tester.tap(find.text(label));
     await tester.pumpAndSettle();
   }
 
   testWidgets('names the build that is running', (tester) async {
-    final checker = _StubUpdateChecker.install(
+    final checker = ScriptedUpdateChecker.install(
       const UpdateCheck(UpdateOutcome.upToDate),
     );
-    await show(tester, checker);
+    await show(tester);
 
     expect(find.text(l10n.appTitle), findsOneWidget);
     expect(find.text(l10n.aboutVersion(appVersion)), findsOneWidget);
@@ -86,12 +64,12 @@ void main() {
   });
 
   testWidgets('asks only when the button is pressed', (tester) async {
-    final checker = _StubUpdateChecker.install(
+    final checker = ScriptedUpdateChecker.install(
       const UpdateCheck(UpdateOutcome.upToDate),
     );
-    await show(tester, checker);
+    await show(tester);
 
-    await pressCheck(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
 
     expect(checker.asked, 1);
     expect(find.text(l10n.aboutUpToDate), findsOneWidget);
@@ -100,16 +78,16 @@ void main() {
   testWidgets('offers the download page when there is a newer version', (
     tester,
   ) async {
-    final checker = _StubUpdateChecker.install(
+    final checker = ScriptedUpdateChecker.install(
       const UpdateCheck(
         UpdateOutcome.available,
         version: '9.9.9',
         url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
       ),
     );
-    await show(tester, checker);
+    await show(tester);
 
-    await pressCheck(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
 
     expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsOneWidget);
     expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
@@ -121,6 +99,30 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(checker.asked, 1);
+  });
+
+  testWidgets('hands the download address to the platform to open', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(
+      const UpdateCheck(
+        UpdateOutcome.available,
+        version: '9.9.9',
+        url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
+      ),
+    );
+    // Installed rather than driven: the real opener starts the machine's
+    // browser, and this test is about which address the page hands over.
+    final links = ScriptedLinkOpener.install();
+    await show(tester);
+
+    await press(tester, l10n.aboutCheckForUpdates);
+    await press(tester, l10n.aboutOpenDownload);
+
+    expect(links.opened, [
+      'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
+    ]);
   });
 
   testWidgets('says so when there is nothing to compare against', (
@@ -128,30 +130,28 @@ void main() {
   ) async {
     // The state the repository is genuinely in until a release is published,
     // and not an error: there is nothing wrong with the app or the network.
-    final checker = _StubUpdateChecker.install(
-      const UpdateCheck(UpdateOutcome.noRelease),
-    );
-    await show(tester, checker);
+    ScriptedUpdateChecker.install(const UpdateCheck(UpdateOutcome.noRelease));
+    await show(tester);
 
-    await pressCheck(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
 
     expect(find.text(l10n.aboutNoRelease), findsOneWidget);
     expect(find.text(l10n.aboutOpenDownload), findsNothing);
   });
 
   testWidgets('says so when the question could not be asked', (tester) async {
-    final checker = _StubUpdateChecker.install(UpdateCheck.unreachable);
-    await show(tester, checker);
+    ScriptedUpdateChecker.install(UpdateCheck.unreachable);
+    await show(tester);
 
-    await pressCheck(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
 
     expect(find.text(l10n.aboutUnreachable), findsOneWidget);
     expect(find.text(l10n.aboutNoRelease), findsNothing);
   });
 
   testWidgets('always says how an upgrade is done by hand', (tester) async {
-    final checker = _StubUpdateChecker.install(UpdateCheck.unreachable);
-    await show(tester, checker);
+    ScriptedUpdateChecker.install(UpdateCheck.unreachable);
+    await show(tester);
 
     // Whatever the network did, the way that needs no network is on the card.
     expect(find.text(l10n.aboutHowToUpgrade), findsOneWidget);

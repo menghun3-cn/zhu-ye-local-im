@@ -539,7 +539,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutDescription =>
-      'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.';
+      'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.';
 
   @override
   String aboutVersion(String version) {
@@ -574,6 +574,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aboutHowToUpgrade =>
       'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.';
+
+  @override
+  String get railUpdate => 'Update';
 
   @override
   String get aliasHelper => 'What other Devices show for this one';
