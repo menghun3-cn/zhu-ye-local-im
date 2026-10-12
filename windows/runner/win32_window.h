@@ -7,6 +7,15 @@
 #include <memory>
 #include <string>
 
+// The class name the runner's top-level window is registered and created under.
+//
+// Deliberately not the template's default of "FLUTTER_RUNNER_WIN32_WINDOW",
+// which is shared by every Flutter Windows application in existence: a second
+// launch of this application finds the window of the first one by class name,
+// and a shared name would let it raise somebody else's window instead -- or,
+// worse, find one belonging to an unrelated program and then exit silently.
+extern const wchar_t kWin32WindowClassName[];
+
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
 // inherited from by classes that wish to specialize with custom
 // rendering and input handling
