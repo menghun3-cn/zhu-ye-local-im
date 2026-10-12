@@ -231,5 +231,14 @@ $sha = (Get-FileHash $setup -Algorithm SHA256).Hash
 Write-Host ("    {0:N0} B ({1:N2} MB)" -f $info.Length, ($info.Length / 1MB))
 Write-Host "    sha256 $sha"
 
+# ------------------------------------------------------------------ 7. latest 别名
+# 与绿色包同一个理由（见 pack-windows-portable.ps1 里那段），也放在最后一步：安装包
+# 验完了才更新别名。两个产物各由**它自己的**脚本发布别名 —— 让绿色包脚本顺手去发安装
+# 包的别名，就得先假设另一个产物在不在，那个假设迟早是错的。
+Step '更新 latest 别名（局域网脚本按这个名字拉）'
+$latestSetup = Join-Path $dist 'LocalTransfer-latest-windows-x64-setup.exe'
+& (Join-Path $PSScriptRoot 'publish-latest.ps1') -Source $setup -Name (Split-Path $latestSetup -Leaf)
+
 Write-Host ''
 Write-Host "完成: $setup"
+Write-Host "完成: $latestSetup  (固定名，跟这次打包一起更新)"
