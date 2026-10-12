@@ -130,6 +130,7 @@ final class PlatformSeams {
     required this.platform,
     required this.defaultIncomingDirectory,
     required this.hostShell,
+    required this.controlsWindow,
   });
 
   /// Where this Device's identity is kept, or an in-memory stand-in.

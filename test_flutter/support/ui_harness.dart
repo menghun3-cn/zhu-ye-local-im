@@ -138,7 +138,12 @@ Future<UiDevice> startUiDevice(
   String? defaultIncomingDirectory,
   DevicePlatform platform = DevicePlatform.windows,
   MessageStore? messageStore,
-  HostShell? hostShell,
+  // The recording stand-in specifically, rather than any [HostShell]: this
+  // argument exists so that a test can start from a host whose state is already
+  // set -- starting with the system, say -- and read it back afterwards, and
+  // both of those need the scripting. A host that does something other than
+  // record is not what this harness is for.
+  ScriptedHostShell? hostShell,
   bool controlsWindow = true,
 }) async {
   late final UiDevice device;
@@ -1166,6 +1171,15 @@ class ScriptedHostShell implements HostShell {
   /// to stand in for a user who changed it outside the app.
   bool autostart;
 
+  /// When true, [setAutostart] records the request and leaves [autostart] where
+  /// it was — a registry write that was denied, or an entry something else puts
+  /// back. It is the only way to see the difference between the app reporting
+  /// what it asked for and the app reporting what is there.
+  bool refusesAutostartWrites = false;
+
+  /// Every value the app has asked for, oldest first.
+  final List<bool> autostartRequests = [];
+
   /// Every close-button value the app has pushed, oldest first.
   ///
   /// A list rather than the last value because "it was told the same thing
@@ -1183,7 +1197,11 @@ class ScriptedHostShell implements HostShell {
   Future<bool> autostartEnabled() async => autostart;
 
   @override
-  Future<void> setAutostart(bool enabled) async => autostart = enabled;
+  Future<void> setAutostart(bool enabled) async {
+    autostartRequests.add(enabled);
+    if (refusesAutostartWrites) return;
+    autostart = enabled;
+  }
 }
 
 /// A one-pixel PNG, for the tests that need the clipboard to hold a picture.
