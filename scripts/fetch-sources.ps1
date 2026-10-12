@@ -1,4 +1,4 @@
-# 数据源获取脚本：按 data/pins/*.json 下载并校验数据源缓存
+﻿# 数据源获取脚本：按 data/pins/*.json 下载并校验数据源缓存
 # 用法： .\scripts\fetch-sources.ps1 [-WritePins] [-Force] [-DryRun]
 #   -WritePins   首次运行回填 sha256/size/fetched_at 到 pin JSON（随后以哈希锁定版本）
 #   -Force       缓存哈希一致也强制重下（用于刷新源内容后重锁）

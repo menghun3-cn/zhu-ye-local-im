@@ -97,13 +97,15 @@ Android APK。
 - 两个新的中文文件都带 UTF-8 BOM，`.iss` 是 UTF-8 带 BOM，新说明书与它同级那份的编码
   一致。
 
-**没验过的，而且这件事要紧。** 本机没装 Inno Setup，所以
-`packaging/local_transfer.iss` **一次都没有被编译过**。这个工作流一次都没跑过；
-`flutter build windows` / `build apk` 在这里根本跑不了（本机 Dart 无法创建子进程，于是
-`flutter`、`dart test`、`flutter analyze` 全都不可用）。上面那些全是静态检查加上一个
-脚本的两条报错路径，仅此而已。它第一次真正受检，就是 `v0.1.0` 那次发布本身；而最可能
-需要修的正是只有编译器才判得了的两件事：那组 Inno Setup 指令，以及
-`subosito/flutter-action@v2` 能不能解析固定住的 `3.47.5`。
+**当时没验过的，以及第一次跑出来的结果。** 本机没装 Inno Setup，所以
+`packaging/local_transfer.iss` **至今仍未被编译过**；`flutter build windows` / `build apk`
+在这里根本跑不了（有一段时间本机 Dart 无法创建子进程，于是 `flutter`、`dart test`、
+`flutter analyze` 全都不可用）。上面那些全是静态检查加上一个脚本的两条报错路径，仅此
+而已。它第一次真正受检，就是 `v0.1.0` 那次发布。那一次校验版本号通过，两个构建作业全
+红 —— 红的不在 Inno Setup 指令里（那一步根本没走到），而在
+`android/app/build.gradle.kts` 和绿色包脚本自己的 zip 校验里。`subosito/flutter-action@v2`
+对固定住的 `3.47.5` 解析无恙，所以上面那段盯着的另一件事站住了。两个缺陷与修复的理由见
+[拥有它们的那篇 note](../bug-fix/2026-10-12-two-build-steps-that-had-only-ever-run-on-one-side.md)。
 
 ## Alternatives considered
 
@@ -149,8 +151,11 @@ Android APK。
 `flutter analyze` 与两个文档校验器的 `gates.yml` 是显然的下一步，而它被刻意留在了这笔
 改动之外。
 
-**这条流水线自己一次都没跑过。** 它第一次执行就是 `v0.1.0` 那次发布。如果它在那儿失败，
-那是流水线的问题而不是产品的问题，而且在还没有人下载过任何东西之前，tag 可以删掉重推。
+**这条流水线的第一次执行就是 `v0.1.0` 那次发布，而它在那里失败了。** 失败在流水线而
+不在产品 —— 校验版本号通过，两个构建作业都死在工具里 —— 于是 tag 被删掉，重推到带着
+修复的 `master` tip 上，正好就是上一段为它写下的那种情形。tag 会移动是实打实的代价，
+而且是明知故付：它名下什么都没发布过，所以没人下载过任何东西。缺陷本身见
+[它们自己的 note](../bug-fix/2026-10-12-two-build-steps-that-had-only-ever-run-on-one-side.md)。
 
 **CI 用的是工作流里钉住的那个 Flutter 版本。** 升它从此变成第二处需要显式改的地方，
 而不是自动跟着 `stable` 走。这是为「发布产物可复现」付的代价。

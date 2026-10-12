@@ -117,15 +117,19 @@ Verified on the machine this was written on:
 - Both new Chinese files carry a UTF-8 BOM and the `.iss` is UTF-8 with BOM, and
   the readme matches its sibling's encoding.
 
-**Not verified, and it matters.** Inno Setup is not installed on this machine, so
-`packaging/local_transfer.iss` has never been compiled. The workflow has never
-run; `flutter build windows` / `build apk` could not be run at all here (Dart
-cannot create child processes on this machine, so `flutter`, `dart test` and
-`flutter analyze` are all unavailable). Everything above is a static check plus
-the two error paths of a script, and nothing more. The first real exercise is the
-`v0.1.0` release itself, and the things most likely to need a fix are the two
-that only a compiler can judge: the Inno Setup directive set, and whether
-`subosito/flutter-action@v2` resolves the pinned `3.47.5`.
+**Not verified at the time, and what the first run said.** Inno Setup is not
+installed on this machine, so `packaging/local_transfer.iss` still has never been
+compiled; `flutter build windows` and `build apk` could not be run here at all
+(this machine's Dart could not create child processes for a stretch, so
+`flutter`, `dart test` and `flutter analyze` were all unavailable). Everything
+above was a static check plus the two error paths of a script, and nothing more.
+The first real exercise was the `v0.1.0` release. It passed the version check and
+failed in both build jobs — not in the Inno Setup directive set, which was never
+reached, but in `android/app/build.gradle.kts` and in the portable script's own
+zip verification. `subosito/flutter-action@v2` resolved the pinned `3.47.5`
+without complaint, so the other item that paragraph was watching for held. The
+two defects and the reasoning behind their fixes are in
+[the Agent Note that owns them](../bug-fix/2026-10-12-two-build-steps-that-had-only-ever-run-on-one-side.md).
 
 ## Alternatives considered
 
@@ -182,10 +186,14 @@ nowhere else. A `gates.yml` running `dart test`, `dart format`, `flutter analyze
 and the two documentation verifiers on every pull request is the obvious next
 step, and it is deliberately not in this change.
 
-**The release pipeline itself was never run.** Its own first execution is the
-`v0.1.0` release. If it fails there, the failure is in the pipeline and not in
-the product, and the tag can be deleted and re-pushed before anybody has
-downloaded anything.
+**The release pipeline's first execution was the `v0.1.0` release, and it failed
+there.** The failure was in the pipeline rather than in the product — the version
+check passed and both build jobs died in tooling — so the tag was deleted and
+re-pushed onto a `master` tip carrying the fixes, which is exactly the case this
+paragraph was written for. A tag that moves is a real cost, and it is paid
+knowingly: nothing was published under it, so nobody has downloaded anything. The
+defects are in
+[their own Agent Note](../bug-fix/2026-10-12-two-build-steps-that-had-only-ever-run-on-one-side.md).
 
 **CI uses whatever Flutter version is pinned in the workflow.** Bumping it is now
 a deliberate edit in a second place, not an automatic follow of `stable`. That is
