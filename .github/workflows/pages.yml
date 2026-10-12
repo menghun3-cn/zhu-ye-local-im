@@ -1,0 +1,53 @@
+name: Pages
+
+# 官网发布：`site/` 是纯静态目录（一个 HTML、一份 CSS、一份不引第三方库的 JS），
+# 直接交给 Pages，没有任何构建步骤。
+#
+# 只在 `master` 上部署：按 AGENTS.md §2.2，`master` 是生产分支，官网是给使用者看的
+# 东西，跟着发布走 —— `develop` 上的改动要等它被合进 `master` 才上线。
+# `workflow_dispatch` 留给「改完想立刻看一眼」的情况，不必为一个错别字发版。
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时刻只跑一次部署，但**不**取消进行中的那一次：半途取消会让线上停在
+# 上一个已经上传、还没激活的 artifact 上。宁可排队。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 打包 site/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      # 整个 `site/` 目录原样上传 —— 没有编译、没有压缩、没有注入。
+      # 页面上不加载任何第三方脚本或字体，这里也就不需要任何构建工具。
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: 部署
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
