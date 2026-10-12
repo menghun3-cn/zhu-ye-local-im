@@ -22,6 +22,7 @@ import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
 import 'package:local_transfer/ui/update_check.dart';
+import 'package:local_transfer/ui/update_install.dart';
 import 'package:local_transfer/ui/update_notice.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
@@ -1223,6 +1224,86 @@ class ScriptedUpdateChecker implements UpdateChecker {
   Future<UpdateCheck> latest() async {
     asked += 1;
     return answer;
+  }
+}
+
+/// An installer that answers instead of replacing anything.
+///
+/// The same seam argument as [ScriptedUpdateChecker], and a stronger one: the
+/// real installer downloads a build from the internet, replaces the folder the
+/// test is running from and then ends the process the test is running in. So a
+/// test hands in what should happen and keeps its files.
+///
+/// [supported] defaults to false, which is what a platform that cannot replace
+/// itself answers — and what every test that is not about installing wants,
+/// because it is the state in which the offer is left off the card entirely.
+///
+/// ```dart
+/// final installer = ScriptedUpdateInstaller.replace(supported: true);
+/// await press(tester, l10n.aboutUpdateInstall);
+/// expect(installer.askedFor.single.version, '9.9.9');
+/// ```
+class ScriptedUpdateInstaller implements UpdateInstaller {
+  /// Answers with [result], after reporting [progress].
+  ScriptedUpdateInstaller({
+    this.supported = false,
+    this.progress = const [],
+    this.result = const UpdateInstallResult.handedOver(),
+    this.leftOver,
+  });
+
+  /// Whether this stand-in says it can replace the build it is running in.
+  @override
+  final bool supported;
+
+  /// What is reported to the caller before [result].
+  final List<UpdateInstallProgress> progress;
+
+  /// What the attempt ends as. A hand-over is the real one's usual ending, and
+  /// the process would not be here to read it; a test can.
+  final UpdateInstallResult result;
+
+  /// What [previousFailure] answers.
+  final UpdateInstallFailure? leftOver;
+
+  /// Every answer the installer was handed, in order.
+  final List<UpdateCheck> askedFor = [];
+
+  /// Installs a scripted installer in place of the real one.
+  ///
+  /// Registers [UpdateInstallResolution.reset] with `addTearDown` itself, like
+  /// [ScriptedUpdateChecker]: a static resolution left pointing at a stand-in
+  /// would silently answer for the next test in the file.
+  static ScriptedUpdateInstaller replace({
+    bool supported = false,
+    List<UpdateInstallProgress> progress = const [],
+    UpdateInstallResult result = const UpdateInstallResult.handedOver(),
+    UpdateInstallFailure? leftOver,
+  }) {
+    final installer = ScriptedUpdateInstaller(
+      supported: supported,
+      progress: progress,
+      result: result,
+      leftOver: leftOver,
+    );
+    UpdateInstallResolution.installer = installer;
+    addTearDown(UpdateInstallResolution.reset);
+    return installer;
+  }
+
+  @override
+  UpdateInstallFailure? previousFailure() => leftOver;
+
+  @override
+  Future<UpdateInstallResult> install(
+    UpdateCheck check, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  }) async {
+    askedFor.add(check);
+    for (final step in progress) {
+      onProgress(step);
+    }
+    return result;
   }
 }
 

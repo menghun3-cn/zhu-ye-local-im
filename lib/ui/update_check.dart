@@ -15,6 +15,14 @@ const String updateRepository = 'menghun3-cn/zhu-ye-local-im';
 const String updateReleasesPage =
     'https://github.com/$updateRepository/releases/latest';
 
+/// Where the release API answers.
+///
+/// A field rather than a constant in the request so that a test can point the
+/// checker at a server of its own — the same reason `repository` is one. The
+/// two together are the whole of the address, and both default to the real
+/// thing.
+const String updateApiHost = 'https://api.github.com';
+
 /// What a look for a newer build came back with.
 ///
 /// A closed set of names rather than a sentence: turning an outcome into words
@@ -36,10 +44,58 @@ enum UpdateOutcome {
   unreachable,
 }
 
+/// One file a release carries.
+///
+/// [digest] is the checksum GitHub publishes for an uploaded asset, spelled
+/// `sha256:<hex>`. It is the only one this application can check a download
+/// against without fetching a second address: the versioned artifact carries no
+/// `.sha256` sidecar of its own — only the fixed-name alias does — so a build
+/// that verified against the sidecar would have to fetch the alias and could
+/// then not be sure the two came from the same release. Null for an asset
+/// uploaded before GitHub published digests, which is a good enough reason not
+/// to download it automatically at all.
+final class UpdateAsset {
+  /// Names the file [name] at [url], [size] bytes long, checked by [digest].
+  const UpdateAsset({
+    required this.name,
+    required this.url,
+    required this.size,
+    this.digest,
+  });
+
+  /// What the release calls it, version and all.
+  final String name;
+
+  /// Where it is served from.
+  final String url;
+
+  /// How many bytes it is, as the release states. Zero when it did not say.
+  final int size;
+
+  /// The published checksum, or null when there is none.
+  final String? digest;
+
+  /// The checksum as bare lowercase hex, or null when there is none.
+  String? get sha256 {
+    final published = digest;
+    if (published == null) return null;
+    const prefix = 'sha256:';
+    final hex = published.startsWith(prefix)
+        ? published.substring(prefix.length)
+        : published;
+    return hex.isEmpty ? null : hex.toLowerCase();
+  }
+}
+
 /// The answer to "is there a newer build", as data.
 final class UpdateCheck {
   /// The answer [outcome], naming [version] and [url] when it has them.
-  const UpdateCheck(this.outcome, {this.version, this.url});
+  const UpdateCheck(
+    this.outcome, {
+    this.version,
+    this.url,
+    this.assets = const [],
+  });
 
   /// What came back.
   final UpdateOutcome outcome;
@@ -50,8 +106,76 @@ final class UpdateCheck {
   /// Where to get it, when [outcome] is [UpdateOutcome.available].
   final String? url;
 
+  /// Every file the release carries, when [outcome] is
+  /// [UpdateOutcome.available]. Empty for the other three.
+  final List<UpdateAsset> assets;
+
   /// The answer to a question that could not be asked.
   static const UpdateCheck unreachable = UpdateCheck(UpdateOutcome.unreachable);
+}
+
+/// The release API's answer, read into an [UpdateCheck].
+///
+/// Split out of [GitHubUpdateChecker] so that the shape of the JSON can be
+/// tested without a network. What the checker adds over this is the request;
+/// the two were one function only while there was nothing else to do with the
+/// body.
+///
+/// The four outcomes are unchanged, including the one the older versions of
+/// this file had: a repository with no releases answers with no `tag_name`, and
+/// that is [UpdateOutcome.noRelease] rather than a failure.
+UpdateCheck parseRelease(
+  Object? decoded, {
+  required String currentVersion,
+  required String fallbackUrl,
+}) {
+  if (decoded is! Map<String, Object?>) return UpdateCheck.unreachable;
+  final tag = decoded['tag_name'];
+  if (tag is! String || tag.isEmpty) {
+    return const UpdateCheck(UpdateOutcome.noRelease);
+  }
+  if (!isNewerVersion(tag, currentVersion)) {
+    return const UpdateCheck(UpdateOutcome.upToDate);
+  }
+  final page = decoded['html_url'];
+  return UpdateCheck(
+    UpdateOutcome.available,
+    version: tag,
+    url: page is String && page.isNotEmpty ? page : fallbackUrl,
+    assets: parseAssets(decoded['assets']),
+  );
+}
+
+/// The release's files, as far as they can be read from an answer.
+///
+/// Anything unreadable is dropped rather than reported: an asset with no name
+/// or no address cannot be downloaded, and one missing digest cannot be
+/// checked — and both facts are already visible where they matter, which is the
+/// decision to install by hand instead. A release whose `assets` is not a list
+/// at all yields none, which reads downstream as "this release does not carry
+/// the file this copy needs".
+List<UpdateAsset> parseAssets(Object? raw) {
+  if (raw is! List) return const [];
+  final assets = <UpdateAsset>[];
+  for (final entry in raw) {
+    if (entry is! Map<String, Object?>) continue;
+    final name = entry['name'];
+    final url = entry['browser_download_url'];
+    if (name is! String || name.isEmpty || url is! String || url.isEmpty) {
+      continue;
+    }
+    final size = entry['size'];
+    final digest = entry['digest'];
+    assets.add(
+      UpdateAsset(
+        name: name,
+        url: url,
+        size: size is int && size >= 0 ? size : 0,
+        digest: digest is String && digest.isNotEmpty ? digest : null,
+      ),
+    );
+  }
+  return assets;
 }
 
 /// Asks whether a newer build than this one has been published.
@@ -83,11 +207,16 @@ final class GitHubUpdateChecker implements UpdateChecker {
   /// there for the platform's own minute-long default.
   const GitHubUpdateChecker({
     this.repository = updateRepository,
+    this.apiHost = updateApiHost,
     this.timeout = const Duration(seconds: 8),
   });
 
   /// The repository to ask, as `owner/name`.
   final String repository;
+
+  /// The host the release API answers on. A test points this at a server of its
+  /// own; nothing in the application ever changes it.
+  final String apiHost;
 
   /// How long any one step of the request may take.
   final Duration timeout;
@@ -97,11 +226,7 @@ final class GitHubUpdateChecker implements UpdateChecker {
     final client = HttpClient()..connectionTimeout = timeout;
     try {
       final request = await client
-          .getUrl(
-            Uri.parse(
-              'https://api.github.com/repos/$repository/releases/latest',
-            ),
-          )
+          .getUrl(Uri.parse('$apiHost/repos/$repository/releases/latest'))
           .timeout(timeout);
       // GitHub rejects a request with no User-Agent, and answers a different
       // shape without the versioned Accept header.
@@ -123,20 +248,10 @@ final class GitHubUpdateChecker implements UpdateChecker {
           .transform(utf8.decoder)
           .join()
           .timeout(timeout);
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, Object?>) return UpdateCheck.unreachable;
-      final tag = decoded['tag_name'];
-      if (tag is! String || tag.isEmpty) {
-        return const UpdateCheck(UpdateOutcome.noRelease);
-      }
-      if (!isNewerVersion(tag, appVersion)) {
-        return const UpdateCheck(UpdateOutcome.upToDate);
-      }
-      final page = decoded['html_url'];
-      return UpdateCheck(
-        UpdateOutcome.available,
-        version: tag,
-        url: page is String && page.isNotEmpty ? page : updateReleasesPage,
+      return parseRelease(
+        jsonDecode(body),
+        currentVersion: appVersion,
+        fallbackUrl: updateReleasesPage,
       );
     } on Object {
       // Every failure is the same answer to the user: the question did not get
