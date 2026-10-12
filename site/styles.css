@@ -259,6 +259,8 @@ svg { display: block; }
   font-family: var(--font-mono); font-size: var(--fs-meta);
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-xs); padding: 1px 5px;
+  /* 下载区那条给出的是整条固定地址，比容器还长 —— 不折断它就会把页面顶宽。 */
+  word-break: break-all;
 }
 
 /* 两栏说明（左侧一列窄标题，右侧正文） */

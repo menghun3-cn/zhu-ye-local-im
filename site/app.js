@@ -49,15 +49,28 @@
   /* ---------------------------------------------------------------------
      最新版本：按钮默认都指向 releases/latest，能读到 API 时就换成具体产物。
      读不到（离线、被限流、还没有发布）就原样保留 —— 页面照常可用。
+
+     附件里有两组「同一个结尾」的名字：带版本号的产物，和一份固定名（`-latest-`）
+     别名（release.yml 两个都传，别名是给按固定地址拉包的外网机器用的）。后缀匹配会
+     同时命中两者，谁排在前面谁被选上 —— 选到别名时，页面标签写着「最新版本 v0.1.1」、
+     文件名里却没有版本号，前后自相矛盾。所以优先具体产物，别名只当没有它时的兜底。
      --------------------------------------------------------------------- */
+  function isAlias(name) {
+    return name.indexOf('-latest-') !== -1;
+  }
+
   function bySuffix(assets, suffix) {
+    var fallback = null;
     for (var i = 0; i < assets.length; i++) {
       var name = assets[i].name || '';
-      if (name.length >= suffix.length && name.slice(-suffix.length) === suffix) {
-        return assets[i];
+      if (name.length < suffix.length || name.slice(-suffix.length) !== suffix) continue;
+      if (isAlias(name)) {
+        if (!fallback) fallback = assets[i];
+        continue;
       }
+      return assets[i];
     }
-    return null;
+    return fallback;
   }
 
   function fillRelease(release) {
