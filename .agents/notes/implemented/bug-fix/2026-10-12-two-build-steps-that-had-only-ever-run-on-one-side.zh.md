@@ -52,4 +52,4 @@ Status: implemented
 - `scripts/fetch-sources.ps1` 在 5.1 下 0 个 PowerShell AST 解析错误，原为 9 个。它从没被跑过，所以也从没被察觉。
 - **门禁依旧看不见这一类缺陷。** `AGENTS.md` §5 里没有任何一项会跑构建脚本，而本机没有 PowerShell 7 —— 所以一个在两个版本之间不同的分隔符或编码假设，仍然只有推一个 tag 才能抓到。这篇 note 记录这个缺口，而不是关掉它。
 - **`v0.1.0` 被重推到含本修复的 `master` tip 上。** tag 会移动，版本号不动。已经取过那个失败 tag 的树的人，会为同一个 tag 名拿到另一个提交 —— 这就是「第一个发布版用它自己的号发出去」的代价，只有在它名下什么都没发布过时才可接受。
-- 三个产物仍然只是部分被证明。portable zip 现在已被 CI 组装并压缩过，一路走到抛错的那一步校验；APK 仍然从未成功编译过；Inno Setup 仍然从未编译过 `packaging/local_transfer.iss`。
+- 三个产物当时都只是部分被证明 —— 此后各自都被行使过了。portable zip 一路走到抛错的那一步校验；APK 在 `v0.1.0` 的第三次执行上编译成功；而同一次执行里，Inno Setup 在解析 `packaging/local_transfer.iss` 之前就拒收了参数列表 —— 那是[第四个、属于它自己那一类的缺陷](2026-10-12-a-define-that-was-spelled-without-its-d.zh.md)，而不是这三个的第四个实例。
