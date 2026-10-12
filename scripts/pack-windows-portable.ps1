@@ -60,7 +60,15 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
 
-$name    = 'LocalTransfer-1.0.0-windows-x64-portable'
+# 版本号只有一个来源：pubspec.yaml。这里曾经写死过 1.0.0 —— 那种写法的代价是每次
+# 发版都要记得改两处，而改漏了不会报错，只会打出一个文件名骗人的包。
+# 安装包脚本（pack-windows-installer.ps1）按同一规则推出它要复用的目录名。
+$versionMatch = Select-String -Path (Join-Path $repo 'pubspec.yaml') -Pattern '^\s*version:\s*(\S+)' |
+    Select-Object -First 1
+if (-not $versionMatch) { throw 'pubspec.yaml 里没找到 version: 行' }
+$version = $versionMatch.Matches[0].Groups[1].Value.Split('+')[0]
+
+$name    = "LocalTransfer-$version-windows-x64-portable"
 $release = Join-Path $repo 'build\windows\x64\runner\Release'
 $dist    = Join-Path $repo 'build\dist'
 $stage   = Join-Path $dist $name
@@ -395,7 +403,7 @@ if ($noteSource) {
     Set-Content -Path $note -Value $body -Encoding UTF8 -NoNewline
     Write-Host "    + 使用说明.txt (来自 $noteSource，已改写为 $branch @ $commit)"
 } else {
-    $ver = (Select-String -Path (Join-Path $repo 'pubspec.yaml') -Pattern '^\s*version:\s*(\S+)').Matches[0].Groups[1].Value
+    $ver = $version
     @(
         "LocalTransfer $ver — Windows 绿色免安装版（x64）",
         '=================================================',

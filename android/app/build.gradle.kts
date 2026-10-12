@@ -4,6 +4,22 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// 发布签名。密钥与口令放在 android/key.properties（已被 .gitignore 忽略）；
+// CI 由 .github/workflows/release.yml 从 GitHub Secrets 写出同名的文件，
+// 于是本机与流水线走的是同一条路径、同一个约定。
+//
+// 没有这个文件时退回调试签名，这样 `flutter run --release` 在任何机器上都还能跑，
+// 但打出来的**不是**发布包。这是刻意的取舍：让构建永远能成功，把「这是不是一个
+// 正式包」的判定交给流水线 —— release.yml 会在构建之后用 apksigner 核对证书里
+// 确实有 CN=LocalTransfer，对不上就失败，而不是发出一批调试签名的包
+// （调试签名无法覆盖升级正式签名，用户将来必须卸载重装）。
+val keystoreProperties = java.util.Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKey = keystorePropertiesFile.exists()
+if (hasReleaseKey) {
+    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "cn.hnasct.local_transfer"
     compileSdk = flutter.compileSdkVersion
@@ -15,7 +31,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "cn.hnasct.local_transfer"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,11 +44,27 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                // 相对路径按模块目录（android/app）解析，所以 key.properties 里写
+                // storeFile=local_transfer-release.p12，密钥就放在 android/app/ 下。
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeType = keystoreProperties.getProperty("storeType") ?: "PKCS12"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
