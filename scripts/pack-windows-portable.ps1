@@ -451,7 +451,15 @@ Add-Type -AssemblyName System.IO.Compression
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
 try {
     $entries = @{}
-    foreach ($e in $archive.Entries) { $entries[$e.FullName] = $e }
+    # zip 条目名里的分隔符随**跑脚本的 PowerShell 版本**变：Windows PowerShell 5.1
+    # （.NET Framework 的 ZipFile）写出来的是 `data\app.so`，PowerShell 7（.NET 5+）
+    # 按 zip 规范归一成 `data/app.so`。本机是 5.1、CI 里 `shell: pwsh` 是 7 —— 不归一
+    # 就会「同一份包，本地绿、CI 红」：2026-10-12 首次发版正是这样，校验报
+    # `zip 缺少必需文件: data\app.so, data\icudtl.dat`，而包里其实一个都不少。
+    # 统一按反斜杠存键，下面的查找就与跑在哪个版本上无关了。
+    foreach ($e in $archive.Entries) {
+        $entries[($e.FullName -replace '/', '\')] = $e
+    }
 
     $required = @('local_transfer.exe', 'flutter_windows.dll', 'data\app.so', 'data\icudtl.dat', '使用说明.txt') + $crtNames
     $missing = @($required | Where-Object { -not $entries.ContainsKey($_) })

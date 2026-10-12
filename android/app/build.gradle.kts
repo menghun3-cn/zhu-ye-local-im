@@ -1,3 +1,9 @@
+// 必须写成顶层 import，不能就地写 `java.util.Properties()`：在 Gradle Kotlin DSL 里
+// `java` 这个名字会被 Java 插件扩展遮蔽，`java.util` 于是被当成「扩展上的 util 成员」，
+// 编译期直接报 `Unresolved reference 'util'`（2026-10-12 首次发布时 CI 就死在这里）。
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -13,11 +19,11 @@ plugins {
 // 正式包」的判定交给流水线 —— release.yml 会在构建之后用 apksigner 核对证书里
 // 确实有 CN=LocalTransfer，对不上就失败，而不是发出一批调试签名的包
 // （调试签名无法覆盖升级正式签名，用户将来必须卸载重装）。
-val keystoreProperties = java.util.Properties()
+val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKey = keystorePropertiesFile.exists()
 if (hasReleaseKey) {
-    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {

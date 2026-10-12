@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-10-12-a-tag-builds-the-three-packages.md
 #   git hash-object 2026-10-12-a-tag-builds-the-three-packages.zh.md
-2026-10-12-a-tag-builds-the-three-packages.md: 898004df9291443cead5e4ab91818d9a8a5ee1c6
-2026-10-12-a-tag-builds-the-three-packages.zh.md: 4c26be3be25573ce237e4a46e850a927b0d03ac1
+2026-10-12-a-tag-builds-the-three-packages.md: 2048a54636eac85151a66c8ec46272fd158b4a1b
+2026-10-12-a-tag-builds-the-three-packages.zh.md: 10e131dd9e86003bcda25ecdd23fc0dffaf409b4
