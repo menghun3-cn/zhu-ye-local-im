@@ -5,13 +5,20 @@
 ; scripts/pack-windows-installer.ps1 调用本文件产出。两者的内容完全相同，
 ; 区别只在「怎么送到用户机器上」。
 ;
-; 一律经由那个脚本调用 —— 它负责把下面几个 #define 传进来，ISCC 不会替你猜：
-;   /DLTStage=<dir>     已经组装好的绿色目录（含 VC++ 运行库与使用说明）
-;   /LTName=LocalTransfer   英文名，用于安装目录与文件名
-;   /LTVersion=0.1.0    版本号（与 pubspec.yaml 一致，由脚本读出）
-;   /LTOut=<dir>        安装包输出目录
-;   /LTIcon=<file>      app_icon.ico 的绝对路径
-;   /LTDocs=<dir>       packaging 目录（取「安装说明.txt」）
+; 一律经由那个脚本调用 —— 它负责把下面几个 #define 传进来，ISCC 不会替你猜。
+; 注意每行的写法是 `/D` + 名字 + `=值`：**开头的 `/D` 就是「定义变量」这个开关**，
+; 名字本身叫 LTStage / LTVersion……，不带 D。漏了那个 D，ISCC 会把它当成不认识的开关：
+; 往 stderr 写一行 `Unknown option:` 就直接以 1 退出，**本文件一个字都不会被解析**
+; —— 它不会把 `{#LTVersion}` 悄悄展开成空串，但那条报错只说「这个选项不认识」，
+; 不说「你少给了一个定义」，指不到病根上。
+; 2026-10-12 第一次真正发版时本文件的这段注释把六个定义全写成了 `/LT…`（同样漏 D），
+; 而 /LTDocs 那一行照抄了它。写错不要紧，别把错的当范本。
+;   /DLTStage=<dir>         已经组装好的绿色目录（含 VC++ 运行库与使用说明）
+;   /DLTName=LocalTransfer  英文名，用于安装目录与文件名
+;   /DLTVersion=0.1.0       版本号（与 pubspec.yaml 一致，由脚本读出）
+;   /DLTOut=<dir>           安装包输出目录
+;   /DLTIcon=<file>         app_icon.ico 的绝对路径
+;   /DLTDocs=<dir>          packaging 目录（取「安装说明.txt」）
 ;
 ; 需要 Inno Setup 6.3 或更高：下面的 ArchitecturesAllowed=x64compatible 是
 ; 6.3 引入的写法（6.2 及更早只认 x64）。

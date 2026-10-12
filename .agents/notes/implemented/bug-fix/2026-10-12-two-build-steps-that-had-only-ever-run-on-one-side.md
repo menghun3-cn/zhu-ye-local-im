@@ -121,7 +121,9 @@ release would put a number in front of every user that nobody can account for.
   gets a different commit for the same tag name — the price of shipping the first
   release under its own number, and acceptable only because nothing was published
   under it.
-- The three artifacts remain partly unproven. The portable zip has now been
-  assembled and compressed by CI and got as far as the verification that threw;
-  the APK has still never compiled successfully; Inno Setup has still never
-  compiled `packaging/local_transfer.iss`.
+- The three artifacts were, at the time, only partly proven — and each has since
+  been exercised. The portable zip got as far as the verification that threw; the
+  APK compiled successfully on the third `v0.1.0` run; and on that same run Inno
+  Setup refused the argument list before parsing `packaging/local_transfer.iss` at
+  all, which is [a fourth defect of its own kind](2026-10-12-a-define-that-was-spelled-without-its-d.md)
+  rather than a fourth instance of these three.
