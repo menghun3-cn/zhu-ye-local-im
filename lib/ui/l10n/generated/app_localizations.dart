@@ -584,12 +584,6 @@ abstract class AppLocalizations {
   /// **'Send a file'**
   String get menuSendFile;
 
-  /// No description provided for @menuSendImage.
-  ///
-  /// In en, this message translates to:
-  /// **'Send an image'**
-  String get menuSendImage;
-
   /// No description provided for @dropToSend.
   ///
   /// In en, this message translates to:
