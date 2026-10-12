@@ -66,11 +66,15 @@ abstract interface class UpdateChecker {
 
 /// Asks GitHub what the latest release is.
 ///
-/// Asked only when the user presses the button — never at startup, and never on
-/// a timer. This application's promise is that it does not talk to anything
-/// outside the network unless it was asked to, and a build that quietly polled
-/// GitHub on launch would break that promise for a convenience nobody asked
-/// for.
+/// Asked twice, and never more often: once as the application comes up — see
+/// `UpdateNotice`, which is what the rail's update entry reads — and again each
+/// time the About surface's button is pressed. Never on a timer, and never from
+/// a page being opened. This application's promise is that it does not talk to
+/// anything outside the local network unless it was asked to, and the one
+/// request it makes on its own is deliberate, happens once per run, carries
+/// nothing about this Device, and is named in the About text for exactly that
+/// reason. A build that polled GitHub on a schedule, or on every visit to a
+/// page, would be breaking that promise quietly instead.
 final class GitHubUpdateChecker implements UpdateChecker {
   /// Asks [repository], giving up after [timeout].
   ///

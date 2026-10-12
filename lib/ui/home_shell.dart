@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/core.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
+import 'external_links.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'pages/about_page.dart';
 import 'pages/clipboard_page.dart';
@@ -13,6 +14,7 @@ import 'pages/devices_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
+import 'update_notice.dart';
 import 'wechat/theme.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
@@ -30,11 +32,22 @@ const int _conversationsSurface = 0;
 /// The six surfaces, and the way between them.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
-  const HomeShell({super.key, required this.seams});
+  const HomeShell({super.key, required this.seams, this.update});
 
   /// The platform facts a page needs but the controller does not carry —
   /// where a Transfer lands by default, and where the profile lives.
   final PlatformSeams seams;
+
+  /// Whether a newer build has been published, when this shell was given
+  /// something that knows.
+  ///
+  /// Held by the application rather than made here, because the question is
+  /// asked once per run and this widget is rebuilt every time the controller
+  /// reports a change: a notice created here would ask again on each rebuild.
+  /// Nullable so that a tree assembled without one — a test that cares about
+  /// something else — simply has no update entry, rather than reaching for the
+  /// network to draw a rail it is not asking about.
+  final UpdateNotice? update;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -193,6 +206,7 @@ class _HomeShellState extends State<HomeShell> {
     // Every surface, kept alive: switching tabs must not restart a page, and a
     // conversation half-typed into one must survive a look at another.
     final content = IndexedStack(index: _index, children: pages);
+    final notice = widget.update;
 
     return Scaffold(
       // No `AppBar` on purpose. The window's own title bar already carries the
@@ -209,6 +223,31 @@ class _HomeShellState extends State<HomeShell> {
                   onDestinationSelected: (index) =>
                       setState(() => _index = index),
                   labelType: NavigationRailLabelType.all,
+                  // The update entry is pinned rather than listed with the six.
+                  // It is not a surface: pressing it leaves the application for
+                  // a browser. A destination in the middle of the list would also
+                  // make every tab below it move the day a seventh surface
+                  // arrives, and the tabs are what a user has learned by
+                  // position.
+                  trailingAtBottom: true,
+                  trailing: notice == null
+                      ? null
+                      : ListenableBuilder(
+                          listenable: notice,
+                          builder: (context, _) {
+                            final version = notice.version;
+                            final url = notice.url;
+                            // Nothing to say while the question is out, and
+                            // nothing to say when the answer is "you are up to
+                            // date": an entry that is always there would be a
+                            // permanent question mark on a rail whose whole job
+                            // is to be a map of where things are.
+                            if (version == null || url == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return _UpdateEntry(version: version, url: url);
+                          },
+                        ),
                   destinations: [
                     for (final destination in destinations)
                       NavigationRailDestination(
@@ -233,6 +272,77 @@ class _HomeShellState extends State<HomeShell> {
               onDestinationSelected: (index) => setState(() => _index = index),
               destinations: destinations,
             ),
+    );
+  }
+}
+
+/// The rail's update entry: one word on the rail, the version on the hover.
+///
+/// The rail has room for one word, so the version number — which is the whole
+/// reason the entry exists rather than a coloured dot — rides on the hover.
+/// That the version is the payload and not the label is why the tooltip is
+/// [AppLocalizations.aboutUpdateAvailable] rather than a sentence invented
+/// here: the About card already says exactly this fact, in exactly this shape,
+/// and two spellings of one number is one place for them to drift apart.
+///
+/// Drawn as a [TextButton] rather than as a [NavigationRailDestination]:
+/// destinations switch the surface below, and this one leaves the application
+/// for a browser. It wears the same icon the About card's 「检查更新」 button
+/// does, so the two read as the same feature, and that icon is already in the
+/// shipped bundle's icon subset.
+class _UpdateEntry extends StatelessWidget {
+  const _UpdateEntry({required this.version, required this.url});
+
+  /// The newer version, named on the hover.
+  final String version;
+
+  /// Where pressing it goes.
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    return Padding(
+      // Room to breathe under the last destination: without it the entry sits
+      // flush against the bottom edge of the window and reads as a tab that has
+      // fallen off the end of the list.
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: Tooltip(
+        message: l10n.aboutUpdateAvailable(version),
+        child: TextButton(
+          onPressed: () => unawaited(LinkResolution.opener.open(url)),
+          // The colours are named rather than inherited: the rail's own theme
+          // styles destinations, and a `TextButton` inside one has no style of
+          // its own to fall back on — it would come out in the theme's default
+          // primary, which is not this design's green.
+          style: TextButton.styleFrom(
+            foregroundColor: colors.brandStrong,
+            // Wide enough to be a comfortable target, narrow enough to fit
+            // inside a 72px rail: the label below is two characters.
+            minimumSize: const Size(0, 52),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(WeChat.controlRadius),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // No colour or size of its own on purpose: a `ButtonStyleButton`
+              // hands its child an `IconTheme` carrying the foreground colour
+              // and the resolved icon size, so the icon is the button's own
+              // green in either theme without saying so twice.
+              const Icon(Icons.system_update_alt),
+              const SizedBox(height: 2),
+              Text(
+                l10n.railUpdate,
+                style: const TextStyle(fontSize: WeChat.fontSizeMeta),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

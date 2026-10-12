@@ -163,7 +163,7 @@
   "noDefaultFolder": "没有默认文件夹",
   "nothingWentWrong": "一切正常。",
 
-  "aboutDescription": "竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。",
+  "aboutDescription": "竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：所有传送都只在本网络内。唯一的例外是启动时向 GitHub 问一次版本号，不发送任何内容。",
   "aboutVersion": "版本 {version}",
   "aboutCheckForUpdates": "检查更新",
   "aboutChecking": "正在检查…",
@@ -173,6 +173,7 @@
   "aboutNoRelease": "还没有发布过任何版本，暂时无从比较本机这版。",
   "aboutUnreachable": "连不上更新服务器。请检查网络，或手动下载新版本。",
   "aboutHowToUpgrade": "升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。",
+  "railUpdate": "更新",
 
   "aliasHelper": "其他设备上显示的名称",
   "cancel": "取消",
