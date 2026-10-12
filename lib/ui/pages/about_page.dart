@@ -14,13 +14,16 @@ import '../widgets.dart';
 ///
 /// A surface of its own rather than a section of Settings: it is the one page
 /// whose content is about the *program* rather than about this Device or this
-/// network, and it is the only one that ever talks to the outside world.
+/// network.
 ///
-/// Nothing here is asked until the user presses 检查更新. That is the whole
-/// reason the button exists rather than the check running on arrival: this
-/// application's promise is that it stays inside the local network, and a page
-/// that reached out on being opened would break that promise for a fact nobody
-/// had asked for yet.
+/// Nothing here is asked when the page is opened, and the difference that makes
+/// is a narrower one than it used to be. The application asks GitHub once as it
+/// comes up — see `UpdateNotice`, and this card's own description, which names
+/// that as the one exception to staying inside the local network — and this
+/// button is how a user asks again on demand, without restarting the app to find
+/// out. What the page must not do is ask on *arrival*: that would turn one
+/// deliberate request per run into one per visit, and a visit is not something a
+/// person thinks of as reaching outwards.
 class AboutPage extends StatefulWidget {
   /// Shows what this build is.
   const AboutPage({super.key});
@@ -107,7 +110,8 @@ class _AboutPageState extends State<AboutPage> {
                     ),
                     if (url != null)
                       TextButton.icon(
-                        onPressed: () => unawaited(openInBrowser(url)),
+                        onPressed: () =>
+                            unawaited(LinkResolution.opener.open(url)),
                         icon: const Icon(Icons.open_in_new, size: 18),
                         label: Text(l10n.aboutOpenDownload),
                       ),

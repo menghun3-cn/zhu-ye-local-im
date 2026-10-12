@@ -259,7 +259,7 @@
   "noDefaultFolder": "no default folder",
   "nothingWentWrong": "Nothing has gone wrong.",
 
-  "aboutDescription": "Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.",
+  "aboutDescription": "Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.",
   "aboutVersion": "Version {version}",
   "@aboutVersion": {
     "placeholders": { "version": { "type": "String" } }
@@ -275,6 +275,7 @@
   "aboutNoRelease": "No version has been published yet, so there is nothing to compare this build against.",
   "aboutUnreachable": "The update server could not be reached. Check the network, or download the new version by hand.",
   "aboutHowToUpgrade": "To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device's identity and must not be touched.",
+  "railUpdate": "Update",
 
   "aliasHelper": "What other Devices show for this one",
   "cancel": "Cancel",

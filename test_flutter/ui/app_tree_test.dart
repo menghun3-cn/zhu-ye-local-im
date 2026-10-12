@@ -9,6 +9,7 @@ import 'package:local_transfer/ui/controller_scope.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/pages/conversation_page.dart';
 import 'package:local_transfer/ui/seams.dart';
+import 'package:local_transfer/ui/update_check.dart';
 
 import '../support/ui_harness.dart';
 
@@ -31,6 +32,14 @@ void main() {
     testWidgets('a route pushed from the shell can read the controller', (
       tester,
     ) async {
+      // The application asks GitHub once as it comes up — that is what the
+      // rail's update entry reads — so pumping `LocalTransferApp` at all now
+      // means answering that question. Answered from a script for the same
+      // reason the host shell below is a recorded one: this test is about the
+      // tree `main` builds, not about what the network says. "Unreachable" is
+      // the answer that leaves the rail exactly as it was, which is what every
+      // assertion below assumes.
+      ScriptedUpdateChecker.install(UpdateCheck.unreachable);
       final seams = PlatformSeams(
         store: MemoryProfileStore(),
         profilePath: null,

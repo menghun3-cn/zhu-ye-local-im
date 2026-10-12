@@ -8,6 +8,7 @@ import 'feedback.dart';
 import 'home_shell.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'seams.dart';
+import 'update_notice.dart';
 import 'wechat/theme.dart';
 
 /// The languages this application speaks, in **fallback order**.
@@ -49,9 +50,29 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   LocalTransferController? _controller;
   Object? _failure;
 
+  /// Whether a newer build has been published, asked once as the app comes up.
+  ///
+  /// This is the single outbound request the application makes without being
+  /// asked at that moment, and it is here rather than in the shell because it is
+  /// asked once per run: the shell is rebuilt on every controller change, and a
+  /// notice created inside one would ask again each time. What it buys is the
+  /// only thing that makes an update entry worth having — the rail can say a
+  /// newer build exists before the user has thought to go looking for one.
+  ///
+  /// The About card's own button still asks on demand; see [UpdateNotice] for
+  /// why the two share one checker, and the About text for how the promise
+  /// this application makes about the network is worded now that this exists.
+  final UpdateNotice _update = UpdateNotice();
+
   @override
   void initState() {
     super.initState();
+    // Deliberately not awaited, and deliberately not inside [_open]: the answer
+    // is about this build rather than about the controller, and a window that
+    // took an extra round trip to appear would be paying for a decoration. The
+    // notice starts out empty and the shell simply has no update entry until an
+    // answer lands.
+    unawaited(_update.check());
     unawaited(_open());
   }
 
@@ -99,6 +120,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     // The seams are not closed with it: this widget was handed them and does
     // not own them.
     unawaited(_controller?.close());
+    _update.dispose();
     super.dispose();
   }
 
@@ -167,7 +189,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   Widget _screenFor(BuildContext context) {
     final controller = _controller;
     if (controller != null) {
-      return HomeShell(seams: widget.seams);
+      return HomeShell(seams: widget.seams, update: _update);
     }
     final failure = _failure;
     if (failure != null) {

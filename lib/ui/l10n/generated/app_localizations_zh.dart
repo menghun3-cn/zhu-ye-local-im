@@ -518,7 +518,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutDescription =>
-      '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：以上一切都只在本网络内。';
+      '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：所有传送都只在本网络内。唯一的例外是启动时向 GitHub 问一次版本号，不发送任何内容。';
 
   @override
   String aboutVersion(String version) {
@@ -551,6 +551,9 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get aboutHowToUpgrade =>
       '升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。';
+
+  @override
+  String get railUpdate => '更新';
 
   @override
   String get aliasHelper => '其他设备上显示的名称';

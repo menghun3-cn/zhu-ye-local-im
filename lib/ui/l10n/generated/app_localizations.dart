@@ -965,7 +965,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDescription.
   ///
   /// In en, this message translates to:
-  /// **'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: everything above stays inside this network.'**
+  /// **'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.'**
   String get aboutDescription;
 
   /// No description provided for @aboutVersion.
@@ -1021,6 +1021,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.'**
   String get aboutHowToUpgrade;
+
+  /// No description provided for @railUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get railUpdate;
 
   /// No description provided for @aliasHelper.
   ///
