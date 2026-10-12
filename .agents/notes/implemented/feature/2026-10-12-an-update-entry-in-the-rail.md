@@ -52,6 +52,14 @@ out, and none when the answer is "you are up to date" or "the question could not
 be asked". A rail is a map of where things are; an entry that is usually a
 no-op is noise on it.
 
+**The whole answer is kept, not a boolean.** `version` and `url` each turn three
+different nothings — "nothing published", "the question could not be asked",
+"this build is the latest" — into one `null`, because the rail does the same
+thing with all three. `answer` is what tells them apart, and it is why the notice
+holds an `UpdateCheck` rather than a flag saying an update exists: the rail is
+allowed to be incurious about *why* it draws nothing, and a test asserting which
+nothing happened is not.
+
 **The version number rides on the tooltip.** The label is one word — `railUpdate`,
 「更新」 — and `Tooltip` carries `l10n.aboutUpdateAvailable(version)`, the same
 sentence the About card already uses for the same fact. A second spelling of one
@@ -78,6 +86,11 @@ last of the six destinations rather than among them, carrying the newer version
 in a tooltip that a hover actually puts on screen, opening the address the answer
 named when pressed, falling back to the download page when it named none, and
 absent in a window with no rail at all.
+
+The one about a question that could not be asked asserts both halves of that
+claim: that the rail drew nothing, *and* that the notice recorded `unreachable`
+rather than still holding nothing — two states the rail draws identically and
+only the notice can separate.
 
 The two seams that make it assertable are in the harness: `ScriptedUpdateChecker`
 (the question would otherwise leave a real request behind) and `ScriptedLinkOpener`
