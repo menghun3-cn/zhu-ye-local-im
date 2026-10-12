@@ -959,15 +959,13 @@ Finder updateEntry(TestWindow window) => find.descendant(
 Finder sendButton(TestWindow window) =>
     onConversation(window, find.widgetWithText(TextButton, l10n.send));
 
-/// The composer's attach ("send a file") button in [window]'s conversation.
+/// The composer's attach button in [window]'s conversation.
+///
+/// The single entry for everything that can be attached — a picture is chosen
+/// through the same dialog as a file and told apart by its extension, so there
+/// is no second button to find.
 Finder attachButton(TestWindow window) =>
     onConversation(window, find.byTooltip(l10n.menuSendFile));
-
-/// The composer's image button in [window]'s conversation.
-Finder imageButton(TestWindow window) => onConversation(
-  window,
-  find.widgetWithIcon(IconButton, Icons.image_outlined),
-);
 
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///
@@ -1020,23 +1018,21 @@ class ScriptedPicker implements FilePicker {
   }
 
   List<String> _files = const [];
-  String? _image;
   String? _directory;
 
   /// How many times the file picker was opened.
   int filesAsked = 0;
 
-  /// How many times the image picker was opened.
-  int imagesAsked = 0;
-
   /// How many times the folder chooser was opened.
   int directoriesAsked = 0;
 
-  /// What the next file picker answers with.
+  /// What the next file picker answers with — pictures included.
+  ///
+  /// One queue for both, because there is one dialog for both: whether a path
+  /// is a picture is the conversation's reading of its extension, and a fixture
+  /// that answered pictures from a second queue would be asserting which button
+  /// was pressed rather than what the user chose.
   void willOffer(List<String> paths) => _files = paths;
-
-  /// What the next image picker answers with, or null to cancel.
-  void willOfferImage(String? path) => _image = path;
 
   /// What the next folder chooser answers with, or null to cancel.
   void willChooseDirectory(String? path) => _directory = path;
@@ -1045,13 +1041,6 @@ class ScriptedPicker implements FilePicker {
   Future<List<XFile>> files() async {
     filesAsked += 1;
     return [for (final path in _files) XFile(path)];
-  }
-
-  @override
-  Future<XFile?> image() async {
-    imagesAsked += 1;
-    final path = _image;
-    return path == null ? null : XFile(path);
   }
 
   @override
