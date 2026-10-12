@@ -383,9 +383,9 @@ class StagedAttachment {
 /// chat send.
 ///
 /// Enter sends and Shift+Enter breaks the line, which is the desktop
-/// convention. That is not what [TextField] does by default, so it is wired by
-/// hand in `_ComposerField` below; `textInputAction` is only a hint to the
-/// *platform* keyboard and does nothing for a physical one.
+/// convention — and neither half of it is what a [TextField] gives on its own.
+/// Both are claimed in `_ComposerField` below, where the reason Shift+Enter
+/// cannot be left to the framework is written down.
 class ConversationComposer extends StatefulWidget {
   /// Builds the composer over [message].
   const ConversationComposer({
@@ -531,16 +531,28 @@ class _ConversationComposerState extends State<ConversationComposer> {
 
 /// The text field, wired so that Enter sends and Shift+Enter breaks the line.
 ///
-/// [TextField] with `maxLines: null` treats Enter as a newline and never calls
-/// [TextField.onSubmitted] — the opposite of what a chat box does. The field is
-/// therefore given `maxLines: null` (so it still grows) and a [Shortcuts] layer
-/// that turns a bare Enter into [SendMessageIntent] while leaving Shift+Enter
-/// to fall through to the default newline insert.
+/// The bare Enter is the easy half: [WidgetsApp] declares the framework's own
+/// text-editing table near the top of the tree, and a [Shortcuts] widget
+/// between that table and the field — this one — overrides it. Claiming Enter
+/// here is therefore enough to make it a send instead of a line break, and the
+/// event is consumed before the table that would have handed it to the IME.
 ///
-/// [TextField.onSubmitted] is wired as well, and is not redundant: a physical
-/// Enter arrives as a key event (the [Shortcuts] path), but a soft keyboard's
-/// send key, a test's `TextInputAction.send`, and any platform that reports the
-/// action instead of the key arrive here. Both roads lead to the same [onSend].
+/// Shift+Enter is the half that has to be claimed here for a reason worth
+/// writing down, because leaving it to the framework looks right and is not.
+/// No default table claims it: every one of those activators is a
+/// [SingleActivator] with `shift: false`, and a [SingleActivator] matches its
+/// modifiers exactly, so Shift+Enter falls past all of them. What answers it is
+/// the *engine*: an enter key nobody claimed is translated into the field's
+/// `textInputAction` — [TextInputAction.send] here — and that action cannot
+/// tell the two chords apart. Left to fall through, Shift+Enter arrives at
+/// [TextField.onSubmitted] as a send, which is the bug this table fixes. So the
+/// chord is claimed, the break is inserted by hand ([_breakLine]), and the key
+/// event is consumed, which is what keeps the engine out of it.
+///
+/// [TextField.onSubmitted] is wired as well, and is not redundant: it is what
+/// answers a soft keyboard's send key — on Android, where this is the only
+/// Enter there is — and any platform that reports the action rather than the
+/// key. Both roads lead to the same [onSend].
 class _ComposerField extends StatelessWidget {
   const _ComposerField({
     required this.controller,
@@ -569,14 +581,28 @@ class _ComposerField extends StatelessWidget {
 
   /// The paste [TextField] would have performed, done here because intercepting
   /// Ctrl+V stopped it from ever happening.
-  ///
-  /// Copies [TextField]'s own rule — the selection is replaced, and the caret
-  /// lands after what was inserted — rather than appending, so that pasting
-  /// over a selection behaves the way it does everywhere else on the desktop.
   Future<void> _pasteText() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text;
     if (text == null || text.isEmpty) return;
+    _insertAtCaret(text);
+  }
+
+  /// Breaks the line, which is what Shift+Enter means here.
+  ///
+  /// Inserted by hand rather than left to the field, because the chord is
+  /// claimed by the table above — see the doc on this widget for why it has to
+  /// be claimed at all.
+  void _breakLine() => _insertAtCaret('\n');
+
+  /// Puts [text] where the caret is, following [TextField]'s own rule — the
+  /// selection is replaced, and the caret lands after what was inserted —
+  /// rather than appending, so that inserting over a selection behaves the way
+  /// it does everywhere else on the desktop.
+  ///
+  /// Written out by hand because both callers stopped the field from doing it
+  /// itself: one by claiming Ctrl+V, the other Shift+Enter.
+  void _insertAtCaret(String text) {
     final value = controller.value;
     final selection = value.selection;
     if (!selection.isValid) {
@@ -610,6 +636,15 @@ class _ComposerField extends StatelessWidget {
         // The same intent under the numpad's key, which is a distinct
         // logical key and would otherwise do nothing on a full-size keyboard.
         SingleActivator(LogicalKeyboardKey.numpadEnter): SendMessageIntent(),
+        // Shift+Enter, both keys again, and claimed rather than left alone.
+        // An enter key that no table answers is translated by the engine into
+        // the field's `textInputAction`, which is a send — so "leaving it to
+        // the default line break" is what makes Shift+Enter send. See the doc
+        // on this widget for the whole of that.
+        SingleActivator(LogicalKeyboardKey.enter, shift: true):
+            InsertLineBreakIntent(),
+        SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
+            InsertLineBreakIntent(),
         // Paste, claimed so that a file or a picture on the clipboard can
         // become a message. Both chords: a desktop has one and a Mac the other,
         // and this is the same one line either way.
@@ -623,6 +658,12 @@ class _ComposerField extends StatelessWidget {
           SendMessageIntent: CallbackAction<SendMessageIntent>(
             onInvoke: (_) {
               onSend();
+              return null;
+            },
+          ),
+          InsertLineBreakIntent: CallbackAction<InsertLineBreakIntent>(
+            onInvoke: (_) {
+              _breakLine();
               return null;
             },
           ),
@@ -641,9 +682,10 @@ class _ComposerField extends StatelessWidget {
           focusNode: focusNode,
           minLines: 1,
           maxLines: 6,
-          // The action a soft keyboard's send key reports, and what a test
-          // drives with `TextInputAction.send`. A physical Enter never reaches
-          // this — it is answered by the [Shortcuts] layer above.
+          // What a soft keyboard's send key reports, and what a test drives
+          // with `TextInputAction.send`. Neither physical Enter chord reaches
+          // it: both are claimed by the [Shortcuts] layer above, and that is
+          // the point of claiming them — this action cannot tell them apart.
           textInputAction: TextInputAction.send,
           onSubmitted: (_) => onSend(),
           style: TextStyle(
@@ -672,6 +714,17 @@ class _ComposerField extends StatelessWidget {
 class SendMessageIntent extends Intent {
   /// Const so the intent can live in a `const` shortcut table.
   const SendMessageIntent();
+}
+
+/// What Shift+Enter in the composer means.
+///
+/// Its own intent rather than the framework's idea of a line break, because
+/// there is no framework intent to claim here: an Enter that nothing claims is
+/// answered by the engine with the field's `textInputAction`, and that is a
+/// send. Breaking the line is therefore this intent's own job.
+class InsertLineBreakIntent extends Intent {
+  /// Const so the intent can live in a `const` shortcut table.
+  const InsertLineBreakIntent();
 }
 
 /// What Ctrl+V in the composer means.
