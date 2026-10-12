@@ -186,6 +186,16 @@ test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 两个脚本的版本号都从 `pubspec.yaml` 读，不写死 —— 写死等于每次发版要记得改多处，
 而改漏了不报错，只会产出一个文件名骗人的包。
 
+另外每次打包都会在同一目录里留一份**固定名**的别名 ——
+`LocalTransfer-latest-windows-x64-portable.zip` /
+`LocalTransfer-latest-windows-x64-setup.exe`，旁边各带一个 `.sha256` 侧车（按
+`sha256sum` 的格式写，拉取方一句 `sha256sum -c` 就能验）：局域网里的脚本要按固定名字
+拉包，而带版本号的名字没法写死。别名**只在全部检查通过之后**才更新，所以它一出现就
+意味着「有一个通过了全部检查的包」；中途任何一步失败时，它保持上一版的完好内容。
+两份别名由同一个 `scripts/publish-latest.ps1` 发布（先写 `.new` 再原子改名，写完复算
+一次哈希），两个打包脚本都不各写一份。CI 的 Release 附件**不含**这两个别名 ——
+`release.yml` 里按版本号显式列出路径，Release 上的「最新」由 tag 决定。
+
 ### 6.3 官网
 
 `site/` 是官网，**纯静态**：一个 `index.html`、一份 `styles.css`、一份 `app.js`，
@@ -236,7 +246,9 @@ tag 推上去之后 `.github/workflows/release.yml` 负责剩下的事：
 
 1. **校验** tag `vX.Y.Z`、`pubspec.yaml`、`appVersion` 三者一致，任何一处对不上一律失败；
 2. 产出三个产物：Windows 安装包（`*-setup.exe`）、Windows 绿色包（`*-portable.zip`）、
-   Android APK（`*-android.apk`）；
+   Android APK（`*-android.apk`）—— **只有这三个**：打包脚本在本机留下的 `latest`
+   固定名别名（见 §6.2）刻意不上传，所以 `release.yml` 里按版本号显式列出产物路径，
+   而不是写 `build/dist/*-portable.zip` 这类会把别名一起带上的通配；
 3. 用 `CHANGELOG.md` 里该版本的条目作为 Release 说明（没有条目时退回自动生成的说明），
    并把三个产物附上去。
 

@@ -630,5 +630,19 @@ if ($Smoke) {
     }
 }
 
+# ---------------------------------------------------------------- 7. latest 别名
+# 局域网里的脚本要按固定名字拉包，而名字里带版本号就没法写死（版本号每次发版都变），
+# 所以每次打包都在同一个目录里再留一份别名，外加它的 .sha256 侧车。
+#
+# 这一步必须在**最后**：只有构建、组包、zip 校验、（可选）冒烟全过了才更新它 —— 于是
+# 「latest 存在」的含义是「有一个通过了全部检查的包」，而不是「刚打出来一个包」。中途
+# 失败时它保持上一版的完好内容（旧，但是好的）；反过来先更新再检查，就等着把坏包推给
+# 全局域网。发布规则本身（先写 .new 再原子改名、写完复算哈希）在 publish-latest.ps1 里，
+# 两个打包脚本都不各写一份 —— 那种规则只该有一处实现。
+Step '更新 latest 别名（局域网脚本按这个名字拉）'
+$latest = Join-Path $dist 'LocalTransfer-latest-windows-x64-portable.zip'
+& (Join-Path $PSScriptRoot 'publish-latest.ps1') -Source $zip -Name (Split-Path $latest -Leaf)
+
 Write-Host ''
 Write-Host "完成: $zip"
+Write-Host "完成: $latest  (固定名，跟这次打包一起更新)"
