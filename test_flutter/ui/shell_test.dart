@@ -265,6 +265,11 @@ void main() {
           ),
         ),
       );
+      // `MaterialApp` cross-fades one theme into the next, so the frame drawn
+      // *on* the flip still carries the palette it is coming from — the lerp
+      // the test above pins. Waiting the animation out is what makes this a
+      // test of the lookup rather than of the interpolation.
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(resolved.brightness, Brightness.light);
       expect(resolved, WeChatColors.light);

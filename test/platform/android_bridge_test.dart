@@ -50,10 +50,14 @@ void main() {
     setUpAll(() {
       final seams = _read(_seamsPath);
       // Read out of the Dart source rather than written down here, so renaming
-      // the Dart constant and forgetting Kotlin is what the test catches.
+      // the Dart constant and forgetting Kotlin is what the test catches. Anchored
+      // to the constant this seam is built on — "the first MethodChannel in the
+      // file" stopped being the paths channel once the host shell added one of
+      // its own above it, and a first-match read compares Kotlin against
+      // whichever declaration happens to be nearest the top.
       channel = _capture(
         seams,
-        RegExp(r"MethodChannel\(\s*'([^']+)'"),
+        RegExp(r"defaultPathsChannel\s*=\s*MethodChannel\(\s*'([^']+)'"),
         'the channel Dart names',
       );
       method = _capture(
