@@ -8,14 +8,6 @@ import 'package:local_transfer/ui/pages/settings_page.dart';
 
 import '../support/ui_harness.dart';
 
-/// A window tall enough for the whole Settings surface to be laid out at once.
-///
-/// Taller than [wideWindow] on purpose. The window-and-startup card is the
-/// third one on the page, and a test that had to scroll to reach a control would
-/// be testing the scroll as much as the control. Width is left at the wide
-/// value so the shell still takes its rail branch.
-const Size tallWindow = Size(1000, 1600);
-
 /// What a restart would read for the close button.
 ///
 /// The stored JSON rather than the live profile the controller is holding: the

@@ -41,31 +41,53 @@ void main() {
     );
   }
 
-  /// Writes [bytes] to a uniquely named temp file and tears it down after.
+  /// Writes [bytes] to a temp file that goes away when the test does.
   ///
   /// The tray reads the bytes off disk — a path that does not exist would make
-  /// every test below a test of the error path by accident.
+  /// every test below a test of the error path by accident. The file lives in a
+  /// [tempDirectory], which is deliberately best-effort about the delete: a
+  /// picture the tray has decoded keeps its bytes mapped on Windows until the
+  /// widget tree that drew it is gone, and that outlives this teardown.
   File pngFixture(String name, Uint8List bytes) {
-    final file = File(
-      '${Directory.systemTemp.path}${Platform.pathSeparator}$name',
-    );
+    final home = tempDirectory('composer-tray-');
+    final file = File('${home.path}${Platform.pathSeparator}$name');
     file.writeAsBytesSync(bytes);
-    addTearDown(() {
-      if (file.existsSync()) file.deleteSync();
-    });
     return file;
   }
 
-  /// Lets the real image decode run to completion (or failure) and re-pumps.
+  /// Whether the tray's thumbnail has answered — with pixels or with the
+  /// broken-picture glyph.
   ///
-  /// A widget test's clock is fake, and a codec runs on real time: without
-  /// this, a decode that *would* fail never fails, and the error path below
-  /// would be untestable.
+  /// Two shapes, because the widget takes two: a decode that succeeds leaves a
+  /// [RawImage] holding an image, and one that fails is handed to `errorBuilder`
+  /// — which *replaces* the [RawImage] with the glyph. Waiting only for the
+  /// first would hang on exactly the case the third test is about.
+  bool thumbnailAnswered(WidgetTester tester) {
+    if (find.byIcon(Icons.broken_image_outlined).evaluate().isNotEmpty) {
+      return true;
+    }
+    final raw = find.descendant(
+      of: find.byType(Image),
+      matching: find.byType(RawImage),
+    );
+    return raw.evaluate().isNotEmpty &&
+        tester.widget<RawImage>(raw).image != null;
+  }
+
+  /// Waits for the tray's thumbnail to finish decoding — either way.
+  ///
+  /// A widget test's clock is fake and a codec runs on real time, so a decode
+  /// that *would* fail never fails under a plain `pump`, and a fixed sleep can
+  /// only guess at how long the engine needs. A staged *file* draws no image at
+  /// all, so there is nothing to wait for and this returns at once — which is
+  /// the state the chip test pins.
   Future<void> letDecodeSettle(WidgetTester tester) async {
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pump();
+    if (find.byType(Image).evaluate().isEmpty) return;
+    await pumpUntil(
+      tester,
+      () => thumbnailAnswered(tester),
+      description: 'the thumbnail’s decode to answer, one way or the other',
+    );
   }
 
   group('the composer attachment tray', () {
