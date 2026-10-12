@@ -1666,7 +1666,9 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
-    testWidgets('a picked image waits as a picture', (tester) async {
+    testWidgets('a picture picked through the file dialog waits as a picture', (
+      tester,
+    ) async {
       final picker = ScriptedPicker.install();
       addTearDown(PickerResolution.reset);
       final hub = MemoryBeaconHub();
@@ -1679,7 +1681,9 @@ void main() {
       final home = tempDirectory('local-transfer-pick-image-');
       final source = File('${home.path}${Platform.pathSeparator}holiday.png');
       await writePng(tester, source, width: 1200, height: 300);
-      picker.willOfferImage(source.path);
+      // There is one dialog, and the picture is chosen from it as a `.png` in a
+      // file list — there is no second, picture-only button any more.
+      picker.willOffer([source.path]);
 
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
@@ -1689,7 +1693,7 @@ void main() {
       );
       await openConversation(tester, windowA, name: 'Bob');
 
-      await tester.tap(imageButton(windowA));
+      await tester.tap(attachButton(windowA));
       await pumpUntil(
         tester,
         () => onConversation(
@@ -1698,7 +1702,7 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'the chosen picture to appear in the composer',
       );
-      expect(picker.imagesAsked, 1);
+      expect(picker.filesAsked, 1, reason: 'the one attach button, one dialog');
       expect(alice.controller.transfers, isEmpty);
 
       await tester.tap(sendButton(windowA));
@@ -1710,7 +1714,9 @@ void main() {
       expect(
         alice.controller.transfers.single.kind,
         PayloadKind.image,
-        reason: 'an image picked as an image travels as one',
+        reason:
+            'its extension is what makes it a picture, not which door it came '
+            'in through',
       );
 
       await pumpUntil(
@@ -1718,6 +1724,96 @@ void main() {
         () => bob.offers.isNotEmpty,
         description: 'Bob to be offered the picture',
       );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('one dialog sends a picture and a file each its own way', (
+      tester,
+    ) async {
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      final hub = MemoryBeaconHub();
+      final inbox = tempDirectory('local-transfer-pick-mixed-in-');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      // Bob is told where things go, so the picture has an answer already and
+      // the file does not — which is exactly the difference the one dialog has
+      // to keep.
+      final bob = await startUiDevice(
+        tester,
+        hub.b,
+        'Bob',
+        defaultIncomingDirectory: inbox.path,
+      );
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final home = tempDirectory('local-transfer-pick-mixed-');
+      final note = File('${home.path}${Platform.pathSeparator}notes.txt');
+      note.writeAsBytesSync([for (var i = 0; i < 16; i++) i]);
+      final picture = File('${home.path}${Platform.pathSeparator}holiday.png');
+      await writePng(tester, picture, width: 40, height: 20);
+      // Both chosen in one go, in the order a multi-select dialog hands them
+      // back.
+      picker.willOffer([picture.path, note.path]);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      await tester.tap(attachButton(windowA));
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('notes.txt'),
+        ).evaluate().isNotEmpty,
+        description: 'both choices to appear in the composer',
+      );
+      expect(picker.filesAsked, 1, reason: 'one dialog for the two of them');
+      expect(alice.controller.transfers, isEmpty);
+
+      await tester.tap(sendButton(windowA));
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 2,
+        description: 'both to be sent',
+      );
+      expect(
+        [for (final transfer in alice.controller.transfers) transfer.kind],
+        [PayloadKind.image, PayloadKind.file],
+        reason: 'the picture travels as a picture and the file as a file',
+      );
+
+      await pumpUntil(
+        tester,
+        () =>
+            bob.controller.transfers.length == 2 &&
+            bob.controller.transfers.any(
+              (view) =>
+                  view.kind == PayloadKind.image && view.localPath != null,
+            ),
+        description: 'the picture to land with nobody answering anything',
+      );
+      expect(
+        bob.controller.transfers.any(
+          (view) => view.kind == PayloadKind.file && view.localPath != null,
+        ),
+        isFalse,
+        reason: 'the file is not written until Bob says yes',
+      );
+      expect(
+        bob.offers.single.kind,
+        PayloadKind.file,
+        reason: 'the picture was never a question and the file still is',
+      );
+
       await tester.runAsync(() => bob.controller.reject(bob.offers.single));
 
       await shutdown(tester, [alice, bob]);

@@ -2,13 +2,12 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 
-/// The file extensions the image picker offers, and the set an image must be in
-/// to be shown as a picture.
+/// The set a file must be in to be sent — and drawn — as a picture.
 ///
 /// A whitelist rather than "let the decoder decide": an image message is drawn
-/// by reading the file, so a picker that let a user choose a `.txt` would
-/// produce a bubble that can only ever show its own name. These are the formats
-/// Flutter's decoders handle on every desktop platform.
+/// by reading the file, so treating a `.txt` as a picture would produce a
+/// bubble that can only ever show its own name. These are the formats Flutter's
+/// decoders handle on every desktop platform.
 const List<String> imageExtensions = [
   'png',
   'jpg',
@@ -31,14 +30,19 @@ const List<String> imageExtensions = [
 /// clears it again in a `tearDown`.
 abstract interface class FilePicker {
   /// Asks for files to send. Empty when the user cancelled.
+  ///
+  /// One dialog for everything the composer can attach, pictures included: a
+  /// picture *is* a file, and which of the two a choice turns out to be is
+  /// decided by [looksLikeImage] rather than by which control was pressed. A
+  /// second dialog behind a picture-only filter would make the same photograph
+  /// two different messages depending on the door it came in through, and would
+  /// leave the user to know that "send a file" cannot send a picture — a rule
+  /// that was only ever true of a filter.
   Future<List<XFile>> files();
-
-  /// Asks for one image to send. Null when the user cancelled.
-  Future<XFile?> image();
 
   /// Asks for a folder to keep things in. Null when the user cancelled.
   ///
-  /// The same seam as the two above, and for the same reason: this is the OS's
+  /// The same seam as the one above, and for the same reason: this is the OS's
   /// own folder chooser, and a dialog that runs outside Flutter never returns
   /// to a `testWidgets` body. A destination a user can only *type* is a
   /// destination most users cannot set at all.
@@ -51,14 +55,6 @@ final class SystemPicker implements FilePicker {
 
   @override
   Future<List<XFile>> files() => openFiles(confirmButtonText: '发送');
-
-  @override
-  Future<XFile?> image() => openFile(
-    confirmButtonText: '发送',
-    acceptedTypeGroups: const [
-      XTypeGroup(label: '图片', extensions: imageExtensions),
-    ],
-  );
 
   @override
   Future<String?> directory() => getDirectoryPath(confirmButtonText: '选择');

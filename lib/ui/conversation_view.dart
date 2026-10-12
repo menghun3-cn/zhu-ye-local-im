@@ -142,17 +142,15 @@ class _ConversationViewState extends State<ConversationView> {
   /// Picking is not sending: the files wait in the box until 发送 is pressed, so
   /// that a message can be written beside them and a wrong choice can be taken
   /// back without having to answer a question on the far side's screen.
+  ///
+  /// Pictures come through here too — one control, one dialog. What a choice
+  /// turns out to be is [_stagePaths]' business, and that is also what decides
+  /// whether the far side is asked to accept it: a picture is drawn on arrival,
+  /// a file waits for a click.
   Future<void> _pickFiles() async {
     final chosen = await PickerResolution.picker.files();
     if (!mounted || chosen.isEmpty) return;
     _stagePaths([for (final file in chosen) file.path]);
-  }
-
-  /// Asks for one image and puts it in the composer.
-  Future<void> _pickImage() async {
-    final chosen = await PickerResolution.picker.image();
-    if (!mounted || chosen == null) return;
-    _stagePaths([chosen.path]);
   }
 
   /// Stages whatever the clipboard is holding, and says whether it staged
@@ -344,7 +342,6 @@ class _ConversationViewState extends State<ConversationView> {
           onSend: () => _sendMessage(controller),
           onPaste: () => _pasteIntoComposer(controller),
           onAttach: canSend ? () => unawaited(_pickFiles()) : null,
-          onPickImage: canSend ? () => unawaited(_pickImage()) : null,
         ),
       ],
     );
@@ -394,7 +391,6 @@ class ConversationComposer extends StatefulWidget {
     required this.onSend,
     required this.onPaste,
     required this.onAttach,
-    this.onPickImage,
     this.attachments = const [],
     this.onRemoveAttachment,
   });
@@ -410,10 +406,11 @@ class ConversationComposer extends StatefulWidget {
   final Future<bool> Function() onPaste;
 
   /// Null when the peer is no longer known well enough to send to it.
+  ///
+  /// The one way in for everything that can be attached, pictures included:
+  /// whether a choice turns out to be a picture or a file is not this control's
+  /// to say — see [_pickFiles] and [_stagePaths].
   final VoidCallback? onAttach;
-
-  /// Null when an image cannot be sent — no peer, or no picker on this platform.
-  final VoidCallback? onPickImage;
 
   /// Files and pictures chosen for this message that have not gone out yet.
   ///
@@ -487,13 +484,6 @@ class _ConversationComposerState extends State<ConversationComposer> {
                   onPressed: widget.onAttach,
                   tooltip: l10n.menuSendFile,
                   icon: const Icon(Icons.attach_file, size: 20),
-                  color: colors.secondaryText,
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  onPressed: widget.onPickImage,
-                  tooltip: l10n.menuSendImage,
-                  icon: const Icon(Icons.image_outlined, size: 20),
                   color: colors.secondaryText,
                   visualDensity: VisualDensity.compact,
                 ),

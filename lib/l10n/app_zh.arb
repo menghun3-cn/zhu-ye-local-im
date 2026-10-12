@@ -96,7 +96,6 @@
   "trusted": "已信任",
 
   "menuSendFile": "发送文件",
-  "menuSendImage": "发送图片",
   "dropToSend": "松手即发送",
   "trustDevice": "信任这台设备",
   "stopTrustingDevice": "不再信任这台设备",
