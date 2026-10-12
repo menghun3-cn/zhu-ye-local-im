@@ -1,0 +1,215 @@
+name: Release
+
+# 打 tag 触发。
+#
+# 按 AGENTS.md §2.2，tag 只在 `release/vX.Y.Z` 合入 `master` **之后**打在 `master` 的
+# tip 上。本工作流不创建 tag，也不该有人从别的分支推 `v*` tag —— 它只负责「tag 已经
+# 存在」之后的事：校验版本号、出三个产物、建 Release。
+#
+# 版本号三处必须一次对齐（tag / pubspec.yaml / appVersion），任何一处对不上一律失败：
+# 名字错了的产物一旦发出去，用户报问题时引用的版本号就是错的。
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 建 Release 需要写权限；此外不需要任何权限。
+# 安卓签名密钥来自仓库 Secrets，只在 runner 内存与临时目录里出现，不进版本库、不进产物。
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: 校验版本号
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: tag / pubspec / appVersion 三者一致
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          pubspec=$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml | head -n1)
+          appversion=$(sed -nE "s/^const String appVersion = '([^']+)';.*/\1/p" lib/app/app_version.dart | head -n1)
+          echo "tag=$tag  pubspec=$pubspec  appVersion=$appversion"
+          if [ -z "$pubspec" ]; then
+            echo "::error::pubspec.yaml 里没找到 version: 行"
+            exit 1
+          fi
+          if [ -z "$appversion" ]; then
+            echo "::error::lib/app/app_version.dart 里没找到 appVersion"
+            exit 1
+          fi
+          if [ "$tag" != "v$pubspec" ]; then
+            echo "::error::tag $tag 与 pubspec.yaml 的 $pubspec 不一致，应为 v$pubspec"
+            exit 1
+          fi
+          if [ "$appversion" != "$pubspec" ]; then
+            echo "::error::appVersion 是 $appversion，pubspec.yaml 是 $pubspec —— 改版本号要同时改两处"
+            exit 1
+          fi
+          echo "version=$pubspec" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows 安装包与绿色包
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 固定在项目当前使用的 Flutter 版本上：发布产物必须可复现，不能今天的流水线
+      # 和上个月打出来的包来自两套 SDK。升级这里是**一次显式动作**，与本地
+      # D:\tools\flutter 的升级一起做。
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+
+      # 绿色包脚本自己会 `flutter pub get` + `flutter build windows --release`，
+      # 并在写完之后验证压缩包本身（文件齐全、目录布局、包内 app.so 含本次新增文案、
+      # 字体字形、以及解压后真的能启动并绑上端口）。CI 里跑的那一份与本地同一份脚本，
+      # 不给流水线留一条「另一套打包方式」。
+      - name: 打绿色包并冒烟
+        shell: pwsh
+        run: ./scripts/pack-windows-portable.ps1 -Smoke
+
+      - name: 装 Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      # 复用上一步组装并验证过的目录。安装包脚本会拒绝在没有该目录时继续，
+      # 也会拒绝 `.iss` 缺 UTF-8 BOM 的版本（缺 BOM 时中文会静默变乱码）。
+      - name: 打安装包
+        shell: pwsh
+        run: ./scripts/pack-windows-installer.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: |
+            build/dist/*-portable.zip
+            build/dist/*-setup.exe
+
+  android:
+    name: Android APK
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+
+      # runner 镜像通常已经接受过许可，这一步是保险。失败不致命，所以不据此判红。
+      - name: 接受 Android 许可
+        run: yes | flutter doctor --android-licenses || true
+
+      # 从 Secrets 还原签名密钥，并写出 android/key.properties —— 与开发者本机放的
+      # 是同一个文件、同一个格式（见 android/app/build.gradle.kts 的注释）。
+      - name: 落盘签名密钥
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::缺少仓库 Secret：$name（见 packaging/安装说明.txt 与本次发布的说明）"
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/local_transfer-release.p12
+          cat > android/key.properties <<EOF
+          storeFile=local_transfer-release.p12
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          storeType=PKCS12
+          EOF
+
+      - name: 构建 APK
+        run: flutter build apk --release
+
+      - name: 改名并核对签名
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/dist
+          apk="build/dist/LocalTransfer-${{ needs.version.outputs.version }}-android.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk "$apk"
+
+          # 必须核对签名：没有密钥时 Gradle 会**静默**退回调试签名（见
+          # android/app/build.gradle.kts），那样打出来的包用户将来无法覆盖升级，
+          # 而构建本身是成功的 —— 只有在这里当场证伪才拦得住。
+          apksigner=$(ls "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$apksigner" ]; then
+            echo "::error::找不到 apksigner，无法核对签名"
+            exit 1
+          fi
+          "$apksigner" verify --print-certs "$apk" | tee certs.txt
+          if ! grep -q 'CN=LocalTransfer' certs.txt; then
+            echo "::error::这个 APK 不是用本项目的发布密钥签的（很可能是调试签名）"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          path: build/dist/*-android.apk
+
+  release:
+    name: 建 Release
+    needs: [version, windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 列出产物
+        run: ls -l dist
+
+      # Release 说明取 CHANGELOG.md 里该版本的条目 —— 发布流程（git-publish）本来
+      # 就要求 release 分支上先写好这一节，这里只是把它搬上去，不另写一份。
+      # 没有对应条目时退回 GitHub 自动生成的说明，而不是发一条空 Release。
+      - name: 建 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.version.outputs.version }}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { inside = 1; next }
+            inside && index($0, "## [") == 1 { exit }
+            inside { print }
+          ' CHANGELOG.md > release-notes.md
+          title="竹叶局域网传输 v$version"
+          if [ -s release-notes.md ]; then
+            echo "用 CHANGELOG.md 里 v$version 的条目作为说明"
+            gh release create "v$version" dist/* --title "$title" --notes-file release-notes.md
+          else
+            echo "CHANGELOG.md 里没有 v$version 的条目，改用自动生成的说明"
+            gh release create "v$version" dist/* --title "$title" --generate-notes
+          fi
