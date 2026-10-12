@@ -402,7 +402,7 @@ $noteCandidates = @(
 )
 $noteSource = $noteCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if ($noteSource) {
-    # 构建日期与 commit 号随每次打包变化，写死在模板里必然过时 —— 自动改写这两行。
+    # 构建日期、commit 号与**版本号**都随每次打包变化，写死在模板里必然过时 —— 逐行改写。
     $commit = (& git rev-parse --short HEAD 2>$null)
     if (-not $commit) { $commit = 'unknown' }
     $branch = (& git rev-parse --abbrev-ref HEAD 2>$null)
@@ -410,8 +410,18 @@ if ($noteSource) {
     $body = Get-Content -Path $noteSource -Raw -Encoding UTF8
     $body = $body -replace '(?m)^构建日期：.*$', "构建日期：$(Get-Date -Format 'yyyy-MM-dd')"
     $body = $body -replace '(?m)^代码版本：.*$', "代码版本：$branch @ $commit"
+    # 标题行也带着版本号，而且它是用户在包里读到的**第一句话** —— 写着旧版本号，用户报
+    # 问题时引用的版本就是错的（release.yml 里那条注释说的正是这件事）。整行替换，不碰正文。
+    $body = $body -replace '(?m)^竹叶局域网传输.*— Windows 绿色免安装版（x64）\s*$', "竹叶局域网传输 $version — Windows 绿色免安装版（x64）"
     Set-Content -Path $note -Value $body -Encoding UTF8 -NoNewline
-    Write-Host "    + 使用说明.txt (来自 $noteSource，已改写为 $branch @ $commit)"
+
+    # 为什么读回来再查一遍：上面那条替换是「整行锚定」的，模板标题改个字或换个标点就
+    # **静默**不再匹配 —— 包照旧打得出来，只是又带着旧版本号。所以让「没写进去」在这里失败。
+    $noteFirstLine = Get-Content -Path $note -TotalCount 1 -Encoding UTF8
+    if ($noteFirstLine -notmatch [regex]::Escape($version)) {
+        throw "使用说明.txt 的标题行没有带上本次版本号 $version（当前读到：「$noteFirstLine」）—— 「竹叶局域网传输 … — Windows 绿色免安装版（x64）」这一行是不是被改过？"
+    }
+    Write-Host "    + 使用说明.txt (来自 $noteSource，已改写为 $version / $branch @ $commit)"
 } else {
     $ver = $version
     @(
