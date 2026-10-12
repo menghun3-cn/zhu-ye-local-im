@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-a-picked-file-waits-in-the-composer.md
+#   git hash-object 2026-10-09-a-picked-file-waits-in-the-composer.zh.md
+2026-10-09-a-picked-file-waits-in-the-composer.md: 0ef281c529281bef3354dd633312ce05316cb489
+2026-10-09-a-picked-file-waits-in-the-composer.zh.md: c3d9d3661e231fc7e0da0edbc69491cdf45f8dca

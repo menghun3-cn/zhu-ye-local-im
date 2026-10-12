@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-08-packaging-is-a-script-not-a-ritual.md
+#   git hash-object 2026-10-08-packaging-is-a-script-not-a-ritual.zh.md
+2026-10-08-packaging-is-a-script-not-a-ritual.md: 7f494478edce0bf3119134905896d5c50331ae56
+2026-10-08-packaging-is-a-script-not-a-ritual.zh.md: b901c7b107bd2cd3a7fb06e77737d9cc7a221cb2

@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-the-board-and-a-received-bubble-trade-fills.md
+#   git hash-object 2026-10-09-the-board-and-a-received-bubble-trade-fills.zh.md
+2026-10-09-the-board-and-a-received-bubble-trade-fills.md: 9624354d1622c4afefb61ade774239e2933cf568
+2026-10-09-the-board-and-a-received-bubble-trade-fills.zh.md: 7b152293ee24d3b60db13eef4943cf845e3cf4b9

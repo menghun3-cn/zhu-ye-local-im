@@ -12,6 +12,9 @@ android/local.properties
 android/key.properties
 *.jks
 *.keystore
+# 发布签名密钥是 PKCS12 容器。CI 从 GitHub Secrets 把它写到 android/app/ 下，
+# 本机放一份也一样 —— 两种情形都不该进版本库。
+*.p12
 
 # Windows
 windows/flutter/ephemeral/
@@ -34,3 +37,6 @@ Desktop.ini
 *.key
 .env
 .env.*
+
+# Local agent workspace — session logs and notes, never part of the shipped project
+.workbuddy/

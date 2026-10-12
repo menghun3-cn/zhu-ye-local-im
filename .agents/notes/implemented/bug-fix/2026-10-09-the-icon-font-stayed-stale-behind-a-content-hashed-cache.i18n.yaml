@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-09-the-icon-font-stayed-stale-behind-a-content-hashed-cache.md
+#   git hash-object 2026-10-09-the-icon-font-stayed-stale-behind-a-content-hashed-cache.zh.md
+2026-10-09-the-icon-font-stayed-stale-behind-a-content-hashed-cache.md: b7ed323780a9f4716360e22cb36dbf52416efc19
+2026-10-09-the-icon-font-stayed-stale-behind-a-content-hashed-cache.zh.md: 226021a3739013b69f7d66b9e8aa38a8e09c44ad

@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-29-core-wire-protocol-and-secure-session.md
+#   git hash-object 2026-09-29-core-wire-protocol-and-secure-session.zh.md
+2026-09-29-core-wire-protocol-and-secure-session.md: 426a88f946184d2c8d71635d50a6968fb2410223
+2026-09-29-core-wire-protocol-and-secure-session.zh.md: c0b1889c0d5e9603a9698b4217bb4a82bee2d9e1

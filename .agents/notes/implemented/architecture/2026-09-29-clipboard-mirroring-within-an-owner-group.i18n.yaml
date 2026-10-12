@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-09-29-clipboard-mirroring-within-an-owner-group.md
+#   git hash-object 2026-09-29-clipboard-mirroring-within-an-owner-group.zh.md
+2026-09-29-clipboard-mirroring-within-an-owner-group.md: 597fd09da0aeec3bfee4c0147cfb4f290bd03057
+2026-09-29-clipboard-mirroring-within-an-owner-group.zh.md: 5e271e2d3bcb3f8bbe747d5f6e4daa5410e97c23
