@@ -60,8 +60,14 @@ URL 还得先问一次 API。而局域网场景恰恰是**网络可能根本到�
 **`release.yml` 的产物路径在同一次提交里改了。** 原本是 `build/dist/*-portable.zip` 和
 `build/dist/*-setup.exe`，两个通配都命中别名；放着不管的话，一次发布就会带上五个附件，而不是
 三个，其中两对和旁边的兄弟文件逐字节相同。现在路径显式写出名字里的版本号。Releases 页面上的
-数量仍然是三个，这与[产物那篇笔记](2026-10-12-a-tag-builds-the-three-packages.md)和 `AGENTS.md`
-§9 的说法一致。
+数量**当时**仍是三个，这与[产物那篇笔记](2026-10-12-a-tag-builds-the-three-packages.md)和
+`AGENTS.md` §9 的说法一致。
+
+那一条排除后来被**反转**了，见
+[随 Release 一起发那篇](2026-10-12-the-fixed-name-goes-out-with-the-release.md)：同样这两个
+别名现在也作为 Release 附件发出去，因为局域网之外的机器没有别的路够到它们。这里定下的其余一切
+仍然成立 —— 让别名意味着「有一个包通过了全部检查」的那个次序、原子改名、复制后复算哈希、侧车
+格式、规则只有一处实现 —— 两篇笔记要合起来读。
 
 ## Verification
 

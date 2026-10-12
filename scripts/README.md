@@ -33,6 +33,8 @@
 
 每次打包还会在同一目录里留一份**固定名**的别名（`LocalTransfer-latest-windows-x64-portable.zip`，旁边一个同名 `.sha256`），给局域网里按固定地址拉包的脚本用——带版本号的名字没法写死在脚本里。别名由 `publish-latest.ps1` 统一发布，并且**只在全部检查通过之后**才更新，所以它一出现就意味着「有一个通过了全部检查的包」。
 
+这两个别名同时会**跟着 Release 一起发**（`release.yml` 里连 `.sha256` 一起逐条列出），外网的机器因此也能按固定地址拉包：`releases/latest/download/LocalTransfer-latest-windows-x64-setup.exe`。发出前那一步会用 `sha256sum -c` 验侧车、用 `cmp` 确认别名与本版产物逐字节相同。
+
 ## 常用命令
 
 ```powershell
