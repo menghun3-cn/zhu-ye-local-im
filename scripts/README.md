@@ -10,6 +10,7 @@
 | `verify-translation-pairs.ps1` | 校验 `.md` / `.zh.md` 双语配对的 `.i18n.yaml` 一致性记录；确认一致后可用 `-Write` 重写记录 |
 | `fetch-sources.ps1` | 按 `data/pins/*.json` 下载并校验数据源缓存，哈希不一致即失败 |
 | `pack-windows-portable.ps1` | 把 Windows release 构建打成绿色免安装 zip，并验证产物确实含当前代码；`-Smoke` 追加启动冒烟 |
+| `publish-latest.ps1` | 把一个带版本号的产物发布成固定名（latest）别名，并写 `.sha256` 侧车；由两个打包脚本在收尾时调用 |
 
 ## 打 Windows 绿色包
 
@@ -29,6 +30,10 @@
 - **`flutter build windows` 不会带上 VC++ 运行库。** `local_transfer.exe` 动态导入 `MSVCP140.dll` / `VCRUNTIME140.dll` / `VCRUNTIME140_1.dll`，开发机上 `System32` 里有所以测不出来，干净机器上会直接报「找不到 VCRUNTIME140.dll」。脚本从 VS 的 `VC\Redist\MSVC\<ver>\x64\Microsoft.VC143.CRT` 取来补齐。
 
 说明文件的维护位置：**`packaging/使用说明.txt`**（在版本库里，别人 clone 后就有完整版）。脚本每次把它复制进包，并把「构建日期」和「代码版本」两行改写成实际值——这两行随每次打包变化，写死在模板里必然过时。找不到该文件时依次退回 `build/dist/使用说明.txt`，再没有就生成一份最小的兜底。
+
+每次打包还会在同一目录里留一份**固定名**的别名（`LocalTransfer-latest-windows-x64-portable.zip`，旁边一个同名 `.sha256`），给局域网里按固定地址拉包的脚本用——带版本号的名字没法写死在脚本里。别名由 `publish-latest.ps1` 统一发布，并且**只在全部检查通过之后**才更新，所以它一出现就意味着「有一个通过了全部检查的包」。
+
+这两个别名同时会**跟着 Release 一起发**（`release.yml` 里连 `.sha256` 一起逐条列出），外网的机器因此也能按固定地址拉包：`releases/latest/download/LocalTransfer-latest-windows-x64-setup.exe`。发出前那一步会用 `sha256sum -c` 验侧车、用 `cmp` 确认别名与本版产物逐字节相同。
 
 ## 常用命令
 

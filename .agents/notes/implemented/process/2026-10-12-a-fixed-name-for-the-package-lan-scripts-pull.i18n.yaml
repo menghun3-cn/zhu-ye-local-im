@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-12-a-fixed-name-for-the-package-lan-scripts-pull.md
+#   git hash-object 2026-10-12-a-fixed-name-for-the-package-lan-scripts-pull.zh.md
+2026-10-12-a-fixed-name-for-the-package-lan-scripts-pull.md: e7190e185e2277f0a6f8a875d9791bcb98c0edc7
+2026-10-12-a-fixed-name-for-the-package-lan-scripts-pull.zh.md: 0db1f3c2b1bc30b97452d528a58715d65ec8761e

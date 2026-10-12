@@ -4,7 +4,7 @@ name: Release
 #
 # 按 AGENTS.md §2.2，tag 只在 `release/vX.Y.Z` 合入 `master` **之后**打在 `master` 的
 # tip 上。本工作流不创建 tag，也不该有人从别的分支推 `v*` tag —— 它只负责「tag 已经
-# 存在」之后的事：校验版本号、出三个产物、建 Release。
+# 存在」之后的事：校验版本号、出三个产物（外加固定名别名）、建 Release。
 #
 # 版本号三处必须一次对齐（tag / pubspec.yaml / appVersion），任何一处对不上一律失败：
 # 名字错了的产物一旦发出去，用户报问题时引用的版本号就是错的。
@@ -88,13 +88,25 @@ jobs:
         shell: pwsh
         run: ./scripts/pack-windows-installer.ps1
 
+      # 按名字**逐条列出**，不写成 `build/dist/*-portable.zip` 这类通配：那个目录里还有
+      # `使用说明.txt` 之类的东西，通配会把它们一起当成产物。
+      #
+      # 固定名（`-latest-`）别名跟着上 Release，是给**外网**的机器用的：它们进不了局域网，
+      # 只能靠 `releases/latest/download/<名字>` 这种固定地址，而那个地址要求附件名不带
+      # 版本号。别名与版本化产物内容相同，`.sha256` 侧车一起带上，拉取方才有东西可校验。
+      # 别名由打包脚本在冒烟通过之后才写（scripts/publish-latest.ps1），所以附件里有它
+      # 就等于「这一版通过了全部检查」—— 它的存在本身就是那个结论。
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           if-no-files-found: error
           path: |
-            build/dist/*-portable.zip
-            build/dist/*-setup.exe
+            build/dist/LocalTransfer-${{ needs.version.outputs.version }}-windows-x64-portable.zip
+            build/dist/LocalTransfer-${{ needs.version.outputs.version }}-windows-x64-setup.exe
+            build/dist/LocalTransfer-latest-windows-x64-portable.zip
+            build/dist/LocalTransfer-latest-windows-x64-portable.zip.sha256
+            build/dist/LocalTransfer-latest-windows-x64-setup.exe
+            build/dist/LocalTransfer-latest-windows-x64-setup.exe.sha256
 
   android:
     name: Android APK
@@ -189,6 +201,42 @@ jobs:
 
       - name: 列出产物
         run: ls -l dist
+
+      # 固定地址是外网唯一的入口，所以在发出去之前再核一遍：附件齐不齐、侧车认不认、
+      # 别名是不是**这一版**的包。
+      #
+      # 三点各自的理由：
+      #   1) 缺别名 → `releases/latest/download/<名字>` 会 404，而用户看到的只是「下载
+      #      失败」，查不到是发版这一步漏了；
+      #   2) 侧车用真的 `sha256sum -c` 验 —— 拉取方用的是同一个工具、同一份侧车。侧车格式
+      #      （`<小写哈希>  文件名`、无 BOM、只有 LF）到底对不对只有它能证，自己再写一段
+      #      等价的校验逻辑，只是把自己的错再算一遍；
+      #   3) 别名必须与本次的版本化产物**逐字节相同**：它代表「这一版的包」，不是上一版
+      #      留下来的副本（打包脚本写完别名之后某一步失败时就会是那样）。
+      - name: 核对 latest 别名
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          for kind in portable.zip setup.exe; do
+            asset="LocalTransfer-latest-windows-x64-$kind"
+            versioned="LocalTransfer-$VERSION-windows-x64-$kind"
+            if [ ! -s "$asset" ]; then
+              echo "::error::Release 附件里缺 $asset —— 外网的固定地址会 404"
+              exit 1
+            fi
+            if [ ! -s "$asset.sha256" ]; then
+              echo "::error::$asset 没有 .sha256 侧车"
+              exit 1
+            fi
+            if ! cmp --silent "$asset" "$versioned"; then
+              echo "::error::$asset 与本次的 $versioned 不是同一份内容"
+              exit 1
+            fi
+          done
+          sha256sum -c ./*.sha256
 
       # Release 说明取 CHANGELOG.md 里该版本的条目 —— 发布流程（git-publish）本来
       # 就要求 release 分支上先写好这一节，这里只是把它搬上去，不另写一份。

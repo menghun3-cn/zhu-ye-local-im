@@ -186,6 +186,22 @@ test_flutter/     widget 测试（由 flutter test test_flutter 跑）
 两个脚本的版本号都从 `pubspec.yaml` 读，不写死 —— 写死等于每次发版要记得改多处，
 而改漏了不报错，只会产出一个文件名骗人的包。
 
+另外每次打包都会在同一目录里留一份**固定名**的别名 ——
+`LocalTransfer-latest-windows-x64-portable.zip` /
+`LocalTransfer-latest-windows-x64-setup.exe`，旁边各带一个 `.sha256` 侧车（按
+`sha256sum` 的格式写，拉取方一句 `sha256sum -c` 就能验）：局域网里的脚本要按固定名字
+拉包，而带版本号的名字没法写死。别名**只在全部检查通过之后**才更新，所以它一出现就
+意味着「有一个通过了全部检查的包」；中途任何一步失败时，它保持上一版的完好内容。
+两份别名由同一个 `scripts/publish-latest.ps1` 发布（先写 `.new` 再原子改名，写完复算
+一次哈希），两个打包脚本都不各写一份。
+
+别名也**跟着 Release 一起发**（`release.yml` 里逐条列出，连 `.sha256` 侧车）：局域网
+之外没有别的通道 —— 外网的机器只能按固定地址拉包，即
+`releases/latest/download/LocalTransfer-latest-windows-x64-setup.exe`（绿色包同理）。
+`releases/latest/download/<名字>` 要求附件名里不带版本号，而「最新」那个 Release 由 tag
+决定。发出去之前那一步会再核一遍：`sha256sum -c` 验侧车、`cmp` 确认别名与本次的版本化
+产物逐字节相同 —— 外网拿到的东西必须就是刚验完的那个包，不是上一版的遗留。
+
 ### 6.3 官网
 
 `site/` 是官网，**纯静态**：一个 `index.html`、一份 `styles.css`、一份 `app.js`，
@@ -199,7 +215,10 @@ Settings → Pages → Source 必须是 **GitHub Actions**（不是「从分支�
 否则这个工作流跑完也没人接管产物。
 
 页面上的下载按钮默认指向 `releases/latest`，能读到 GitHub API 时替换成具体产物、
-读不到就退回那个链接 —— 官网不会因为一次限流或离线而给出死链。
+读不到就退回那个链接 —— 官网不会因为一次限流或离线而给出死链。附件里同时存在别名
+（§6.2），后缀匹配会把它一并命中，所以 `app.js` 显式跳过 `-latest-` 的名字：按钮旁边
+写着版本号，选到别名就成了「标签是 v0.1.1、文件名里却没有版本」。下载区还列出了那两个
+固定地址（不依赖 API，永远指向最新一版），给要写脚本的人直接抄。
 
 ## 7. 平台事实约束
 
@@ -236,9 +255,13 @@ tag 推上去之后 `.github/workflows/release.yml` 负责剩下的事：
 
 1. **校验** tag `vX.Y.Z`、`pubspec.yaml`、`appVersion` 三者一致，任何一处对不上一律失败；
 2. 产出三个产物：Windows 安装包（`*-setup.exe`）、Windows 绿色包（`*-portable.zip`）、
-   Android APK（`*-android.apk`）；
+   Android APK（`*-android.apk`），**外加** Windows 那两个固定名别名与它们的 `.sha256`
+   侧车（见 §6.2 —— 外网的机器只能按固定地址拉包，所以别名要跟着上 Release）。产物在
+   `release.yml` 里逐条按名字列出，不写 `build/dist/*-portable.zip` 这类通配：同一个
+   目录里还有 `使用说明.txt` 之类的东西，通配会把它们一起当成产物；
 3. 用 `CHANGELOG.md` 里该版本的条目作为 Release 说明（没有条目时退回自动生成的说明），
-   并把三个产物附上去。
+   把上述产物附上去。建 Release 之前先核一遍：`sha256sum -c` 验侧车、`cmp` 确认别名与
+   本版产物逐字节相同 —— 缺别名或对不上就**不发**（固定地址 404 比不发版更难查）。
 
 因此**发版前必须先写好 CHANGELOG 条目**，且版本号三处（pubspec / appVersion / tag）
 要在 release 分支上一次性对齐再合入 `master`。产物由 tag 决定，不由谁的本地机器决定 ——
