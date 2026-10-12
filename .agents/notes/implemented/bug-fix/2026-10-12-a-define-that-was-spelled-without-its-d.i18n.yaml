@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-12-a-define-that-was-spelled-without-its-d.md
+#   git hash-object 2026-10-12-a-define-that-was-spelled-without-its-d.zh.md
+2026-10-12-a-define-that-was-spelled-without-its-d.md: 0308893c17fb02170c85b55321bd4fd93eead81e
+2026-10-12-a-define-that-was-spelled-without-its-d.zh.md: c46d0440af53b5a4061ae379738c093c8b09e265
