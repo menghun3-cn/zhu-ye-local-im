@@ -23,12 +23,15 @@ import 'reveal.dart';
 /// *settled* Transfer offers — showing its file in its folder, and putting a
 /// picture back on the clipboard — lives here beside them for the same reason.
 
-/// Asks where [view]'s offer should land, then takes it.
+/// Answers [view]'s offer by taking it.
 ///
-/// [defaultDirectory] is where the platform puts received files when the user
-/// has not said otherwise; the folder is asked for rather than assumed, because
-/// a Device that only ever wrote to one folder would be a Device that cannot
-/// file anything.
+/// [defaultDirectory] is where received files go — what the user chose in
+/// settings, or the platform's own default. Pressing 接收 *is* the answer, so
+/// when that folder exists the offer lands in it straight away and nothing
+/// else is asked: a second question between the click and the bytes would make
+/// the button feel like the first half of one. The folder question is kept
+/// only for a Device that has no folder to receive into at all, where assuming
+/// one would mean being able to file nothing.
 Future<void> acceptOffer(
   BuildContext context,
   LocalTransferController controller,
@@ -38,20 +41,25 @@ Future<void> acceptOffer(
   final offer = view.offer;
   if (offer == null) return;
   final l10n = AppLocalizations.of(context);
-  final path = await askForDirectory(
-    context,
-    title: view.kind == PayloadKind.file
-        ? l10n.whereShouldFilesLand
-        : l10n.whereShouldThisArrive,
-    initial: defaultDirectory,
-  );
+  final path = defaultDirectory == null || defaultDirectory.isEmpty
+      ? await askForDirectory(
+          context,
+          title: view.kind == PayloadKind.file
+              ? l10n.whereShouldFilesLand
+              : l10n.whereShouldThisArrive,
+          initial: defaultDirectory,
+        )
+      : defaultDirectory;
   if (path == null) return;
-  // The dialog is gone by now, and so may be the surface behind it.
+  // Only the dialog road can outlive the surface behind it; the direct one has
+  // not awaited anything. One check covers both.
   if (!context.mounted) return;
   await guarded(context, () async {
     final directory = Directory(path);
     // A folder the user typed may not exist yet; creating it here rather than
-    // failing the Transfer is what makes the field usable.
+    // failing the Transfer is what makes the field usable. The default needs
+    // it too: "files go to Downloads/LocalTransfer" has to become true the
+    // first time 接收 is pressed.
     directory.createSync(recursive: true);
     await controller.acceptInto(offer, directory);
   });

@@ -490,7 +490,9 @@ void main() {
       );
 
       await tapButton(tester, l10n.accept, window: windowA);
-      // Accepting is not enough on its own: the folder has to be chosen.
+      // Bob was started with no folder to receive into, so accepting is not
+      // enough on its own: the folder is the one thing left to ask. The test
+      // after this one covers the Device that already has a folder.
       await pumpUntil(
         tester,
         () => dialogIsOpen(windowA),
@@ -522,6 +524,76 @@ void main() {
 
       await shutdown(tester, [alice, bob]);
     });
+
+    testWidgets(
+      'accepting a file asks no second question when there is a folder to receive into',
+      (tester) async {
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        // Bob knows where received files go: the answer the folder dialog would
+        // have collected is already on the Device, so pressing 接收 had better
+        // be the whole answer.
+        final inbox = tempDirectory('local-transfer-accept-in-');
+        final bob = await startUiDevice(
+          tester,
+          hub.b,
+          'Bob',
+          defaultIncomingDirectory: inbox.path,
+        );
+        await pumpWindow(tester, bob);
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+
+        final home = tempDirectory('local-transfer-accept-out-');
+        final source = File(
+          '${home.path}${Platform.pathSeparator}straight-in.bin',
+        );
+        source.writeAsBytesSync([for (var i = 0; i < 32; i++) i]);
+        await tester.runAsync(() => alice.controller.sendFile(source));
+        await pumpUntil(
+          tester,
+          () => bob.offers.isNotEmpty,
+          description: 'Bob to be offered the file',
+        );
+        await openTab(tester, l10n.tabTransfers, window: windowA);
+        await pumpUntil(
+          tester,
+          () => onPage(
+            windowA,
+            TransfersPage,
+            find.text(l10n.accept),
+          ).evaluate().isNotEmpty,
+          description: 'the offer to render with its two answers',
+        );
+
+        await tapButton(tester, l10n.accept, window: windowA);
+        await tester.pump();
+        expect(
+          dialogIsOpen(windowA),
+          isFalse,
+          reason: 'the folder is already known; the click is the whole answer',
+        );
+        await pumpUntil(
+          tester,
+          () => bob.offers.single.state == TransferState.completed,
+          description: 'the Transfer to complete',
+        );
+        // The bytes land *after* the Transfer reports itself complete (the sink
+        // closes and the staged file is renamed then), so the file on disk is
+        // the thing to wait for rather than the state.
+        final written = File(
+          '${inbox.path}${Platform.pathSeparator}straight-in.bin',
+        );
+        await pumpUntil(
+          tester,
+          () => written.existsSync(),
+          description: 'the file to land in the receiving folder',
+        );
+        expect(written.lengthSync(), 32);
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
   });
 
   group('the Clipboard surface', () {
