@@ -75,6 +75,7 @@ final class UiDevice {
     required this.clipboard,
     required this.store,
     required this.messageStore,
+    required this.hostShell,
     required this.seams,
   });
 
@@ -92,6 +93,10 @@ final class UiDevice {
   /// to assert "this message is still here after a restart" without a real file
   /// and a real second process.
   final MessageStore messageStore;
+
+  /// The window and startup behaviour this Device was given, and where a test
+  /// reads back what the app told the window to do.
+  final ScriptedHostShell hostShell;
 
   /// What the pages are told about the platform.
   final PlatformSeams seams;
@@ -133,6 +138,8 @@ Future<UiDevice> startUiDevice(
   String? defaultIncomingDirectory,
   DevicePlatform platform = DevicePlatform.windows,
   MessageStore? messageStore,
+  HostShell? hostShell,
+  bool controlsWindow = true,
 }) async {
   late final UiDevice device;
   await tester.runAsync(() async {
@@ -141,6 +148,10 @@ Future<UiDevice> startUiDevice(
     // Handed in when a test wants a conversation to survive a restart: the
     // second Device over the same store is the restart.
     final conversation = messageStore ?? MemoryMessageStore();
+    // A host that records instead of acting. Installed by default rather than
+    // left null so that every Device under test has one to look at, exactly as
+    // the platform layer hands one to the real Device.
+    final host = hostShell ?? ScriptedHostShell();
     final controller = LocalTransferController(
       store: store,
       beaconTransport: transport,
@@ -156,6 +167,7 @@ Future<UiDevice> startUiDevice(
       // never heard of, and an image would be offered instead of filed.
       defaultIncomingDirectory: defaultIncomingDirectory,
       messageStore: conversation,
+      hostShell: host,
     );
     await controller.start();
     device = UiDevice(
@@ -163,6 +175,7 @@ Future<UiDevice> startUiDevice(
       clipboard: clipboard,
       store: store,
       messageStore: conversation,
+      hostShell: host,
       // The same objects the controller was built on, plus the two facts the
       // pages need but the controller does not carry.
       seams: PlatformSeams(
@@ -174,6 +187,8 @@ Future<UiDevice> startUiDevice(
         clipboard: clipboard,
         platform: platform,
         defaultIncomingDirectory: defaultIncomingDirectory,
+        hostShell: host,
+        controlsWindow: controlsWindow,
       ),
     );
     // Recorded here the way a screen would, by rendering them.
@@ -1128,6 +1143,47 @@ class ScriptedRevealer implements Revealer {
     revealed.add(path);
     return answers;
   }
+}
+
+/// A host that writes down what it was told instead of doing it.
+///
+/// Passed to a Device the way the real one is, rather than installed as a
+/// global: the host is a constructor argument, so a test that wants to see what
+/// the app told the window simply holds the object it handed in —
+/// `device.hostShell`. The install-and-reset dance the other scripted seams
+/// need is only for the ones that replace a global.
+///
+/// It is deliberately *not* an emulator of the Windows runner. It holds one
+/// bool of state, which is the same amount the registry entry holds, and the
+/// point of it is that the app reads that state back rather than trusting what
+/// it asked for — see `LocalTransferController.setAutostart`, which is the
+/// behaviour these two fields exist to check.
+class ScriptedHostShell implements HostShell {
+  /// Starts with the app's own default: not starting with the system.
+  ScriptedHostShell({this.autostart = false});
+
+  /// Whether this host says it starts with the system. Set directly by a test
+  /// to stand in for a user who changed it outside the app.
+  bool autostart;
+
+  /// Every close-button value the app has pushed, oldest first.
+  ///
+  /// A list rather than the last value because "it was told the same thing
+  /// twice" and "it was told once" are different bugs, and only a list can tell
+  /// them apart.
+  final List<bool> closeToTray = [];
+
+  /// What the app last asked the close button to do, or null for never.
+  bool? get closeToTrayNow => closeToTray.isEmpty ? null : closeToTray.last;
+
+  @override
+  Future<void> setCloseToTray(bool value) async => closeToTray.add(value);
+
+  @override
+  Future<bool> autostartEnabled() async => autostart;
+
+  @override
+  Future<void> setAutostart(bool enabled) async => autostart = enabled;
 }
 
 /// A one-pixel PNG, for the tests that need the clipboard to hold a picture.

@@ -1,6 +1,7 @@
 import 'package:test/test.dart';
 
 import 'package:local_transfer/core/clipboard/clipboard_capability.dart';
+import 'package:local_transfer/core/host/close_behaviour.dart';
 import 'package:local_transfer/core/identity/fingerprint.dart';
 import 'package:local_transfer/core/identity/owner_group.dart';
 import 'package:local_transfer/core/profile/device_profile.dart';
@@ -302,6 +303,82 @@ void main() {
       });
     });
 
+    group('the close button', () {
+      DeviceProfile profileOf(DevicePlatform platform) =>
+          DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
+
+      test('defaults to hiding the window, because being reachable is the '
+          'point', () {
+        // The default is not a placeholder: an app whose job is receiving
+        // things cannot do it after the last window closes, so the answer that
+        // needs no user action is the one that keeps it running.
+        expect(
+          profileOf(DevicePlatform.windows).closeBehaviour,
+          CloseBehaviour.minimiseToTray,
+        );
+      });
+
+      test(
+        'a profile written before the key existed decodes to the default',
+        () {
+          final restored = DeviceProfile.fromJson({
+            'self': _fp('a').hex,
+            'alias': 'Desk',
+            'platform': 'windows',
+          });
+          expect(restored.closeBehaviour, CloseBehaviour.minimiseToTray);
+        },
+      );
+
+      test('a value this build does not know decodes to the default', () {
+        // Tolerant rather than strict, like `acceptPairingRequests`: what is
+        // being read is a preference, and a preference is not worth refusing to
+        // open a Device's identity file over. A newer version writing a third
+        // behaviour must not make an older one unable to start.
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'closeBehaviour': 'somewhere-else',
+        });
+        expect(restored.closeBehaviour, CloseBehaviour.minimiseToTray);
+      });
+
+      test('a value of the wrong type decodes to the default too', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'closeBehaviour': 3,
+        });
+        expect(restored.closeBehaviour, CloseBehaviour.minimiseToTray);
+      });
+
+      test('the choice is written as its own name and read back', () {
+        final profile = profileOf(DevicePlatform.windows)
+          ..closeBehaviour = CloseBehaviour.quit;
+        expect(profile.toJson()['closeBehaviour'], 'quit');
+        expect(
+          DeviceProfile.fromJson(profile.toJson()).closeBehaviour,
+          CloseBehaviour.quit,
+        );
+      });
+
+      test('the wire names are distinct and stable', () {
+        // These two strings are a file format: they are what a profile written
+        // today is read back with tomorrow, so they may be added to but not
+        // renamed. Spelled out here rather than compared to themselves.
+        expect(CloseBehaviour.minimiseToTray.wireName, 'tray');
+        expect(CloseBehaviour.quit.wireName, 'quit');
+        expect(
+          CloseBehaviour.fromWireName('tray'),
+          CloseBehaviour.minimiseToTray,
+        );
+        expect(CloseBehaviour.fromWireName('quit'), CloseBehaviour.quit);
+        expect(CloseBehaviour.fromWireName('later'), isNull);
+      });
+    });
+
     test('canMirrorTo follows group membership, not favorites', () {
       final self = _fp('a');
       final member = _fp('b');
@@ -329,6 +406,7 @@ void main() {
         favorites: {favourite},
         clipboardPeers: {_fp('e')},
         incomingDirectory: 'D:/shared/inbox',
+        closeBehaviour: CloseBehaviour.quit,
         known: {
           _fp('d').hex: KnownDevice(
             fingerprint: _fp('d'),
@@ -347,6 +425,7 @@ void main() {
       expect(restored.favorites, [favourite]);
       expect(restored.clipboardPeers, [_fp('e')]);
       expect(restored.incomingDirectory, 'D:/shared/inbox');
+      expect(restored.closeBehaviour, CloseBehaviour.quit);
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);
       expect(known!.alias, 'Phone');

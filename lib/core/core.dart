@@ -19,6 +19,8 @@ export 'discovery/peer_registry.dart';
 export 'discovery/udp_beacon_transport.dart';
 export 'history/message_record.dart';
 export 'history/message_store.dart';
+export 'host/close_behaviour.dart';
+export 'host/host_shell.dart';
 export 'identity/device_descriptor.dart';
 export 'identity/fingerprint.dart';
 export 'identity/owner_group.dart';

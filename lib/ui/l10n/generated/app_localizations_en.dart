@@ -482,6 +482,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNotices => 'Notices';
 
   @override
+  String get settingsWindowAndStartup => 'Window and startup';
+
+  @override
+  String get settingsStartWithWindows => 'Start with Windows';
+
+  @override
+  String get settingsStartWithWindowsOn => 'Starts by itself when you sign in.';
+
+  @override
+  String get settingsStartWithWindowsOff => 'You start it yourself.';
+
+  @override
+  String get settingsCloseButton => 'When the close button is clicked';
+
+  @override
+  String get settingsCloseToTray => 'Minimise to the notification area';
+
+  @override
+  String get settingsCloseQuit => 'Quit';
+
+  @override
+  String get settingsCloseToTrayHint =>
+      'The window is hidden and the app keeps running in the background, so it can still receive things.';
+
+  @override
+  String get settingsCloseQuitHint => 'Closing the window ends the app.';
+
+  @override
   String get factAlias => 'Alias';
 
   @override
