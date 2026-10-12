@@ -7,18 +7,19 @@ import 'update_check.dart';
 /// The rail's update entry has to know the answer *before* anybody opens the
 /// About surface, so the question is asked once as the application comes up and
 /// the answer is kept here until the process ends. This is the one place in the
-/// product that talks to anything outside the local network nobody having asked
-/// it to at that moment, and it is the deliberate exception the About text
-/// names: a build that never looked could only ever tell a user about an upgrade
-/// they had already thought to go looking for.
+/// product that talks to anything outside the local network without somebody
+/// having asked it to at that moment, and it is the deliberate exception the
+/// About text names: a build that never looked could only ever tell a user about
+/// an upgrade they had already thought to go looking for.
 ///
 /// ## Why it is not part of the controller
 ///
-/// [LocalTransferController] is the one object a screen talks to, and this
+/// `LocalTransferController` is the one object a screen talks to, and this
 /// deliberately is not in it. The controller's job is Devices, Sessions and
-/// Transfers, and the interface it would need — an [UpdateChecker] — lives in
-/// this layer: `lib/app` may not import Flutter, and it may not reach upwards
-/// into `lib/ui` either. What the two share is a lifetime, not a subject.
+/// Transfers; the interface this needs — an [UpdateChecker] — lives in this
+/// layer, and `lib/app` may neither import Flutter nor reach upwards into
+/// `lib/ui`. What the controller and this notice share is a lifetime, not a
+/// subject.
 ///
 /// ## Asked through the shared seam
 ///
@@ -32,28 +33,27 @@ class UpdateNotice extends ChangeNotifier {
 
   UpdateCheck? _answer;
 
-  /// The last answer, or null while none has arrived.
+  /// The whole answer, or null while none has arrived.
   ///
-  /// Every outcome is kept, not only the interesting one: a caller that wants
-  /// to say "the question could not be asked" needs the difference between that
-  /// and "nothing has been asked yet", and `null` versus an outcome is how the
-  /// two are told apart.
+  /// Every outcome is kept rather than only the interesting one, and this is
+  /// what tells the four of them apart: [version] and [url] both collapse
+  /// "nothing published", "the question could not be asked" and "this build is
+  /// the latest" into a single null, because the rail does the same thing with
+  /// all three. Anything that needs to say *which* one happened reads it here.
   UpdateCheck? get answer => _answer;
 
-  /// The version to upgrade to, or null when there is nothing newer to fetch.
+  /// The version to upgrade to, or null when there is nothing to offer.
   String? get version =>
       _answer?.outcome == UpdateOutcome.available ? _answer?.version : null;
 
-  /// Whether there is something newer to fetch.
-  bool get hasUpdate => version != null;
-
-  /// Where to fetch it.
+  /// Where to fetch [version], or null when there is nothing to offer.
   ///
   /// The release the answer came from when it named one, and the download page
   /// otherwise — the same fallback the About surface makes, and for the same
   /// reason: an answer whose `html_url` was missing still leaves a browser able
   /// to open the page a person would have gone to by hand.
-  String? get url => hasUpdate ? (_answer?.url ?? updateReleasesPage) : null;
+  String? get url =>
+      version == null ? null : (_answer?.url ?? updateReleasesPage);
 
   /// Asks once.
   ///

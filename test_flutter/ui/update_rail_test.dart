@@ -76,17 +76,20 @@ void main() {
   });
 
   testWidgets('is absent when the question could not be asked', (tester) async {
-    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
-    await pumpWindow(
-      tester,
-      device,
-      update: await noticeSaying(UpdateCheck.unreachable),
-    );
-
     // A machine with no route out is the ordinary case, not a broken one, and
     // an entry offering an upgrade nobody can describe would be worse than no
     // entry at all.
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    final notice = await noticeSaying(UpdateCheck.unreachable);
+    await pumpWindow(tester, device, update: notice);
+
+    // Two different things, asserted separately: the entry is not offered, and
+    // the notice really did record *why* — "the question could not be asked" is
+    // not the same state as "nothing has been asked yet", even though the rail
+    // draws both the same way.
     expect(inRail(find.text(l10n.railUpdate)), findsNothing);
+    expect(notice.answer?.outcome, UpdateOutcome.unreachable);
+    expect(notice.version, isNull);
 
     await shutdown(tester, [device]);
   });
