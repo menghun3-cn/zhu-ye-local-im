@@ -320,9 +320,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuSendFile => 'Send a file';
 
   @override
-  String get menuSendImage => 'Send an image';
-
-  @override
   String get dropToSend => 'Let go to send';
 
   @override
