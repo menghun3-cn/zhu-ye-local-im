@@ -750,7 +750,10 @@ void main() {
         profilePath: 'C:/profiles/alice/profile.json',
         defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
       );
-      await pumpWindow(tester, device);
+      // Tall, because the page is a lazy list and the last line under test —
+      // what has gone wrong, which is nothing — is only built when the window
+      // is tall enough to hold the cards above it.
+      await pumpWindow(tester, device, size: tallWindow);
       await openTab(tester, l10n.tabSettings, window: windowA);
 
       expect(
@@ -1768,9 +1771,12 @@ void main() {
       await tester.tap(attachButton(windowA));
       await pumpUntil(
         tester,
+        // By its name, which for a picture is on the tooltip rather than on the
+        // face: the tray previews a picture with its own bytes, so the name is
+        // the thing the tile keeps but does not draw.
         () => onConversation(
           windowA,
-          find.text('holiday.png'),
+          find.byTooltip('holiday.png'),
         ).evaluate().isNotEmpty,
         description: 'the chosen picture to appear in the composer',
       );
@@ -1842,10 +1848,17 @@ void main() {
       await tester.tap(attachButton(windowA));
       await pumpUntil(
         tester,
-        () => onConversation(
-          windowA,
-          find.text('notes.txt'),
-        ).evaluate().isNotEmpty,
+        // Both, not just the one with a name on its face: the picture is a
+        // thumbnail and says what it is only on its tooltip.
+        () =>
+            onConversation(
+              windowA,
+              find.text('notes.txt'),
+            ).evaluate().isNotEmpty &&
+            onConversation(
+              windowA,
+              find.byTooltip('holiday.png'),
+            ).evaluate().isNotEmpty,
         description: 'both choices to appear in the composer',
       );
       expect(picker.filesAsked, 1, reason: 'one dialog for the two of them');
@@ -1858,7 +1871,13 @@ void main() {
         description: 'both to be sent',
       );
       expect(
-        [for (final transfer in alice.controller.transfers) transfer.kind],
+        // Oldest first, so that the assertion reads in the order the two were
+        // chosen. The list itself is newest first, because that is how the
+        // conversation draws it.
+        [
+          for (final transfer in alice.controller.transfers.reversed)
+            transfer.kind,
+        ],
         [PayloadKind.image, PayloadKind.file],
         reason: 'the picture travels as a picture and the file as a file',
       );

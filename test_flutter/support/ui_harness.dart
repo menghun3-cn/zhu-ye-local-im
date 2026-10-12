@@ -38,6 +38,15 @@ const Size wideWindow = Size(1000, 800);
 /// A window size that takes the narrow branch of the shell (a bottom bar).
 const Size narrowWindow = Size(600, 900);
 
+/// A window tall enough for a whole page to be laid out at once.
+///
+/// Taller than [wideWindow] on purpose. The Settings surface is a lazy list, so
+/// a line below the fold is not merely out of sight — it has not been *built*,
+/// and `find.text` matches nothing. A test that scrolled to reach one would be
+/// testing the scroll as much as the line. The width is left at the wide value
+/// so the shell still takes its rail branch.
+const Size tallWindow = Size(1000, 1600);
+
 /// The two windows a two-Device test shows side by side.
 const ValueKey<String> windowAKey = ValueKey('window-a');
 const ValueKey<String> windowBKey = ValueKey('window-b');
@@ -430,6 +439,13 @@ Future<void> pumpUntil(
     );
     await tester.pump(const Duration(milliseconds: 16));
   }
+  // The loop only pumps while the condition is still false, so a condition that
+  // already held when this was called — a radio that sets its field on the way
+  // into `onSelectionChanged`, or a switch whose handler fires synchronously —
+  // would be reported with the tree still showing the frame from *before* the
+  // tap. One frame drawn after the condition is known to hold is what makes
+  // "waited until" mean "and the window shows it".
+  await tester.pump(const Duration(milliseconds: 16));
 }
 
 /// Advances past a route transition without waiting for the tree to quiesce.
