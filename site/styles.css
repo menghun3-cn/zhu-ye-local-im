@@ -213,7 +213,13 @@ svg { display: block; }
    画面只被压窄到约 cos30≈0.87 倍、仍正面可读。绕中轴（transform-origin 默认
    50% 50%）所以左右对称收拢，绘制盒比列窄，无需 scale 也吃进右栏。颜色和布局
    都不依赖这个变换，关掉也照常。 */
-.hero__art { margin: 0; }
+/* 首屏截图：一块立着的屏幕，绕自己的中央竖轴水平转 30° —— 父级加
+   perspective 才有纵深，图像才「立起来、从侧前看着」。perspective-origin
+   居中（50% 50%）让旋转严格绕中轴、左右对称；不写 rotateX，所以只是
+   水平横摆，不往前栽。rotateY 把绘制盒横向收窄（×cos30），天然吃进右栏，
+   不需 scale。文字在三维变换下会轻微发虚，这是为纵深观感接受的取舍
+   （颜色与布局都不依赖 3D，关掉也照常）。 */
+.hero__art { margin: 0; perspective: 1000px; perspective-origin: 50% 50%; }
 .hero__art img {
   display: block; width: 100%; height: auto;
   border: 1px solid var(--border); border-radius: var(--r-lg);
