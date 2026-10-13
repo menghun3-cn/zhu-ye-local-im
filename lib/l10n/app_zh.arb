@@ -122,6 +122,7 @@
   "cannotCopyImage": "没能复制这张图片。",
   "copyText": "复制文字",
   "cannotCopyText": "没能复制这段文字。",
+  "copySelection": "复制",
   "deleteMessage": "删除",
 
   "clipboardSyncHeader": "剪贴板同步",
@@ -215,7 +216,8 @@
   "tabConversation": "对话",
   "conversationListEmpty": "还没有对话。只要扫描到设备，它就会自动出现在这里，可以直接连接。",
   "conversationPickOne": "从左边选一个对话，或者先连接一台设备。",
-  "conversationDisconnected": "连接已断开",
+  "conversationDisconnected": "离线",
+  "conversationUnread": "[{count}]",
   "sendFileTitle": "发送文件给 {peer}",
   "fieldPath": "路径",
   "pathHelper": "粘贴或输入一个文件路径",

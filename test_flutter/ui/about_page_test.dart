@@ -105,6 +105,45 @@ void main() {
     expect(find.text(l10n.aboutUpToDate), findsOneWidget);
   });
 
+  testWidgets('the buttons that do something here are filled, one of them', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    await show(tester);
+
+    // Checking is the ordinary action on this page, so it is drawn as the
+    // ordinary action — the filled pill the rest of the app uses. It used to be
+    // a `TextButton` with an icon, which is the shape for a *secondary* step,
+    // and a page whose only button looks secondary reads as a page with no
+    // action on it.
+    expect(
+      find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+      findsOneWidget,
+      reason: 'the page\'s own action is the filled one',
+    );
+    expect(
+      find.widgetWithText(TextButton, l10n.aboutCheckForUpdates),
+      findsNothing,
+      reason: 'a word-shaped button would say this is not the way in',
+    );
+
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    // Installing is the same kind of thing — a step taken on this page — so it
+    // is filled too. Opening the download page is *not*: it leaves for a
+    // browser, and dressing it like the others would make three buttons of
+    // equal weight where the user has one decision to make.
+    expect(
+      find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(TextButton, l10n.aboutOpenDownload),
+      findsOneWidget,
+      reason: 'leaving the app is not the same action as acting in it',
+    );
+  });
+
   testWidgets('offers the download page when there is a newer version', (
     tester,
   ) async {

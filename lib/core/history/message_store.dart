@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'conversation_reading.dart';
 import 'message_record.dart';
 
 /// How many messages this Device keeps, across every conversation.
@@ -144,16 +145,42 @@ final class FileMessageStore implements MessageStore {
   }
 }
 
-/// The messages a store holds, oldest first.
+/// The whole of what a conversation file holds: the messages, and what the
+/// user has read of them.
 ///
-/// Oldest first because that is how the file is written and how a running
-/// conversation appends; the newest-first order a UI draws is the controller's
-/// business, not the file's. An empty store answers with an empty list rather
-/// than throwing — a Device that has never exchanged a message has a
-/// conversation of zero messages, which is not an error.
-Future<List<MessageRecord>> loadMessages(MessageStore store) async {
+/// One object rather than two, because the two are written together and a file
+/// that could hold one without the other would eventually be read in a state
+/// neither writer intended — a message list with no reading state says every
+/// message just arrived, and a reading state with no messages says nothing at
+/// all. They travel in one envelope and one `save`.
+final class StoredConversation {
+  /// Pairs [messages] with [reading].
+  const StoredConversation({required this.messages, required this.reading});
+
+  /// Every remembered message, oldest first.
+  final List<MessageRecord> messages;
+
+  /// What the user has read of them.
+  final ConversationReading reading;
+
+  /// Nothing remembered at all — a Device that has never exchanged anything.
+  static final StoredConversation empty = StoredConversation(
+    messages: const <MessageRecord>[],
+    reading: ConversationReading(),
+  );
+}
+
+/// Everything a store holds, oldest message first.
+///
+/// An empty store answers with [StoredConversation.empty] rather than throwing:
+/// a Device that has never exchanged a message has a conversation of zero
+/// messages, which is not an error. A file written before the reading state
+/// existed reads back with an empty one, which is exactly right for it — every
+/// incoming message in it is unread, because nobody has opened a conversation
+/// since the app learned to care.
+Future<StoredConversation> loadConversation(MessageStore store) async {
   final json = await store.load();
-  if (json == null) return const <MessageRecord>[];
+  if (json == null) return StoredConversation.empty;
   final raw = json['messages'];
   if (raw is! List) {
     throw const FormatException('"messages" must be a list');
@@ -165,18 +192,63 @@ Future<List<MessageRecord>> loadMessages(MessageStore store) async {
     }
     messages.add(MessageRecord.fromJson(entry.cast<String, Object?>()));
   }
-  return messages;
+  final rawReading = json['reading'];
+  final reading = rawReading == null
+      ? ConversationReading()
+      : ConversationReading.fromJson(_object(rawReading, 'reading'));
+  return StoredConversation(messages: messages, reading: reading);
+}
+
+/// Persists [conversation], oldest message first, through [store].
+///
+/// The whole thing is written every time. A conversation changes when a person
+/// sends, deletes or opens something, which is a handful of times a minute at
+/// most, so there is nothing to gain from a journal, and a single file that is
+/// always either the old conversation or the new one is a file a reader can
+/// trust.
+///
+/// The version stays 1. The envelope gained a key rather than changing one, and
+/// the older reader this has to stay compatible with is the one that read
+/// `messages` and ignored everything else — which is exactly what a version
+/// bump would break for no gain. Bump it when a key's *meaning* changes, not
+/// when one is added.
+Future<void> saveConversation(
+  StoredConversation conversation,
+  MessageStore store,
+) {
+  return store.save({
+    'version': 1,
+    'messages': [for (final message in conversation.messages) message.toJson()],
+    'reading': conversation.reading.toJson(),
+  });
+}
+
+/// The messages a store holds, oldest first.
+///
+/// Kept beside [loadConversation] because a caller that only wants the messages
+/// is common and saying `(await loadConversation(store)).messages` at every one
+/// of them is noise. The reading state is *not* optional to persist, only to
+/// ask for.
+Future<List<MessageRecord>> loadMessages(MessageStore store) async {
+  return (await loadConversation(store)).messages;
 }
 
 /// Persists [messages], oldest first, through [store].
 ///
-/// The whole list is written every time. A conversation changes when a person
-/// sends or deletes something, which is a handful of times a minute at most, so
-/// there is nothing to gain from a journal, and a single file that is always
-/// either the old list or the new one is a file a reader can trust.
+/// Kept beside [saveConversation] for the same reason, and it writes an empty
+/// reading state: a caller that had a reading state to keep would be calling
+/// [saveConversation]. Anything else would silently drop what the user had
+/// read, which is the one mistake this pair of functions exists to make hard.
 Future<void> saveMessages(List<MessageRecord> messages, MessageStore store) {
-  return store.save({
-    'version': 1,
-    'messages': [for (final message in messages) message.toJson()],
-  });
+  return saveConversation(
+    StoredConversation(messages: messages, reading: ConversationReading()),
+    store,
+  );
+}
+
+Map<String, Object?> _object(Object? value, String key) {
+  if (value is! Map) {
+    throw FormatException('"$key" must be an object');
+  }
+  return value.cast<String, Object?>();
 }
