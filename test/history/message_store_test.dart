@@ -25,6 +25,8 @@ MessageRecord _message({
   text: text,
 );
 
+String _hex(String label) => _peer(label).hex;
+
 void main() {
   group('MemoryMessageStore', () {
     test('an empty store holds no messages', () async {
@@ -56,6 +58,91 @@ void main() {
       final read = await loadMessages(store);
       expect(read.single.text, 'original');
       expect(identical(read.single, written), isFalse);
+    });
+  });
+
+  group('what the user has read', () {
+    test('a file with no reading key reads back as never opened', () async {
+      // Exactly the shape the version before `reading` wrote. Every incoming
+      // message in it is unread, because nobody had opened a conversation
+      // since the app learned to care.
+      final store = MemoryMessageStore();
+      await store.save({
+        'version': 1,
+        'messages': [_message().toJson()],
+      });
+
+      final stored = await loadConversation(store);
+
+      expect(stored.messages, hasLength(1));
+      expect(stored.reading.hasOpened(_peer('Alice')), isFalse);
+      expect(stored.reading.lastPeer, isNull);
+    });
+
+    test('the reading state survives a round trip', () async {
+      final store = MemoryMessageStore();
+      final opened = DateTime.utc(2026, 10, 10, 10);
+      final reading = ConversationReading()..markOpened(_peer('Alice'), opened);
+      reading.lastPeer = _hex('Alice');
+
+      await saveConversation(
+        StoredConversation(messages: [_message()], reading: reading),
+        store,
+      );
+
+      final stored = await loadConversation(store);
+
+      expect(stored.messages, hasLength(1));
+      expect(stored.reading.openedThrough(_peer('Alice')), opened);
+      expect(stored.reading.lastPeer, _hex('Alice'));
+    });
+
+    test('the empty store is empty, not unknown', () async {
+      final stored = await loadConversation(MemoryMessageStore());
+
+      expect(stored.messages, isEmpty);
+      expect(stored.reading.lastPeer, isNull);
+    });
+
+    test('a reading block that is not an object cannot be read', () async {
+      final store = MemoryMessageStore();
+      await store.save({
+        'version': 1,
+        'messages': <Object>[],
+        'reading': 'nope',
+      });
+
+      await expectLater(loadConversation(store), throwsFormatException);
+    });
+
+    test('a watermark that is not a timestamp cannot be read', () async {
+      // Strict on purpose: guessing here would silently reset every unread
+      // count, which is a change nobody would trace back to this line.
+      final store = MemoryMessageStore();
+      await store.save({
+        'version': 1,
+        'messages': <Object>[],
+        'reading': {
+          'openedThrough': {_hex('Alice'): 'yesterday'},
+        },
+      });
+
+      await expectLater(loadConversation(store), throwsFormatException);
+    });
+
+    test('a saved reading state is really in the file', () async {
+      final store = MemoryMessageStore();
+      final reading = ConversationReading()
+        ..markOpened(_peer('Alice'), DateTime.utc(2026, 10, 10, 10));
+      await saveConversation(
+        StoredConversation(messages: const [], reading: reading),
+        store,
+      );
+
+      final json = (await store.load())!;
+      expect(json['reading'], {
+        'openedThrough': {_hex('Alice'): '2026-10-10T10:00:00.000Z'},
+      });
     });
   });
 

@@ -973,8 +973,13 @@ Finder updateEntry(TestWindow window) => find.descendant(
 /// Found by the label the user reads rather than by a tooltip: the send control
 /// is a labelled button in the WeChat layout, and a tooltip that only shows on
 /// hover is not what a user identifies it by.
+///
+/// A [FilledButton] because that is what it is — a filled pill in the action
+/// green, the same shape the primary action at the foot of a dialog wears. It
+/// was a [TextButton] with a hand-painted background, which drew the same thing
+/// and was not the type it looked like.
 Finder sendButton(TestWindow window) =>
-    onConversation(window, find.widgetWithText(TextButton, l10n.send));
+    onConversation(window, find.widgetWithText(FilledButton, l10n.send));
 
 /// The composer's attach button in [window]'s conversation.
 ///
@@ -983,6 +988,27 @@ Finder sendButton(TestWindow window) =>
 /// is no second button to find.
 Finder attachButton(TestWindow window) =>
     onConversation(window, find.byTooltip(l10n.menuSendFile));
+
+/// Hands [device] a text message, through the controller rather than the screen.
+///
+/// For a test that needs a *conversation* to have something in it and is not
+/// about typing: an unread count, a preview line, a remembered conversation.
+/// Driving the composer instead would drag the sender's window into the tree,
+/// which a test about the receiver's list does not want and cannot easily undo.
+///
+/// Waits for the message to settle, because a caller that read the count on the
+/// next line would otherwise be racing the arrival.
+Future<void> sendText(
+  WidgetTester tester,
+  UiDevice device,
+  String body, {
+  Fingerprint? to,
+}) async {
+  await tester.runAsync(() async {
+    final sent = await device.controller.sendText(body, to: to);
+    await untilTrue(() => sent.isSettled, 'the sent text to settle');
+  });
+}
 
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///
