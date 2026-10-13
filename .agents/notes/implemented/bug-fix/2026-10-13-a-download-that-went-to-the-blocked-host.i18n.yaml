@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-13-a-download-that-went-to-the-blocked-host.md
+#   git hash-object 2026-10-13-a-download-that-went-to-the-blocked-host.zh.md
+2026-10-13-a-download-that-went-to-the-blocked-host.md: 4675a1844fb4fcdd2cd71027b8a41acce804ff9c
+2026-10-13-a-download-that-went-to-the-blocked-host.zh.md: e7d66a2b4f872764d3c32b60ed1fe1d1ce1f44ab
