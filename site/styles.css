@@ -207,17 +207,18 @@ svg { display: block; }
 .hero__meta { margin-top: var(--s4); display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: var(--fs-meta); color: var(--text-3); }
 .hero__meta span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* 首屏截图：正面立着的一屏，整体顺时针转 30°（CSS 正角度即顺时针，
-   所以「左边高、右边低」）。这是 2D 旋转，不是之前那版 3D 侧视 —— 用户后来
-   改要「正面立、转 30°」的干净斜放，不要纵深。旋转不改布局盒，转完的包围盒
-   比原图宽约 1.17 倍，会顶出右栏，故叠一层 scale(.82) 把它收进列内（角度仍是
-   精确的 30°）。颜色和布局都不依赖这个变换，关掉也照常。 */
+/* 首屏截图：正面立着的一屏，绕它的中央竖轴水平转 30°（CSS 的 rotateY 即
+   绕竖轴转，左右像转门一样摆开，所以「水平旋转」）。不要透视、不立起来 ——
+   用户要的是平面画面绕中轴横摆，不是四棱锥纵深；于是这是正交投影下的 rotateY，
+   画面只被压窄到约 cos30≈0.87 倍、仍正面可读。绕中轴（transform-origin 默认
+   50% 50%）所以左右对称收拢，绘制盒比列窄，无需 scale 也吃进右栏。颜色和布局
+   都不依赖这个变换，关掉也照常。 */
 .hero__art { margin: 0; }
 .hero__art img {
   display: block; width: 100%; height: auto;
   border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--sh3);
-  transform: rotate(30deg) scale(.82);
+  transform: rotateY(30deg);
 }
 [data-theme="dark"] .hero__art img { border-color: var(--border-strong); }
 
@@ -341,7 +342,7 @@ svg { display: block; }
   .hero h1 { font-size: 34px; }
   .hero .lede { font-size: 16px; }
   .hero__art { max-width: 100%; }
-  .hero__art img { transform: rotate(30deg) scale(.8); }
+  .hero__art img { transform: rotateY(30deg); }
   .block h2 { font-size: 22px; }
   .topbar__nav { display: none; }
   .split { grid-template-columns: 1fr; gap: 0; }
