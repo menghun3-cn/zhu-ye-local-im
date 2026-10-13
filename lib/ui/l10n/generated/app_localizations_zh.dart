@@ -400,6 +400,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cannotCopyText => '没能复制这段文字。';
 
   @override
+  String get copySelection => '复制';
+
+  @override
   String get deleteMessage => '删除';
 
   @override
@@ -683,7 +686,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get conversationPickOne => '从左边选一个对话，或者先连接一台设备。';
 
   @override
-  String get conversationDisconnected => '连接已断开';
+  String get conversationDisconnected => '离线';
+
+  @override
+  String conversationUnread(int count) {
+    return '[$count]';
+  }
 
   @override
   String sendFileTitle(String peer) {

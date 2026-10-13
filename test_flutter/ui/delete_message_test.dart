@@ -110,10 +110,12 @@ void main() {
       // show and no picture to copy, and a menu with nothing in it would have
       // been a right-click that did nothing while still eating the gesture.
       //
-      // Copy text is here rather than on a selectable bubble because Flutter
-      // gives a secondary click to the innermost handler, and a selectable body
-      // would therefore own this gesture alone — Delete would be unreachable on
-      // the one kind of message a person sends most.
+      // Copy text is the *whole-message* copy, and it is offered here because
+      // nothing is selected — the bubble is selectable (see the last test), so
+      // a user with words under the pointer gets the other one instead. Both
+      // live on one menu because the right-click has to stay the message's:
+      // a selectable body with a menu of its own would take this gesture and
+      // leave Delete unreachable on the kind of message a person sends most.
       expect(windowA.within(find.text(l10n.deleteMessage)), findsOneWidget);
       expect(windowA.within(find.text(l10n.copyText)), findsOneWidget);
       expect(
@@ -261,6 +263,82 @@ void main() {
       );
 
       await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('words in a bubble can be selected, and the menu knows it', (
+      tester,
+    ) async {
+      final copied = captureClipboardWrites();
+      final sent = await shownText(tester);
+
+      // A message's body is selectable text, so a person can take a phrase out
+      // of a sentence the way they can anywhere else on the desktop. The
+      // right-click is still the message's — see the class doc on
+      // `TransferContextMenu` for why one menu carries both jobs.
+      final body = onConversation(windowA, find.text('see you at six'));
+      expect(
+        find.ancestor(of: body, matching: find.byType(SelectionArea)),
+        findsWidgets,
+        reason: 'the body is drawn inside a selection region',
+      );
+
+      // Select a word with the mouse, the way a person does: press at one end,
+      // drag across, release. `selectAll` would prove the region exists but not
+      // that dragging reaches it.
+      await tester.longPress(body);
+      await settleRoute(tester);
+
+      await rightClick(tester, body);
+      await pumpUntil(
+        tester,
+        () =>
+            windowA.within(find.text(l10n.deleteMessage)).evaluate().isNotEmpty,
+        description: 'the message to offer its actions',
+      );
+
+      // Read off the menu's own items rather than off the whole window: a
+      // selection also raises Flutter's built-in toolbar, which carries a Copy
+      // of its own, and counting *that* would be counting a different thing.
+      Finder menuItem(String label) => find.ancestor(
+        of: find.text(label),
+        matching: find.byType(PopupMenuItem<String>),
+      );
+
+      // With words under the pointer, the menu grows a Copy that takes *the
+      // selection*, and drops the whole-message Copy text: two entries both
+      // saying "copy" would leave the user to guess which one they wanted.
+      expect(
+        menuItem(l10n.copySelection),
+        findsOneWidget,
+        reason: 'a selection is what is about to be copied',
+      );
+      expect(
+        menuItem(l10n.copyText),
+        findsNothing,
+        reason: 'one Copy at a time, and it is the one for the selection',
+      );
+      // Delete is not traded away for it: the menu gains a line, it does not
+      // swap one.
+      expect(menuItem(l10n.deleteMessage), findsOneWidget);
+
+      await tester.tap(windowA.within(find.text(l10n.copySelection)).last);
+      await pumpUntil(
+        tester,
+        () => copied.isNotEmpty,
+        description: 'the selection to reach the clipboard',
+      );
+      // A *part* of the message, not the whole of it. That is the difference
+      // between this line and Copy text: the point of selecting is to take the
+      // piece you wanted, and a copy that quietly handed over the whole
+      // sentence would make dragging across one word pointless work.
+      expect(copied.single, 'you');
+      expect(
+        copied.single,
+        isNot('see you at six'),
+        reason: 'the selection is what was copied, not the whole message',
+      );
+
+      await shutdown(tester, [sent.alice, sent.bob]);
     });
   });
 }
