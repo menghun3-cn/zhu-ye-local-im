@@ -22,6 +22,7 @@ import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
 import 'package:local_transfer/ui/update_check.dart';
+import 'package:local_transfer/ui/update_install.dart';
 import 'package:local_transfer/ui/update_notice.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
@@ -972,8 +973,13 @@ Finder updateEntry(TestWindow window) => find.descendant(
 /// Found by the label the user reads rather than by a tooltip: the send control
 /// is a labelled button in the WeChat layout, and a tooltip that only shows on
 /// hover is not what a user identifies it by.
+///
+/// A [FilledButton] because that is what it is — a filled pill in the action
+/// green, the same shape the primary action at the foot of a dialog wears. It
+/// was a [TextButton] with a hand-painted background, which drew the same thing
+/// and was not the type it looked like.
 Finder sendButton(TestWindow window) =>
-    onConversation(window, find.widgetWithText(TextButton, l10n.send));
+    onConversation(window, find.widgetWithText(FilledButton, l10n.send));
 
 /// The composer's attach button in [window]'s conversation.
 ///
@@ -982,6 +988,27 @@ Finder sendButton(TestWindow window) =>
 /// is no second button to find.
 Finder attachButton(TestWindow window) =>
     onConversation(window, find.byTooltip(l10n.menuSendFile));
+
+/// Hands [device] a text message, through the controller rather than the screen.
+///
+/// For a test that needs a *conversation* to have something in it and is not
+/// about typing: an unread count, a preview line, a remembered conversation.
+/// Driving the composer instead would drag the sender's window into the tree,
+/// which a test about the receiver's list does not want and cannot easily undo.
+///
+/// Waits for the message to settle, because a caller that read the count on the
+/// next line would otherwise be racing the arrival.
+Future<void> sendText(
+  WidgetTester tester,
+  UiDevice device,
+  String body, {
+  Fingerprint? to,
+}) async {
+  await tester.runAsync(() async {
+    final sent = await device.controller.sendText(body, to: to);
+    await untilTrue(() => sent.isSettled, 'the sent text to settle');
+  });
+}
 
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///
@@ -1223,6 +1250,86 @@ class ScriptedUpdateChecker implements UpdateChecker {
   Future<UpdateCheck> latest() async {
     asked += 1;
     return answer;
+  }
+}
+
+/// An installer that answers instead of replacing anything.
+///
+/// The same seam argument as [ScriptedUpdateChecker], and a stronger one: the
+/// real installer downloads a build from the internet, replaces the folder the
+/// test is running from and then ends the process the test is running in. So a
+/// test hands in what should happen and keeps its files.
+///
+/// [supported] defaults to false, which is what a platform that cannot replace
+/// itself answers — and what every test that is not about installing wants,
+/// because it is the state in which the offer is left off the card entirely.
+///
+/// ```dart
+/// final installer = ScriptedUpdateInstaller.replace(supported: true);
+/// await press(tester, l10n.aboutUpdateInstall);
+/// expect(installer.askedFor.single.version, '9.9.9');
+/// ```
+class ScriptedUpdateInstaller implements UpdateInstaller {
+  /// Answers with [result], after reporting [progress].
+  ScriptedUpdateInstaller({
+    this.supported = false,
+    this.progress = const [],
+    this.result = const UpdateInstallResult.handedOver(),
+    this.leftOver,
+  });
+
+  /// Whether this stand-in says it can replace the build it is running in.
+  @override
+  final bool supported;
+
+  /// What is reported to the caller before [result].
+  final List<UpdateInstallProgress> progress;
+
+  /// What the attempt ends as. A hand-over is the real one's usual ending, and
+  /// the process would not be here to read it; a test can.
+  final UpdateInstallResult result;
+
+  /// What [previousFailure] answers.
+  final UpdateInstallFailure? leftOver;
+
+  /// Every answer the installer was handed, in order.
+  final List<UpdateCheck> askedFor = [];
+
+  /// Installs a scripted installer in place of the real one.
+  ///
+  /// Registers [UpdateInstallResolution.reset] with `addTearDown` itself, like
+  /// [ScriptedUpdateChecker]: a static resolution left pointing at a stand-in
+  /// would silently answer for the next test in the file.
+  static ScriptedUpdateInstaller replace({
+    bool supported = false,
+    List<UpdateInstallProgress> progress = const [],
+    UpdateInstallResult result = const UpdateInstallResult.handedOver(),
+    UpdateInstallFailure? leftOver,
+  }) {
+    final installer = ScriptedUpdateInstaller(
+      supported: supported,
+      progress: progress,
+      result: result,
+      leftOver: leftOver,
+    );
+    UpdateInstallResolution.installer = installer;
+    addTearDown(UpdateInstallResolution.reset);
+    return installer;
+  }
+
+  @override
+  UpdateInstallFailure? previousFailure() => leftOver;
+
+  @override
+  Future<UpdateInstallResult> install(
+    UpdateCheck check, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  }) async {
+    askedFor.add(check);
+    for (final step in progress) {
+      onProgress(step);
+    }
+    return result;
   }
 }
 

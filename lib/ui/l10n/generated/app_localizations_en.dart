@@ -412,6 +412,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotCopyText => 'Could not copy that text.';
 
   @override
+  String get copySelection => 'Copy';
+
+  @override
   String get deleteMessage => 'Delete';
 
   @override
@@ -573,6 +576,60 @@ class AppLocalizationsEn extends AppLocalizations {
       'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.';
 
   @override
+  String get aboutUpdateInstall => 'Download and update';
+
+  @override
+  String get aboutUpdateDownloading => 'Downloading';
+
+  @override
+  String get aboutUpdateVerifying => 'Checking what arrived…';
+
+  @override
+  String get aboutUpdateStaging => 'Unpacking…';
+
+  @override
+  String get aboutUpdateHandingOver => 'Replacing this folder and restarting…';
+
+  @override
+  String get aboutUpdateFailedTitle => 'The update was not completed';
+
+  @override
+  String get aboutUpdateInstallHint =>
+      'Press Download and update: it fetches the new build, checks it against the checksum the release published, replaces this folder and restarts the app by itself. When that cannot be done, the button beside it opens the page to download by hand.';
+
+  @override
+  String get updateFailureUnsupported =>
+      'This platform cannot replace itself. Download the new version by hand.';
+
+  @override
+  String get updateFailureNoAsset =>
+      'The release does not carry the file this copy needs. Download it by hand.';
+
+  @override
+  String get updateFailureNoDigest =>
+      'The release publishes no checksum for its file, so nothing can be checked before it is installed. Download it by hand.';
+
+  @override
+  String get updateFailureNotWritable =>
+      'The folder this app runs from cannot be written to. Download the new version by hand and unpack it over this folder.';
+
+  @override
+  String get updateFailureDownload =>
+      'The download did not finish. Check the network, then try again.';
+
+  @override
+  String get updateFailureChecksum =>
+      'What arrived is not what the release published, so it has been thrown away.';
+
+  @override
+  String get updateFailureUnpack =>
+      'The download arrived but could not be unpacked, so it has been thrown away.';
+
+  @override
+  String get updateFailureHandover =>
+      'A previous replacement did not finish. Download the new version by hand and unpack it over this folder.';
+
+  @override
   String get railUpdate => 'Update';
 
   @override
@@ -580,6 +637,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancel => 'Cancel';
+
+  @override
+  String get close => 'Close';
 
   @override
   String get save => 'Save';
@@ -661,7 +721,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick a conversation on the left, or connect a Device first.';
 
   @override
-  String get conversationDisconnected => 'Session closed';
+  String get conversationDisconnected => 'Offline';
+
+  @override
+  String conversationUnread(int count) {
+    return '[$count]';
+  }
 
   @override
   String sendFileTitle(String peer) {
