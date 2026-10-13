@@ -55,19 +55,40 @@ enum UpdateOutcome {
 /// uploaded before GitHub published digests, which is a good enough reason not
 /// to download it automatically at all.
 final class UpdateAsset {
-  /// Names the file [name] at [url], [size] bytes long, checked by [digest].
+  /// Names the file [name] at [url], [size] bytes long, checked by [digest],
+  /// and also served at [apiUrl].
   const UpdateAsset({
     required this.name,
     required this.url,
     required this.size,
+    this.apiUrl,
     this.digest,
   });
 
   /// What the release calls it, version and all.
   final String name;
 
-  /// Where it is served from.
+  /// Where it is served from: the address the download button on the release
+  /// page itself points at.
   final String url;
+
+  /// The same file at the release API's own address, or null when the answer
+  /// did not name one.
+  ///
+  /// One file, two addresses, because they are two hosts and a network can
+  /// reach one and not the other. [url] is on `github.com`; this one is on
+  /// `api.github.com` — the host this application has *already* reached in
+  /// order to be holding this answer at all. Asking for it with
+  /// `Accept: application/octet-stream` returns the bytes rather than a
+  /// description of them.
+  ///
+  /// Which of the two is the blocked one depends on where the machine is: the
+  /// development network answers on `api.github.com` and times out on
+  /// `github.com`, and a network that filters by name the other way round is
+  /// no harder to imagine. So neither is a fallback — both are tried, and the
+  /// first that delivers the file is the one that works. See
+  /// `update_install.dart`.
+  final String? apiUrl;
 
   /// How many bytes it is, as the release states. Zero when it did not say.
   final int size;
@@ -94,6 +115,7 @@ final class UpdateCheck {
     this.outcome, {
     this.version,
     this.url,
+    this.notes,
     this.assets = const [],
   });
 
@@ -105,6 +127,17 @@ final class UpdateCheck {
 
   /// Where to get it, when [outcome] is [UpdateOutcome.available].
   final String? url;
+
+  /// What the release itself says it changes, when [outcome] is
+  /// [UpdateOutcome.available] and the release carried any.
+  ///
+  /// Markdown, as the release pipeline writes it: the body is the version's own
+  /// `CHANGELOG.md` section, so it is a couple of `###` headings over `- …`
+  /// items and nothing more exotic. Reading it into something a card can draw
+  /// belongs to the card — see `update_notes.dart` — and this class only
+  /// carries it, the same way it carries [version] rather than a sentence about
+  /// it.
+  final String? notes;
 
   /// Every file the release carries, when [outcome] is
   /// [UpdateOutcome.available]. Empty for the other three.
@@ -138,10 +171,16 @@ UpdateCheck parseRelease(
     return const UpdateCheck(UpdateOutcome.upToDate);
   }
   final page = decoded['html_url'];
+  final body = decoded['body'];
   return UpdateCheck(
     UpdateOutcome.available,
     version: tag,
     url: page is String && page.isNotEmpty ? page : fallbackUrl,
+    // A release published without notes — `--generate-notes` writes some of its
+    // own, and somebody filling in the web form may write none — is a release
+    // whose changes cannot be shown. Null rather than an empty string, so the
+    // card has one thing to ask rather than two.
+    notes: body is String && body.trim().isNotEmpty ? body : null,
     assets: parseAssets(decoded['assets']),
   );
 }
@@ -166,11 +205,13 @@ List<UpdateAsset> parseAssets(Object? raw) {
     }
     final size = entry['size'];
     final digest = entry['digest'];
+    final apiUrl = entry['url'];
     assets.add(
       UpdateAsset(
         name: name,
         url: url,
         size: size is int && size >= 0 ? size : 0,
+        apiUrl: apiUrl is String && apiUrl.isNotEmpty ? apiUrl : null,
         digest: digest is String && digest.isNotEmpty ? digest : null,
       ),
     );

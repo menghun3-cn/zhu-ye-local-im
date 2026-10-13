@@ -8,6 +8,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../update_check.dart';
 import '../update_install.dart';
+import '../update_notes.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -174,6 +175,10 @@ class _AboutPageState extends State<AboutPage> {
     final colors = WeChatColors.of(context);
     final answer = _answer;
     final url = _downloadUrl;
+    // Empty for the three outcomes that carry no release, which is what makes
+    // the panel below appear exactly when there is a better version to describe
+    // — `UpdateCheck.notes` is filled by `parseRelease` for that case alone.
+    final notes = readUpdateNotes(answer?.notes);
     final progress = _progress;
     final failure = _failure;
     final leftOver = _leftOver;
@@ -270,6 +275,19 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                     ),
                   ),
+                // What the newer build says it changes, under the version it
+                // is. The version alone answers "is there something to fetch";
+                // this is what answers "do I want it", which is the question a
+                // user actually has in front of a button that will replace the
+                // program they are running.
+                if (notes.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _UpdateNotes(
+                      notes: notes,
+                      title: l10n.aboutUpdateNotes,
+                    ),
+                  ),
                 if (progress != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -342,4 +360,119 @@ class _AboutPageState extends State<AboutPage> {
       ],
     );
   }
+}
+
+/// What the newer build says it changes.
+///
+/// A panel of its own rather than more lines of the sentence above it, because
+/// the two are different kinds of thing: that sentence is this application
+/// reporting what it found, and this is the release's own notes — a quotation,
+/// in the release's words. The sunken fill is the one this design gives an
+/// inset panel, which is also what keeps a long changelog from reading as part
+/// of the card's own text.
+///
+/// The lines arrive already classified — see `update_notes.dart` — and the only
+/// decisions taken here are the ones about drawing: a section of the notes is
+/// bold and set off by a little space above it, an item is a bullet with its
+/// text hanging beside it rather than under it, and anything else is prose.
+class _UpdateNotes extends StatelessWidget {
+  /// Draws [notes], under a [title] that says what they are.
+  const _UpdateNotes({required this.notes, required this.title});
+
+  /// The release's lines, in the order it wrote them.
+  final List<UpdateNote> notes;
+
+  /// What to call them: the section is labelled, because a quotation with no
+  /// attribution on a card that is otherwise this app's own voice would read as
+  /// something this app is claiming about itself.
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.surfaceSunken,
+        borderRadius: BorderRadius.circular(WeChat.controlRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: WeChat.fontSizeMeta,
+              color: colors.secondaryText,
+            ),
+          ),
+          for (var index = 0; index < notes.length; index++)
+            _line(context, notes[index], first: index == 0),
+        ],
+      ),
+    );
+  }
+
+  /// Draws one line of the notes, [first] being the one at the top.
+  Widget _line(BuildContext context, UpdateNote note, {required bool first}) {
+    final colors = WeChatColors.of(context);
+    final panelTop = !first && note.kind == UpdateNoteKind.heading ? 8.0 : 2.0;
+    switch (note.kind) {
+      case UpdateNoteKind.heading:
+        // The release's own section title — 新增, 修复 — so it is set apart by
+        // weight rather than by size: a size smaller than the items it labels
+        // would read as a footnote, and a larger one would compete with the
+        // version line above the panel.
+        return Padding(
+          padding: EdgeInsets.only(top: panelTop),
+          child: Text(
+            note.text,
+            style: TextStyle(
+              fontSize: WeChat.fontSizePreview,
+              fontWeight: FontWeight.w600,
+              height: WeChat.lineHeightBody,
+              color: colors.bubbleText,
+            ),
+          ),
+        );
+      case UpdateNoteKind.item:
+        // The bullet hangs beside the text rather than in front of it: a
+        // wrapped item that started its second line under the bullet instead of
+        // under the first word would read as a sub-item of itself.
+        return Padding(
+          padding: EdgeInsets.only(top: panelTop),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '·',
+                style: TextStyle(
+                  fontSize: WeChat.fontSizePreview,
+                  height: WeChat.lineHeightBody,
+                  color: colors.secondaryText,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: _prose(context, note.text)),
+            ],
+          ),
+        );
+      case UpdateNoteKind.text:
+        return Padding(
+          padding: EdgeInsets.only(top: panelTop),
+          child: _prose(context, note.text),
+        );
+    }
+  }
+
+  /// A line of the notes that is neither a section nor an item.
+  Widget _prose(BuildContext context, String text) => Text(
+    text,
+    style: TextStyle(
+      fontSize: WeChat.fontSizePreview,
+      height: WeChat.lineHeightBody,
+      color: WeChatColors.of(context).bubbleText,
+    ),
+  );
 }

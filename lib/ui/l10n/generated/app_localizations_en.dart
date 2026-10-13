@@ -561,6 +561,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aboutUpdateNotes => 'Release notes';
+
+  @override
   String get aboutOpenDownload => 'Open the download page';
 
   @override
