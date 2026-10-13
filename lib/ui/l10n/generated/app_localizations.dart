@@ -998,6 +998,12 @@ abstract class AppLocalizations {
   /// **'Version {version} is available.'**
   String aboutUpdateAvailable(String version);
 
+  /// No description provided for @aboutUpdateNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get aboutUpdateNotes;
+
   /// No description provided for @aboutOpenDownload.
   ///
   /// In en, this message translates to:

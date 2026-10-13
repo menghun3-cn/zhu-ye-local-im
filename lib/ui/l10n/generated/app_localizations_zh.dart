@@ -540,6 +540,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get aboutUpdateNotes => '更新日志';
+
+  @override
   String get aboutOpenDownload => '打开下载页';
 
   @override
