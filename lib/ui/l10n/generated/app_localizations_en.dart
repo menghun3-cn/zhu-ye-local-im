@@ -412,6 +412,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotCopyText => 'Could not copy that text.';
 
   @override
+  String get copySelection => 'Copy';
+
+  @override
   String get deleteMessage => 'Delete';
 
   @override
@@ -718,7 +721,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick a conversation on the left, or connect a Device first.';
 
   @override
-  String get conversationDisconnected => 'Session closed';
+  String get conversationDisconnected => 'Offline';
+
+  @override
+  String conversationUnread(int count) {
+    return '[$count]';
+  }
 
   @override
   String sendFileTitle(String peer) {

@@ -162,6 +162,16 @@ final class LocalTransferController {
   final Map<String, _WiredSession> _wired = {};
   final List<_Tracked> _transfers = [];
   final List<MessageRecord> _history = [];
+
+  /// What the user has read of the conversation, and where they were last.
+  ///
+  /// A value object rather than fields spread across this class, because the
+  /// two facts in it are persisted together and forgotten together: see
+  /// [ConversationReading]. Always present — a Device that remembers nothing
+  /// still has a reading state, it simply never records anything in it, and
+  /// every message in it is unread.
+  ConversationReading _reading = ConversationReading();
+
   final List<StreamSubscription<Object?>> _watch = [];
   final List<String> _notices = [];
 
@@ -398,6 +408,75 @@ final class LocalTransferController {
     views.sort(_newestFirst);
     return views;
   }
+
+  /// How many messages from [peer] the user has not read.
+  ///
+  /// Counted from the same list the conversation draws, so a badge and the
+  /// messages under it can never disagree: whatever is in [transfers] for this
+  /// peer and is incoming and newer than the watermark is exactly what a user
+  /// would find by opening it. Clipboard entries are left out for the same
+  /// reason the conversation list leaves them out — a mirrored clipboard is not
+  /// something anybody reads.
+  int unreadCount(Fingerprint peer) {
+    return _reading.unreadFor(peer, () sync* {
+      for (final view in _historyViewsFor(peer)) {
+        yield (
+          incoming: view.direction == TransferDirection.incoming,
+          at: view.at,
+        );
+      }
+    }());
+  }
+
+  /// Whether this Device has ever opened [peer]'s conversation.
+  ///
+  /// What tells "everything here is new" from "nothing new since last time",
+  /// which are the two answers a first-ever launch and an ordinary one give to
+  /// the same question.
+  bool hasOpenedConversation(Fingerprint peer) => _reading.hasOpened(peer);
+
+  /// The conversation the user was last in, or null for none.
+  ///
+  /// What the Conversations surface opens with, so that arriving there is
+  /// coming back to where you were rather than to a blank pane. Null on a
+  /// Device that has never opened one, which is the honest answer and the one
+  /// the empty-state hint is written for.
+  Fingerprint? get lastConversation {
+    final hex = _reading.lastPeer;
+    if (hex == null) return null;
+    return Fingerprint(hex);
+  }
+
+  /// Records that [peer]'s conversation has been read, as of now.
+  ///
+  /// Called when a conversation is on screen. The whole of the unread rule is
+  /// in this call and the comparison it feeds: everything already there is read
+  /// the moment the user is looking at it, and anything that arrives afterwards
+  /// is not. Writing only when something actually changes keeps this from
+  /// rewriting the conversation file on every rebuild — the surface calls it
+  /// from `build`, which runs a great many times per second.
+  Future<void> markConversationOpened(Fingerprint peer) async {
+    final before = _reading.openedThrough(peer);
+    final now = _clock();
+    final movedLast = _reading.lastPeer != peer.hex;
+    final advanced = before == null || now.isAfter(before);
+    if (!advanced && !movedLast) return;
+    _reading
+      ..markOpened(peer, now)
+      ..lastPeer = peer.hex;
+    _notify();
+    await _persistHistory();
+  }
+
+  /// Every remembered message exchanged with [peer], newest first, clipboard
+  /// aside.
+  ///
+  /// A helper for [unreadCount] rather than a public accessor: the surface that
+  /// draws a conversation already has [transfers], and handing out a second way
+  /// to ask the same question would be a second thing to keep in step.
+  Iterable<TransferView> _historyViewsFor(Fingerprint peer) => transfers.where(
+    (view) => view.peer == peer && view.kind != PayloadKind.clipboard,
+  );
 
   /// Orders two messages the way a conversation reads.
   ///
@@ -970,8 +1049,24 @@ final class LocalTransferController {
     }
     _transfers.removeWhere((tracked) => _handleOf(tracked) == handle);
     _history.removeWhere((record) => record.handle == handle);
+    _pruneReading();
     _notify();
     await _persistHistory();
+  }
+
+  /// Drops reading state for peers this Device no longer holds anything for.
+  ///
+  /// Called after a deletion, which is the one thing that can empty a
+  /// conversation. Without it the map would keep an entry per peer ever talked
+  /// to and never lose one, and a Device that had been forgotten would keep a
+  /// watermark that nothing could ever compare against — harmless, but a file
+  /// that grows for no reason, and one that would silently resurrect an
+  /// old read position if the peer came back.
+  void _pruneReading() {
+    _reading.retainOnly({
+      for (final view in transfers)
+        if (view.kind != PayloadKind.clipboard) view.peer.hex,
+    });
   }
 
   /// Changes how the clipboard is treated, starting or stopping the watcher.
@@ -1524,12 +1619,14 @@ final class LocalTransferController {
     final store = _messages;
     if (store == null) return;
     try {
-      final remembered = await loadMessages(store);
+      final remembered = await loadConversation(store);
       _history
         ..clear()
-        ..addAll(remembered);
+        ..addAll(remembered.messages);
+      _reading = remembered.reading;
     } on Object catch (error) {
       _history.clear();
+      _reading = ConversationReading();
       _notice('the conversation could not be read back: $error');
     }
   }
@@ -1564,7 +1661,10 @@ final class LocalTransferController {
     final store = _messages;
     if (store == null) return;
     try {
-      await saveMessages(_history, store);
+      await saveConversation(
+        StoredConversation(messages: _history, reading: _reading),
+        store,
+      );
     } on Object catch (error) {
       _notice('the conversation could not be saved: $error');
     }

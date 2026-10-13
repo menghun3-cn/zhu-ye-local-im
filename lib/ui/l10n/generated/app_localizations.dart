@@ -734,6 +734,12 @@ abstract class AppLocalizations {
   /// **'Could not copy that text.'**
   String get cannotCopyText;
 
+  /// No description provided for @copySelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copySelection;
+
   /// No description provided for @deleteMessage.
   ///
   /// In en, this message translates to:
@@ -1271,8 +1277,14 @@ abstract class AppLocalizations {
   /// No description provided for @conversationDisconnected.
   ///
   /// In en, this message translates to:
-  /// **'Session closed'**
+  /// **'Offline'**
   String get conversationDisconnected;
+
+  /// The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.
+  ///
+  /// In en, this message translates to:
+  /// **'[{count}]'**
+  String conversationUnread(int count);
 
   /// No description provided for @sendFileTitle.
   ///

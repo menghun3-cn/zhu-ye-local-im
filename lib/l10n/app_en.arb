@@ -212,6 +212,7 @@
   "cannotCopyImage": "Could not copy that image.",
   "copyText": "Copy text",
   "cannotCopyText": "Could not copy that text.",
+  "copySelection": "Copy",
   "deleteMessage": "Delete",
 
   "clipboardSyncHeader": "Clipboard sync",
@@ -323,7 +324,12 @@
   "tabConversation": "Conversations",
   "conversationListEmpty": "No conversations yet. A Device this one finds shows up here on its own, ready to connect.",
   "conversationPickOne": "Pick a conversation on the left, or connect a Device first.",
-  "conversationDisconnected": "Session closed",
+  "conversationDisconnected": "Offline",
+  "conversationUnread": "[{count}]",
+  "@conversationUnread": {
+    "description": "The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.",
+    "placeholders": { "count": { "type": "int" } }
+  },
   "sendFileTitle": "Send a file to {peer}",
   "@sendFileTitle": {
     "placeholders": { "peer": { "type": "String" } }

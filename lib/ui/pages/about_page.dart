@@ -211,9 +211,21 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: 8),
                 Text(l10n.aboutDescription),
                 const Divider(height: 24),
-                Row(
+                // A row that wraps, because the three buttons together are
+                // wider than a narrow window: on a squeezed card an overflow
+                // stripe is what a `Row` would draw, and a button nobody can
+                // reach is worse than one that moved to the next line.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    TextButton.icon(
+                    // The one action on this card a user reaches for, so it
+                    // wears the filled style every other primary action in this
+                    // application wears — 检查更新 is a *button*, not a link,
+                    // and a flat green word was the odd one out beside the
+                    // Connect and Send buttons elsewhere.
+                    FilledButton.icon(
                       onPressed: _asking || _busy
                           ? null
                           : () => unawaited(_check()),
@@ -228,11 +240,14 @@ class _AboutPageState extends State<AboutPage> {
                     // build knows how to replace. Absent rather than disabled
                     // elsewhere: an inert button explains nothing.
                     if (canInstall)
-                      TextButton.icon(
+                      FilledButton.icon(
                         onPressed: _busy ? null : () => unawaited(_install()),
                         icon: const Icon(Icons.download_outlined, size: 18),
                         label: Text(l10n.aboutUpdateInstall),
                       ),
+                    // Opens a page rather than doing something in this window,
+                    // so it stays the quiet style: the filled button above is
+                    // what a user should press.
                     if (url != null)
                       TextButton.icon(
                         onPressed: () =>
