@@ -207,16 +207,17 @@ svg { display: block; }
 .hero__meta { margin-top: var(--s4); display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: var(--fs-meta); color: var(--text-3); }
 .hero__meta span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* 首屏截图：一块立着的屏幕，从侧前方看过去。用 3D 透视（父级 perspective +
-   子级 rotateY）代替之前的 2D 斜放 —— 用户要的就是「竖起来、从侧边看」的纵深
-   感：屏幕一侧朝你、一侧往后退，像斜前方立在桌上。代价是界面文字在三维变换
-   下会轻微发虚，这是为这个观感接受的取舍（颜色与布局都不依赖 3D，关掉也照常）。 */
-.hero__art { margin: 0; perspective: 1100px; perspective-origin: 80% 50%; }
+/* 首屏截图：正面立着的一屏，整体顺时针转 30°（CSS 正角度即顺时针，
+   所以「左边高、右边低」）。这是 2D 旋转，不是之前那版 3D 侧视 —— 用户后来
+   改要「正面立、转 30°」的干净斜放，不要纵深。旋转不改布局盒，转完的包围盒
+   比原图宽约 1.17 倍，会顶出右栏，故叠一层 scale(.82) 把它收进列内（角度仍是
+   精确的 30°）。颜色和布局都不依赖这个变换，关掉也照常。 */
+.hero__art { margin: 0; }
 .hero__art img {
   display: block; width: 100%; height: auto;
   border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--sh3);
-  transform: rotateY(20deg) rotateX(3deg);
+  transform: rotate(30deg) scale(.82);
 }
 [data-theme="dark"] .hero__art img { border-color: var(--border-strong); }
 
@@ -340,7 +341,7 @@ svg { display: block; }
   .hero h1 { font-size: 34px; }
   .hero .lede { font-size: 16px; }
   .hero__art { max-width: 100%; }
-  .hero__art img { transform: rotateY(12deg) rotateX(2deg); }
+  .hero__art img { transform: rotate(30deg) scale(.8); }
   .block h2 { font-size: 22px; }
   .topbar__nav { display: none; }
   .split { grid-template-columns: 1fr; gap: 0; }
