@@ -283,19 +283,10 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     final stage = newUpdateStage();
     final downloaded = File(_within(stage.path, _fileName(asset.name)));
     onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
-    final client = HttpClient()..connectionTimeout = _requestTimeout;
     try {
-      await _download(
-        client,
-        Uri.parse(asset.url),
-        downloaded,
-        asset.size,
-        onProgress,
-      );
+      await _download(asset, downloaded, onProgress);
     } on Object {
       return const UpdateInstallResult.failed(UpdateInstallFailure.download);
-    } finally {
-      client.close(force: true);
     }
 
     onProgress(const UpdateInstallProgress(UpdateInstallStage.verifying));
@@ -634,8 +625,80 @@ Future<bool> _matchesDigest(File file, String expected) async {
   }
 }
 
-/// Reads [url] into [destination], counting the bytes for [onProgress].
+/// The addresses [asset] can be fetched from, best first.
+///
+/// Two of them, because the two live on different hosts and a network can reach
+/// one and not the other — the release API's own address is on
+/// `api.github.com`, which is the host this application has already reached to
+/// be asked this question at all, and the address the release page's download
+/// button points at is on `github.com`. Measured on the development machine:
+/// `api.github.com` answers and `github.com` times out, so a build that only
+/// knew the second one could check for an update and never install it. Neither
+/// is a fallback in the "unlikely" sense; both are tried, in the order that puts
+/// the host already proven reachable first.
+///
+/// Duplicates are dropped: a release could hand back the same address twice in
+/// the two fields, and fetching it twice would only be slower.
+List<String> downloadAddresses(UpdateAsset asset) {
+  final addresses = <String>[];
+  final apiUrl = asset.apiUrl;
+  if (apiUrl != null && apiUrl.isNotEmpty) addresses.add(apiUrl);
+  if (asset.url.isNotEmpty && !addresses.contains(asset.url)) {
+    addresses.add(asset.url);
+  }
+  return addresses;
+}
+
+/// Fetches [asset] to [destination], trying each of its addresses.
+///
+/// Reports progress per attempt, from zero: a second attempt is a second
+/// download, and a bar that resumed where the failed one left off would be
+/// claiming bytes this one has not received. Throws when no address delivers
+/// the whole file, which is what the caller reports as "the download did not
+/// arrive" — an answer that has not changed, and one the user can act on by
+/// trying again.
 Future<void> _download(
+  UpdateAsset asset,
+  File destination,
+  void Function(UpdateInstallProgress progress) onProgress,
+) async {
+  Object? failure;
+  for (final address in downloadAddresses(asset)) {
+    // A new client per attempt: a connection that failed during its CONNECT
+    // leaves the pool of the one that held it in a state worth not reusing, and
+    // the second host is a different one anyway.
+    final client = HttpClient()..connectionTimeout = _requestTimeout;
+    try {
+      final received = await _fetch(
+        client,
+        Uri.parse(address),
+        destination,
+        asset.size,
+        onProgress,
+      );
+      // Short of the bytes the release published is not a download that
+      // arrived, and finding that out here is what gives the next address a
+      // chance: an interception that answers with a page of its own returns
+      // 200 and the whole wrong file, which the checksum below would catch —
+      // but only after every address had been given up on.
+      if (asset.size > 0 && received != asset.size) {
+        throw HttpException(
+          '$received of ${asset.size} bytes',
+          uri: Uri.parse(address),
+        );
+      }
+      return;
+    } on Object catch (error) {
+      failure = error;
+    } finally {
+      client.close(force: true);
+    }
+  }
+  throw failure ?? const HttpException('no address to download from');
+}
+
+/// Reads [url] into [destination], answering how many bytes arrived.
+Future<int> _fetch(
   HttpClient client,
   Uri url,
   File destination,
@@ -644,6 +707,9 @@ Future<void> _download(
 ) async {
   final request = await client.getUrl(url).timeout(_requestTimeout);
   request.headers.set(HttpHeaders.userAgentHeader, 'zhuye-local-transfer');
+  // What turns the API's address from a description of a file into the file
+  // itself. The download address ignores it, so one header serves both.
+  request.headers.set(HttpHeaders.acceptHeader, 'application/octet-stream');
   final response = await request.close().timeout(_requestTimeout);
   if (response.statusCode != HttpStatus.ok) {
     throw HttpException('HTTP ${response.statusCode}', uri: url);
@@ -668,6 +734,7 @@ Future<void> _download(
   } finally {
     await sink.close();
   }
+  return received;
 }
 
 /// Unpacks [package] into [into], answering whether it worked.

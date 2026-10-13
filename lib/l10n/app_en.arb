@@ -271,6 +271,7 @@
   "@aboutUpdateAvailable": {
     "placeholders": { "version": { "type": "String" } }
   },
+  "aboutUpdateNotes": "Release notes",
   "aboutOpenDownload": "Open the download page",
   "aboutNoRelease": "No version has been published yet, so there is nothing to compare this build against.",
   "aboutUnreachable": "The update server could not be reached. Check the network, or download the new version by hand.",

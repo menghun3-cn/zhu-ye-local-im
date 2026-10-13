@@ -75,6 +75,14 @@ void main() {
     url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
   );
 
+  /// The same answer, from a release that says what it changes.
+  const availableWithNotes = UpdateCheck(
+    UpdateOutcome.available,
+    version: '9.9.9',
+    url: 'https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest',
+    notes: '### 新增\n\n- 一键更新\n\n### 修复\n\n- 修好了',
+  );
+
   testWidgets('names the build that is running', (tester) async {
     final checker = ScriptedUpdateChecker.install(
       const UpdateCheck(UpdateOutcome.upToDate),
@@ -166,6 +174,46 @@ void main() {
       findsOneWidget,
     );
     expect(checker.asked, 1);
+  });
+
+  testWidgets('shows the version, and what the release says it changes', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(availableWithNotes);
+    ScriptedUpdateInstaller.replace();
+    await show(tester);
+
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    // The version answers "is there something to fetch"; the notes answer "do I
+    // want it", which is the question somebody standing in front of a button
+    // that replaces this program actually has.
+    expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsOneWidget);
+    expect(find.text(l10n.aboutUpdateNotes), findsOneWidget);
+    // Sections and items, with the markup they were written in taken off: the
+    // reader is being told what changed, not shown a file.
+    expect(find.text('新增'), findsOneWidget);
+    expect(find.text('修复'), findsOneWidget);
+    expect(find.text('一键更新'), findsOneWidget);
+    expect(find.text('修好了'), findsOneWidget);
+    expect(find.textContaining('###'), findsNothing);
+  });
+
+  testWidgets('says nothing extra when the release carried no notes', (
+    tester,
+  ) async {
+    // `--generate-notes` writes some of its own and somebody filling in the web
+    // form may write none, so a release with an empty body is a release to show
+    // the version of and nothing else. An empty panel with a title on it would
+    // be claiming there is news when there is none.
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace();
+    await show(tester);
+
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsOneWidget);
+    expect(find.text(l10n.aboutUpdateNotes), findsNothing);
   });
 
   testWidgets('hands the download address to the platform to open', (
