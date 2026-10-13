@@ -60,38 +60,76 @@
   <main id="top">
 
     <section class="section hero">
-      <p class="eyebrow reveal">局域网直连 · 无服务端</p>
-      <h1 class="reveal">两台设备之间传东西，<br>走你自己的<em>局域网</em>。</h1>
-      <p class="lede reveal">
-        在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板。
-        没有服务端、没有账号、没有云端 —— 程序平时只和局域网说话，
-        唯一一次访问外网，是你亲自点「检查更新」的时候。
-      </p>
-      <div class="hero__actions reveal">
-        <a class="btn btn--primary" id="heroDownload"
-           href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
-           target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v12M7 11l5 5 5-5M4 20h16"/>
-          </svg>
-          下载 Windows 版
-        </a>
-        <a class="btn btn--ghost" href="#downloads">全部下载</a>
-        <span class="muted" style="font-size:var(--fs-meta)" id="heroVersion"></span>
-      </div>
-      <div class="hero__meta reveal">
-        <span><i class="dot" style="color:var(--brand)"></i>Windows 10 1809+ / x64</span>
-        <span><i class="dot" style="color:var(--text-3)"></i>Android（试用）</span>
-        <span><i class="dot" style="color:var(--text-3)"></i>免安装可用 · 不写注册表</span>
+      <div class="hero__grid">
+        <div class="hero__copy reveal">
+          <p class="eyebrow">局域网直连 · 无服务端</p>
+          <h1>两台设备之间传东西，<br>走你自己的<em>局域网</em>。</h1>
+          <p class="lede">
+            在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板。
+            没有服务端、没有账号、没有云端 —— 程序平时只和局域网说话，
+            唯一一次访问外网，是你亲自点「检查更新」的时候。
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--primary" id="heroDownload"
+               href="https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest"
+               target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12M7 11l5 5 5-5M4 20h16"/>
+              </svg>
+              下载 Windows 版
+            </a>
+            <a class="btn btn--ghost" href="#downloads">全部下载</a>
+            <span class="muted" style="font-size:var(--fs-meta)" id="heroVersion"></span>
+          </div>
+          <div class="hero__meta">
+            <span><i class="dot" style="color:var(--brand)"></i>Windows 10 1809+ / x64</span>
+            <span><i class="dot" style="color:var(--text-3)"></i>Android（试用）</span>
+            <span><i class="dot" style="color:var(--text-3)"></i>免安装可用 · 不写注册表</span>
+          </div>
+        </div>
+
+        <figure class="hero__art reveal">
+          <img src="assets/hero.png"
+               alt="竹叶局域网传输的运行界面：左侧是设备与对话列表，右侧是正在与另一台设备互传文件的对话"
+               width="1284" height="769">
+        </figure>
       </div>
 
-      <div class="facts reveal">
-        <div><div class="fact__k">服务器</div><div class="fact__v">没有</div></div>
-        <div><div class="fact__k">账号</div><div class="fact__v">没有</div></div>
-        <div><div class="fact__k">云端</div><div class="fact__v">没有</div></div>
-        <div><div class="fact__k">外网请求</div><div class="fact__v">仅「检查更新」</div></div>
-      </div>
+      <ul class="nots reveal">
+        <li>
+          <svg class="nots__mark" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M4.7 11.3 11.3 4.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="nots__k">服务器</span>
+          <span class="nots__v">没有</span>
+        </li>
+        <li>
+          <svg class="nots__mark" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M4.7 11.3 11.3 4.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="nots__k">账号</span>
+          <span class="nots__v">没有</span>
+        </li>
+        <li>
+          <svg class="nots__mark" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M4.7 11.3 11.3 4.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="nots__k">云端</span>
+          <span class="nots__v">没有</span>
+        </li>
+        <li>
+          <svg class="nots__mark" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="8" cy="8" r="1.9" fill="currentColor"/>
+          </svg>
+          <span class="nots__k">外网请求</span>
+          <span class="nots__v">仅「检查更新」</span>
+        </li>
+      </ul>
     </section>
 
     <section class="section block" id="features">
@@ -276,14 +314,6 @@
         <strong>未做代码签名。</strong>
         首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息」→「仍要运行」即可。
         介意的话可以读源码自行构建 —— 仓库里有完整的构建与打包脚本。
-      </div>
-
-      <div class="callout reveal">
-        <strong>要写脚本自动拉包，就用这两个固定地址。</strong>
-        它们永远指向最新一版的产物，脚本里不用写版本号，外网的机器照样能用：
-        <br><code>https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest/download/LocalTransfer-latest-windows-x64-setup.exe</code>
-        <br><code>https://github.com/menghun3-cn/zhu-ye-local-im/releases/latest/download/LocalTransfer-latest-windows-x64-portable.zip</code>
-        <br>旁边各有一个同名的 <code>.sha256</code>，下载后一句 <code>sha256sum -c</code> 就能验完整性。
       </div>
     </section>
 
