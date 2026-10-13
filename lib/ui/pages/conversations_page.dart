@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
@@ -63,10 +65,20 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// the identity did not change.
   String? _selected;
 
+  /// Whether [_selected] is still the "nothing picked yet" state.
+  ///
+  /// The distinction this exists for: a user who tapped the *first* row's
+  /// conversation and a user who has picked nothing at all are different, and
+  /// only the second should be handed the remembered conversation. Without it
+  /// the remembered peer would be restored on top of every arrival at this
+  /// surface, undoing a choice the user made and then navigated away from.
+  bool _untouched = true;
+
   @override
   void initState() {
     super.initState();
     _selected = widget.requestedPeer?.hex;
+    _untouched = widget.requestedPeer == null;
   }
 
   @override
@@ -77,7 +89,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
     // selection may outvote. A cleared one is not a request to close anything.
     final requested = widget.requestedPeer;
     if (requested != null && requested != oldWidget.requestedPeer) {
-      setState(() => _selected = requested.hex);
+      setState(() {
+        _selected = requested.hex;
+        _untouched = false;
+      });
     }
   }
 
@@ -134,15 +149,44 @@ class _ConversationsPageState extends State<ConversationsPage> {
     final controller = ControllerScope.of(context);
     final conversations = _conversationsOf(controller);
 
+    // What the pane opens with: the conversation the user asked for, or the one
+    // they were last in. Arriving at this surface is coming back to a
+    // conversation, not to a form — a messenger that showed a blank pane beside
+    // a list of your conversations would be making the user pick one they
+    // already picked, every single time they came back.
+    //
+    // The remembered peer is only a *fallback*: once the user has tapped a row
+    // or a request has arrived, [_untouched] is false and this stops applying,
+    // so a choice made in this sitting is never overwritten by an older one.
+    final remembered = _untouched && _selected == null
+        ? controller.lastConversation?.hex
+        : null;
+    final wanted = _selected ?? remembered;
+
     // A selection that is no longer in the list is dropped rather than kept as
     // a dangling pane: showing a conversation the list no longer offers would
     // leave the header unable to say what it is.
     _Conversation? selected;
     for (final entry in conversations) {
-      if (entry.peer.fingerprint.hex == _selected) {
+      if (entry.peer.fingerprint.hex == wanted) {
         selected = entry;
         break;
       }
+    }
+    final current = selected;
+
+    // Opening a conversation is what reads it, and arriving here already
+    // looking at one is an opening like any other — so the remembered
+    // conversation is marked read on the frame that shows it, exactly as a
+    // tapped one is. Deferred past the frame because this is `build`, and
+    // marking writes to the conversation file.
+    if (current != null && current.peer.fingerprint.hex == remembered) {
+      final peer = current.peer.fingerprint;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(controller.markConversationOpened(peer));
+        }
+      });
     }
 
     final wide = MediaQuery.sizeOf(context).width >= 720;
@@ -157,7 +201,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
     // Narrow windows get the list and then the conversation, one at a time:
     // two panes at 400 logical pixels each would leave neither readable.
     if (!wide) {
-      final current = selected;
       if (current == null) {
         return _list(context, l10n, conversations, selected: null);
       }
@@ -166,7 +209,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
           _PaneHeader(
             title: current.peer.displayName,
             subtitle: _subtitleFor(current.peer, l10n),
-            onBack: () => setState(() => _selected = null),
+            onBack: () => setState(() {
+              _selected = null;
+              _untouched = false;
+            }),
             offline: !current.peer.isConnected,
           ),
           Expanded(
@@ -185,11 +231,11 @@ class _ConversationsPageState extends State<ConversationsPage> {
         Container(
           width: WeChat.conversationListWidth,
           color: colors.sidebarBackground,
-          child: _list(context, l10n, conversations, selected: selected),
+          child: _list(context, l10n, conversations, selected: current),
         ),
         VerticalDivider(width: 1, color: colors.divider),
         Expanded(
-          child: selected == null
+          child: current == null
               // The pane a conversation would open into, so it wears the
               // conversation's own white rather than the page's grey.
               ? ColoredBox(
@@ -203,18 +249,18 @@ class _ConversationsPageState extends State<ConversationsPage> {
                   // Keyed by peer so switching conversations rebuilds the
                   // composer and the scroll position rather than carrying the
                   // previous one's over.
-                  key: ValueKey(selected.peer.fingerprint.hex),
-                  peer: selected.peer.fingerprint,
+                  key: ValueKey(current.peer.fingerprint.hex),
+                  peer: current.peer.fingerprint,
                   defaultIncomingDirectory: widget.defaultIncomingDirectory,
                   header: _PaneHeader(
-                    title: selected.peer.displayName,
+                    title: current.peer.displayName,
                     // The address, and — when the Session has gone — that it
                     // has. A conversation outlives its Session, so this is the
                     // only place that says whether typing here would reach
                     // anybody, and a pane that looked the same either way would
                     // be inviting a message into a void.
-                    subtitle: _subtitleFor(selected.peer, l10n),
-                    offline: !selected.peer.isConnected,
+                    subtitle: _subtitleFor(current.peer, l10n),
+                    offline: !current.peer.isConnected,
                   ),
                 ),
         ),
@@ -241,6 +287,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
     List<_Conversation> conversations, {
     required _Conversation? selected,
   }) {
+    final controller = ControllerScope.of(context);
     return ListView.builder(
       itemCount: conversations.length,
       itemBuilder: (context, index) {
@@ -250,11 +297,24 @@ class _ConversationsPageState extends State<ConversationsPage> {
           l10n: l10n,
           selected:
               entry.peer.fingerprint.hex == selected?.peer.fingerprint.hex,
-          controller: ControllerScope.of(context),
-          onTap: () => setState(() => _selected = entry.peer.fingerprint.hex),
+          unread: controller.unreadCount(entry.peer.fingerprint),
+          controller: controller,
+          onTap: () => _open(entry.peer.fingerprint),
         );
       },
     );
+  }
+
+  /// Opens [peer]'s conversation, and records that it has been read.
+  ///
+  /// The mark is made here rather than from the conversation's own `build`,
+  /// because "the user is looking at it" is a fact about this list's selection
+  /// and not about the widget below it: a conversation that was rebuilt while
+  /// the user was on another surface — which the shell's `IndexedStack` does
+  /// every time the controller ticks — is not being read by anybody.
+  void _open(Fingerprint peer) {
+    setState(() => _selected = peer.hex);
+    unawaited(ControllerScope.of(context).markConversationOpened(peer));
   }
 }
 
@@ -303,6 +363,7 @@ class _ConversationTile extends StatelessWidget {
     required this.entry,
     required this.l10n,
     required this.selected,
+    required this.unread,
     required this.controller,
     required this.onTap,
   });
@@ -310,6 +371,13 @@ class _ConversationTile extends StatelessWidget {
   final _Conversation entry;
   final AppLocalizations l10n;
   final bool selected;
+
+  /// How many messages from this peer the user has not read.
+  ///
+  /// Pushed in rather than read here, so that the count and the row it marks
+  /// are decided by one caller and a test can ask for a row with any number on
+  /// it without arranging a whole conversation to produce it.
+  final int unread;
 
   /// Used to dial, and to open the pairing window. The tile is the only place a
   /// Session is started from, so it needs the controller and not just the view.
@@ -338,6 +406,13 @@ class _ConversationTile extends StatelessWidget {
     final lower =
         _actionFor(context, peer, canConnect, canPair) ??
         _summary(context, peer, latest);
+    // An unread row is *louder*: the name goes semibold, and the preview steps
+    // up from secondary ink to body ink. That is the difference a user reads at
+    // a glance — no separate dot or badge is needed, because the row itself is
+    // telling, and a badge would be a third thing competing with the clock and
+    // the action button already in that corner.
+    final loud = unread > 0;
+    final previewColour = loud ? colors.bubbleText : colors.secondaryText;
 
     return ConversationRow(
       selected: selected,
@@ -375,15 +450,16 @@ class _ConversationTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: WeChat.fontSizeTitle,
                       color: colors.bubbleText,
+                      fontWeight: loud ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _previewFor(peer, latest),
+                    _previewFor(peer, latest, unread),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: WeChat.fontSizePreview,
-                      color: colors.secondaryText,
+                      color: previewColour,
                     ),
                   ),
                 ],
@@ -447,7 +523,23 @@ class _ConversationTile extends StatelessWidget {
   /// line is a different height from its neighbours and the list looks broken —
   /// so it falls back to the address, which is also the answer to "which
   /// machine is this".
-  String _previewFor(PeerView peer, TransferView? latest) {
+  ///
+  /// An unread conversation leads with how many are waiting: the count first,
+  /// then the same preview every row has. That is what the desktop client does,
+  /// and the reason is that the count answers "should I open this" while the
+  /// preview answers "what is it about" — and the first question comes first.
+  /// The count is a plain bracketed number rather than a red badge, because a
+  /// badge belongs on an avatar where it cannot be mistaken for the message's
+  /// own first characters; here it shares a line with the text, and the square
+  /// brackets are what keep the two apart.
+  String _previewFor(PeerView peer, TransferView? latest, int unread) {
+    final preview = _summaryOf(peer, latest);
+    if (unread <= 0) return preview;
+    return '${l10n.conversationUnread(unread)} $preview';
+  }
+
+  /// The last thing said, with no unread prefix.
+  String _summaryOf(PeerView peer, TransferView? latest) {
     final last = latest;
     if (last == null) return describePeerAddress(peer, l10n);
     final text = last.text;

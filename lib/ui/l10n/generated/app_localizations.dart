@@ -734,6 +734,12 @@ abstract class AppLocalizations {
   /// **'Could not copy that text.'**
   String get cannotCopyText;
 
+  /// No description provided for @copySelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copySelection;
+
   /// No description provided for @deleteMessage.
   ///
   /// In en, this message translates to:
@@ -1016,6 +1022,96 @@ abstract class AppLocalizations {
   /// **'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.'**
   String get aboutHowToUpgrade;
 
+  /// No description provided for @aboutUpdateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and update'**
+  String get aboutUpdateInstall;
+
+  /// No description provided for @aboutUpdateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get aboutUpdateDownloading;
+
+  /// No description provided for @aboutUpdateVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking what arrived…'**
+  String get aboutUpdateVerifying;
+
+  /// No description provided for @aboutUpdateStaging.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpacking…'**
+  String get aboutUpdateStaging;
+
+  /// No description provided for @aboutUpdateHandingOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacing this folder and restarting…'**
+  String get aboutUpdateHandingOver;
+
+  /// No description provided for @aboutUpdateFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The update was not completed'**
+  String get aboutUpdateFailedTitle;
+
+  /// No description provided for @aboutUpdateInstallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Download and update: it fetches the new build, checks it against the checksum the release published, replaces this folder and restarts the app by itself. When that cannot be done, the button beside it opens the page to download by hand.'**
+  String get aboutUpdateInstallHint;
+
+  /// No description provided for @updateFailureUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This platform cannot replace itself. Download the new version by hand.'**
+  String get updateFailureUnsupported;
+
+  /// No description provided for @updateFailureNoAsset.
+  ///
+  /// In en, this message translates to:
+  /// **'The release does not carry the file this copy needs. Download it by hand.'**
+  String get updateFailureNoAsset;
+
+  /// No description provided for @updateFailureNoDigest.
+  ///
+  /// In en, this message translates to:
+  /// **'The release publishes no checksum for its file, so nothing can be checked before it is installed. Download it by hand.'**
+  String get updateFailureNoDigest;
+
+  /// No description provided for @updateFailureNotWritable.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder this app runs from cannot be written to. Download the new version by hand and unpack it over this folder.'**
+  String get updateFailureNotWritable;
+
+  /// No description provided for @updateFailureDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'The download did not finish. Check the network, then try again.'**
+  String get updateFailureDownload;
+
+  /// No description provided for @updateFailureChecksum.
+  ///
+  /// In en, this message translates to:
+  /// **'What arrived is not what the release published, so it has been thrown away.'**
+  String get updateFailureChecksum;
+
+  /// No description provided for @updateFailureUnpack.
+  ///
+  /// In en, this message translates to:
+  /// **'The download arrived but could not be unpacked, so it has been thrown away.'**
+  String get updateFailureUnpack;
+
+  /// No description provided for @updateFailureHandover.
+  ///
+  /// In en, this message translates to:
+  /// **'A previous replacement did not finish. Download the new version by hand and unpack it over this folder.'**
+  String get updateFailureHandover;
+
   /// No description provided for @railUpdate.
   ///
   /// In en, this message translates to:
@@ -1033,6 +1129,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancel;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
 
   /// No description provided for @save.
   ///
@@ -1175,8 +1277,14 @@ abstract class AppLocalizations {
   /// No description provided for @conversationDisconnected.
   ///
   /// In en, this message translates to:
-  /// **'Session closed'**
+  /// **'Offline'**
   String get conversationDisconnected;
+
+  /// The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.
+  ///
+  /// In en, this message translates to:
+  /// **'[{count}]'**
+  String conversationUnread(int count);
 
   /// No description provided for @sendFileTitle.
   ///

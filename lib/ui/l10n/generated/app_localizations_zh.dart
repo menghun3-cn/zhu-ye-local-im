@@ -400,6 +400,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cannotCopyText => '没能复制这段文字。';
 
   @override
+  String get copySelection => '复制';
+
+  @override
   String get deleteMessage => '删除';
 
   @override
@@ -550,6 +553,52 @@ class AppLocalizationsZh extends AppLocalizations {
       '升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。';
 
   @override
+  String get aboutUpdateInstall => '下载并更新';
+
+  @override
+  String get aboutUpdateDownloading => '正在下载';
+
+  @override
+  String get aboutUpdateVerifying => '正在校验下载内容…';
+
+  @override
+  String get aboutUpdateStaging => '正在解压…';
+
+  @override
+  String get aboutUpdateHandingOver => '正在替换本目录并重启…';
+
+  @override
+  String get aboutUpdateFailedTitle => '更新没有完成';
+
+  @override
+  String get aboutUpdateInstallHint =>
+      '点「下载并更新」就行：程序会取回新版本、按发布方公布的校验值核一遍、替换本目录，然后自己重启。做不了的时候，旁边那个按钮会打开手动下载的页面。';
+
+  @override
+  String get updateFailureUnsupported => '这个平台不能自己替换，请手动下载新版本。';
+
+  @override
+  String get updateFailureNoAsset => '这个版本没有带本机需要的那个文件，请手动下载。';
+
+  @override
+  String get updateFailureNoDigest => '这个版本没有公布校验值，装上之前没法核对，请手动下载。';
+
+  @override
+  String get updateFailureNotWritable => '程序所在的目录不可写。请手动下载新版本，解压后覆盖本目录。';
+
+  @override
+  String get updateFailureDownload => '下载没有完成。请检查网络后重试。';
+
+  @override
+  String get updateFailureChecksum => '下载到的内容与发布方公布的不一致，已经丢弃。';
+
+  @override
+  String get updateFailureUnpack => '下载到了，但解压失败，已经丢弃。';
+
+  @override
+  String get updateFailureHandover => '上一次替换没有完成。请手动下载新版本，解压后覆盖本目录。';
+
+  @override
   String get railUpdate => '更新';
 
   @override
@@ -557,6 +606,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cancel => '取消';
+
+  @override
+  String get close => '关闭';
 
   @override
   String get save => '保存';
@@ -634,7 +686,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get conversationPickOne => '从左边选一个对话，或者先连接一台设备。';
 
   @override
-  String get conversationDisconnected => '连接已断开';
+  String get conversationDisconnected => '离线';
+
+  @override
+  String conversationUnread(int count) {
+    return '[$count]';
+  }
 
   @override
   String sendFileTitle(String peer) {

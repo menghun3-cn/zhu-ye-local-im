@@ -196,6 +196,49 @@ Future<void> copyTransferText(BuildContext context, TransferView view) async {
   }
 }
 
+/// The words currently selected in the conversation, for the menus in it.
+///
+/// [SelectableRegionState] is reachable only by the widget that created it —
+/// its `SelectionArea` holds the key privately and there is no `of` — so the
+/// selection has to be *pushed* down to whoever wants to read it rather than
+/// pulled up from it. That is what this is: the conversation's `SelectionArea`
+/// reports every change into here ([SelectionArea.onSelectionChanged]), and the
+/// menu on a message reads it from here.
+///
+/// An [InheritedWidget] rather than a callback passed down per bubble, because
+/// a bubble is built by a `ListView` and would need the value threaded through
+/// the builder for no reason: the selection is a fact about the conversation,
+/// not about a message.
+///
+/// Not a [ChangeNotifier]: nothing rebuilds on a change. The only reader is a
+/// right-click, which reads it once, at the moment the menu is built.
+class MessageSelection extends InheritedWidget {
+  /// Publishes [text] — what is selected, or null for nothing — to [child].
+  const MessageSelection({super.key, required this.text, required super.child});
+
+  /// What the conversation has selected, or null when it has nothing.
+  ///
+  /// The *plain text* of the selection rather than a range or a list of nodes:
+  /// the only thing anyone does with it is put it on the clipboard, and the
+  /// text is what that takes. A selection spanning two messages arrives here as
+  /// one string, which is exactly the answer a copy should give.
+  final String? text;
+
+  /// Whether there is anything selected.
+  bool get hasSelection => text != null && text!.isNotEmpty;
+
+  /// What is selected above [context], or null when nothing is.
+  ///
+  /// Null for a surface with no conversation on it — the Transfers list draws
+  /// the same menus over text nobody can select — which is a real answer there
+  /// and not an error.
+  static MessageSelection? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<MessageSelection>();
+
+  @override
+  bool updateShouldNotify(MessageSelection oldWidget) => text != oldWidget.text;
+}
+
 /// Offers what can be done with a Transfer, on a right-click.
 ///
 /// The answers an *offer* needs — accept and refuse — are buttons in the open,
@@ -212,11 +255,26 @@ Future<void> copyTransferText(BuildContext context, TransferView view) async {
 /// everything, settled or not, which is why the menu is never empty and the
 /// right-click is always intercepted.
 ///
-/// For a text message this menu is also where copying the words lives. The
-/// bubble draws its words as plain text rather than as a selectable field, so
-/// there is no second menu on a secondary click to argue with this one; the
-/// line is in the menu instead, and it copies the whole message rather than
-/// whichever words the pointer was over.
+/// ## Words, and selecting them
+///
+/// The bubble's words *are* selectable now — the message list is wrapped in a
+/// [SelectionArea], so a double-click takes a word and a drag takes a range,
+/// which is what a user expects of any text. That puts this menu in the place
+/// the platform's own select/copy toolbar would have been, and rather than
+/// letting the two fight, this widget **is** that toolbar: when there is a
+/// selection it offers 复制 and 全选 *in addition to* the message's own lines,
+/// and the copy takes the selection.
+///
+/// The alternative — letting `SelectionArea` draw its own menu over the words —
+/// would take the message's lines away exactly where a user most wants them: a
+/// right-click on the text of a file message would open a copy toolbar with no
+/// 打开所在文件夹 and no 删除 on it. One menu that knows about both is what keeps
+/// every action reachable from one click.
+///
+/// For a text message the whole of it can also be copied in one line, without
+/// drag-selecting first; that line stays whatever the selection is, because
+/// "copy this message" and "copy these three words" are different requests and a
+/// menu that silently switched between them would be a menu nobody can predict.
 ///
 /// [child] is wrapped rather than replaced — the picture and the card are what
 /// is being pointed at, and they have to go on drawing exactly as they did.
@@ -263,6 +321,13 @@ class TransferContextMenu extends StatelessWidget {
     // throws rather than returning null when the scope above is gone — which is
     // why it is asked before the menu opens rather than after a line is chosen.
     final controller = ControllerScope.of(context);
+    // The selection, likewise read before the menu opens: choosing a line
+    // collapses the selection, so a handler that asked afterwards would find
+    // nothing. Null when this surface has no selectable conversation on it —
+    // the Transfers list — or when the user has not selected anything.
+    final selection = MessageSelection.maybeOf(context);
+    final selected = selection?.hasSelection ?? false ? selection!.text : null;
+    final hasSelection = selected != null && selected.isNotEmpty;
     // The overlay is what `showMenu` lays the menu out inside, so its size is
     // the one the margins below have to be measured against.
     final overlay = Overlay.of(context).context.findRenderObject();
@@ -281,6 +346,16 @@ class TransferContextMenu extends StatelessWidget {
         size.height - at.dy,
       ),
       items: [
+        // Selection first, and only while there is one. This is the line the
+        // platform's own toolbar would have put here, and it leads because the
+        // user who has just dragged across a sentence is looking for exactly
+        // it.
+        if (hasSelection)
+          _item(
+            value: _copySelectionAction,
+            icon: Icons.content_copy_outlined,
+            label: l10n.copySelection,
+          ),
         if (cancel)
           _item(
             value: _cancelAction,
@@ -299,7 +374,12 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.content_copy_outlined,
             label: l10n.copyImage,
           ),
-        if (copyText)
+        // The whole message, whatever is selected. Kept as its own line rather
+        // than folded into 复制 above, because the two ask different questions:
+        // this one means "the message" and that one means "the words I dragged
+        // over", and collapsing them would make the menu's answer depend on a
+        // selection the user cannot see while the menu is open.
+        if (copyText && !hasSelection)
           _item(
             value: _copyTextAction,
             icon: Icons.content_copy_outlined,
@@ -318,6 +398,8 @@ class TransferContextMenu extends StatelessWidget {
     );
     if (!context.mounted) return;
     switch (chosen) {
+      case _copySelectionAction:
+        await _copySelection(selected);
       case _cancelAction:
         await cancelSend(context, view);
       case _revealAction:
@@ -329,6 +411,22 @@ class TransferContextMenu extends StatelessWidget {
       case _deleteAction:
         await controller.deleteMessage(view);
     }
+  }
+
+  /// Puts the selected words on the clipboard.
+  ///
+  /// The text came from [MessageSelection] — the conversation's `SelectionArea`
+  /// pushes every change into it, because a [SelectableRegionState] is not
+  /// reachable from here: `SelectionArea` keeps its key private and offers no
+  /// `of`.
+  ///
+  /// Through Flutter's own `Clipboard`, like [copyTransferText], and silent on
+  /// failure for the same reason: a copy that says nothing on success has to say
+  /// something on failure, and a user who pastes nothing and hears nothing has
+  /// no way to tell which happened.
+  Future<void> _copySelection(String? text) async {
+    if (text == null || text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   /// One line of the menu.
@@ -355,6 +453,7 @@ class TransferContextMenu extends StatelessWidget {
 /// what was chosen and `null` is *also* what a dismissed menu answers with — so
 /// "nothing was chosen" has to be told apart from "the line that was chosen
 /// happens to be first".
+const String _copySelectionAction = 'copy-selection';
 const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _copyAction = 'copy';

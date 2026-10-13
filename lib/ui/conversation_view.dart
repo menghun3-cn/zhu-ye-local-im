@@ -68,6 +68,15 @@ class _ConversationViewState extends State<ConversationView> {
   /// Whether a drag from outside the window is over the history right now.
   bool _dropping = false;
 
+  /// What the user has currently selected among the messages, or null.
+  ///
+  /// Held here rather than inside the [SelectionArea] because its only reader
+  /// is a right-click menu on a message, which is a sibling of the area rather
+  /// than inside it — see [MessageSelection]. Cleared by the area itself when
+  /// the selection collapses, because `onSelectionChanged` fires with null on
+  /// exactly that.
+  String? _selectedText;
+
   /// Files and pictures chosen for the next message, in the order they were
   /// chosen. Nothing here has been offered to the peer yet: picking a file is
   /// not sending one, and a message is read in the order it was composed, so
@@ -81,7 +90,13 @@ class _ConversationViewState extends State<ConversationView> {
     // State. Clearing anyway costs nothing and makes "a draft never crosses
     // into somebody else's conversation" a property of this widget rather than
     // of how its callers happen to key it.
-    if (oldWidget.peer != widget.peer) _staged.clear();
+    if (oldWidget.peer != widget.peer) {
+      _staged.clear();
+      // A selection cannot survive into a conversation that replaced the one it
+      // was made in either, and a stale one would let a copy on the new
+      // conversation's menu put the old conversation's words on the clipboard.
+      _selectedText = null;
+    }
   }
 
   @override
@@ -282,68 +297,94 @@ class _ConversationViewState extends State<ConversationView> {
             padding: const EdgeInsets.all(24),
             child: HintText(l10n.conversationEmpty),
           )
-        : ListView.builder(
-            controller: _scroll,
-            reverse: true,
-            padding: const EdgeInsets.all(16),
-            itemCount: messages.length,
-            itemBuilder: (context, index) => MessageBubble(
-              view: messages[index],
-              controller: controller,
-              defaultIncomingDirectory: widget.defaultIncomingDirectory,
-              // A Device with no name is named by its address, and by the last
-              // number of it inside the avatar — see `PeerView.avatarLabel`.
-              // With no peer in the list at all there is only the Fingerprint,
-              // which is stable and its own, so the avatar is still the same
-              // one every time.
-              peerName: peer?.displayName ?? widget.peer.short(),
-              peerLabel: peer?.avatarLabel,
-              peerSeed: widget.peer.hex,
-              selfName: self.displayName,
-              selfSeed: self.fingerprint.hex,
+        // Selectable, the way every other piece of text on a desktop is: a
+        // double-click takes a word and a drag takes a range. What it does
+        // *not* do is draw the platform's own copy toolbar — a right-click on a
+        // message opens the message's own menu instead, which knows about the
+        // selection and offers 复制 of it alongside 打开所在目录 and 删除. See
+        // [TransferContextMenu]; that is the one place the two are reconciled.
+        //
+        // The area wraps the whole list rather than each bubble, because a
+        // selection that stops at a bubble's edge is not what a user dragging
+        // across two messages is asking for.
+        //
+        // What it selects is published to the menus below it through
+        // [MessageSelection]. A [SelectableRegionState] cannot be reached from
+        // outside the widget that made it, so the selection has to be pushed
+        // from here rather than pulled from there.
+        : SelectionArea(
+            onSelectionChanged: (content) =>
+                setState(() => _selectedText = content?.plainText),
+            child: ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: messages.length,
+              itemBuilder: (context, index) => MessageBubble(
+                view: messages[index],
+                controller: controller,
+                defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                // A Device with no name is named by its address, and by the last
+                // number of it inside the avatar — see `PeerView.avatarLabel`.
+                // With no peer in the list at all there is only the Fingerprint,
+                // which is stable and its own, so the avatar is still the same
+                // one every time.
+                peerName: peer?.displayName ?? widget.peer.short(),
+                peerLabel: peer?.avatarLabel,
+                peerSeed: widget.peer.hex,
+                selfName: self.displayName,
+                selfSeed: self.fingerprint.hex,
+              ),
             ),
           );
-    return Column(
-      children: [
-        if (widget.header != null) widget.header!,
-        Expanded(
-          // The history is a white board with a grey bubble on it for anything
-          // received: the WeChat conversation inverted, which is what the two
-          // fills trading places means. The header and the composer keep their
-          // own greys, so only this pane moves.
-          child: ColoredBox(
-            color: WeChatColors.of(context).conversationBackground,
-            child: DropTarget(
-              // Only registered when there is a peer: a target that accepted a
-              // drop it could not send would swallow the file silently.
-              enable: canSend,
-              onDragEntered: (_) => setState(() => _dropping = true),
-              onDragExited: (_) => setState(() => _dropping = false),
-              onDragDone: (detail) {
-                setState(() => _dropping = false);
-                unawaited(
-                  _sendDropped([for (final file in detail.files) file.path]),
-                );
-              },
-              child: Stack(
-                children: [
-                  Positioned.fill(child: history),
-                  if (_dropping) _dropOverlay(),
-                ],
+    return MessageSelection(
+      // What the user has selected, so that a right-click on a message can
+      // offer to copy it. Published here — around the whole conversation rather
+      // than around the history alone — because the menu it is read by is
+      // attached to a message, and a message is a descendant of this.
+      text: _selectedText,
+      child: Column(
+        children: [
+          if (widget.header != null) widget.header!,
+          Expanded(
+            // The history is a white board with a grey bubble on it for anything
+            // received: the WeChat conversation inverted, which is what the two
+            // fills trading places means. The header and the composer keep their
+            // own greys, so only this pane moves.
+            child: ColoredBox(
+              color: WeChatColors.of(context).conversationBackground,
+              child: DropTarget(
+                // Only registered when there is a peer: a target that accepted a
+                // drop it could not send would swallow the file silently.
+                enable: canSend,
+                onDragEntered: (_) => setState(() => _dropping = true),
+                onDragExited: (_) => setState(() => _dropping = false),
+                onDragDone: (detail) {
+                  setState(() => _dropping = false);
+                  unawaited(
+                    _sendDropped([for (final file in detail.files) file.path]),
+                  );
+                },
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: history),
+                    if (_dropping) _dropOverlay(),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const Divider(height: 1),
-        ConversationComposer(
-          message: _message,
-          attachments: _staged,
-          onRemoveAttachment: _removeStaged,
-          onSend: () => _sendMessage(controller),
-          onPaste: () => _pasteIntoComposer(controller),
-          onAttach: canSend ? () => unawaited(_pickFiles()) : null,
-        ),
-      ],
+          const Divider(height: 1),
+          ConversationComposer(
+            message: _message,
+            attachments: _staged,
+            onRemoveAttachment: _removeStaged,
+            onSend: () => _sendMessage(controller),
+            onPaste: () => _pasteIntoComposer(controller),
+            onAttach: canSend ? () => unawaited(_pickFiles()) : null,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -480,17 +521,33 @@ class _ConversationComposerState extends State<ConversationComposer> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                IconButton(
-                  onPressed: widget.onAttach,
-                  tooltip: l10n.menuSendFile,
-                  icon: const Icon(Icons.attach_file, size: 20),
-                  color: colors.secondaryText,
-                  visualDensity: VisualDensity.compact,
+                // The paperclip is on the same line as the field and the send,
+                // so it takes the same height as both — see
+                // [WeChat.composerControl]. Stretched rather than pinned, so
+                // that when the field grows to six lines the paperclip keeps
+                // its place at the bottom of the row rather than floating in
+                // the middle of it.
+                SizedBox(
+                  height: WeChat.composerControl,
+                  child: IconButton(
+                    onPressed: widget.onAttach,
+                    tooltip: l10n.menuSendFile,
+                    icon: const Icon(Icons.attach_file, size: 20),
+                    color: colors.secondaryText,
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Container(
-                    constraints: const BoxConstraints(minHeight: 36),
+                    // The field's own box, drawn here rather than by the
+                    // `InputDecorationTheme`: the theme now gives every field on
+                    // every other surface an outline, and *this* one wants none
+                    // — it sits inside a fill that is the outline, which is what
+                    // the desktop client's composer looks like.
+                    constraints: const BoxConstraints(
+                      minHeight: WeChat.composerControl,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 8,
@@ -680,14 +737,26 @@ class _ComposerField extends StatelessWidget {
           onSubmitted: (_) => onSend(),
           style: TextStyle(
             fontSize: WeChat.fontSizeInput,
+            height: WeChat.lineHeightBody,
             color: colors.bubbleText,
           ),
           decoration: InputDecoration(
             hintText: hint,
             isDense: true,
+            // Every outline the theme would draw, turned off for this one
+            // field. The box around it is the [Container] above; a second line
+            // inside that box would be the field drawing its own frame inside
+            // the composer's.
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            // And no minimum height either: the [Container] is what decides how
+            // tall this is, and the theme's 44 would fight it — the box would
+            // grow to hold a field that is already taller than it needs to be.
+            constraints: const BoxConstraints(),
             contentPadding: EdgeInsets.zero,
             hintStyle: TextStyle(
               fontSize: WeChat.fontSizeInput,
@@ -728,6 +797,13 @@ class PasteIntoComposerIntent extends Intent {
 }
 
 /// The composer's send button: a flat green pill, as the desktop client has.
+///
+/// Sized to *the field beside it* rather than to a text button's own idea of
+/// how small it can be. The two sit on one line with the attachment button, and
+/// a control that is visibly shorter than the box it is sending from is the
+/// thing a user reported — the pill was about thirty pixels tall against a
+/// composer twice that, which read as an afterthought. [WeChat.composerControl]
+/// is the one height all three controls on this line share.
 class _SendButton extends StatelessWidget {
   const _SendButton({required this.label, required this.onPressed});
 
@@ -737,24 +813,28 @@ class _SendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
-    return TextButton(
+    return FilledButton(
       onPressed: onPressed,
       style: ButtonStyle(
         backgroundColor: WidgetStatePropertyAll(colors.brandStrong),
         foregroundColor: WidgetStatePropertyAll(colors.onBrandStrong),
         shape: const WidgetStatePropertyAll(
           RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
+            borderRadius: BorderRadius.all(Radius.circular(6)),
           ),
         ),
+        // Wider than the theme's standard button: this one carries a word
+        // rather than a pair of words, and it sits at the end of a line where a
+        // narrow pill would read as a chip.
         padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          EdgeInsets.symmetric(horizontal: 20),
         ),
-        minimumSize: const WidgetStatePropertyAll(Size.zero),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
+        minimumSize: const WidgetStatePropertyAll(
+          Size(0, WeChat.composerControl),
+        ),
+        tapTargetSize: MaterialTapTargetSize.padded,
         textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: WeChat.fontSizePreview),
+          TextStyle(fontSize: WeChat.fontSizeBody),
         ),
       ),
       child: Text(label),
@@ -1339,13 +1419,13 @@ class MessageBubble extends StatelessWidget {
   /// own width. Given none — a text message, whose bubble already hugs its
   /// words — the block takes its natural width.
   ///
-  /// A message's words are drawn as plain text, not as a `SelectableText`. A
-  /// selectable body brings its own gesture recognizer, and Flutter gives the
-  /// innermost one the gesture: a secondary click on the words would open the
-  /// platform's copy/select-all toolbar and never reach the message's own menu,
-  /// which is where Delete lives. Copying what a message says is one line of
-  /// that menu instead, for the whole message rather than for the range the
-  /// pointer happened to be over.
+  /// A message's words are drawn as an ordinary [Text], which the
+  /// [SelectionArea] around the message list already makes selectable — a
+  /// double-click takes a word, a drag takes a range, exactly as on any other
+  /// desktop text. What a secondary click does is decided by the menu wrapped
+  /// around this bubble and not by the text: see [TransferContextMenu], which
+  /// offers the selected words *and* the message's own lines in one menu, so
+  /// that selecting a word does not cost the user 打开所在目录 or 删除.
   Widget _body(
     AppLocalizations l10n,
     double? contentWidth,

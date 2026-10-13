@@ -4,6 +4,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'update_check.dart';
+import 'update_install.dart';
 
 /// How the application's words and pictures are chosen.
 ///
@@ -265,3 +266,24 @@ String describeUpdateCheck(UpdateCheck check, AppLocalizations l10n) =>
       UpdateOutcome.noRelease => l10n.aboutNoRelease,
       UpdateOutcome.unreachable => l10n.aboutUnreachable,
     };
+
+/// Why an update did not happen, as a sentence.
+///
+/// A name rather than text on the way in — see [UpdateInstallFailure] — for the
+/// same reason [describeUpdateCheck] takes a name, and every failure keeps a
+/// sentence of its own: "the download did not arrive" and "this folder cannot be
+/// written to" are different things to do about, and a shared "the update
+/// failed" would leave the user with nothing to act on.
+String describeUpdateInstallFailure(
+  UpdateInstallFailure failure,
+  AppLocalizations l10n,
+) => switch (failure) {
+  UpdateInstallFailure.unsupported => l10n.updateFailureUnsupported,
+  UpdateInstallFailure.noAsset => l10n.updateFailureNoAsset,
+  UpdateInstallFailure.noDigest => l10n.updateFailureNoDigest,
+  UpdateInstallFailure.notWritable => l10n.updateFailureNotWritable,
+  UpdateInstallFailure.download => l10n.updateFailureDownload,
+  UpdateInstallFailure.checksum => l10n.updateFailureChecksum,
+  UpdateInstallFailure.unpack => l10n.updateFailureUnpack,
+  UpdateInstallFailure.handover => l10n.updateFailureHandover,
+};

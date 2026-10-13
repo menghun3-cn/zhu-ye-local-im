@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/clipboard_paste.dart';
+import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/pages/clipboard_page.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
@@ -70,6 +71,67 @@ void main() {
         onPage(windowA, DevicesPage, find.text(l10n.pairingListening)),
         findsOneWidget,
       );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the address dialog is drawn with the app\'s own controls', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+      await openTab(tester, l10n.tabDevices, window: windowA);
+      await tapButton(tester, l10n.byAddress, window: windowA);
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the address dialog to open',
+      );
+
+      // The fields are drawn from the theme, not from nothing: a bare field
+      // with no outline is a blank strip a user has to guess is where the
+      // address goes, which is what the complaint was. Read off the widget's
+      // own decoration, so a theme the dialog stopped reading would fail here.
+      final fields = tester.widgetList<TextField>(
+        windowA.within(find.byType(TextField)),
+      );
+      expect(fields, hasLength(2), reason: 'an address and a port');
+      for (final field in fields) {
+        expect(
+          field.decoration?.border,
+          isNull,
+          reason: 'the dialog leaves the border to the theme',
+        );
+        expect(
+          field.decoration?.enabledBorder,
+          isNull,
+          reason: 'and to the theme again when it is not focused',
+        );
+      }
+      expect(
+        Theme.of(tester.element(windowA.within(find.byType(TextField)).first))
+            .inputDecorationTheme
+            .border,
+        isA<OutlineInputBorder>(),
+        reason: 'the theme is what fills that in',
+      );
+
+      // Both actions are real buttons rather than words: Cancel and Connect sit
+      // in a row at the foot of a dialog, where a narrow word-shaped control is
+      // the size of a link rather than of a decision. Cancel is a `TextButton`
+      // and Connect the `FilledButton` that leads, which is the pairing every
+      // dialog in this app uses.
+      final cancel = find.widgetWithText(TextButton, l10n.cancel);
+      final connect = find.widgetWithText(FilledButton, l10n.connect);
+      expect(cancel, findsOneWidget, reason: 'Cancel has to be a button');
+      expect(connect, findsOneWidget, reason: 'Connect has to be a button');
+      for (final button in [cancel, connect]) {
+        expect(
+          tester.getSize(windowA.within(button)).height,
+          greaterThanOrEqualTo(WeChat.buttonHeight),
+          reason: 'a dialog action is a standard-sized control',
+        );
+      }
 
       await shutdown(tester, [device]);
     });
@@ -1491,6 +1553,214 @@ void main() {
       );
 
       await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a conversation nobody has opened counts its arrivals', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      // Said from Bob's side, so Alice has something she has not read. Her
+      // window is up but the conversation has never been opened, which is the
+      // state a Device that just came back from a restart is in.
+      await sendText(tester, bob, 'first');
+      await sendText(tester, bob, 'second');
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () =>
+            conversationListed(windowA, 'Bob') &&
+            alice.controller.unreadCount(bob.fingerprint) == 2,
+        description: 'both arrivals to be counted as unread',
+      );
+
+      // The count leads the preview, so the eye lands on it before the words —
+      // which is the whole point of putting it in front of the content rather
+      // than beside the clock.
+      expect(
+        find.descendant(
+          of: conversationRow(windowA, 'Bob'),
+          matching: find.textContaining(l10n.conversationUnread(2)),
+        ),
+        findsOneWidget,
+      );
+      // And the preview is the last thing said, which is the second message.
+      expect(
+        find.descendant(
+          of: conversationRow(windowA, 'Bob'),
+          matching: find.textContaining('second'),
+        ),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets(
+      'opening a conversation clears its count and keeps it cleared',
+      (tester) async {
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(tester, hub.b, 'Bob');
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+        await pumpWindow(tester, alice);
+
+        await sendText(tester, bob, 'hello');
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () =>
+              conversationListed(windowA, 'Bob') &&
+              alice.controller.unreadCount(bob.fingerprint) == 1,
+          description: 'the arrival to be counted',
+        );
+
+        await openConversation(tester, windowA, name: 'Bob');
+        await pumpUntil(
+          tester,
+          () => alice.controller.unreadCount(bob.fingerprint) == 0,
+          description: 'the count to clear on opening',
+        );
+
+        // And the row says so: the count is gone from the preview, and the
+        // preview is what is left.
+        await pumpUntil(
+          tester,
+          () => find
+              .descendant(
+                of: conversationRow(windowA, 'Bob'),
+                matching: find.textContaining(l10n.conversationUnread(1)),
+              )
+              .evaluate()
+              .isEmpty,
+          description: 'the count to leave the row',
+        );
+
+        // Leaving does not bring it back. A count that came back on the way out
+        // would be one the user has to clear twice.
+        await openConversation(tester, windowA, name: 'Bob');
+        await settleRoute(tester);
+        expect(alice.controller.unreadCount(bob.fingerprint), 0);
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
+
+    testWidgets('the window comes back to the conversation last opened', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == bob.fingerprint,
+        description: 'the conversation to be remembered',
+      );
+
+      // Pumping the window again is the restart: the whole tree is built from
+      // scratch, and the only thing that carries over is what the controller
+      // kept. It opens on the conversation rather than on the pick-one hint.
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text(l10n.messageHint),
+        ).evaluate().isNotEmpty,
+        description: 'the remembered conversation to be open',
+      );
+      expect(
+        onPage(windowA, ConversationsPage, find.text(l10n.conversationPickOne)),
+        findsNothing,
+        reason: 'there is an answer to "which conversation" already',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a tap after the remembered one is what the window keeps', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      final carol = await startUiDevice(tester, hub.join(), 'Carol');
+      await pairDevices(tester, alice, bob);
+      await pairDevices(tester, alice, carol);
+      await connectDevices(tester, alice, bob);
+      await connectDevices(tester, alice, carol);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () =>
+            conversationListed(windowA, 'Bob') &&
+            conversationListed(windowA, 'Carol'),
+        description: 'both conversations to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == bob.fingerprint,
+        description: 'Bob to be remembered',
+      );
+
+      // Picking Carol is a deliberate act, and it has to outrank what was
+      // remembered — otherwise the memory becomes a trap that keeps dragging
+      // the window back to a conversation the user has moved on from.
+      await openConversation(tester, windowA, name: 'Carol');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == carol.fingerprint,
+        description: 'Carol to take over as the remembered conversation',
+      );
+
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text(l10n.messageHint),
+        ).evaluate().isNotEmpty,
+        description: 'a conversation to be open',
+      );
+      // Carol's name is on the header, not Bob's: the window opens where the
+      // user left off rather than where they first were.
+      expect(
+        windowA.within(
+          find.descendant(
+            of: find.byType(ConversationView),
+            matching: find.text('Carol'),
+          ),
+        ),
+        findsWidgets,
+      );
+
+      await shutdown(tester, [alice, bob, carol]);
     });
   });
 

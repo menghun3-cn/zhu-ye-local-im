@@ -87,3 +87,32 @@ Name: "{userdesktop}\竹叶局域网传输"; Filename: "{app}\local_transfer.exe
 
 [Run]
 Filename: "{app}\local_transfer.exe"; Description: "立即运行竹叶局域网传输"; Flags: nowait postinstall skipifsilent
+; 应用内「下载并更新」跑的是静默安装：上面那条带 skipifsilent，会被跳掉，于是文件
+; 换完了却没人把程序带回来。这一条专门补上那一刻，并且**只在应用自己要求时才跑**
+; —— 判据是 `/update` 这个参数，它由 lib/ui/update_install.dart 在启动安装包时
+; 一并递进来。这样一次脚本化的静默安装（`/SILENT`，没有那个参数）仍然只是安装，
+; 不会凭空弹出一个窗口；交互安装也仍然由上面那条负责，两条不会同时生效。
+Filename: "{app}\local_transfer.exe"; Flags: nowait; Check: UpdateWasRequested
+
+[Code]
+// 上面那条 [Run] 的判据：静默安装，而且这次静默安装是本程序自己发起的。
+// `WizardSilent` 是 Inno 自带的支持函数；`CmdLineParamExists` **不是** —— 6.7.3 的
+// 编译器读到它只会报 `Unknown identifier 'CmdLineParamExists'`（本机实测，一个只含
+// 这两行的最小脚本也复现），所以下面自己写一个。只判「参数在不在」，不看取值。
+function CmdLineParamExists(const Value: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), Value) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function UpdateWasRequested(): Boolean;
+begin
+  Result := WizardSilent and CmdLineParamExists('/update');
+end;

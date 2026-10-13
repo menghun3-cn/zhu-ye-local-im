@@ -535,6 +535,50 @@ class WeChat {
   /// 小按钮/小控件的圆角。比卡片小一档，一个 pill 不该出现在列表行里。
   static const double controlRadius = 8;
 
+  // ------------------------------------------------------- 标准控件尺寸
+
+  /// 一个**对话框动作**按钮的最小高度。
+  ///
+  /// 36 是这一档按钮的标准高度（桌面客户端、系统对话框都是这个量级）：
+  /// 从前按钮的 `minimumSize` 是 `Size.zero`、`visualDensity` 又压到
+  /// `compact`，一个「连接」按出来只有二十来像素高，比旁边的输入框还矮，
+  /// 读起来像一个没做完的控件。这一档是给**对话框底部的动作**用的 ——
+  /// 它不与列表行争高度，所以可以取标准尺寸。
+  static const double buttonHeight = 36;
+
+  /// 一个标准按钮的左右内边距。
+  ///
+  /// 比列表行里的行内动作宽：那个是「贴着文字的一个词」，这个是「一个按钮」，
+  /// 四周要有呼吸。横向 16 让两个汉字的标签（「连接」「取消」）读起来不憋。
+  static const double buttonHPadding = 16;
+
+  /// 输入框的最小高度。
+  ///
+  /// 44 是触控/桌面两用的输入行标准高度，也是微信单行输入框的量级：
+  /// 从前把它压到 36，再减去 `isDense` 的收缩，光标几乎贴着上下两条边。
+  /// 多出来的高度由内边距给，不由字号给 —— 字还是 [fontSizeInput]。
+  static const double fieldHeight = 44;
+
+  /// 输入框的左右内边距。
+  ///
+  /// 12 让光标离边框有一指宽；从前是 10，且没有边框衬托，几乎看不出来是在
+  /// 一个框里打字。
+  static const double fieldHPadding = 12;
+
+  /// 输入框的上下内边距。
+  ///
+  /// 与 [fieldHPadding] 分开命名：横竖两个方向在这一档里不是同一个数 ——
+  /// 横向是「离边框多远」，纵向是「离上下沿多远」，把单行高度撑到
+  /// [fieldHeight]。
+  static const double fieldVPadding = 10;
+
+  /// 会话输入行上三个控件共用的高度：附件按钮、输入框、发送按钮。
+  ///
+  /// 三个数各自定高会各差几像素，一行里就会看出参差；共用一个数，一行就是
+  /// 一条线。40 是输入框在这条行上的高度 —— 比对话框里的 [fieldHeight] 矮一
+  /// 档，因为它外面还套着一层 composer 自己的留白，两者相加才是整条输入区。
+  static const double composerControl = 40;
+
   // ---------------------------------------------------------------- 主题
 
   /// The [ThemeData] the app runs on, for one [WeChatColors] palette.
@@ -739,14 +783,18 @@ class WeChat {
               borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
             ),
           ),
+          // Standard size, not a shrunken one. These are the buttons at the
+          // foot of a dialog — Connect, Send, Save — and the thing they have
+          // to match is the field above them, not a list row. The old
+          // `Size.zero` + `compact` made a filled button about twenty pixels
+          // tall, which read as a control somebody forgot to finish.
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            EdgeInsets.symmetric(horizontal: buttonHPadding),
           ),
-          minimumSize: const WidgetStatePropertyAll(Size.zero),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
+          minimumSize: const WidgetStatePropertyAll(Size(0, buttonHeight)),
+          tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: fontSizePreview),
+            TextStyle(fontSize: fontSizeLabel),
           ),
         ),
       ),
@@ -760,14 +808,20 @@ class WeChat {
               borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
             ),
           ),
+          // The same standard height as a filled one, because the two sit
+          // shoulder to shoulder at the foot of a dialog (Cancel beside
+          // Connect) and a row of buttons at two heights looks broken. An
+          // action that genuinely belongs *inside* a line — the row action in
+          // the conversation list, a bubble's own answer — overrides every one
+          // of these metrics at its own call site rather than relying on this
+          // being small; see `_RowAction` and `_BubbleAction`.
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            EdgeInsets.symmetric(horizontal: buttonHPadding),
           ),
-          minimumSize: const WidgetStatePropertyAll(Size.zero),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
+          minimumSize: const WidgetStatePropertyAll(Size(0, buttonHeight)),
+          tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: fontSizePreview),
+            TextStyle(fontSize: fontSizeLabel),
           ),
         ),
       ),
@@ -859,9 +913,60 @@ class WeChat {
           color: colors.secondaryText,
         ),
       ),
+      // Every field on every surface: a real outline, a standard height, and a
+      // hit of brand when it is being edited.
+      //
+      // This used to be `InputBorder.none` with `isDense: true`, and the two
+      // together were the bug a user reported — a field with no line around it
+      // on a panel of nearly the same fill reads as a labelled blank rather
+      // than as somewhere to type. The one field that genuinely wants no
+      // outline is the conversation composer's, because *it* sits inside a
+      // drawn box of its own; that field overrides this at its own call site.
+      //
+      // The focused state is a hairline of brand plus a soft ring of it,
+      // rather than the ring alone: on a light panel a one-pixel green line is
+      // about the same luminance as the grey it replaces, so the ring is what
+      // actually says "this one is live".
       inputDecorationTheme: InputDecorationTheme(
-        border: InputBorder.none,
-        isDense: true,
+        filled: false,
+        isDense: false,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: fieldHPadding,
+          vertical: fieldVPadding,
+        ),
+        constraints: const BoxConstraints(minHeight: fieldHeight),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: colors.borderStrong),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: colors.borderStrong),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: colors.brandStrong, width: 2),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: colors.danger, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: colors.danger),
+        ),
+        labelStyle: TextStyle(
+          fontSize: fontSizeInput,
+          color: colors.secondaryText,
+        ),
+        floatingLabelStyle: TextStyle(
+          fontSize: fontSizeInput,
+          color: colors.brandStrong,
+        ),
+        helperStyle: TextStyle(
+          fontSize: fontSizeMeta,
+          color: colors.secondaryText,
+        ),
         hintStyle: TextStyle(
           fontSize: fontSizeInput,
           color: colors.disabledText,
