@@ -213,7 +213,8 @@ svg { display: block; }
    画面只被压窄到约 cos30≈0.87 倍、仍正面可读。绕中轴（transform-origin 默认
    50% 50%）所以左右对称收拢，绘制盒比列窄，无需 scale 也吃进右栏。颜色和布局
    都不依赖这个变换，关掉也照常。 */
-/* 首屏截图：一块立着的屏幕，绕自己的中央竖轴水平转 45°（顺时针，正值）—— 父级加
+/* 首屏截图：一块立着的屏幕，绕自己的中央竖轴水平转 45°，方向按用户箭头：
+   右缘朝观察者、左缘退后（俯视顺时针，故取负角度）—— 父级加
    perspective 才有纵深，图像才「立起来、从侧前看着」。perspective-origin
    居中（50% 50%）让旋转严格绕中轴、左右对称；不写 rotateX，所以只是
    水平横摆，不往前栽。rotateY 把绘制盒横向收窄（×cos45），天然吃进右栏，
@@ -224,7 +225,7 @@ svg { display: block; }
   display: block; width: 100%; height: auto;
   border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--sh3);
-  transform: rotateY(45deg);
+  transform: rotateY(-45deg);
 }
 [data-theme="dark"] .hero__art img { border-color: var(--border-strong); }
 
@@ -348,7 +349,7 @@ svg { display: block; }
   .hero h1 { font-size: 34px; }
   .hero .lede { font-size: 16px; }
   .hero__art { max-width: 100%; }
-  .hero__art img { transform: rotateY(45deg); }
+  .hero__art img { transform: rotateY(-45deg); }
   .block h2 { font-size: 22px; }
   .topbar__nav { display: none; }
   .split { grid-template-columns: 1fr; gap: 0; }
