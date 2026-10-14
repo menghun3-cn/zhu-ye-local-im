@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-14
+
+### 修复
+
+- 修复会话开着时每帧重写 `messages.json` 导致的共享冲突（点设置菜单时 Notices 刷屏 `PathAccessException`，`errno = 32`）：`markConversationOpened` 的守卫改为「标记真的会推动什么才写」，并把消息与配置保存串成一条链，消除多方向同时保存撞在同一临时文件上的竞态。
+
 ## [0.1.4] - 2026-10-14
 
 ### 新增

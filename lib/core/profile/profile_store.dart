@@ -157,8 +157,38 @@ final class FileProfileStore implements ProfileStore {
     return decoded;
   }
 
+  /// The save in flight, or null once the last one has finished.
+  ///
+  /// Chained rather than left to overlap, for the same reason the message
+  /// store chains its saves: every one writes the same temp file and renames
+  /// it over the target, and two running at once race on that file — the
+  /// rename that lands while the other save still holds it open is refused
+  /// with `ERROR_SHARING_VIOLATION`, "another program is using this file"
+  /// said about this program's own earlier save. The profile is rewritten
+  /// rarely, but rarely is not never: a rename, a pairing and a settings
+  /// change can each ask for one.
+  Future<void>? _inFlight;
+
   @override
-  Future<void> save(Map<String, Object?> json) async {
+  Future<void> save(Map<String, Object?> json) {
+    final previous = _inFlight;
+    final started = previous == null
+        ? _write(json)
+        : previous.then((_) => _write(json));
+    // Held as a future that cannot fail: one rejected save must not turn every
+    // later one into the same failure without trying.
+    final settled = started.then((_) {}, onError: (Object _) {});
+    _inFlight = settled;
+    settled.whenComplete(() {
+      // Cleared only when the newest save is the one that just finished, so
+      // the chain does not grow for the life of the process.
+      if (identical(_inFlight, settled)) _inFlight = null;
+    });
+    return started;
+  }
+
+  /// The write itself, with no other save running beside it.
+  Future<void> _write(Map<String, Object?> json) async {
     final temp = File(_tempPath);
     // `profile_location.dart` decides where a profile goes and says outright
     // that the store is what makes that place exist. On a first launch it
