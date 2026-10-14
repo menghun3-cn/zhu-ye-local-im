@@ -282,14 +282,21 @@
   "aboutUpdateStaging": "Unpacking…",
   "aboutUpdateHandingOver": "Replacing this folder and restarting…",
   "aboutUpdateFailedTitle": "The update was not completed",
-  "aboutUpdateInstallHint": "Press Download and update: it fetches the new build, checks it against the checksum the release published, replaces this folder and restarts the app by itself. When that cannot be done, the button beside it opens the page to download by hand.",
+  "aboutUpdateInstallHint": "Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.",
+  "aboutUpdateConfirmTitle": "Close and update?",
+  "aboutUpdateConfirmBody": "Version {version} has been downloaded and checked against the checksum the release published. Press Close and update: the program closes first, updates itself, and reopens when it is done.",
+  "@aboutUpdateConfirmBody": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "aboutUpdateConfirmApply": "Close and update",
+  "aboutUpdateReady": "The update package is ready. Press Download and update again to install it — no new download.",
   "updateFailureUnsupported": "This platform cannot replace itself. Download the new version by hand.",
   "updateFailureNoAsset": "The release does not carry the file this copy needs. Download it by hand.",
   "updateFailureNoDigest": "The release publishes no checksum for its file, so nothing can be checked before it is installed. Download it by hand.",
   "updateFailureNotWritable": "The folder this app runs from cannot be written to. Download the new version by hand and unpack it over this folder.",
   "updateFailureDownload": "The download did not finish. Check the network, then try again.",
   "updateFailureChecksum": "What arrived is not what the release published, so it has been thrown away.",
-  "updateFailureUnpack": "The download arrived but could not be unpacked, so it has been thrown away.",
+  "updateFailureUnpack": "The download arrived but could not be unpacked. Try again, or download the new version by hand.",
   "updateFailureHandover": "A previous replacement did not finish. Download the new version by hand and unpack it over this folder.",
   "railUpdate": "Update",
 
