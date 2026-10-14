@@ -24,6 +24,7 @@ void main() {
     int size = 1024,
   }) => {
     'name': name,
+    'url': 'https://api.example.test/assets/$name',
     'browser_download_url': 'https://example.test/$name',
     'size': size,
     'digest': digest,
@@ -38,9 +39,11 @@ void main() {
     Object? tag = 'v9.9.9',
     Object? assets = unset,
     Object? htmlUrl = page,
+    String? body = '### 新增\n\n- 一键更新',
   }) => {
     'tag_name': ?tag,
     'html_url': ?htmlUrl,
+    'body': body,
     'assets': identical(assets, unset)
         ? [asset('LocalTransfer-9.9.9-windows-x64-portable.zip')]
         : assets,
@@ -74,8 +77,50 @@ void main() {
         check.assets.first.url,
         'https://example.test/LocalTransfer-9.9.9-android.apk',
       );
+      // The second address for the same file, on the host the question itself
+      // was answered by — see `downloadAddresses`, which tries it first.
+      expect(
+        check.assets.first.apiUrl,
+        'https://api.example.test/assets/LocalTransfer-9.9.9-android.apk',
+      );
       expect(check.assets.first.size, 7);
       expect(check.assets.last.sha256, 'abc123');
+    });
+
+    test('reads what the release says it changes', () {
+      final check = parse(release(body: '### 新增\n\n- 一键更新'));
+      expect(check.notes, '### 新增\n\n- 一键更新');
+    });
+
+    test('has no notes when the release carried none', () {
+      // A release published without notes, or with notes that are nothing but
+      // whitespace, is one whose changes cannot be shown. Null rather than an
+      // empty string, so that a card has one thing to ask rather than two.
+      expect(parse(release(body: null)).notes, isNull);
+      expect(parse(release(body: '')).notes, isNull);
+      expect(parse(release(body: '   \n  ')).notes, isNull);
+    });
+
+    test('keeps a file the answer named no API address for', () {
+      // The download address alone is enough to fetch a file: the API's own
+      // address is a second route to it, and a route that is not offered is
+      // not a reason to refuse the file.
+      final check = parse(
+        release(
+          assets: [
+            {
+              'name': 'kept.zip',
+              'browser_download_url': 'https://example.test/kept.zip',
+              'size': 3,
+              'digest': 'sha256:aa',
+              'url': '',
+            },
+          ],
+        ),
+      );
+
+      expect(check.assets.single.name, 'kept.zip');
+      expect(check.assets.single.apiUrl, isNull);
     });
 
     test('is up to date when the tag is the version running', () {

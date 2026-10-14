@@ -367,6 +367,180 @@ void main() {
     });
   });
 
+  group('which address the file comes from', () {
+    /// One file, reachable at whichever of the two addresses [apiUrl] says.
+    UpdateAsset file({
+      String? apiUrl,
+      String url = 'https://github.test/portable.zip',
+    }) => UpdateAsset(
+      name: 'LocalTransfer-9.9.9-windows-x64-portable.zip',
+      url: url,
+      apiUrl: apiUrl,
+      size: 10,
+      digest: 'sha256:aa',
+    );
+
+    test('is the release API first, then the download address', () {
+      // The order is the point. The API's host is the one this copy has already
+      // reached in order to be holding this answer at all; the download address
+      // is on `github.com`, which is the host a filtered network is likelier to
+      // refuse. Neither is written off, and the one already proven reachable
+      // goes first.
+      expect(downloadAddresses(file(apiUrl: 'https://api.github.test/1')), [
+        'https://api.github.test/1',
+        'https://github.test/portable.zip',
+      ]);
+    });
+
+    test('is the download address alone when the answer named no other', () {
+      expect(downloadAddresses(file()), ['https://github.test/portable.zip']);
+    });
+
+    test('names an address once, even when both fields agree', () {
+      expect(
+        downloadAddresses(file(apiUrl: 'https://github.test/portable.zip')),
+        ['https://github.test/portable.zip'],
+      );
+    });
+  });
+
+  group('fetching the file', () {
+    /// What the release says the file weighs, and what a server that answers
+    /// with it has to send. Short enough to write out.
+    const fileSize = 12;
+    const fileBody = 'not the file';
+
+    /// A release carrying the one file this shape of copy needs, at the two
+    /// addresses [apiUrl] and [url].
+    UpdateCheck releaseAt({String? apiUrl, required String url}) => UpdateCheck(
+      UpdateOutcome.available,
+      version: 'v9.9.9',
+      assets: [
+        UpdateAsset(
+          name: 'LocalTransfer-9.9.9-windows-x64-portable.zip',
+          url: url,
+          apiUrl: apiUrl,
+          // A digest nothing can match, so that every test here stops at the
+          // checksum: what is under test is which address delivered the bytes,
+          // and a matching digest would carry on into unpacking and replacing
+          // the folder this suite is running from.
+          size: fileSize,
+          digest: 'sha256:aa',
+        ),
+      ],
+    );
+
+    /// A server answering on every path, recording the paths it was asked for.
+    ///
+    /// Bound to a loopback port the operating system picks, so several of these
+    /// run in one suite without fighting over an address.
+    Future<(HttpServer, List<String>)> server(
+      void Function(HttpRequest request) answer,
+    ) async {
+      final bound = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final asked = <String>[];
+      addTearDown(() => bound.close(force: true));
+      bound.listen((request) {
+        asked.add(request.uri.path);
+        answer(request);
+        request.response.close();
+      });
+      return (bound, asked);
+    }
+
+    /// What an attempt ended as, remembering to take the stage away after it.
+    ///
+    /// A download that fails still wrote into a folder under the system's
+    /// temporary directory, and leaving those behind would accumulate for as
+    /// long as the suite is run — the application clears its own at startup,
+    /// and a test is not an application.
+    Future<UpdateInstallResult> attempt(UpdateCheck release) async {
+      addTearDown(() => clearStaleUpdateStages(olderThan: Duration.zero));
+      return const PlatformUpdateInstaller().install(
+        release,
+        onProgress: (progress) {},
+      );
+    }
+
+    test(
+      'falls through to the second address when the first refuses',
+      () async {
+        // Windows is the only platform whose packaging this installer knows, so
+        // it is the only one where there is a download to test at all.
+        if (!Platform.isWindows) return;
+        final (bound, asked) = await server((request) {
+          if (request.uri.path == '/api') {
+            request.response.statusCode = HttpStatus.badGateway;
+            return;
+          }
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..write(fileBody);
+        });
+        final port = bound.port;
+
+        final result = await attempt(
+          releaseAt(
+            apiUrl: 'http://127.0.0.1:$port/api',
+            url: 'http://127.0.0.1:$port/download',
+          ),
+        );
+
+        expect(asked, ['/api', '/download']);
+        // The bytes arrived and were then thrown away for not being what the
+        // release published — which is the proof that the *second* address was
+        // the one that delivered them.
+        expect(result.failure, UpdateInstallFailure.checksum);
+      },
+    );
+
+    test('falls through when the first answers with the wrong file', () async {
+      // A refusal is the loud case. The quiet one is a 200 carrying something
+      // that is not this file — an interception with a page of its own — which
+      // is why the byte count the release published is checked before the
+      // checksum is: without it, one wrong answer would end the attempt and the
+      // other address would never be asked.
+      if (!Platform.isWindows) return;
+      final (bound, asked) = await server((request) {
+        request.response.statusCode = HttpStatus.ok;
+        request.response.write(request.uri.path == '/api' ? 'no' : fileBody);
+      });
+      final port = bound.port;
+
+      final result = await attempt(
+        releaseAt(
+          apiUrl: 'http://127.0.0.1:$port/api',
+          url: 'http://127.0.0.1:$port/download',
+        ),
+      );
+
+      expect(asked, ['/api', '/download']);
+      expect(result.failure, UpdateInstallFailure.checksum);
+    });
+
+    test(
+      'says the download did not arrive once both addresses have failed',
+      () async {
+        if (!Platform.isWindows) return;
+        final (bound, asked) = await server((request) {
+          request.response.statusCode = HttpStatus.badGateway;
+        });
+        final port = bound.port;
+
+        final result = await attempt(
+          releaseAt(
+            apiUrl: 'http://127.0.0.1:$port/api',
+            url: 'http://127.0.0.1:$port/download',
+          ),
+        );
+
+        // Both were tried, and the answer is the one the user can act on.
+        expect(asked, ['/api', '/download']);
+        expect(result.failure, UpdateInstallFailure.download);
+      },
+    );
+  });
+
   group('PlatformUpdateInstaller', () {
     test('replaces this build only where the packaging is known', () {
       expect(const PlatformUpdateInstaller().supported, Platform.isWindows);

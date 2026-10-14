@@ -169,6 +169,7 @@
   "aboutChecking": "正在检查…",
   "aboutUpToDate": "已是最新版本。",
   "aboutUpdateAvailable": "有新版本 {version}。",
+  "aboutUpdateNotes": "更新日志",
   "aboutOpenDownload": "打开下载页",
   "aboutNoRelease": "还没有发布过任何版本，暂时无从比较本机这版。",
   "aboutUnreachable": "连不上更新服务器。请检查网络，或手动下载新版本。",
