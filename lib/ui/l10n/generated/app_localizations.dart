@@ -1067,8 +1067,32 @@ abstract class AppLocalizations {
   /// No description provided for @aboutUpdateInstallHint.
   ///
   /// In en, this message translates to:
-  /// **'Press Download and update: it fetches the new build, checks it against the checksum the release published, replaces this folder and restarts the app by itself. When that cannot be done, the button beside it opens the page to download by hand.'**
+  /// **'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.'**
   String get aboutUpdateInstallHint;
+
+  /// No description provided for @aboutUpdateConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close and update?'**
+  String get aboutUpdateConfirmTitle;
+
+  /// No description provided for @aboutUpdateConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Close and update: the program closes first, updates itself, and reopens when it is done.'**
+  String aboutUpdateConfirmBody(String version);
+
+  /// No description provided for @aboutUpdateConfirmApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Close and update'**
+  String get aboutUpdateConfirmApply;
+
+  /// No description provided for @aboutUpdateReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The update package is ready. Press Download and update again to install it — no new download.'**
+  String get aboutUpdateReady;
 
   /// No description provided for @updateFailureUnsupported.
   ///
@@ -1109,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateFailureUnpack.
   ///
   /// In en, this message translates to:
-  /// **'The download arrived but could not be unpacked, so it has been thrown away.'**
+  /// **'The download arrived but could not be unpacked. Try again, or download the new version by hand.'**
   String get updateFailureUnpack;
 
   /// No description provided for @updateFailureHandover.
