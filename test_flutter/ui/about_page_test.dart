@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/app/app.dart';
@@ -25,10 +27,11 @@ import '../support/ui_harness.dart';
 ///
 /// The second half is the one-click install: that it is offered exactly when
 /// this build can replace itself *and* there is something to replace it with,
-/// that the folder is only handed over once somebody presses the button, and
-/// that each way it can fail arrives as its own sentence. What an install does
-/// to the folder — the download, the checksum, the renames — is not here: it
-/// needs no widgets, and it is `test/ui/update_install_test.dart`.
+/// that the folder is only handed over once somebody has answered the question
+/// the update asks first, that answering no leaves the fetched package where it
+/// is, and that each way it can fail arrives as its own sentence. What an
+/// install does to the folder — the download, the checksum, the renames — is
+/// not here: it needs no widgets, and it is `test/ui/update_install_test.dart`.
 void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
@@ -64,6 +67,33 @@ void main() {
   /// the callbacks left behind.
   Future<void> pressAndDraw(WidgetTester tester, String label) async {
     await tester.tap(find.text(label));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  /// Waits for the question an update asks before anything closes.
+  ///
+  /// A dialog of the tree's own rather than a state on the page, so what is
+  /// waited for is the dialog itself.
+  Future<void> pumpUntilAsked(WidgetTester tester) => pumpUntil(
+    tester,
+    () => find.byType(AlertDialog).evaluate().isNotEmpty,
+    description: 'the update to ask before anything closes',
+  );
+
+  /// Answers the question the update asked with the button showing [label], and
+  /// lets the answer land.
+  ///
+  /// The dialog is waited out rather than pumped past: its exit animation is
+  /// what stands between the tap and the page's own continuation, and a fixed
+  /// number of frames would be a guess about how long a route takes.
+  Future<void> tapUpdateAnswer(WidgetTester tester, String label) async {
+    await tester.tap(find.text(label));
+    await pumpUntil(
+      tester,
+      () => find.byType(AlertDialog).evaluate().isEmpty,
+      description: 'the question to close',
+    );
     await tester.pump();
     await tester.pump();
   }
@@ -300,7 +330,7 @@ void main() {
     expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
   });
 
-  testWidgets('installs the newer build when the button is pressed', (
+  testWidgets('asks before it closes, and installs when told to', (
     tester,
   ) async {
     ScriptedUpdateChecker.install(available);
@@ -314,23 +344,76 @@ void main() {
         ),
         UpdateInstallProgress(UpdateInstallStage.verifying),
         UpdateInstallProgress(UpdateInstallStage.staging),
-        UpdateInstallProgress(UpdateInstallStage.handingOver),
       ],
+      prepared: const PreparedUpdate.installer(
+        'LocalTransfer-9.9.9-windows-x64-setup.exe',
+      ),
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
     await pressAndDraw(tester, l10n.aboutUpdateInstall);
+    await pumpUntilAsked(tester);
 
-    expect(installer.askedFor.single.version, '9.9.9');
+    // The question is on screen and nothing has been handed over: the package
+    // is in place and this build is still running, which is the whole point of
+    // asking rather than doing.
+    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
+    expect(find.text(l10n.aboutUpdateConfirmBody('9.9.9')), findsOneWidget);
+    expect(installer.applied, isEmpty);
+
+    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApply);
+
+    expect(
+      installer.applied.single.package,
+      'LocalTransfer-9.9.9-windows-x64-setup.exe',
+    );
     // The last thing the old build draws. The real installer ends the process
     // rather than returning, so this is the state the user is left looking at.
     expect(find.text(l10n.aboutUpdateHandingOver), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('changes nothing when the question is answered no', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    final installer = ScriptedUpdateInstaller.replace(
+      supported: true,
+      progress: const [UpdateInstallProgress(UpdateInstallStage.staging)],
+      prepared: const PreparedUpdate.installer(
+        'LocalTransfer-9.9.9-windows-x64-setup.exe',
+      ),
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+    await pumpUntilAsked(tester);
+    await tapUpdateAnswer(tester, l10n.cancel);
+
+    // Nothing was handed over, nothing failed, and the package is where it was
+    // fetched to — which is what the line says and the button offers again.
+    expect(installer.applied, isEmpty);
+    expect(find.text(l10n.aboutUpdateReady), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+
+    // And it offers it without fetching anything again: the package is already
+    // in the update folder.
+    await press(tester, l10n.aboutUpdateInstall);
+    await pumpUntilAsked(tester);
+
+    expect(installer.askedFor, hasLength(1));
+    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
+  });
+
   testWidgets('shows the bytes while a download is running', (tester) async {
     ScriptedUpdateChecker.install(available);
+    // A download that has not answered yet: the middle of one is the only place
+    // the byte counts exist, and the only way to be in it is to hold the
+    // attempt there.
+    final running = Completer<UpdatePrepareResult>();
     ScriptedUpdateInstaller.replace(
       supported: true,
       progress: const [
@@ -340,6 +423,7 @@ void main() {
           total: 4194304,
         ),
       ],
+      hold: running,
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
@@ -355,6 +439,8 @@ void main() {
       ),
       findsOneWidget,
     );
+    // No question yet: nothing is ready to ask about.
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('says why an update did not happen, and offers it again', (
@@ -363,7 +449,7 @@ void main() {
     ScriptedUpdateChecker.install(available);
     ScriptedUpdateInstaller.replace(
       supported: true,
-      result: const UpdateInstallResult.failed(UpdateInstallFailure.checksum),
+      failure: UpdateInstallFailure.checksum,
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);

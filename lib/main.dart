@@ -30,10 +30,12 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
-  // What earlier hand-overs left in the temporary directory. Started rather
-  // than awaited — it is housekeeping, and the first frame must not wait behind
-  // a folder holding the previous build.
+  // What earlier hand-overs left in the temporary directory, and the package
+  // of an update that has been applied. Started rather than awaited — it is
+  // housekeeping, and the first frame must not wait behind a folder holding
+  // the previous build.
   unawaited(Future<void>(clearStaleUpdateStages));
+  unawaited(Future<void>(clearFetchedUpdate));
 
   try {
     final seams = await openPlatformSeams();

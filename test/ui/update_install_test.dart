@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+import 'package:local_transfer/app/app_version.dart';
 import 'package:local_transfer/ui/update_check.dart';
 import 'package:local_transfer/ui/update_install.dart';
 import 'package:test/test.dart';
@@ -9,8 +12,9 @@ import 'package:test/test.dart';
 /// Everything here that touches a disk touches a folder of its own under the
 /// system's temporary directory, and everything that would replace *this* build
 /// is left to the seam: what is under test is the machinery — which file a
-/// release's list holds for this shape of copy, what the folder looks like
-/// half-way through a replacement, and what happens to it when one fails.
+/// release's list holds for this shape of copy, where a fetched package lands,
+/// what the folder looks like half-way through a replacement, and what happens
+/// to it when one fails.
 void main() {
   /// [relative] under [root], with this platform's separator.
   String pathUnder(String root, String relative) =>
@@ -412,7 +416,11 @@ void main() {
 
     /// A release carrying the one file this shape of copy needs, at the two
     /// addresses [apiUrl] and [url].
-    UpdateCheck releaseAt({String? apiUrl, required String url}) => UpdateCheck(
+    UpdateCheck releaseAt({
+      String? apiUrl,
+      required String url,
+      String digest = 'sha256:aa',
+    }) => UpdateCheck(
       UpdateOutcome.available,
       version: 'v9.9.9',
       assets: [
@@ -420,12 +428,12 @@ void main() {
           name: 'LocalTransfer-9.9.9-windows-x64-portable.zip',
           url: url,
           apiUrl: apiUrl,
-          // A digest nothing can match, so that every test here stops at the
-          // checksum: what is under test is which address delivered the bytes,
-          // and a matching digest would carry on into unpacking and replacing
-          // the folder this suite is running from.
+          // A digest nothing can match by default, so that every test here
+          // stops at the checksum: what is under test is which address
+          // delivered the bytes, and a matching digest would carry on into
+          // unpacking and replacing the folder this suite is running from.
           size: fileSize,
-          digest: 'sha256:aa',
+          digest: digest,
         ),
       ],
     );
@@ -448,18 +456,19 @@ void main() {
       return (bound, asked);
     }
 
-    /// What an attempt ended as, remembering to take the stage away after it.
+    /// What an attempt ended as, remembering to take the folders away after it.
     ///
-    /// A download that fails still wrote into a folder under the system's
-    /// temporary directory, and leaving those behind would accumulate for as
-    /// long as the suite is run — the application clears its own at startup,
-    /// and a test is not an application.
-    Future<UpdateInstallResult> attempt(UpdateCheck release) async {
+    /// The application folder is one of its own under the system's temporary
+    /// directory: the real installer fetches into the folder it runs from, and
+    /// a test that ran it unwired would be fetching into the folder the suite
+    /// itself runs from.
+    Future<UpdatePrepareResult> attempt(
+      UpdateCheck release, {
+      required Directory root,
+    }) async {
       addTearDown(() => clearStaleUpdateStages(olderThan: Duration.zero));
-      return const PlatformUpdateInstaller().install(
-        release,
-        onProgress: (progress) {},
-      );
+      return PlatformUpdateInstaller(application: root.path)
+          .prepare(release, onProgress: (progress) {});
     }
 
     test(
@@ -478,12 +487,14 @@ void main() {
             ..write(fileBody);
         });
         final port = bound.port;
+        final root = folder('lt_app_');
 
         final result = await attempt(
           releaseAt(
             apiUrl: 'http://127.0.0.1:$port/api',
             url: 'http://127.0.0.1:$port/download',
           ),
+          root: root,
         );
 
         expect(asked, ['/api', '/download']);
@@ -506,12 +517,14 @@ void main() {
         request.response.write(request.uri.path == '/api' ? 'no' : fileBody);
       });
       final port = bound.port;
+      final root = folder('lt_app_');
 
       final result = await attempt(
         releaseAt(
           apiUrl: 'http://127.0.0.1:$port/api',
           url: 'http://127.0.0.1:$port/download',
         ),
+        root: root,
       );
 
       expect(asked, ['/api', '/download']);
@@ -526,12 +539,14 @@ void main() {
           request.response.statusCode = HttpStatus.badGateway;
         });
         final port = bound.port;
+        final root = folder('lt_app_');
 
         final result = await attempt(
           releaseAt(
             apiUrl: 'http://127.0.0.1:$port/api',
             url: 'http://127.0.0.1:$port/download',
           ),
+          root: root,
         );
 
         // Both were tried, and the answer is the one the user can act on.
@@ -539,6 +554,54 @@ void main() {
         expect(result.failure, UpdateInstallFailure.download);
       },
     );
+
+    test('does not fetch a package that is already there', () async {
+      // What a cancelled attempt leaves behind: the package in the update
+      // folder, correct and checked. Fetching it again would be twenty
+      // megabytes for a file that is already the right one.
+      if (!Platform.isWindows) return;
+      final (bound, asked) = await server((request) {
+        request.response.statusCode = HttpStatus.ok;
+        request.response.write(fileBody);
+      });
+      final port = bound.port;
+      final root = folder('lt_app_');
+      final update = updateDirectory(root.path);
+      final wanted = 'LocalTransfer-9.9.9-windows-x64-portable.zip';
+      File(pathUnder(update.path, wanted)).writeAsStringSync(fileBody);
+      // Last week's, which the attempt supersedes the moment it is asked for.
+      File(
+        pathUnder(update.path, 'LocalTransfer-0.0.9-windows-x64-portable.zip'),
+      ).writeAsStringSync('last week');
+
+      final result = await attempt(
+        releaseAt(
+          apiUrl: 'http://127.0.0.1:$port/api',
+          url: 'http://127.0.0.1:$port/download',
+          digest: 'sha256:${sha256.convert(utf8.encode(fileBody))}',
+        ),
+        root: root,
+      );
+
+      expect(asked, isEmpty, reason: 'the right bytes were already there');
+      // One package at a time, and the one that was there stays: what failed
+      // was the unpacking of a file that is not a zip, not the package.
+      expect(result.failure, UpdateInstallFailure.unpack);
+      expect(
+        File(pathUnder(update.path, wanted)).existsSync(),
+        isTrue,
+        reason: 'a retry starts from it rather than from the network',
+      );
+      expect(
+        File(
+          pathUnder(
+            update.path,
+            'LocalTransfer-0.0.9-windows-x64-portable.zip',
+          ),
+        ).existsSync(),
+        isFalse,
+      );
+    });
   });
 
   group('PlatformUpdateInstaller', () {
@@ -548,11 +611,87 @@ void main() {
 
     test('does nothing at all on a platform that cannot', () async {
       if (Platform.isWindows) return;
-      final result = await const PlatformUpdateInstaller().install(
-        releaseWith(),
-        onProgress: (progress) {},
-      );
+      final result = await PlatformUpdateInstaller(
+        application: folder('lt_app_').path,
+      ).prepare(releaseWith(), onProgress: (progress) {});
       expect(result.failure, UpdateInstallFailure.unsupported);
+    });
+  });
+
+  group('the update folder', () {
+    test('is under the application, called update', () {
+      final root = folder('lt_app_');
+      expect(
+        updateDirectory(root.path).path,
+        pathUnder(root.path, 'update'),
+        reason: 'beside the build, not in its root and not in the temp',
+      );
+    });
+
+    test('is made when it is not there', () {
+      final root = folder('lt_app_');
+      expect(Directory(pathUnder(root.path, 'update')).existsSync(), isFalse);
+      updateDirectory(root.path);
+      expect(Directory(pathUnder(root.path, 'update')).existsSync(), isTrue);
+    });
+  });
+
+  group('clearFetchedUpdate', () {
+    /// The update folder under [root], with [files] written into it.
+    Directory updateWith(String prefix, Map<String, String> files) {
+      final root = folder(prefix);
+      final update = updateDirectory(root.path);
+      for (final entry in files.entries) {
+        File(pathUnder(update.path, entry.key)).writeAsStringSync(entry.value);
+      }
+      return root;
+    }
+
+    test('takes away the package of the version that is running', () {
+      // The only trace that says an update happened is the name: this build is
+      // the one that package carried, and it is twenty megabytes of nothing.
+      final root = updateWith('lt_app_', {
+        updateAssetName(
+          tag: 'v$appVersion',
+          payload: UpdatePayload.portablePackage,
+        ): 'the package that was just installed',
+      });
+
+      clearFetchedUpdate(root: root.path);
+
+      expect(
+        File(
+          pathUnder(
+            root.path,
+            'update/${updateAssetName(tag: 'v$appVersion', payload: UpdatePayload.portablePackage)}',
+          ),
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('leaves a package for any other version where it is', () {
+      // A cancelled or failed update: the package is what a retry starts from.
+      final root = updateWith('lt_app_', {
+        'LocalTransfer-9.9.9-windows-x64-portable.zip': 'a cancelled update',
+      });
+
+      clearFetchedUpdate(root: root.path);
+
+      expect(
+        File(
+          pathUnder(
+            root.path,
+            'update/LocalTransfer-9.9.9-windows-x64-portable.zip',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
+    test('is nothing at all when the folder is not there', () {
+      // The ordinary state of every build that has never updated itself.
+      clearFetchedUpdate(root: folder('lt_app_').path);
     });
   });
 }
