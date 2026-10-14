@@ -1270,30 +1270,43 @@ class ScriptedUpdateChecker implements UpdateChecker {
 /// expect(installer.askedFor.single.version, '9.9.9');
 /// ```
 class ScriptedUpdateInstaller implements UpdateInstaller {
-  /// Answers with [result], after reporting [progress].
+  /// Answers [prepared] from [prepare] after reporting [progress], or fails
+  /// with [failure] when there is nothing ready.
   ScriptedUpdateInstaller({
     this.supported = false,
     this.progress = const [],
-    this.result = const UpdateInstallResult.handedOver(),
+    this.prepared,
+    this.failure,
     this.leftOver,
+    this.hold,
   });
 
   /// Whether this stand-in says it can replace the build it is running in.
   @override
   final bool supported;
 
-  /// What is reported to the caller before [result].
+  /// What is reported to the caller before the answer.
   final List<UpdateInstallProgress> progress;
 
-  /// What the attempt ends as. A hand-over is the real one's usual ending, and
-  /// the process would not be here to read it; a test can.
-  final UpdateInstallResult result;
+  /// What [prepare] answers with, or null to fail with [failure].
+  final PreparedUpdate? prepared;
+
+  /// What [prepare] fails with when it has nothing ready.
+  final UpdateInstallFailure? failure;
 
   /// What [previousFailure] answers.
   final UpdateInstallFailure? leftOver;
 
+  /// When set, [prepare] reports [progress] and then waits for this to complete
+  /// instead of answering — a download that is still running, which is the only
+  /// way a test can look at the middle of one.
+  final Completer<UpdatePrepareResult>? hold;
+
   /// Every answer the installer was handed, in order.
   final List<UpdateCheck> askedFor = [];
+
+  /// Every update [apply] was handed, in order.
+  final List<PreparedUpdate> applied = [];
 
   /// Installs a scripted installer in place of the real one.
   ///
@@ -1303,14 +1316,18 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   static ScriptedUpdateInstaller replace({
     bool supported = false,
     List<UpdateInstallProgress> progress = const [],
-    UpdateInstallResult result = const UpdateInstallResult.handedOver(),
+    PreparedUpdate? prepared,
+    UpdateInstallFailure? failure,
     UpdateInstallFailure? leftOver,
+    Completer<UpdatePrepareResult>? hold,
   }) {
     final installer = ScriptedUpdateInstaller(
       supported: supported,
       progress: progress,
-      result: result,
+      prepared: prepared,
+      failure: failure,
       leftOver: leftOver,
+      hold: hold,
     );
     UpdateInstallResolution.installer = installer;
     addTearDown(UpdateInstallResolution.reset);
@@ -1321,7 +1338,7 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   UpdateInstallFailure? previousFailure() => leftOver;
 
   @override
-  Future<UpdateInstallResult> install(
+  Future<UpdatePrepareResult> prepare(
     UpdateCheck check, {
     required void Function(UpdateInstallProgress progress) onProgress,
   }) async {
@@ -1329,7 +1346,22 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
     for (final step in progress) {
       onProgress(step);
     }
-    return result;
+    final waiting = hold;
+    if (waiting != null) return waiting.future;
+    final ready = prepared;
+    if (ready != null) return UpdatePrepareResult.ready(ready);
+    return UpdatePrepareResult.failed(failure ?? UpdateInstallFailure.download);
+  }
+
+  @override
+  Future<void> apply(
+    PreparedUpdate update, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  }) async {
+    applied.add(update);
+    // What the real one reports before it ends the process: the last thing the
+    // old build gets to say.
+    onProgress(const UpdateInstallProgress(UpdateInstallStage.handingOver));
   }
 }
 

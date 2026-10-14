@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
+import '../app/app_version.dart';
 import 'update_check.dart';
 
 /// Fetching a newer build and putting it where this one is.
@@ -31,6 +32,29 @@ import 'update_check.dart';
 /// coincidence: the code that finishes an update is the code that was written
 /// most recently, so a fix to this machinery reaches the machines that need it
 /// with the update that carries it.
+///
+/// ## Where the package is fetched to
+///
+/// A folder of the application's own, called `update`: not the root of that
+/// folder, which holds the build itself — a download sitting beside the
+/// executable reads as part of the program — and not the system's temporary
+/// directory either, which is the one place a program may write without asking
+/// and also the one place a user never looks. The package stays there between
+/// attempts, which is what makes a retry after a cancelled one cheap, and the
+/// next start of the version it carries takes it away — see
+/// [clearFetchedUpdate]. The unpacked build beside it is the transient part,
+/// and it lives where transient things live.
+///
+/// ## Two steps, and a question between them
+///
+/// Everything that can be done while this build still runs — fetching the
+/// package, checking it against the checksum the release published, unpacking
+/// it — is one call, [UpdateInstaller.prepare]. What is left ends the process,
+/// because the files it replaces are open until it does, and that is a second
+/// call, [UpdateInstaller.apply]. Between the two the user is asked: the last
+/// thing this build does before its window goes away is close itself on
+/// purpose, and a program that did that without a word would be a program that
+/// disappeared. See `about_page.dart` for the question.
 
 /// The file an installed copy has and an unpacked one does not.
 ///
@@ -189,19 +213,52 @@ final class UpdateInstallProgress {
   }
 }
 
-/// What an attempt to install an update ended as.
-final class UpdateInstallResult {
-  /// The hand-over was started and this process is about to end.
-  const UpdateInstallResult.handedOver() : failure = null;
+/// A newer build, fetched and checked, waiting for the word that puts it in
+/// place.
+///
+/// What [UpdateInstaller.prepare] answers with and [UpdateInstaller.apply]
+/// needs. Everything the second call does is start a process and end this one,
+/// so which of the two it starts is decided here rather than worked out again
+/// from the same facts a second time.
+final class PreparedUpdate {
+  /// The installer an installed copy hands the job to, already checked.
+  const PreparedUpdate.installer(this.package)
+    : payload = UpdatePayload.installer,
+      staged = null;
+
+  /// The unpacked build an unpacked copy replaces itself from.
+  const PreparedUpdate.portable({required this.package, required this.staged})
+    : payload = UpdatePayload.portablePackage;
+
+  /// Which of the two shapes of copy this is for.
+  final UpdatePayload payload;
+
+  /// The file that was fetched and checked, under the update folder.
+  final String package;
+
+  /// The folder the new build was unpacked into, or null for an installer —
+  /// which is run exactly as it arrived and unpacks nothing.
+  final String? staged;
+}
+
+/// What an attempt to fetch and stage an update ended as.
+final class UpdatePrepareResult {
+  /// There is something to put in place, and [prepared] says what.
+  const UpdatePrepareResult.ready(PreparedUpdate this.prepared)
+    : failure = null;
 
   /// It did not happen, and [failure] says why.
-  const UpdateInstallResult.failed(UpdateInstallFailure this.failure);
+  const UpdatePrepareResult.failed(UpdateInstallFailure this.failure)
+    : prepared = null;
 
-  /// Why it did not happen, or null when it did.
+  /// What is waiting to be put in place, or null when nothing is.
+  final PreparedUpdate? prepared;
+
+  /// Why nothing is, or null when something is.
   final UpdateInstallFailure? failure;
 
-  /// Whether a newer build is on its way in.
-  bool get handedOver => failure == null;
+  /// Whether there is something to put in place.
+  bool get isReady => prepared != null;
 }
 
 /// Replacing this build with the one a release names.
@@ -224,77 +281,145 @@ abstract interface class UpdateInstaller {
   /// failure the user has already dealt with.
   UpdateInstallFailure? previousFailure();
 
-  /// Downloads [check], checks it, and hands over to it.
+  /// Fetches [check] and stages it: everything that can be done while this
+  /// build is still running.
   ///
-  /// [onProgress] is called before each step and while the bytes arrive. This
-  /// does not return when the hand-over starts: on success the process it is
-  /// running in has to end, because that process is what holds the files being
-  /// replaced. The caller therefore sees a return only on failure — or, in a
-  /// test, from a stand-in that cannot end anything.
-  Future<UpdateInstallResult> install(
+  /// Answers what is ready, or why nothing is. Nothing here ends the process or
+  /// touches the folder this build runs from — the package lands in the update
+  /// folder and the unpacked build in a folder of its own — so a caller that
+  /// stops here leaves the application exactly as it was. That is what a user
+  /// answering "not now" to the question in `about_page.dart` amounts to.
+  Future<UpdatePrepareResult> prepare(
     UpdateCheck check, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  });
+
+  /// Puts what [prepare] readied in place, and ends this process.
+  ///
+  /// Does not return in the application: the files being replaced are open
+  /// until the process holding them ends, so this one has to. What the user
+  /// sees after it is the window of the build that was just started — the
+  /// hand-over window, or the installer's own — and then the updated
+  /// application, reopened by that window or by the installer's second `[Run]`
+  /// entry. [onProgress] is called before the end, which is the last thing the
+  /// old build gets to say.
+  Future<void> apply(
+    PreparedUpdate prepared, {
     required void Function(UpdateInstallProgress progress) onProgress,
   });
 }
 
 /// Replacing this build with the one a release names, on the platform that can.
 final class PlatformUpdateInstaller implements UpdateInstaller {
-  /// Hands over, and ends the process, through [leave].
-  const PlatformUpdateInstaller({this.leave = _leaveProcess});
+  /// Hands over, and ends the process, through [leave]. Fetches into
+  /// [application], which a test points at a folder of its own.
+  const PlatformUpdateInstaller({this.leave = _leaveProcess, this.application});
 
   /// What happens when a hand-over has started. A test replaces it; nothing in
   /// the application does.
   final void Function() leave;
 
+  /// The folder this build runs from, or null for the real one.
+  ///
+  /// A seam for the same reason `GitHubUpdateChecker.apiHost` is one: the
+  /// installer writes into the folder it runs from, and a test that ran the
+  /// real thing would be writing into the folder the suite itself runs from.
+  final String? application;
+
+  /// The folder this build runs from, seam and all.
+  String get _root => application ?? applicationDirectory().path;
+
   @override
   bool get supported => Platform.isWindows;
 
   @override
-  UpdateInstallFailure? previousFailure() => readHandoverReport(
-    File(_within(applicationDirectory().path, handoverReportName)),
-  );
+  UpdateInstallFailure? previousFailure() =>
+      readHandoverReport(File(_within(_root, handoverReportName)));
 
   @override
-  Future<UpdateInstallResult> install(
+  Future<UpdatePrepareResult> prepare(
     UpdateCheck check, {
     required void Function(UpdateInstallProgress progress) onProgress,
   }) async {
     if (!supported) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.unsupported);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.unsupported);
     }
-    final application = applicationDirectory();
-    final installed = File(_within(application.path, installedCopyMarker))
-        .existsSync();
+    final installed = File(_within(_root, installedCopyMarker)).existsSync();
     final payload = installed
         ? UpdatePayload.installer
         : UpdatePayload.portablePackage;
     final asset = updateAssetFor(check, payload);
     if (asset == null) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.noAsset);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.noAsset);
     }
     final expected = asset.sha256;
     if (expected == null) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.noDigest);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.noDigest);
     }
-    if (!_isWritable(application)) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.notWritable);
+    // The hand-over drops its files into the folder being replaced, so that
+    // folder has to be writable; and the update folder beside it is where the
+    // download lands, which is the same question asked of the same place.
+    if (!_isWritable(Directory(_root))) {
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.notWritable);
     }
-
-    final stage = newUpdateStage();
-    final downloaded = File(_within(stage.path, _fileName(asset.name)));
-    onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
+    final Directory update;
     try {
-      await _download(asset, downloaded, onProgress);
+      update = updateDirectory(_root);
     } on Object {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.download);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.notWritable);
+    }
+    final wanted = _fileName(asset.name);
+    final downloaded = File(_within(update.path, wanted));
+    // One package at a time. A folder holding last week's download beside this
+    // one is a folder nobody can read, and a package that was superseded is
+    // superseded the moment a newer release was asked about.
+    _keepOnly(update, wanted);
+
+    onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
+    // The bytes may already be here: an attempt that was cancelled after the
+    // download leaves the package in place, and fetching it again would be
+    // twenty megabytes for a file that is already the right one.
+    if (!await _matchesDigest(downloaded, expected)) {
+      try {
+        await _download(asset, downloaded, onProgress);
+      } on Object {
+        _discard(downloaded);
+        return const UpdatePrepareResult.failed(UpdateInstallFailure.download);
+      }
     }
 
     onProgress(const UpdateInstallProgress(UpdateInstallStage.verifying));
     if (!await _matchesDigest(downloaded, expected)) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.checksum);
+      // What arrived is not what the release published, and the sentence the
+      // user is about to read says it has been thrown away — so it has.
+      _discard(downloaded);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.checksum);
     }
 
     if (payload == UpdatePayload.installer) {
+      return UpdatePrepareResult.ready(
+        PreparedUpdate.installer(downloaded.path),
+      );
+    }
+
+    onProgress(const UpdateInstallProgress(UpdateInstallStage.staging));
+    final stage = newUpdateStage();
+    if (!await _unpack(downloaded, stage) || !isAPackage(stage)) {
+      // The package is not what failed — it checked out — so it stays where it
+      // is, and a retry starts from it rather than from the network.
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.unpack);
+    }
+    return UpdatePrepareResult.ready(
+      PreparedUpdate.portable(package: downloaded.path, staged: stage.path),
+    );
+  }
+
+  @override
+  Future<void> apply(
+    PreparedUpdate prepared, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  }) async {
+    if (prepared.payload == UpdatePayload.installer) {
       // Inno replaces the files and puts the application back — see the second
       // `[Run]` entry in `packaging/local_transfer.iss`, which runs under
       // `/SILENT` only when `/update` is among the arguments, and that is what
@@ -302,36 +427,34 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
       // should install and nothing more. Whatever the installer does not do,
       // this process must not: its files are open until it ends and it has
       // seconds before the unpacker reaches them.
-      await Process.start(downloaded.path, const [
+      await Process.start(prepared.package, const [
         '/SILENT',
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
         '/update',
       ], mode: ProcessStartMode.detached);
-      return _handOver(onProgress);
+    } else {
+      // The build in the stage folder is the one that can replace this one:
+      // every file of this build is open until this process ends, and that one
+      // has nothing open in the folder it is about to fill. A portable payload
+      // is only ever readied with a folder to run from, so there is nothing to
+      // do without one.
+      final staged = prepared.staged;
+      if (staged == null) return;
+      await Process.start(_within(staged, _executableName), [
+        applyUpdateFlag,
+        stagedArgument,
+        staged,
+        targetArgument,
+        _root,
+      ], mode: ProcessStartMode.detached);
     }
-
-    onProgress(const UpdateInstallProgress(UpdateInstallStage.staging));
-    if (!await _unpack(downloaded, stage) || !isAPackage(stage)) {
-      return const UpdateInstallResult.failed(UpdateInstallFailure.unpack);
-    }
-
-    // The build in the stage folder is the one that can replace this one: every
-    // file of this build is open until this process ends, and that one has
-    // nothing open in the folder it is about to fill.
-    await Process.start(_within(stage.path, _executableName), [
-      applyUpdateFlag,
-      stagedArgument,
-      stage.path,
-      targetArgument,
-      application.path,
-    ], mode: ProcessStartMode.detached);
-    return _handOver(onProgress);
+    await _handOver(onProgress);
   }
 
   /// Says that a hand-over has started, and ends the process it was started
   /// from.
-  Future<UpdateInstallResult> _handOver(
+  Future<void> _handOver(
     void Function(UpdateInstallProgress progress) onProgress,
   ) async {
     onProgress(const UpdateInstallProgress(UpdateInstallStage.handingOver));
@@ -340,7 +463,6 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     // same turn the state was set in.
     await Future<void>.delayed(const Duration(milliseconds: 600));
     leave();
-    return const UpdateInstallResult.handedOver();
   }
 }
 
@@ -361,12 +483,31 @@ abstract final class UpdateInstallResolution {
 /// The folder this build runs from.
 Directory applicationDirectory() => File(Platform.resolvedExecutable).parent;
 
-/// A folder to fetch an update into, besides the one being replaced.
+/// What the folder an update is fetched into is called, under the
+/// application's own.
 ///
-/// The system's own temporary directory: it is the one place a program may
-/// write without asking, and the folder holding the application may be anywhere
-/// at all — including somewhere the user cannot write, which is a question
-/// [PlatformUpdateInstaller] asks before it downloads anything.
+/// Not the root of that folder, which holds the build itself: a download
+/// sitting beside the executable reads as part of the program, and a user who
+/// looks for one should not have to tell the two apart. Not the system's
+/// temporary directory either, which is the one place a program may write
+/// without asking and also the one place a user never looks.
+const String updateDirectoryName = 'update';
+
+/// The folder an update is fetched into, under [root].
+///
+/// Created if it is not there — a first update has nothing to fetch into — and
+/// throws when it cannot be, which the caller reads as "this folder cannot be
+/// written to": the question of whether it can be created is the writability
+/// question the caller has already asked about the folder above it.
+Directory updateDirectory(String root) =>
+    Directory(_within(root, updateDirectoryName))..createSync(recursive: true);
+
+/// A folder to unpack an update into, besides the one being replaced.
+///
+/// The system's own temporary directory: the unpacked build is the transient
+/// part — it exists to be run once, from a folder of its own, and it is taken
+/// away by [clearStaleUpdateStages] — so it belongs where transient things
+/// live rather than beside the package that outlives it.
 Directory newUpdateStage() =>
     Directory.systemTemp.createTempSync('local_transfer_update_');
 
@@ -395,6 +536,36 @@ void clearStaleUpdateStages({
       entry.deleteSync(recursive: true);
     } on Object {
       // Somebody else's, or still busy: leaving it is always an option.
+    }
+  }
+}
+
+/// Takes away the package of an update that has been applied.
+///
+/// The only trace that says an update happened is the name: the package for the
+/// version this build now *is* is the one that was just installed, and it is
+/// twenty megabytes of nothing now. A package for any other version is one
+/// whose update was cancelled or failed — it stays, because it is what a retry
+/// starts from. Called from `main.dart` on an ordinary start, beside
+/// [clearStaleUpdateStages].
+void clearFetchedUpdate({String? root}) {
+  final update = Directory(
+    _within(root ?? applicationDirectory().path, updateDirectoryName),
+  );
+  if (!update.existsSync()) return;
+  for (final payload in UpdatePayload.values) {
+    final package = File(
+      _within(
+        update.path,
+        updateAssetName(tag: 'v$appVersion', payload: payload),
+      ),
+    );
+    try {
+      if (package.existsSync()) package.deleteSync();
+    } on Object {
+      // Best effort. The version still matches on the next start, so a package
+      // that could not be deleted yet is tried for again; and one that outlives
+      // its version is taken away by the next update's own housekeeping.
     }
   }
 }
@@ -612,6 +783,38 @@ bool _isWritable(Directory directory) {
     return true;
   } on Object {
     return false;
+  }
+}
+
+/// Deletes every file in [update] but the one called [keep].
+void _keepOnly(Directory update, String keep) {
+  List<FileSystemEntity> entries;
+  try {
+    entries = update.listSync();
+  } on Object {
+    return;
+  }
+  for (final entry in entries) {
+    // Folders are not this function's business: what a hand-over unpacks is
+    // somewhere else entirely, and anything else a folder might hold is
+    // somebody else's.
+    if (entry is! File) continue;
+    if (_fileName(entry.path) == keep) continue;
+    try {
+      entry.deleteSync();
+    } on Object {
+      // Somebody else's, or still busy: leaving it is always an option.
+    }
+  }
+}
+
+/// Takes a fetched file away, best effort.
+void _discard(File file) {
+  try {
+    if (file.existsSync()) file.deleteSync();
+  } on Object {
+    // Nothing to be done about it: the sentence the user reads is about the
+    // attempt, not about the litter.
   }
 }
 

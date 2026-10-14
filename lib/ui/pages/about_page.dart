@@ -30,7 +30,11 @@ import '../widgets.dart';
 /// The page also offers to install what the question turns up — see
 /// `update_install.dart` for what that does to the folder this build runs from,
 /// and note that the offer is left out entirely on a platform that cannot:
-/// a button that could only ever fail is worse than no button.
+/// a button that could only ever fail is worse than no button. Installing is
+/// two steps with a question between them: everything that can be done while
+/// this build still runs happens without a word, and the step that ends the
+/// process asks first — [_ConfirmUpdateDialog] — because the last thing this
+/// build does before its window goes away is close itself on purpose.
 class AboutPage extends StatefulWidget {
   /// Shows what this build is.
   const AboutPage({super.key});
@@ -67,6 +71,14 @@ class _AboutPageState extends State<AboutPage> {
   /// window that came and went.
   UpdateInstallFailure? _leftOver;
 
+  /// What has been fetched and checked, waiting for the word that puts it in
+  /// place, or null.
+  ///
+  /// Kept rather than thrown away when the question is answered no: the package
+  /// is already in the update folder, so offering it again costs nothing and
+  /// fetching it again would cost twenty megabytes for nothing.
+  PreparedUpdate? _prepared;
+
   @override
   void initState() {
     super.initState();
@@ -89,40 +101,72 @@ class _AboutPageState extends State<AboutPage> {
     setState(() {
       _answer = answer;
       _asking = false;
+      // A fresh question invalidates anything a previous one readied: the
+      // version it named may not be the one on offer now, and a package for a
+      // version nobody asked about is litter with a download in it.
+      _prepared = null;
     });
   }
 
   /// Downloads the newer build, checks it, and hands this folder over to it.
   ///
-  /// On success this does not come back: the installer ends the process, because
-  /// the files it replaces are open until it does. What the page shows after
-  /// that call is therefore the last thing the old build draws, which is the
-  /// whole reason the hand-over is announced on screen before it is started.
+  /// In two steps with a question between them. The first is everything that
+  /// can be done while this build still runs — fetching, checking, unpacking —
+  /// and it answers with what is ready or why nothing is. What is left ends the
+  /// process, because the files it replaces are open until it does, so the user
+  /// is asked before anything closes: on success this does not come back, and
+  /// what the page shows after that call is the last thing the old build draws.
   Future<void> _install() async {
     final answer = _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
-    setState(() {
-      _failure = null;
-      _leftOver = null;
-      _progress = const UpdateInstallProgress(UpdateInstallStage.downloading);
-    });
-    final result = await UpdateInstallResolution.installer.install(
-      answer,
+    var prepared = _prepared;
+    if (prepared == null) {
+      setState(() {
+        _failure = null;
+        _leftOver = null;
+        _progress = const UpdateInstallProgress(UpdateInstallStage.downloading);
+      });
+      final staged = await UpdateInstallResolution.installer.prepare(
+        answer,
+        onProgress: (progress) {
+          if (mounted) setState(() => _progress = progress);
+        },
+      );
+      if (!mounted) return;
+      prepared = staged.prepared;
+      if (prepared == null) {
+        setState(() {
+          _failure = staged.failure;
+          _progress = null;
+        });
+        return;
+      }
+      setState(() {
+        _prepared = prepared;
+        // Nothing is in flight any more: what is left is a question, and a
+        // progress bar over a question is a claim about work that is not
+        // happening.
+        _progress = null;
+      });
+    }
+    // The question. Everything the update still has to do ends this process,
+    // and the user is the one who has to say so — the package is already in
+    // place, so answering no costs nothing and changes nothing.
+    final closing = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ConfirmUpdateDialog(version: answer.version ?? ''),
+    );
+    if (!mounted) return;
+    if (closing != true) {
+      setState(() => _progress = null);
+      return;
+    }
+    await UpdateInstallResolution.installer.apply(
+      prepared,
       onProgress: (progress) {
         if (mounted) setState(() => _progress = progress);
       },
     );
-    if (!mounted) return;
-    if (result.handedOver) {
-      // A hand-over does not return, so this is a stand-in answering. Leaving
-      // the last progress on screen is the honest rendering of "the process
-      // this is running in is about to end".
-      return;
-    }
-    setState(() {
-      _failure = result.failure;
-      _progress = null;
-    });
   }
 
   /// What an update that is under way is doing, as a sentence.
@@ -182,6 +226,7 @@ class _AboutPageState extends State<AboutPage> {
     final progress = _progress;
     final failure = _failure;
     final leftOver = _leftOver;
+    final prepared = _prepared;
     final canInstall =
         _canInstall && answer?.outcome == UpdateOutcome.available;
     final progressSentence = progress == null
@@ -333,6 +378,20 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                     ),
                   ),
+                // What a fetched package is waiting for. Not a progress line —
+                // nothing is in flight — and not a failure either: answering no
+                // to the question left the package exactly where it was.
+                if (prepared != null && failure == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      l10n.aboutUpdateReady,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizePreview,
+                        color: colors.brand,
+                      ),
+                    ),
+                  ),
                 // The address stays on screen even when the browser could not
                 // be opened — a machine with no default handler is exactly the
                 // machine that has to have somewhere to copy it from.
@@ -356,6 +415,40 @@ class _AboutPageState extends State<AboutPage> {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The question an update asks before anything closes.
+///
+/// A dialog of its own rather than a line on the card: what it is asking about
+/// is the window going away, and a question that shared a surface with the
+/// progress it follows would read as one more status line. Answering no is the
+/// quiet option and also the safe one — the package stays in the update folder
+/// and the application carries on exactly as it was.
+class _ConfirmUpdateDialog extends StatelessWidget {
+  /// Asks about closing for [version].
+  const _ConfirmUpdateDialog({required this.version});
+
+  /// The version that has been fetched and checked.
+  final String version;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.aboutUpdateConfirmTitle),
+      content: Text(l10n.aboutUpdateConfirmBody(version)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(l10n.aboutUpdateConfirmApply),
         ),
       ],
     );
