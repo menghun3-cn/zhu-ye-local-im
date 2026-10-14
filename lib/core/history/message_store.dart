@@ -118,8 +118,39 @@ final class FileMessageStore implements MessageStore {
     }
   }
 
+  /// The save in flight, or null once the last one has finished.
+  ///
+  /// Saves are chained rather than left to overlap, and the reason is Windows:
+  /// every save writes the *same* temp file and then renames it over the
+  /// target, and two of those running at once race on that file. The rename
+  /// that lands while the other save still holds the temp file open is
+  /// refused, and the refusal is `ERROR_SHARING_VIOLATION` — reported as
+  /// "another program is using this file" about a program's own earlier save.
+  /// The controller asks for a save from several directions at once (a
+  /// Transfer settling, a conversation being opened, a message being deleted),
+  /// so this is an ordinary case and not a hypothetical one.
+  Future<void>? _inFlight;
+
   @override
-  Future<void> save(Map<String, Object?> json) async {
+  Future<void> save(Map<String, Object?> json) {
+    final previous = _inFlight;
+    final started = previous == null
+        ? _write(json)
+        : previous.then((_) => _write(json));
+    // Held as a future that cannot fail: one rejected save must not turn every
+    // later one into the same failure without trying.
+    final settled = started.then((_) {}, onError: (Object _) {});
+    _inFlight = settled;
+    settled.whenComplete(() {
+      // Cleared only when the newest save is the one that just finished, so
+      // the chain does not grow for the life of the process.
+      if (identical(_inFlight, settled)) _inFlight = null;
+    });
+    return started;
+  }
+
+  /// The write itself, with no other save running beside it.
+  Future<void> _write(Map<String, Object?> json) async {
     final temp = File(_tempPath);
     // The directory is made rather than assumed, for the same reason the
     // profile store makes it: on a first launch nothing under the data
