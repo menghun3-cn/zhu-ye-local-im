@@ -598,7 +598,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      'Press Download and update: it fetches the new build, checks it against the checksum the release published, replaces this folder and restarts the app by itself. When that cannot be done, the button beside it opens the page to download by hand.';
+      'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
+
+  @override
+  String get aboutUpdateConfirmTitle => 'Close and update?';
+
+  @override
+  String aboutUpdateConfirmBody(String version) {
+    return 'Version $version has been downloaded and checked against the checksum the release published. Press Close and update: the program closes first, updates itself, and reopens when it is done.';
+  }
+
+  @override
+  String get aboutUpdateConfirmApply => 'Close and update';
+
+  @override
+  String get aboutUpdateReady =>
+      'The update package is ready. Press Download and update again to install it — no new download.';
 
   @override
   String get updateFailureUnsupported =>
@@ -626,7 +641,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateFailureUnpack =>
-      'The download arrived but could not be unpacked, so it has been thrown away.';
+      'The download arrived but could not be unpacked. Try again, or download the new version by hand.';
 
   @override
   String get updateFailureHandover =>
