@@ -236,5 +236,72 @@ void main() {
 
       await expectLater(loadMessages(store), throwsFormatException);
     });
+
+    test('saves that overlap do not race each other off the file', () async {
+      // The controller asks for a save from several directions at once — a
+      // Transfer settling, a conversation being opened, a message being
+      // deleted — and every one of them writes the *same* temp file before
+      // renaming it over the target. Two of those overlapping used to race on
+      // that file: the rename that landed while the other save still held it
+      // open was refused, and on Windows the refusal is
+      // ERROR_SHARING_VIOLATION, "another program is using this file" said
+      // about this program's own earlier save.
+      final store = storeIn('messages.json');
+      // Wide enough that the writes really do overlap rather than each
+      // finishing inside one microtask: a conversation at its ceiling is a
+      // few hundred kilobytes.
+      Map<String, Object?> payload(int messages) => {
+        'version': 1,
+        'messages': [
+          for (var index = 0; index < messages; index++)
+            _message(id: 'm$index').toJson(),
+        ],
+        'reading': const <String, Object?>{},
+      };
+
+      // Started back to back and only then awaited, which is the shape the
+      // controller produces.
+      await Future.wait([
+        for (var index = 1; index <= 8; index++)
+          store.save(payload(index * 100)),
+      ]);
+
+      // The last save asked for is the one on disk, and nothing was refused.
+      expect(await loadMessages(store), hasLength(800));
+      expect(File('${store.path}.tmp').existsSync(), isFalse);
+    });
+
+    test('a save that fails does not poison the ones after it', () async {
+      // One rejected save must not turn every later one into the same failure
+      // without trying: the conversation would stop being persisted for the
+      // rest of the process, and nothing on screen would say so.
+      final blocker = File('${sandbox.path}${Platform.pathSeparator}blocker');
+      blocker.writeAsStringSync('not a directory');
+      // The parent path names a file, so every save fails before it writes
+      // anything at all.
+      final doomed = FileMessageStore(
+        '${blocker.path}${Platform.pathSeparator}messages.json',
+      );
+
+      await expectLater(
+        doomed.save({
+          'version': 1,
+          'messages': <Object?>[],
+          'reading': const <String, Object?>{},
+        }),
+        throwsA(isA<FileSystemException>()),
+      );
+
+      // The obstruction is gone, so the next save must actually run rather
+      // than replay the earlier failure.
+      blocker.deleteSync();
+      await doomed.save({
+        'version': 1,
+        'messages': [_message(id: 'after').toJson()],
+        'reading': const <String, Object?>{},
+      });
+
+      expect((await loadMessages(doomed)).single.id, 'after');
+    });
   });
 }

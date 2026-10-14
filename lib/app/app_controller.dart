@@ -452,15 +452,25 @@ final class LocalTransferController {
   /// Called when a conversation is on screen. The whole of the unread rule is
   /// in this call and the comparison it feeds: everything already there is read
   /// the moment the user is looking at it, and anything that arrives afterwards
-  /// is not. Writing only when something actually changes keeps this from
-  /// rewriting the conversation file on every rebuild — the surface calls it
-  /// from `build`, which runs a great many times per second.
+  /// is not.
+  ///
+  /// Written only when the mark would actually move something — a conversation
+  /// never opened before, a different one from the one opened last, or one
+  /// still holding messages the watermark does not cover — and otherwise it
+  /// returns before it touches the file or notifies. That has to *hold*, not
+  /// merely be intended: the surface calls this from `build` through a
+  /// post-frame callback, `build` runs a great many times per second, and the
+  /// notification this makes is what triggers the next build. A guard that
+  /// compares the new mark's time against the old one looks sufficient and is
+  /// not — the clock has always moved by the next call, so every call advanced
+  /// the watermark, notified and wrote, and the notification rebuilt the
+  /// surface that scheduled the next call. One conversation left open on
+  /// screen therefore rewrote the file once a frame, forever.
   Future<void> markConversationOpened(Fingerprint peer) async {
     final before = _reading.openedThrough(peer);
-    final now = _clock();
     final movedLast = _reading.lastPeer != peer.hex;
-    final advanced = before == null || now.isAfter(before);
-    if (!advanced && !movedLast) return;
+    if (before != null && !movedLast && unreadCount(peer) == 0) return;
+    final now = _clock();
     _reading
       ..markOpened(peer, now)
       ..lastPeer = peer.hex;

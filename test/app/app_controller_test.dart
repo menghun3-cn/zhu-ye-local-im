@@ -28,6 +28,32 @@ final class TestDevice {
   void recordOffers() => controller.incoming.listen(offers.add);
 }
 
+/// A [MessageStore] that remembers every save it was asked for.
+///
+/// The conversation is written out on a schedule nobody looks at, so "how
+/// many times was it written" is a question a test can only answer by
+/// counting. The store underneath is the in-memory one: what is being
+/// measured is the controller's restraint, not the file format.
+final class CountingMessageStore implements MessageStore {
+  /// Wraps [inner], forwarding everything and counting the saves.
+  CountingMessageStore(this.inner);
+
+  /// Where the saves go.
+  final MessageStore inner;
+
+  /// Every map handed to [save], in order.
+  final List<Map<String, Object?>> saves = [];
+
+  @override
+  Future<Map<String, Object?>?> load() => inner.load();
+
+  @override
+  Future<void> save(Map<String, Object?> json) async {
+    saves.add(json);
+    await inner.save(json);
+  }
+}
+
 /// Brings a Device up on [transport], with an ephemeral port for everything.
 Future<TestDevice> startDevice(
   BeaconTransport transport,
@@ -1330,5 +1356,52 @@ void main() {
       );
       expect(bob.controller.transfers, isNotEmpty);
     });
+
+    test(
+      'marking a conversation read writes once, not once per call',
+      () async {
+        // The surface calls `markConversationOpened` from `build` through a
+        // post-frame callback, and `build` runs a great many times per second.
+        // The guard therefore has to *hold*, not merely be intended: comparing
+        // the new mark's time against the old one never does, because the clock
+        // has always moved by the next call — so every call used to advance the
+        // watermark, notify and write, and the notification rebuilt the surface
+        // that scheduled the next call. One conversation left open on screen
+        // rewrote the file once a frame, for as long as it stayed open.
+        final saved = CountingMessageStore(MemoryMessageStore());
+        final alice = await startDevice(hub.a, 'Alice');
+        final bob = await startDevice(hub.b, 'Bob', messageStore: saved);
+        await pairUp(alice, bob);
+        await connect(alice, bob);
+
+        final sent = await alice.controller.sendText('are you there');
+        await until(
+          () => sent.state.isSettled && bob.controller.transfers.length == 1,
+          description: 'the text to settle on Bob',
+        );
+        // The watermark is a time, so a mark taken in the same millisecond as
+        // the message does not cover it. A real user is never that quick.
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        // Bob has not looked at the conversation, so the message is unread.
+        expect(bob.controller.unreadCount(alice.fingerprint), 1);
+
+        // Looking at it. One write: the watermark moves and the badge clears.
+        await bob.controller.markConversationOpened(alice.fingerprint);
+        expect(bob.controller.unreadCount(alice.fingerprint), 0);
+        final afterOpening = saved.saves.length;
+
+        // And now nothing more is written, however often the surface asks —
+        // which is what a `build`-driven call site does, a great many times a
+        // second, for as long as the conversation is on screen. Spaced rather
+        // than back to back, because the real cadence is one per frame and a
+        // watermark compared against the clock moves on every one of them.
+        for (var call = 0; call < 25; call++) {
+          await Future<void>.delayed(const Duration(milliseconds: 2));
+          await bob.controller.markConversationOpened(alice.fingerprint);
+        }
+        expect(saved.saves.length, afterOpening);
+      },
+    );
   });
 }
