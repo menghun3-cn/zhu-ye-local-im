@@ -159,18 +159,33 @@ void main() {
     /// no border, no minimum height — because the container around it is the
     /// thing a user sees. Measuring the field would be measuring a widget with
     /// no fill, no frame and no say in how tall the row is.
+    ///
+    /// An `AnimatedContainer` rather than a `Container`, because the box has
+    /// two states: at rest it is a hairline of `borderStrong`, and while the
+    /// field holds focus the hairline becomes `brandStrong` with a 3px ring of
+    /// `brandSoft` around it — the design's `:focus-within` on
+    /// `.composer__box`.
     double boxHeight(WidgetTester tester) => tester
         .getSize(
           find
               .ancestor(
                 of: find.byType(TextField),
-                matching: find.byType(Container),
+                matching: find.byType(AnimatedContainer),
               )
               .first,
         )
         .height;
 
-    testWidgets('is one control tall', (tester) async {
+    Rect boxRect(WidgetTester tester) => tester.getRect(
+      find
+          .ancestor(
+            of: find.byType(TextField),
+            matching: find.byType(AnimatedContainer),
+          )
+          .first,
+    );
+
+    testWidgets('is the height the design draws', (tester) async {
       await pumpComposer(tester, <String>[]);
 
       // Measured rather than asked for, because the number that matters is the
@@ -178,17 +193,44 @@ void main() {
       // token correct and the box the wrong size.
       expect(
         boxHeight(tester),
-        WeChat.composerControl,
-        reason: 'the drawn height is the token, not something near it',
+        WeChat.fieldHeight,
+        reason: 'the design\'s .composer__box is 44 tall',
       );
-      // Which is taller than it used to be. The complaint was that this box was
-      // a strip rather than a box, so the assertion is against the number it
-      // was, not just against a token that could be lowered to match.
+      // Which is taller than the strip this box used to be. The complaint was
+      // that it was a strip rather than a box, so the assertion is against the
+      // number it was, not just against a token that could be lowered to match.
       expect(
         boxHeight(tester),
         greaterThan(32),
         reason: 'and taller than the strip it was before',
       );
+    });
+
+    testWidgets('the two buttons beside it are a step shorter', (tester) async {
+      final l10n = lookupAppLocalizations(appLocale);
+      await pumpComposer(tester, <String>[]);
+
+      // The design's `.btn` is 34 against the box's 44, and the three controls
+      // are aligned on their *bottoms* (`align-items: flex-end`). One height
+      // for all three was the old layout; the difference is the design's, so
+      // it is asserted rather than smoothed away — and asserting the bottoms
+      // is what keeps a later "centre them instead" from being silent.
+      final box = boxRect(tester);
+      for (final control in [
+        tester.getRect(find.byTooltip(l10n.menuSendFile)),
+        tester.getRect(find.widgetWithText(FilledButton, l10n.send)),
+      ]) {
+        expect(
+          control.height,
+          WeChat.composerControl,
+          reason: 'the design\'s .btn is 34 tall',
+        );
+        expect(
+          control.bottom,
+          box.bottom,
+          reason: 'and it sits on the box\'s bottom edge, not its top',
+        );
+      }
     });
 
     testWidgets('keeps an outline even though text fields no longer do', (
@@ -208,45 +250,76 @@ void main() {
         reason: 'the field defers to the box around it',
       );
 
-      final box = tester.widget<Container>(
+      final box = tester.widget<AnimatedContainer>(
         find
             .ancestor(
               of: find.byType(TextField),
-              matching: find.byType(Container),
+              matching: find.byType(AnimatedContainer),
             )
             .first,
       );
-      final decoration = box.decoration;
+      final decoration = box.decoration! as BoxDecoration;
       expect(
-        decoration,
-        isA<BoxDecoration>(),
+        decoration.color,
+        isNotNull,
         reason: 'the composer draws the field\'s fill itself',
       );
+      // And it draws the hairline the design's `.composer__box` has at rest:
+      // a box with no outline is a blank, not somewhere to type.
       expect(
-        (decoration! as BoxDecoration).color,
+        decoration.border,
         isNotNull,
-        reason: 'and it is filled, so the box is visible against the page',
+        reason: 'the box is what reads as a field, and it has a border',
       );
     });
 
-    testWidgets('is shorter than an ordinary dialog field, not taller', (
+    testWidgets('the box answers focus the way the design does', (
       tester,
     ) async {
       await pumpComposer(tester, <String>[]);
+      final boxFinder = find
+          .ancestor(
+            of: find.byType(TextField),
+            matching: find.byType(AnimatedContainer),
+          )
+          .first;
+      BoxDecoration decoration() =>
+          (tester.widget<AnimatedContainer>(boxFinder).decoration!)
+              as BoxDecoration;
 
-      // Deliberately *not* the theme's `fieldHeight`: a form field sits under a
-      // label and needs the room; the composer shares its row with two buttons
-      // and has to line up with them. Asserting the difference is what keeps a
-      // later "make all fields the same" from silently making the composer
-      // taller than the row it lives in.
+      // At rest: the hairline of border-strong, and no ring.
       expect(
-        boxHeight(tester),
-        lessThan(WeChat.fieldHeight),
-        reason: 'the composer is not a form field',
+        decoration().border?.top.color,
+        WeChatColors.light.borderStrong,
+        reason: 'the design\'s .composer__box at rest is a border-strong line',
+      );
+      expect(
+        decoration().boxShadow ?? const <BoxShadow>[],
+        isEmpty,
+        reason: 'and no ring until the field is being typed into',
+      );
+
+      await tester.tap(find.byType(TextField));
+      // Settled rather than pumped once: the border and the ring are animated
+      // over 160ms, and a single pump would read the halfway values.
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(
+        decoration().border?.top.color,
+        WeChatColors.light.brandStrong,
+        reason: ':focus-within turns the line brand-strong',
+      );
+      final ring = decoration().boxShadow!;
+      expect(ring, hasLength(1), reason: 'one ring, not a stack of shadows');
+      expect(ring.single.color, WeChatColors.light.brandSoft);
+      expect(
+        ring.single.spreadRadius,
+        3,
+        reason: 'the design\'s 0 0 0 3px brand-soft ring',
       );
     });
 
-    testWidgets('the send button is filled and lines up with the box', (
+    testWidgets('the send button is filled and bottom-aligned with the box', (
       tester,
     ) async {
       final l10n = lookupAppLocalizations(appLocale);
@@ -264,15 +337,39 @@ void main() {
         reason: 'the send is the action here, so it is drawn as one',
       );
 
-      // And it is at least as tall as the box it sends from — the thing a user
-      // reported was a pill visibly shorter than the composer beside it.
+      // In the action green, with the ink that goes on that green — white on
+      // the deep light-mode one.
+      final style = tester.widget<FilledButton>(send).style!;
       expect(
-        tester.getSize(send).height,
-        greaterThanOrEqualTo(boxHeight(tester)),
-        reason: 'a button shorter than its own field reads as an afterthought',
+        style.backgroundColor?.resolve(const <WidgetState>{}),
+        WeChatColors.light.brandStrong,
       );
       expect(
-        tester.getSize(send).width,
+        style.foregroundColor?.resolve(const <WidgetState>{}),
+        WeChatColors.light.onBrandStrong,
+      );
+
+      // And it carries the arrow the design puts beside the word.
+      expect(
+        find.descendant(of: send, matching: find.byIcon(Icons.arrow_forward)),
+        findsOneWidget,
+        reason: '发送 is followed by the design\'s arrow',
+      );
+
+      // A step shorter than the box it sends from, sitting on its bottom edge:
+      // the design's 34px `.btn` under a 44px `.composer__box`, aligned on the
+      // bottom. The old complaint was a pill shorter than the composer *and*
+      // floating in the middle of it; what the design asks for is shorter and
+      // bottom-aligned, which is what is asserted here.
+      final sendRect = tester.getRect(send);
+      expect(sendRect.height, WeChat.composerControl);
+      expect(
+        sendRect.bottom,
+        boxRect(tester).bottom,
+        reason: 'aligned on the bottom edge, as flex-end does',
+      );
+      expect(
+        sendRect.width,
         greaterThanOrEqualTo(60),
         reason: 'wide enough for the word plus its own padding',
       );
