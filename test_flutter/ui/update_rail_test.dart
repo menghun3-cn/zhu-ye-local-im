@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/pages/about_page.dart';
 import 'package:local_transfer/ui/update_check.dart';
+import 'package:local_transfer/ui/update_install.dart';
 import 'package:local_transfer/ui/update_notice.dart';
 
 import '../support/ui_harness.dart';
 
-/// The rail's update entry: when it is there, what the hover says, and where a
-/// press goes.
+/// The rail's update entry: when it is there, what the hover says, and what a
+/// press does.
 ///
 /// This is one requirement of the release round — 「有版本更新时，做左侧菜单栏最
 /// 下方显示"更新"按钮，鼠标滑过时显示要升级更新的版本号」 — and it can only be
 /// asserted because of two seams. The answer comes from [ScriptedUpdateChecker],
-/// so nothing here asks GitHub; the press lands in [ScriptedLinkOpener], so
-/// nothing here starts a browser on the machine running the suite. Both matter
-/// more than usual for this feature: the question is asked by the application
+/// so nothing here asks GitHub; the press lands in [ScriptedUpdateInstaller],
+/// so nothing here replaces the folder the suite runs from. Both matter more
+/// than usual for this feature: the question is asked by the application
 /// coming up rather than by a button, so a test that forgot the first seam would
 /// leave a real request behind.
+///
+/// The press *installs* rather than opening a browser, which is the other half
+/// of the requirement: a user who has been told a newer build exists should not
+/// then have to go and fetch it by hand. The rail has nowhere to put a download
+/// — so what it does is bring the About card forward, which is where the
+/// download, the question before closing and the failure sentence live. The
+/// assertions below therefore check both halves: that the shell switched to
+/// that surface, and that the card was handed the press.
 ///
 /// The notice is built here and handed to the shell rather than made inside it
 /// — see `HomeShell.update` — which is what lets a test put a known answer in
@@ -139,42 +149,91 @@ void main() {
     await shutdown(tester, [device]);
   });
 
-  testWidgets('opens the release it names when pressed', (tester) async {
-    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
-    final links = ScriptedLinkOpener.install();
-    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
-
-    await tester.tap(updateEntry(windowA));
-    await tester.pump();
-
-    expect(links.opened, [
-      'https://github.com/menghun3-cn/zhu-ye-local-im/releases/tag/v0.1.7',
-    ]);
-
-    await shutdown(tester, [device]);
-  });
-
-  testWidgets('falls back to the download page when the answer names none', (
+  testWidgets('installs what it names when pressed, on the About surface', (
     tester,
   ) async {
     final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
-    final links = ScriptedLinkOpener.install();
-    await pumpWindow(
-      tester,
-      device,
-      // A release whose `html_url` was missing. Pressing the entry still has to
-      // go somewhere a person can download from, and the place they would have
-      // gone by hand is the one the About card falls back to as well.
-      update: await noticeSaying(
-        const UpdateCheck(UpdateOutcome.available, version: '0.1.7'),
+    final installer = ScriptedUpdateInstaller.replace(
+      supported: true,
+      prepared: const PreparedUpdate.installer(
+        'LocalTransfer-0.1.7-windows-x64-setup.exe',
       ),
     );
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
 
     await tester.tap(updateEntry(windowA));
-    await tester.pump();
+    await settleRoute(tester);
 
-    expect(links.opened, [updateReleasesPage]);
+    // The press goes nowhere near a browser: the whole point of the entry is
+    // that a user who has been told a newer build exists should not have to go
+    // and fetch it by hand.
+    expect(find.byType(ScriptedLinkOpener), findsNothing);
 
+    // It hands the job to the About card, which is the one surface with room
+    // for a download's progress and the question before closing.
+    expect(selectedSurface(tester, window: windowA), aboutSurface);
+    expect(installer.askedFor.single.version, '0.1.7');
+    await shutdown(tester, [device]);
+  });
+
+  testWidgets('asks before anything closes, exactly as the card does', (
+    tester,
+  ) async {
+    // The rail's press is the About card's own install, not a second one: if it
+    // skipped the question, a user who pressed an entry on a rail would lose
+    // their window without ever being asked — which is the one thing the
+    // question exists to prevent.
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    final installer = ScriptedUpdateInstaller.replace(
+      supported: true,
+      prepared: const PreparedUpdate.installer(
+        'LocalTransfer-0.1.7-windows-x64-setup.exe',
+      ),
+    );
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
+
+    await tester.tap(updateEntry(windowA));
+    await pumpUntil(
+      tester,
+      () => dialogIsOpen(windowA),
+      description: 'the update to ask before anything closes',
+    );
+
+    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
+    expect(installer.applied, isEmpty);
+
+    await tapDialogButton(tester, l10n.aboutUpdateConfirmApply, window: windowA);
+
+    expect(
+      installer.applied.single.package,
+      'LocalTransfer-0.1.7-windows-x64-setup.exe',
+    );
+    await shutdown(tester, [device]);
+  });
+
+  testWidgets('says so on the card when the install cannot happen', (
+    tester,
+  ) async {
+    // A release without the file a copy of this shape needs. The entry is drawn
+    // from an answer that carries a version, so the press still goes somewhere —
+    // and what it lands on is the failure sentence rather than a browser.
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      failure: UpdateInstallFailure.noAsset,
+    );
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
+
+    await tester.tap(updateEntry(windowA));
+    await pumpUntil(
+      tester,
+      () => onPage(windowA, AboutPage, find.text(l10n.updateFailureNoAsset))
+          .evaluate()
+          .isNotEmpty,
+      description: 'the failure to reach the card',
+    );
+
+    expect(selectedSurface(tester, window: windowA), aboutSurface);
     await shutdown(tester, [device]);
   });
 

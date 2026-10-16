@@ -42,6 +42,7 @@ class ConversationView extends StatefulWidget {
     required this.peer,
     this.defaultIncomingDirectory,
     this.header,
+    this.autoFocusComposer = false,
   });
 
   /// The Device this conversation is with.
@@ -56,6 +57,15 @@ class ConversationView extends StatefulWidget {
   /// [Scaffold] of its own to put one in; the pushed page passes null because
   /// its [AppBar] already names the peer.
   final Widget? header;
+
+  /// Whether the composer's field should take focus when this view appears.
+  ///
+  /// The one case for it is *arriving* at a conversation — from the rail, from
+  /// a row in the list, or from the Devices surface — where the user's next
+  /// act is nearly always to type. A conversation that was merely rebuilt (the
+  /// controller ticking while the user reads it elsewhere) must not steal
+  /// focus, which is why this is opt-in per arrival rather than always on.
+  final bool autoFocusComposer;
 
   @override
   State<ConversationView> createState() => _ConversationViewState();
@@ -382,6 +392,7 @@ class _ConversationViewState extends State<ConversationView> {
             onSend: () => _sendMessage(controller),
             onPaste: () => _pasteIntoComposer(controller),
             onAttach: canSend ? () => unawaited(_pickFiles()) : null,
+            autoFocus: widget.autoFocusComposer,
           ),
         ],
       ),
@@ -434,6 +445,7 @@ class ConversationComposer extends StatefulWidget {
     required this.onAttach,
     this.attachments = const [],
     this.onRemoveAttachment,
+    this.autoFocus = false,
   });
 
   /// The text being typed. Owned by the caller so it survives a rebuild.
@@ -463,12 +475,38 @@ class ConversationComposer extends StatefulWidget {
   /// staged, which is the same condition as [onAttach] being null.
   final ValueChanged<int>? onRemoveAttachment;
 
+  /// Whether to request focus for the input field on the next frame.
+  ///
+  /// Used when the user switches to this conversation (via tab, list selection,
+  /// or external request) so they can start typing immediately.
+  final bool autoFocus;
+
   @override
   State<ConversationComposer> createState() => _ConversationComposerState();
 }
 
 class _ConversationComposerState extends State<ConversationComposer> {
   final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(ConversationComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.autoFocus && widget.autoFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -505,7 +543,7 @@ class _ConversationComposerState extends State<ConversationComposer> {
           color: colors.toolbarBackground,
           border: Border(top: BorderSide(color: colors.divider)),
         ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,51 +559,74 @@ class _ConversationComposerState extends State<ConversationComposer> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // The paperclip is on the same line as the field and the send,
-                // so it takes the same height as both — see
-                // [WeChat.composerControl]. Stretched rather than pinned, so
-                // that when the field grows to six lines the paperclip keeps
-                // its place at the bottom of the row rather than floating in
-                // the middle of it.
-                SizedBox(
-                  height: WeChat.composerControl,
-                  child: IconButton(
-                    onPressed: widget.onAttach,
-                    tooltip: l10n.menuSendFile,
-                    icon: const Icon(Icons.attach_file, size: 20),
-                    color: colors.secondaryText,
-                    visualDensity: VisualDensity.compact,
+                // The design's `.btn--ghost.btn--icon`: a square of the same
+                // height as the send button, hairline border, nothing but the
+                // + in it. It is the quietest of the three controls on this
+                // line — the send is the action and the box is the subject,
+                // and this only offers what can be attached.
+                //
+                // Bottom-aligned rather than centred: the box beside it is a
+                // step taller (the design's `.composer__box` is 44 against a
+                // button's 34), and `align-items: flex-end` is what the design
+                // does with the difference.
+                // A [Tooltip] rather than the `tooltip:` the `.icon`
+                // constructors take: [OutlinedButton] has no such parameter
+                // — only `OutlinedButton.icon` does, and this button is not
+                // an icon-button pair. Wrapping the box keeps the hover
+                // affordance without reshaping the control.
+                Tooltip(
+                  message: l10n.menuSendFile,
+                  child: SizedBox(
+                    width: WeChat.composerControl,
+                    height: WeChat.composerControl,
+                    child: OutlinedButton(
+                      onPressed: widget.onAttach,
+                      style: ButtonStyle(
+                        backgroundColor: WidgetStateProperty.resolveWith((
+                          states,
+                        ) {
+                          return states.contains(WidgetState.hovered)
+                              ? colors.listHover
+                              : Colors.transparent;
+                        }),
+                        foregroundColor: WidgetStatePropertyAll(
+                          colors.bubbleText,
+                        ),
+                        side: WidgetStateProperty.resolveWith((states) {
+                          return BorderSide(
+                            color: states.contains(WidgetState.hovered)
+                                ? colors.disabledText
+                                : colors.borderStrong,
+                          );
+                        }),
+                        shape: const WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(
+                              Radius.circular(WeChat.controlRadius),
+                            ),
+                          ),
+                        ),
+                        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                        minimumSize: const WidgetStatePropertyAll(
+                          Size(WeChat.composerControl, WeChat.composerControl),
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Icon(Icons.add, size: 18),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Container(
-                    // The field's own box, drawn here rather than by the
-                    // `InputDecorationTheme`: the theme now gives every field on
-                    // every other surface an outline, and *this* one wants none
-                    // — it sits inside a fill that is the outline, which is what
-                    // the desktop client's composer looks like.
-                    constraints: const BoxConstraints(
-                      minHeight: WeChat.composerControl,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: _ComposerField(
-                      controller: widget.message,
-                      focusNode: _focus,
-                      hint: l10n.messageHint,
-                      onSend: _send,
-                      onPaste: widget.onPaste,
-                    ),
+                  child: _ComposerField(
+                    controller: widget.message,
+                    focusNode: _focus,
+                    hint: l10n.messageHint,
+                    onSend: _send,
+                    onPaste: widget.onPaste,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 _SendButton(label: l10n.send, onPressed: _send),
               ],
             ),
@@ -600,6 +661,14 @@ class _ConversationComposerState extends State<ConversationComposer> {
 /// answers a soft keyboard's send key — on Android, where this is the only
 /// Enter there is — and any platform that reports the action rather than the
 /// key. Both roads lead to the same [onSend].
+/// The field, and the box the design draws around it.
+///
+/// The box is drawn here rather than by the parent because it has two states:
+/// at rest it is a hairline of [WeChatColors.borderStrong], and while the field
+/// holds focus the hairline becomes [WeChatColors.brandStrong] with a 3px ring
+/// of [WeChatColors.brandSoft] around it — the design's
+/// `:focus-within` on `.composer__box`. That is one `ListenableBuilder` on the
+/// focus node, which is why the two cannot live apart.
 class _ComposerField extends StatelessWidget {
   const _ComposerField({
     required this.controller,
@@ -677,94 +746,134 @@ class _ComposerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
-    return Shortcuts(
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.enter): SendMessageIntent(),
-        // The same intent under the numpad's key, which is a distinct
-        // logical key and would otherwise do nothing on a full-size keyboard.
-        SingleActivator(LogicalKeyboardKey.numpadEnter): SendMessageIntent(),
-        // Shift+Enter, both keys again, and claimed rather than left alone.
-        // An enter key that no table answers is translated by the engine into
-        // the field's `textInputAction`, which is a send — so "leaving it to
-        // the default line break" is what makes Shift+Enter send. See the doc
-        // on this widget for the whole of that.
-        SingleActivator(LogicalKeyboardKey.enter, shift: true):
-            InsertLineBreakIntent(),
-        SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
-            InsertLineBreakIntent(),
-        // Paste, claimed so that a file or a picture on the clipboard can
-        // become a message. Both chords: a desktop has one and a Mac the other,
-        // and this is the same one line either way.
-        SingleActivator(LogicalKeyboardKey.keyV, control: true):
-            PasteIntoComposerIntent(),
-        SingleActivator(LogicalKeyboardKey.keyV, meta: true):
-            PasteIntoComposerIntent(),
-      },
-      child: Actions(
-        actions: {
-          SendMessageIntent: CallbackAction<SendMessageIntent>(
-            onInvoke: (_) {
-              onSend();
-              return null;
+    // The box's two states, in one builder: the border colour and the ring are
+    // both functions of whether this field holds focus, so they rebuild
+    // together rather than as two things that could disagree.
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          // The design's `.composer__box`: 44px minimum, hairline border,
+          // `--r-lg` rounding, and a soft brand ring while focused. The box is
+          // the outline — the field inside draws none of its own.
+          constraints: const BoxConstraints(minHeight: WeChat.fieldHeight),
+          padding: const EdgeInsets.symmetric(horizontal: WeChat.fieldHPadding),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(WeChat.cardRadius),
+            border: Border.all(
+              color: focused ? colors.brandStrong : colors.borderStrong,
+            ),
+            boxShadow: focused
+                ? [
+                    BoxShadow(
+                      color: colors.brandSoft,
+                      spreadRadius: 3,
+                      blurRadius: 0,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Shortcuts(
+            shortcuts: const {
+              SingleActivator(LogicalKeyboardKey.enter): SendMessageIntent(),
+              // The same intent under the numpad's key, which is a distinct
+              // logical key and would otherwise do nothing on a full-size
+              // keyboard.
+              SingleActivator(LogicalKeyboardKey.numpadEnter):
+                  SendMessageIntent(),
+              // Shift+Enter, both keys again, and claimed rather than left
+              // alone. An enter key that no table answers is translated by the
+              // engine into the field's `textInputAction`, which is a send —
+              // so "leaving it to the default line break" is what makes
+              // Shift+Enter send. See the doc on this widget for the whole of
+              // that.
+              SingleActivator(LogicalKeyboardKey.enter, shift: true):
+                  InsertLineBreakIntent(),
+              SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
+                  InsertLineBreakIntent(),
+              // Paste, claimed so that a file or a picture on the clipboard can
+              // become a message. Both chords: a desktop has one and a Mac the
+              // other, and this is the same one line either way.
+              SingleActivator(LogicalKeyboardKey.keyV, control: true):
+                  PasteIntoComposerIntent(),
+              SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+                  PasteIntoComposerIntent(),
             },
-          ),
-          InsertLineBreakIntent: CallbackAction<InsertLineBreakIntent>(
-            onInvoke: (_) {
-              _breakLine();
-              return null;
-            },
-          ),
-          PasteIntoComposerIntent: CallbackAction<PasteIntoComposerIntent>(
-            onInvoke: (_) {
-              // The clipboard is read asynchronously but a key handler has to
-              // answer now: claiming the chord is what stops the field from
-              // pasting text underneath us, and the fallback runs afterwards.
-              unawaited(_paste());
-              return null;
-            },
-          ),
-        },
-        child: TextField(
-          controller: controller,
-          focusNode: focusNode,
-          minLines: 1,
-          maxLines: 6,
-          // What a soft keyboard's send key reports, and what a test drives
-          // with `TextInputAction.send`. Neither physical Enter chord reaches
-          // it: both are claimed by the [Shortcuts] layer above, and that is
-          // the point of claiming them — this action cannot tell them apart.
-          textInputAction: TextInputAction.send,
-          onSubmitted: (_) => onSend(),
-          style: TextStyle(
-            fontSize: WeChat.fontSizeInput,
-            height: WeChat.lineHeightBody,
-            color: colors.bubbleText,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            isDense: true,
-            // Every outline the theme would draw, turned off for this one
-            // field. The box around it is the [Container] above; a second line
-            // inside that box would be the field drawing its own frame inside
-            // the composer's.
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
-            // And no minimum height either: the [Container] is what decides how
-            // tall this is, and the theme's 44 would fight it — the box would
-            // grow to hold a field that is already taller than it needs to be.
-            constraints: const BoxConstraints(),
-            contentPadding: EdgeInsets.zero,
-            hintStyle: TextStyle(
-              fontSize: WeChat.fontSizeInput,
-              color: colors.secondaryText,
+            child: Actions(
+              actions: {
+                SendMessageIntent: CallbackAction<SendMessageIntent>(
+                  onInvoke: (_) {
+                    onSend();
+                    return null;
+                  },
+                ),
+                InsertLineBreakIntent: CallbackAction<InsertLineBreakIntent>(
+                  onInvoke: (_) {
+                    _breakLine();
+                    return null;
+                  },
+                ),
+                PasteIntoComposerIntent: CallbackAction<PasteIntoComposerIntent>(
+                  onInvoke: (_) {
+                    // The clipboard is read asynchronously but a key handler
+                    // has to answer now: claiming the chord is what stops the
+                    // field from pasting text underneath us, and the fallback
+                    // runs afterwards.
+                    unawaited(_paste());
+                    return null;
+                  },
+                ),
+              },
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                minLines: 1,
+                maxLines: 6,
+                // What a soft keyboard's send key reports, and what a test
+                // drives with `TextInputAction.send`. Neither physical Enter
+                // chord reaches it: both are claimed by the [Shortcuts] layer
+                // above, and that is the point of claiming them — this action
+                // cannot tell them apart.
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => onSend(),
+                style: TextStyle(
+                  fontSize: WeChat.fontSizeInput,
+                  height: WeChat.lineHeightBody,
+                  color: colors.bubbleText,
+                ),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  isDense: true,
+                  // Every outline the theme would draw, turned off for this
+                  // one field. The box around it is the [AnimatedContainer]
+                  // above; a second line inside that box would be the field
+                  // drawing its own frame inside the composer's.
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  // And no minimum height either: the box is what decides how
+                  // tall this is, and the theme's 44 would fight it — the box
+                  // would grow to hold a field that is already taller than it
+                  // needs to be.
+                  constraints: const BoxConstraints(),
+                  contentPadding: EdgeInsets.zero,
+                  hintStyle: TextStyle(
+                    fontSize: WeChat.fontSizeInput,
+                    color: colors.secondaryText,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -798,12 +907,11 @@ class PasteIntoComposerIntent extends Intent {
 
 /// The composer's send button: a flat green pill, as the desktop client has.
 ///
-/// Sized to *the field beside it* rather than to a text button's own idea of
-/// how small it can be. The two sit on one line with the attachment button, and
-/// a control that is visibly shorter than the box it is sending from is the
-/// thing a user reported — the pill was about thirty pixels tall against a
-/// composer twice that, which read as an afterthought. [WeChat.composerControl]
-/// is the one height all three controls on this line share.
+/// Sized to the design's `.btn--primary`: 34 tall, 14 of padding either side,
+/// the label at `--fs-label` in 600 weight, with the arrow that follows it. It
+/// is a step shorter than the box it sends from — the design aligns the three
+/// controls on their *bottoms*, not their tops — which is why the height here
+/// is [WeChat.composerControl] and not [WeChat.fieldHeight].
 class _SendButton extends StatelessWidget {
   const _SendButton({required this.label, required this.onPressed});
 
@@ -820,24 +928,42 @@ class _SendButton extends StatelessWidget {
         foregroundColor: WidgetStatePropertyAll(colors.onBrandStrong),
         shape: const WidgetStatePropertyAll(
           RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(6)),
+            borderRadius: BorderRadius.all(
+              Radius.circular(WeChat.controlRadius),
+            ),
           ),
         ),
         // Wider than the theme's standard button: this one carries a word
         // rather than a pair of words, and it sits at the end of a line where a
         // narrow pill would read as a chip.
         padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 20),
+          EdgeInsets.symmetric(horizontal: 14),
         ),
         minimumSize: const WidgetStatePropertyAll(
           Size(0, WeChat.composerControl),
         ),
-        tapTargetSize: MaterialTapTargetSize.padded,
+        // Shrink-wrapped so the drawn height *is* the design's 34: the padded
+        // default would report 48 — `kMinInteractiveDimension` — while the
+        // child stayed at 34, and the row would show a button taller than the
+        // box it sits beside. The hit area is the button itself, which is what
+        // the design draws.
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: WeChat.fontSizeBody),
+          TextStyle(
+            fontSize: WeChat.fontSizeLabel,
+            fontWeight: FontWeight.w600,
+            height: 1,
+          ),
         ),
       ),
-      child: Text(label),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 8),
+          const Icon(Icons.arrow_forward, size: 15),
+        ],
+      ),
     );
   }
 }
