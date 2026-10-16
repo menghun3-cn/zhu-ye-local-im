@@ -295,6 +295,19 @@ void main() {
         throwsA(isA<FileSystemException>()),
       );
     });
+
+    test('startDetached waits for the process to start before returning', () async {
+      // The hand-over window exits the moment startDetached answers. A
+      // fire-and-forget start would let the old build vanish while nobody had
+      // created the new one yet, so the failure to start has to surface here
+      // rather than be lost in an unawaited future.
+      await expectLater(
+        startDetached(
+          'definitely-not-a-real-executable-${DateTime.now().microsecondsSinceEpoch}',
+        ),
+        throwsA(isA<ProcessException>()),
+      );
+    });
   });
 
   group('the report a hand-over leaves', () {

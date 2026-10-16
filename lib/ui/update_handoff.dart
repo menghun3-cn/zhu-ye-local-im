@@ -81,7 +81,9 @@ class _UpdateHandoffScreenState extends State<UpdateHandoffScreen> {
       // the frame's own thread would freeze the progress that is the one thing
       // telling the user this is not a crash.
       final executable = await Isolate.run(widget.handoff.putInPlace);
-      startDetached(executable);
+      // The new process must actually exist before the old one goes away:
+      // exiting early can leave the update finished but nobody restarted.
+      await startDetached(executable);
       // The build that was just started is the window the user asked for. This
       // one has nothing left to do and must not stay in front of it.
       exit(0);

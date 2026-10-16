@@ -736,8 +736,13 @@ final class UpdateHandoff {
 }
 
 /// Starts [executable] with no arguments, detached from this process.
-void startDetached(String executable) {
-  Process.start(executable, const [], mode: ProcessStartMode.detached);
+///
+/// The await is the point rather than a nicety: the caller is the replacement
+/// build, which hands control back by exiting the instant the new window is on
+/// its way. Exiting before [Process.start] has actually created the process
+/// would let the old build disappear without the new one ever coming up.
+Future<void> startDetached(String executable) async {
+  await Process.start(executable, const [], mode: ProcessStartMode.detached);
 }
 
 /// [path], with [root] taken off the front and `/` as the separator.
