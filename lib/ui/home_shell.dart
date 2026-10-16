@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../core/core.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
-import 'external_links.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'pages/about_page.dart';
 import 'pages/clipboard_page.dart';
@@ -29,7 +28,30 @@ import 'wechat/theme.dart';
 /// would be five constants kept in step with a list for no gain.
 const int _conversationsSurface = 0;
 
+/// Where the About surface sits, named for the one thing outside the index list
+/// that has to know it.
+///
+/// The rail's update entry brings this surface forward: it has nowhere to *put*
+/// an update — no room for a download's progress, for the question before
+/// closing, or for the sentence an attempt ends in — and this card has all
+/// three. Writing the index once is what keeps the entry and the About
+/// destination agreeing; two spellings of it would be two chances for the entry
+/// to open a surface that is not the one it thinks it is.
+///
+/// Named beside [_conversationsSurface] rather than beside it in a list: that
+/// one is the leading surface and reads first, this one is an exception and is
+/// only written by machinery.
+const int _aboutSurface = 5;
+
 /// The six surfaces, and the way between them.
+///
+/// The About surface doubles as where an update is carried out. That is worth
+/// stating here rather than leaving it to the About page's own documentation,
+/// because it is a fact about the *shell's* indices: the rail's update entry
+/// switches to it rather than leaving the application, so pressing that entry
+/// moves the same selection a press on the About destination moves. The two are
+/// kept in step by [_aboutSurface] being written once, which is the whole of why
+/// the constant exists — see its own doc.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
   const HomeShell({super.key, required this.seams, this.update});
@@ -64,6 +86,27 @@ class _HomeShellState extends State<HomeShell> {
   /// the case this exists for: the user asked to talk to somebody, so the tab
   /// changes and that conversation is already open.
   Fingerprint? _requestedConversation;
+
+  /// How many times the user has been brought to the Conversations surface.
+  ///
+  /// Arriving at a conversation is arriving *to type in it*: the next act is
+  /// nearly always a message, and a composer that waits to be clicked first
+  /// makes the user pay a click for something they already asked for. The
+  /// page owns the field, so the shell cannot focus it — what it can say is
+  /// "the user just asked for this surface", which is what this counter
+  /// carries. A counter rather than a bool, so that asking twice asks twice:
+  /// leaving the surface and coming back is a second arrival, not a repeat
+  /// of the first.
+  int _conversationArrivals = 0;
+
+  /// How many times the rail's update entry has been pressed.
+  ///
+  /// The entry is where a user presses "install the newer build", and the
+  /// About card is where an install is carried out — see [_aboutSurface]. A
+  /// counter rather than a call, because the shell cannot reach into a page
+  /// that is built in the `IndexedStack` below: what travels down is the
+  /// count, and the card answers the change.
+  int _installRequests = 0;
 
   StreamSubscription<PairingRequest>? _requests;
 
@@ -115,6 +158,43 @@ class _HomeShellState extends State<HomeShell> {
     setState(() {
       _requestedConversation = peer;
       _index = _conversationsSurface;
+      _conversationArrivals++;
+    });
+  }
+
+  /// Brings surface [index] forward, counting it as an arrival when it is the
+  /// Conversations one.
+  ///
+  /// Both roads into a surface go through here — the rail and the bottom bar
+  /// hand their selections to it — so "the user asked for this tab" has one
+  /// answer rather than two that could drift apart.
+  void _select(int index) {
+    setState(() {
+      _index = index;
+      if (index == _conversationsSurface) _conversationArrivals++;
+    });
+  }
+
+  /// Brings the About surface forward and asks it to install what was found.
+  ///
+  /// What the rail's update entry does when it is pressed. It used to leave the
+  /// application for a browser, which made a user who had just been told a newer
+  /// build exists go and fetch it by hand — the one thing an entry pinned to the
+  /// rail should save them. It installs instead: the answer the entry was drawn
+  /// from is *already here*, on the notice that found it, and the About card
+  /// carries the whole of what an install does.
+  ///
+  /// The card is where the work happens rather than here, because the rail has
+  /// nowhere to put any of it: 72 pixels holds neither a download's progress,
+  /// nor the question an update asks before it closes this program, nor the
+  /// sentence an attempt ends in. So the shell switches to the one surface that
+  /// has all three and passes the count down; the card answers the change, and
+  /// a press that arrives while one is already under way is dropped rather than
+  /// queued — two downloads of one package is one too many.
+  void _installUpdate() {
+    setState(() {
+      _index = _aboutSurface;
+      _installRequests++;
     });
   }
 
@@ -138,6 +218,7 @@ class _HomeShellState extends State<HomeShell> {
       ConversationsPage(
         defaultIncomingDirectory: incoming,
         requestedPeer: _requestedConversation,
+        focusRequest: _conversationArrivals,
       ),
       DevicesPage(
         defaultIncomingDirectory: incoming,
@@ -146,7 +227,10 @@ class _HomeShellState extends State<HomeShell> {
       TransfersPage(defaultIncomingDirectory: incoming),
       const ClipboardPage(),
       SettingsPage(seams: widget.seams),
-      const AboutPage(),
+      AboutPage(
+        offeredUpdate: widget.update?.answer,
+        installRequest: _installRequests,
+      ),
     ];
     final destinations = <NavigationDestination>[
       NavigationDestination(
@@ -220,8 +304,7 @@ class _HomeShellState extends State<HomeShell> {
               children: [
                 NavigationRail(
                   selectedIndex: _index,
-                  onDestinationSelected: (index) =>
-                      setState(() => _index = index),
+                  onDestinationSelected: _select,
                   labelType: NavigationRailLabelType.all,
                   // The update entry is pinned rather than listed with the six.
                   // It is not a surface: pressing it leaves the application for
@@ -236,16 +319,18 @@ class _HomeShellState extends State<HomeShell> {
                           listenable: notice,
                           builder: (context, _) {
                             final version = notice.version;
-                            final url = notice.url;
                             // Nothing to say while the question is out, and
                             // nothing to say when the answer is "you are up to
                             // date": an entry that is always there would be a
                             // permanent question mark on a rail whose whole job
                             // is to be a map of where things are.
-                            if (version == null || url == null) {
+                            if (version == null) {
                               return const SizedBox.shrink();
                             }
-                            return _UpdateEntry(version: version, url: url);
+                            return _UpdateEntry(
+                              version: version,
+                              onInstall: _installUpdate,
+                            );
                           },
                         ),
                   destinations: [
@@ -269,7 +354,7 @@ class _HomeShellState extends State<HomeShell> {
           ? null
           : NavigationBar(
               selectedIndex: _index,
-              onDestinationSelected: (index) => setState(() => _index = index),
+              onDestinationSelected: _select,
               destinations: destinations,
             ),
     );
@@ -286,18 +371,23 @@ class _HomeShellState extends State<HomeShell> {
 /// and two spellings of one number is one place for them to drift apart.
 ///
 /// Drawn as a [TextButton] rather than as a [NavigationRailDestination]:
-/// destinations switch the surface below, and this one leaves the application
-/// for a browser. It wears the same icon the About card's 「检查更新」 button
-/// does, so the two read as the same feature, and that icon is already in the
-/// shipped bundle's icon subset.
+/// destinations switch the surface below, and this one hands a job to it — see
+/// [_HomeShellState._installUpdate], which is what the press does. It wears the
+/// same icon the About card's 「检查更新」 button does, so the two read as the
+/// same feature, and that icon is already in the shipped bundle's icon subset.
 class _UpdateEntry extends StatelessWidget {
-  const _UpdateEntry({required this.version, required this.url});
+  const _UpdateEntry({required this.version, required this.onInstall});
 
   /// The newer version, named on the hover.
   final String version;
 
-  /// Where pressing it goes.
-  final String url;
+  /// What pressing it does: start the install.
+  ///
+  /// Handed in rather than built here, because the shell is what has to bring
+  /// the About surface forward — and a widget drawn deep inside a rail has no
+  /// way to name the shell's own selection. The entry's job ends at saying
+  /// "the user wants it"; where the work happens is the shell's decision.
+  final VoidCallback onInstall;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +401,14 @@ class _UpdateEntry extends StatelessWidget {
       child: Tooltip(
         message: l10n.aboutUpdateAvailable(version),
         child: TextButton(
-          onPressed: () => unawaited(LinkResolution.opener.open(url)),
+          // Installs rather than opens a browser: the whole point of the entry
+          // is that a user who has been told a newer build exists should not
+          // then have to go and fetch it by hand. What it does instead is
+          // hand the job to the About card, which has the room to show a
+          // download's progress, ask the one question before closing, and say
+          // how an attempt ended — so the shell switches to it and counts the
+          // press.
+          onPressed: onInstall,
           // The colours are named rather than inherited: the rail's own theme
           // styles destinations, and a `TextButton` inside one has no style of
           // its own to fall back on — it would come out in the theme's default
