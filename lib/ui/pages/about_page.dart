@@ -37,11 +37,7 @@ import '../widgets.dart';
 /// build does before its window goes away is close itself on purpose.
 class AboutPage extends StatefulWidget {
   /// Shows what this build is, installing [offeredUpdate] when asked to.
-  const AboutPage({
-    super.key,
-    this.offeredUpdate,
-    this.installRequest = 0,
-  });
+  const AboutPage({super.key, this.offeredUpdate, this.installRequest = 0});
 
   /// What the application's own update check found, when it was asked at all.
   ///

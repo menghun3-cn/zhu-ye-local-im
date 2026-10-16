@@ -202,7 +202,11 @@ void main() {
     expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
     expect(installer.applied, isEmpty);
 
-    await tapDialogButton(tester, l10n.aboutUpdateConfirmApply, window: windowA);
+    await tapDialogButton(
+      tester,
+      l10n.aboutUpdateConfirmApply,
+      window: windowA,
+    );
 
     expect(
       installer.applied.single.package,
@@ -227,9 +231,11 @@ void main() {
     await tester.tap(updateEntry(windowA));
     await pumpUntil(
       tester,
-      () => onPage(windowA, AboutPage, find.text(l10n.updateFailureNoAsset))
-          .evaluate()
-          .isNotEmpty,
+      () => onPage(
+        windowA,
+        AboutPage,
+        find.text(l10n.updateFailureNoAsset),
+      ).evaluate().isNotEmpty,
       description: 'the failure to reach the card',
     );
 
