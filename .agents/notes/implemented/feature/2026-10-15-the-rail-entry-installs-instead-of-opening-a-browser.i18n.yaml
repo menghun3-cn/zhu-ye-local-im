@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md
+#   git hash-object 2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.zh.md
+2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md: fa7c545637f47ede1f99e273ecb501efa1703ad5
+2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.zh.md: 2afa91a3676491c46ddfe8f566570ba0f25b6b04

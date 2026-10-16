@@ -40,6 +40,7 @@ class ConversationsPage extends StatefulWidget {
     super.key,
     this.defaultIncomingDirectory,
     this.requestedPeer,
+    this.focusRequest = 0,
   });
 
   /// Where a file received here lands when the user has not said otherwise.
@@ -52,6 +53,15 @@ class ConversationsPage extends StatefulWidget {
   /// it once it has been honoured, so that coming back here later opens with
   /// whatever the user last picked rather than with a stale instruction.
   final Fingerprint? requestedPeer;
+
+  /// How many times the user has been brought to this surface.
+  ///
+  /// Counted by the shell, which is the only thing that knows a tab was
+  /// pressed. A change in it means the user just asked for this surface, and
+  /// the answer to that is a composer ready to type in — the alternative is a
+  /// second click on the box for every arrival. A counter rather than a bool
+  /// so that arriving twice asks twice.
+  final int focusRequest;
 
   @override
   State<ConversationsPage> createState() => _ConversationsPageState();
@@ -74,6 +84,18 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// surface, undoing a choice the user made and then navigated away from.
   bool _untouched = true;
 
+  /// Set for one frame when the composer should take focus.
+  ///
+  /// A flag rather than a direct `FocusNode` held here, because the field
+  /// lives inside [ConversationView] — which is keyed by peer and rebuilt
+  /// whenever the selection changes — and a node held out here would be the
+  /// wrong one the moment the user opened a different conversation. The flag
+  /// travels down as `autoFocusComposer`, and the view's composer answers the
+  /// false→true edge. It comes back down in a post-frame callback: the edge is
+  /// what triggers the request, so a flag left standing would make the *next*
+  /// arrival a no-op.
+  bool _focusComposer = false;
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +115,13 @@ class _ConversationsPageState extends State<ConversationsPage> {
         _selected = requested.hex;
         _untouched = false;
       });
+    }
+    // The user has just been brought here, so the composer takes the caret.
+    // Only the *arrival* asks — a controller tick that rebuilds this page
+    // while the user reads elsewhere must not pull the caret out of whatever
+    // they are doing, which is why this is an edge and not a state.
+    if (widget.focusRequest != oldWidget.focusRequest) {
+      setState(() => _focusComposer = true);
     }
   }
 
@@ -175,6 +204,17 @@ class _ConversationsPageState extends State<ConversationsPage> {
     }
     final current = selected;
 
+    // The arrival's focus request is answered on this frame and taken back on
+    // the next: the composer asks for focus on the false→true edge, so the
+    // flag has to come down again or the following arrival would find it
+    // already true and ask for nothing.
+    final focusComposer = _focusComposer;
+    if (focusComposer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _focusComposer = false);
+      });
+    }
+
     // Opening a conversation is what reads it, and arriving here already
     // looking at one is an opening like any other — so the remembered
     // conversation is marked read on the frame that shows it, exactly as a
@@ -220,6 +260,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
               key: ValueKey(current.peer.fingerprint.hex),
               peer: current.peer.fingerprint,
               defaultIncomingDirectory: widget.defaultIncomingDirectory,
+              autoFocusComposer: focusComposer,
             ),
           ),
         ],
@@ -252,6 +293,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
                   key: ValueKey(current.peer.fingerprint.hex),
                   peer: current.peer.fingerprint,
                   defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                  autoFocusComposer: focusComposer,
                   header: _PaneHeader(
                     title: current.peer.displayName,
                     // The address, and — when the Session has gone — that it

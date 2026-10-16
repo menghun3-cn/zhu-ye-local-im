@@ -36,8 +36,34 @@ import '../widgets.dart';
 /// process asks first — [_ConfirmUpdateDialog] — because the last thing this
 /// build does before its window goes away is close itself on purpose.
 class AboutPage extends StatefulWidget {
-  /// Shows what this build is.
-  const AboutPage({super.key});
+  /// Shows what this build is, installing [offeredUpdate] when asked to.
+  const AboutPage({
+    super.key,
+    this.offeredUpdate,
+    this.installRequest = 0,
+  });
+
+  /// What the application's own update check found, when it was asked at all.
+  ///
+  /// Handed down by the shell from the notice it already holds — see
+  /// `UpdateNotice`, which is asked once as the application comes up — so that
+  /// the rail's update entry can start an install on a card that has not been
+  /// opened and asked first. It is *not* shown for that reason alone: the
+  /// answer is adopted only when a request arrives, which is what keeps this
+  /// card saying nothing until somebody asks it something.
+  final UpdateCheck? offeredUpdate;
+
+  /// How many times the user has asked for the newer build to be installed.
+  ///
+  /// Counted by the shell, which is the only thing that knows the rail's
+  /// update entry was pressed. A change in it is that press arriving: the
+  /// rail has no room for a download's progress, the question before closing
+  /// or the sentence an attempt ends in, and this card has all three — so the
+  /// entry hands the work here rather than duplicating it in a 72-pixel strip.
+  ///
+  /// A counter rather than a pending flag, so that two presses are two
+  /// installs and a rebuild in between is not one.
+  final int installRequest;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -85,6 +111,18 @@ class _AboutPageState extends State<AboutPage> {
     _leftOver = UpdateInstallResolution.installer.previousFailure();
   }
 
+  @override
+  void didUpdateWidget(AboutPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The rail's entry was pressed. The answer it was drawn from is adopted
+    // first: the card may never have been asked, and an install needs a
+    // version to fetch.
+    final installRequest = widget.installRequest;
+    if (installRequest == oldWidget.installRequest) return;
+    if (_asking || _busy) return;
+    unawaited(_install(offered: widget.offeredUpdate ?? _answer));
+  }
+
   /// Whether an update is in flight.
   bool get _busy => _progress != null;
 
@@ -116,9 +154,17 @@ class _AboutPageState extends State<AboutPage> {
   /// process, because the files it replaces are open until it does, so the user
   /// is asked before anything closes: on success this does not come back, and
   /// what the page shows after that call is the last thing the old build draws.
-  Future<void> _install() async {
-    final answer = _answer;
+  ///
+  /// [offered] is the answer to install when the caller has one this page was
+  /// never asked for — the rail's update entry, pressing straight through to
+  /// here from the application's own check. It defaults to what this card last
+  /// asked, which is the road this page's own button takes. Either way the
+  /// answer is adopted as this page's own, so the card describes the update it
+  /// is carrying out rather than staying silent about one that is under way.
+  Future<void> _install({UpdateCheck? offered}) async {
+    final answer = offered ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
+    setState(() => _answer = answer);
     var prepared = _prepared;
     if (prepared == null) {
       setState(() {
