@@ -1811,15 +1811,17 @@ void main() {
       // Asserted on Bob's row specifically rather than on "some selected row":
       // the surface opens whatever was remembered, so a row that happened to be
       // first would satisfy a weaker assertion while the feature did nothing.
-      final rows = tester.widgetList<ConversationRow>(
-        onPage(
-          windowA,
-          ConversationsPage,
-          find.byWidgetPredicate(
-            (widget) => widget is ConversationRow && widget.selected,
-          ),
-        ),
-      ).toList();
+      final rows = tester
+          .widgetList<ConversationRow>(
+            onPage(
+              windowA,
+              ConversationsPage,
+              find.byWidgetPredicate(
+                (widget) => widget is ConversationRow && widget.selected,
+              ),
+            ),
+          )
+          .toList();
       expect(
         rows,
         hasLength(1),
