@@ -64,6 +64,15 @@ const int transfersSurface = 2;
 const int clipboardSurface = 3;
 const int settingsSurface = 4;
 
+/// Where the About surface sits, and the sixth of the ordered list.
+///
+/// Named for the same reason the first five are: a test that pressed a tab and
+/// then asserted which surface came up would be reading the shell's own
+/// ordering back to itself. It earns its own name twice over, because the
+/// rail's update entry switches here rather than leaving the application — the
+/// test of that needs a number to press against.
+const int aboutSurface = 5;
+
 /// The strings the windows under test are showing.
 ///
 /// Looked up from the same generated class the application reads, for the same

@@ -1762,6 +1762,95 @@ void main() {
 
       await shutdown(tester, [alice, bob, carol]);
     });
+
+    testWidgets('coming back to the menu reopens the last conversation, '
+        'ready to type in', (tester) async {
+      // Two halves of one requirement. Arriving at the Conversations surface
+      // is coming back to where you were — the row that was open is open again
+      // — and it is arriving *to type*: a composer that waits to be clicked
+      // first makes the user pay a click for something they already asked for.
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == bob.fingerprint,
+        description: 'Bob to be the remembered conversation',
+      );
+
+      // Somewhere else for a while — the whole point of the requirement is the
+      // *return*, and a return from nowhere tests nothing.
+      await openTab(tester, l10n.tabSettings, window: windowA);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text(l10n.messageHint),
+        ).evaluate().isNotEmpty,
+        description: 'the last conversation to be open again',
+      );
+
+      // The first half: it is *selected*, not merely rebuilt. A rebuilt row with
+      // no selection would open the conversation while looking like none was
+      // picked — and the requirement says the row is what comes back.
+      //
+      // Asserted on Bob's row specifically rather than on "some selected row":
+      // the surface opens whatever was remembered, so a row that happened to be
+      // first would satisfy a weaker assertion while the feature did nothing.
+      final rows = tester.widgetList<ConversationRow>(
+        onPage(
+          windowA,
+          ConversationsPage,
+          find.byWidgetPredicate(
+            (widget) => widget is ConversationRow && widget.selected,
+          ),
+        ),
+      ).toList();
+      expect(
+        rows,
+        hasLength(1),
+        reason: 'exactly one row is selected, and it is the one that reopened',
+      );
+      expect(
+        rows.single.peer,
+        'Bob',
+        reason: 'the selected row is the conversation that was open',
+      );
+
+      // The second half: the caret is already in the box, with no click spent
+      // on it. Asserted through the focus node rather than by typing — typing
+      // would itself give the field focus, and a test that did that would pass
+      // whether or not the arrival ever asked.
+      expect(
+        onConversation(windowA, find.byType(TextField)),
+        findsOneWidget,
+        reason: 'there is one composer to be focused',
+      );
+      expect(
+        tester
+            .widget<TextField>(onConversation(windowA, find.byType(TextField)))
+            .focusNode
+            ?.hasFocus,
+        isTrue,
+        reason: 'the composer already holds focus on arrival',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
   });
 
   group('pasting into the composer', () {
