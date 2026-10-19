@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-19-periodic-update-checks-on-a-cadence.md
+#   git hash-object 2026-10-19-periodic-update-checks-on-a-cadence.zh.md
+2026-10-19-periodic-update-checks-on-a-cadence.md: cd3fd1a554577b6474d5e988ed1f05c2fed8cd24
+2026-10-19-periodic-update-checks-on-a-cadence.zh.md: e1e946b928e3db62b698b94bf5d8c6eec5a1517d

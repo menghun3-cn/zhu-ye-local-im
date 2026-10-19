@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-19-feature-work-happens-in-worktrees.md
+#   git hash-object 2026-10-19-feature-work-happens-in-worktrees.zh.md
+2026-10-19-feature-work-happens-in-worktrees.md: cbb2217306f2f978b1281239de25fe29bc9f564e
+2026-10-19-feature-work-happens-in-worktrees.zh.md: 12ebd4b1cdc73d769712ef6def2076c177c41649

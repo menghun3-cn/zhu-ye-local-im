@@ -731,6 +731,20 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// How often this Device asks GitHub whether a newer build has been
+  /// published.
+  UpdateCheckInterval get updateCheckInterval =>
+      _local?.profile.updateCheckInterval ?? UpdateCheckInterval.hourly;
+
+  /// Sets how often the update question is asked, and persists it.
+  Future<void> setUpdateCheckInterval(UpdateCheckInterval value) async {
+    final local = _requireLocal();
+    if (local.profile.updateCheckInterval == value) return;
+    local.profile.updateCheckInterval = value;
+    await _persist();
+    _notify();
+  }
+
   /// Whether this app starts with the system.
   bool get autostartEnabled => _autostart;
 

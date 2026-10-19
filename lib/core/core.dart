@@ -47,4 +47,5 @@ export 'transfer/transfer_channel.dart';
 export 'transfer/transfer_engine.dart';
 export 'transfer/transfer_limits.dart';
 export 'transport/byte_transport.dart';
+export 'update/update_check_interval.dart';
 export 'util/crockford_base32.dart';

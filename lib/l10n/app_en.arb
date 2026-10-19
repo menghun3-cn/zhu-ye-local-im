@@ -249,6 +249,16 @@
   "settingsCloseQuit": "Quit",
   "settingsCloseToTrayHint": "The window is hidden and the app keeps running in the background, so it can still receive things.",
   "settingsCloseQuitHint": "Closing the window ends the app.",
+  "settingsUpdate": "Update checks",
+  "settingsPeriodicUpdateTitle": "Check for updates in the background",
+  "settingsPeriodicUpdateOn": "The app checks for a newer build on its own.",
+  "settingsPeriodicUpdateOff": "The app only checks when you ask it to.",
+  "settingsUpdateFrequency": "How often",
+  "settingsUpdateHint": "A check asks GitHub for the published version and sends nothing about this Device. Turning it off leaves the startup check alone.",
+  "updateIntervalHourly": "Every hour",
+  "updateIntervalSixHours": "Every 6 hours",
+  "updateIntervalDaily": "Daily",
+  "updateIntervalThreeDays": "Every 3 days",
   "factAlias": "Alias",
   "factFingerprint": "Fingerprint",
   "renameThisDevice": "Rename this Device",
@@ -259,7 +269,7 @@
   "noDefaultFolder": "no default folder",
   "nothingWentWrong": "Nothing has gone wrong.",
 
-  "aboutDescription": "Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.",
+  "aboutDescription": "Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The only thing that reaches outside is a question to GitHub about the published version — once at startup, then on the frequency you choose in Settings — and it sends no content of any kind.",
   "aboutVersion": "Version {version}",
   "@aboutVersion": {
     "placeholders": { "version": { "type": "String" } }
