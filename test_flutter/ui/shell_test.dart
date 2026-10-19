@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/nav_rail.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -96,16 +97,11 @@ void main() {
       expect(theme.colorScheme.surface, WeChatColors.light.surface);
     });
 
-    test('paints the navigation surfaces in the WeChat greys', () {
+    test('paints the navigation bar in the WeChat greys', () {
+      // The rail is not here: it is drawn by the app rather than by Material, so
+      // it takes its colours from the palette directly and has no theme slot to
+      // pin. What is left in this theme is the bar a narrow window wears.
       final theme = WeChat.theme(WeChatColors.light);
-
-      final rail = theme.navigationRailTheme;
-      expect(rail.backgroundColor, WeChatColors.light.sidebarBackground);
-      // The current surface wears the *action* green, the one every pressable
-      // control uses, on a soft green pill.
-      expect(rail.selectedIconTheme?.color, WeChatColors.light.brandStrong);
-      expect(rail.indicatorColor, WeChatColors.light.brandSoft);
-      expect(rail.unselectedIconTheme?.color, WeChatColors.light.secondaryText);
 
       final bar = theme.navigationBarTheme;
       expect(bar.backgroundColor, WeChatColors.light.toolbarBackground);
@@ -300,7 +296,7 @@ void main() {
       // The window branch is a real decision the shell makes from its width,
       // so the wide branch is asserted rather than assumed.
       expect(
-        windowA.within(find.byType(NavigationRail)),
+        windowA.within(find.byType(AppNavRail)),
         findsOneWidget,
         reason: 'a ${wideWindow.width}px window is a wide one',
       );
@@ -326,7 +322,7 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('a narrow window offers the same four as a bottom bar', (
+    testWidgets('a narrow window offers the same six as a bottom bar', (
       tester,
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
@@ -337,7 +333,7 @@ void main() {
         findsOneWidget,
         reason: 'a ${narrowWindow.width}px window is a narrow one',
       );
-      expect(windowA.within(find.byType(NavigationRail)), findsNothing);
+      expect(windowA.within(find.byType(AppNavRail)), findsNothing);
 
       final bar = windowA.within(find.byType(NavigationBar));
       final labels = [

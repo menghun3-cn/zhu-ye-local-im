@@ -16,6 +16,7 @@ import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/external_links.dart';
 import 'package:local_transfer/ui/home_shell.dart';
 import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
+import 'package:local_transfer/ui/nav_rail.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
@@ -522,7 +523,7 @@ Future<void> openTab(
 }) async {
   // The rail is the wide-window control and the bar the narrow one; whichever
   // this window built is the one to tap.
-  final rail = window.within(find.byType(NavigationRail));
+  final rail = window.within(find.byType(AppNavRail));
   final control = rail.evaluate().isNotEmpty
       ? rail
       : window.within(find.byType(NavigationBar));
@@ -970,7 +971,7 @@ Finder onConversation(TestWindow window, Finder matching) => window.within(
 /// it by — and if there were, a test would then be asserting the position
 /// twice over. A window whose rail has no entry matches nothing.
 Finder updateEntry(TestWindow window) => find.descendant(
-  of: window.within(find.byType(NavigationRail)),
+  of: window.within(find.byType(AppNavRail)),
   matching: find.ancestor(
     of: find.text(l10n.railUpdate),
     matching: find.byType(TextButton),

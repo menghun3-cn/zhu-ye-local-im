@@ -77,6 +77,66 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 工作区里还有一批**与本次需求无关**的改动（composer 改版：图标 `attach_file` → `add`、
 高度 40 → 34/44、focus-within 描边）与 README 中文化，一并留在工作区，未在本次处理。
 
+## 后续：更新执行期间所有入口置灰，确认按钮改口「更新并重启」（2026-10-19）
+
+### Problem
+
+更新执行期间按钮仍然可点。About 页的「下载并更新」在下载时本来就置灰（`_busy`），但
+同一张卡上的「检查更新」和「打开下载页」仍可点；更重要的是**左侧菜单的「更新」按钮**
+没有禁用的概念 —— 进入 About 页后用户还能再点它，第二次点击再次触发 `_install()`。
+虽然 `didUpdateWidget` 的 `if (_asking || _busy) return;` 会挡住第二次下载，但对应的是
+「点了等于没点」，不是「看得出不能点」。用户在漫长的下载、校验、解压过程中会反复点它，
+然后得到一个看起来什么都没发生的按钮。
+
+另外，确认对话框按钮叫「关闭并更新」：用户要知道的是更新完之后程序会不会自己回来，
+而这句话把动作序号反了 —— 已经下载好的前提就摆在那里，这一刻唯一的动作是**重启**。
+
+### Decision
+
+- About 页把更新过程当成**一个不可再进入的状态**：`_asking` 或 `_busy` 期间，检查更新、
+  下载并更新、打开下载页三个按钮全部置灰；失败后 `_busy` 清零，三个按钮恢复 —— 同一
+  个按钮就是重试。
+- 左侧菜单的「更新」按钮由 shell 用 `_updateLocked` 状态置灰：About 页通过新的
+  `onUpdateBusyChanged` 回调把「进入更新」「退出更新」报给 shell，rail 的 `_UpdateEntry`
+  在 `enabled: false` 时 `onPressed: null`。
+- 状态同步放在 `addPostFrameCallback` 里而不是 `_install()` 开头：rail 点击经由
+  `didUpdateWidget` 到达 About 页，而那一次仍在 build 阶段，直接 `setState` 父级
+  HomeShell 会触发 `setState() called during build`。
+- 下载完成后（`_prepared != null`）到确认框打开之间 `_busy` 为空，shell 不置灰：
+  这是为了让用户在确认框打开时再点 rail 的「更新」能命中正在等着的同一个确认框，
+  而不是静默丢弃。确认框确认后到进程结束前再次置灰。
+- 文案：确认框标题/正文/按钮从「关闭并更新」改为「更新并重启」；按钮下方那段说明里
+  的指引也同步改名。
+
+### Alternatives considered
+
+**点击一次后永远置灰** —— 失败后用户需要重试，置灰到底等于把重试入口藏起来；失败瞬间
+恢复由 `_busy` 清零自然完成。
+
+**把 busy 状态放进 `UpdateNotice` 里让 rail 直接听** —— rail 和 About 页共用通知，但
+notice 的职责是「启动时问一次」的答案；更新动作是从 About 页发起的，通知本身并不感知下载。
+让 notice 兼任会把它变成一个四处都是的全局状态。
+
+**确认框打开期间也置灰** —— 会丢掉一次「再点一次 rail 入口打开同一个确认框」的机会；
+用户双击 rail 按钮时第二次点击不应成了空气。置灰的窗口期是「真正有工作在跑」的窗口期，
+不是「等待用户回答」的窗口期。
+
+### Consequences
+
+- `lib/ui/pages/about_page.dart`：`AboutPage.onUpdateBusyChanged`；`_check`/`_install`
+  各阶段调用 `_reportBusy`；`_install` 开头与确认后经 `addPostFrameCallback` 同步，
+  避免 build 阶段 setState 父级。
+- `lib/ui/home_shell.dart`：`_updateLocked`、`_setUpdateLocked`；`_UpdateEntry`
+  增加 `enabled`，置灰时 `onPressed: null`（Material 的 disabled 样式就是置灰）。
+- `lib/l10n/app_zh.arb` / `app_en.arb`：确认框三句 + 安装说明改为「更新并重启」。
+- `test_flutter/ui/update_rail_test.dart`：新增「下载中 rail 入口置灰、失败后恢复」。
+- `test_flutter/ui/about_page_test.dart`：新增「下载中关于页三按钮全置灰、失败后恢复」。
+
+### 门禁
+
+- `flutter analyze`：无问题
+- `dart test`：574 通过
+
 ## Consequences
 
 - `lib/ui/home_shell.dart`：rail 更新按钮改为安装；新增 `_installUpdate()`；About 页接两个新参数；
