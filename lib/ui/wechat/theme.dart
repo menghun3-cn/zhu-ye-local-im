@@ -517,6 +517,67 @@ class WeChat {
   /// 线只是把两条会话轻轻分开。
   static const double conversationRowPadding = 12;
 
+  // ---------------------------------------------------------------- 导航轨
+
+  /// 导航轨的宽度。
+  ///
+  /// 84 是稿子 `.rail` 的宽度（`design-preview/styles.css`）。Material 3 的
+  /// 导航轨默认 80，而这一档要让「图标 + 文字」那一块在两侧 8 像素的留白之外
+  /// 还站得开 —— 稿子的数就是照着这个块算出来的，所以照抄，不去凑默认值。
+  static const double railWidth = 84;
+
+  /// 导航轨左右两侧的留白（稿子 `.rail` 的 `padding: 16px 8px`）。
+  static const double railHPadding = 8;
+
+  /// 导航轨上下的留白。上下同一个数：轨道是一条通高的栏，两头一样宽。
+  static const double railVPadding = 16;
+
+  /// 导航项之间的间距（稿子 `.rail` 的 `gap: 8px`）。
+  static const double railItemGap = 8;
+
+  /// 品牌位那块方形的边长（稿子 `.rail__brand` 的 40 × 40）。
+  static const double railBrandBox = 40;
+
+  /// 品牌位里那枚标记的边长（稿子那枚 SVG 的 26 × 26）。
+  static const double railBrandMark = 26;
+
+  /// 品牌位与第一个导航项之间的距离（稿子 `.rail__brand` 的 margin-bottom）。
+  ///
+  /// 与 [railItemGap] 分开数：稿子里这一段是 margin（12）之外**再**加一个
+  /// flex gap（8），品牌位因此不是「又一个导航项」。这里照加：品牌位自己带
+  /// 12，列还会给它补 8。
+  static const double railBrandGap = 12;
+
+  /// 导航项的圆角。
+  ///
+  /// 10 是稿子的 `--r-md`（导航项、头像、列表行共用的一档）。与
+  /// [avatarRadius] 取值相同而不共用：一个是头像的方，一个是能点的块，
+  /// 名字分开，改一个就不会顺手带走另一个。
+  static const double railItemRadius = 10;
+
+  /// 导航项上下各自的内边距（稿子 `.rail__item` 的 `padding: 8px 0`）。
+  ///
+  /// 没有左右：导航项是满宽的，左右两边由 [railHPadding] 一次给足。
+  static const double railItemPadding = 8;
+
+  /// 导航项里图标与文字之间的距离（稿子 `.rail__item` 的 `gap: 5px`）。
+  static const double railIconLabelGap = 5;
+
+  /// 导航项的图标边长。
+  ///
+  /// 20 是稿子 `.rail__item svg` 的尺寸，也与全站 `iconTheme` 同号。Material
+  /// 的导航轨自己会把图标放大一档，而导航项这一块由我们自己画，所以尺寸取稿子
+  /// 那个数，不跟随任何组件的默认值。
+  static const double railIconSize = 20;
+
+  /// 导航项标签的字号。
+  ///
+  /// 11 是稿子 `.rail__item` 的字号，比 [fontSizeMeta] 还小一档：它不在字阶
+  /// 上，是稿子单独给轨道写下的数 —— 导航项只有图标与文字两行，字号大一档，
+  /// 这一块就高出稿子量好的那一格。行高不在这里定：标签继承应用正文的行高
+  /// [lineHeightBody]，稿子那一页的行高是它自己的事。
+  static const double railLabelSize = 11;
+
   /// 卡片圆角。与气泡同档：一块面板和一个气泡属于同一个家族。
   static const double cardRadius = 14;
 
@@ -829,27 +890,6 @@ class WeChat {
             TextStyle(fontSize: fontSizeLabel),
           ),
         ),
-      ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: colors.sidebarBackground,
-        // The current surface is marked by a soft green pill behind it, and
-        // its icon and label wear the action green.
-        indicatorColor: colors.brandSoft,
-        selectedIconTheme: IconThemeData(color: colors.brandStrong, size: 22),
-        unselectedIconTheme: IconThemeData(
-          color: colors.secondaryText,
-          size: 22,
-        ),
-        selectedLabelTextStyle: TextStyle(
-          fontSize: fontSizeMeta,
-          color: colors.brandStrong,
-        ),
-        unselectedLabelTextStyle: TextStyle(
-          fontSize: fontSizeMeta,
-          color: colors.secondaryText,
-        ),
-        useIndicator: true,
-        elevation: 0,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colors.toolbarBackground,

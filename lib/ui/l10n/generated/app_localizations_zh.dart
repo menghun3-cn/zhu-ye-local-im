@@ -575,18 +575,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      '点「下载并更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「关闭并更新」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
+      '点「下载并更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「更新并重启」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
 
   @override
-  String get aboutUpdateConfirmTitle => '关闭并更新？';
+  String get aboutUpdateConfirmTitle => '更新并重启？';
 
   @override
   String aboutUpdateConfirmBody(String version) {
-    return '新版本 $version 已经下载完成，并核对过发布方公布的校验值。点「关闭并更新」：程序先关闭，更新完成后自动重新打开。';
+    return '新版本 $version 已经下载完成，并核对过发布方公布的校验值。点「更新并重启」：程序先关闭，更新完成后自动重新打开。';
   }
 
   @override
-  String get aboutUpdateConfirmApply => '关闭并更新';
+  String get aboutUpdateConfirmApply => '更新并重启';
 
   @override
   String get aboutUpdateReady => '更新包已就绪。再点一次「下载并更新」即可安装，不用重新下载。';
