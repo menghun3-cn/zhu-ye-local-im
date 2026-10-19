@@ -5,6 +5,7 @@ import 'package:local_transfer/core/host/close_behaviour.dart';
 import 'package:local_transfer/core/identity/fingerprint.dart';
 import 'package:local_transfer/core/identity/owner_group.dart';
 import 'package:local_transfer/core/profile/device_profile.dart';
+import 'package:local_transfer/core/update/update_check_interval.dart';
 
 Fingerprint _fp(String seed) {
   // 64 hex characters derived from a readable seed, so test intent stays
@@ -379,6 +380,84 @@ void main() {
       });
     });
 
+    group('the update-check interval', () {
+      DeviceProfile profileOf(DevicePlatform platform) =>
+          DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
+
+      test('defaults to hourly, the quiet cadence the app ships with', () {
+        expect(
+          profileOf(DevicePlatform.windows).updateCheckInterval,
+          UpdateCheckInterval.hourly,
+        );
+      });
+
+      test(
+        'a profile written before the key existed decodes to the default',
+        () {
+          final restored = DeviceProfile.fromJson({
+            'self': _fp('a').hex,
+            'alias': 'Desk',
+            'platform': 'windows',
+          });
+          expect(restored.updateCheckInterval, UpdateCheckInterval.hourly);
+        },
+      );
+
+      test('a value this build does not know decodes to the default', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'updateCheckInterval': 'weekly',
+        });
+        expect(restored.updateCheckInterval, UpdateCheckInterval.hourly);
+      });
+
+      test('a value of the wrong type decodes to the default too', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'updateCheckInterval': 3,
+        });
+        expect(restored.updateCheckInterval, UpdateCheckInterval.hourly);
+      });
+
+      test('the choice is written as its own name and read back', () {
+        final profile = profileOf(DevicePlatform.windows)
+          ..updateCheckInterval = UpdateCheckInterval.daily;
+        expect(profile.toJson()['updateCheckInterval'], 'daily');
+        expect(
+          DeviceProfile.fromJson(profile.toJson()).updateCheckInterval,
+          UpdateCheckInterval.daily,
+        );
+      });
+
+      test('the wire names are distinct and stable and duration follows', () {
+        expect(UpdateCheckInterval.off.wireName, 'off');
+        expect(UpdateCheckInterval.hourly.wireName, 'hourly');
+        expect(UpdateCheckInterval.everySixHours.wireName, 'six-hours');
+        expect(UpdateCheckInterval.daily.wireName, 'daily');
+        expect(UpdateCheckInterval.everyThreeDays.wireName, 'three-days');
+        expect(
+          UpdateCheckInterval.fromWireName('six-hours'),
+          UpdateCheckInterval.everySixHours,
+        );
+        expect(UpdateCheckInterval.fromWireName('weekly'), isNull);
+        expect(UpdateCheckInterval.off.duration, isNull);
+        expect(UpdateCheckInterval.hourly.duration, const Duration(hours: 1));
+        expect(
+          UpdateCheckInterval.everySixHours.duration,
+          const Duration(hours: 6),
+        );
+        expect(UpdateCheckInterval.daily.duration, const Duration(hours: 24));
+        expect(
+          UpdateCheckInterval.everyThreeDays.duration,
+          const Duration(hours: 72),
+        );
+      });
+    });
+
     test('canMirrorTo follows group membership, not favorites', () {
       final self = _fp('a');
       final member = _fp('b');
@@ -407,6 +486,7 @@ void main() {
         clipboardPeers: {_fp('e')},
         incomingDirectory: 'D:/shared/inbox',
         closeBehaviour: CloseBehaviour.quit,
+        updateCheckInterval: UpdateCheckInterval.everyThreeDays,
         known: {
           _fp('d').hex: KnownDevice(
             fingerprint: _fp('d'),
@@ -426,6 +506,7 @@ void main() {
       expect(restored.clipboardPeers, [_fp('e')]);
       expect(restored.incomingDirectory, 'D:/shared/inbox');
       expect(restored.closeBehaviour, CloseBehaviour.quit);
+      expect(restored.updateCheckInterval, UpdateCheckInterval.everyThreeDays);
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);
       expect(known!.alias, 'Phone');

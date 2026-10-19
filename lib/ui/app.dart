@@ -50,18 +50,23 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   LocalTransferController? _controller;
   Object? _failure;
 
-  /// Whether a newer build has been published, asked once as the app comes up.
+  /// Whether a newer build has been published, asked as the app comes up and
+  /// then on the interval the Settings surface chose.
   ///
   /// This is the single outbound request the application makes without being
-  /// asked at that moment, and it is here rather than in the shell because it is
-  /// asked once per run: the shell is rebuilt on every controller change, and a
-  /// notice created inside one would ask again each time. What it buys is the
-  /// only thing that makes an update entry worth having — the rail can say a
-  /// newer build exists before the user has thought to go looking for one.
+  /// asked at that moment, and it is here rather than in the shell because it
+  /// must outlive rebuilds: the shell is rebuilt on every controller change,
+  /// and a notice created inside one would ask again each time. What it buys is
+  /// the only thing that makes an update entry worth having — the rail can say
+  /// a newer build exists before the user has thought to go looking for one.
   ///
   /// The About card's own button still asks on demand; see [UpdateNotice] for
   /// why the two share one checker, and the About text for how the promise
   /// this application makes about the network is worded now that this exists.
+  ///
+  /// After the controller has started the notice is handed it — see
+  /// [UpdateNotice.attach] — which is what lets the scheduled questions follow
+  /// the interval the user picked on the Settings surface.
   final UpdateNotice _update = UpdateNotice();
 
   @override
@@ -112,6 +117,9 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       await controller.close();
       return;
     }
+    // The interval the user picked lives in the profile, so the timer cannot
+    // be armed until the controller has brought that profile up.
+    _update.attach(controller);
     setState(() => _controller = controller);
   }
 

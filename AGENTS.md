@@ -25,6 +25,10 @@
 
 所有 `feat` / `fix` / `chore` 分支**必须从 `develop` 切出**，并且**只能通过 PR 合回 `develop`**。
 
+**所有新功能与修复都在独立的 Git worktree 中开发**：`git worktree add -b <type>/<描述> <worktree路径> origin/develop`。
+主工作区（`F:\asc_workspace\code\aicode\zhu-ye-local-im`）只保留仓库操作与发布流程；任何代码改动都不直接
+落在主工作区里，避免并行任务、未提交的半成品互相污染。worktree 内改完、门禁全绿后再提 PR。
+
 命名：`<type>/<简短描述>`，描述用小写连字符。
 
 ```
