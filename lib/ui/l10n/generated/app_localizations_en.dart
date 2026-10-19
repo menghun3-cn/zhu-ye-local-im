@@ -601,15 +601,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
 
   @override
-  String get aboutUpdateConfirmTitle => 'Close and update?';
+  String get aboutUpdateConfirmTitle => 'Update and restart?';
 
   @override
   String aboutUpdateConfirmBody(String version) {
-    return 'Version $version has been downloaded and checked against the checksum the release published. Press Close and update: the program closes first, updates itself, and reopens when it is done.';
+    return 'Version $version has been downloaded and checked against the checksum the release published. Press Update and restart: the program closes first, updates itself, and reopens when it is done.';
   }
 
   @override
-  String get aboutUpdateConfirmApply => 'Close and update';
+  String get aboutUpdateConfirmApply => 'Update and restart';
 
   @override
   String get aboutUpdateReady =>

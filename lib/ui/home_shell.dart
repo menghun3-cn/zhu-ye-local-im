@@ -6,6 +6,7 @@ import '../core/core.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'nav_rail.dart';
 import 'pages/about_page.dart';
 import 'pages/clipboard_page.dart';
 import 'pages/conversations_page.dart';
@@ -42,6 +43,16 @@ const int _conversationsSurface = 0;
 /// one is the leading surface and reads first, this one is an exception and is
 /// only written by machinery.
 const int _aboutSurface = 5;
+
+/// How many of the six entries hang at the foot of the rail.
+///
+/// The design splits them the way a desk is split: four places to be (会话 /
+/// 设备 / 传输 / 剪贴板), and then, past the space, the two things a user visits
+/// to change something (设置 / 关于) — `design-preview/conversation.html` puts a
+/// `.rail__spacer` between the two groups. Which entries those are follows from
+/// the list's own order, so the only number the code has to write down is how
+/// many come at the end.
+const int _toolSurfaces = 2;
 
 /// The six surfaces, and the way between them.
 ///
@@ -107,6 +118,15 @@ class _HomeShellState extends State<HomeShell> {
   /// that is built in the `IndexedStack` below: what travels down is the
   /// count, and the card answers the change.
   int _installRequests = 0;
+
+  /// Whether an install is under way and the entry must go quiet.
+  ///
+  /// The shell cannot see into the About card, so the card reports the phases
+  /// that must pin the entry: a check while a download is in flight, all the
+  /// way through to the closing hand-over. The one moment it stays false is
+  /// between a successful download and the question: the entry is alive there
+  /// so that a second press can find the question the first press opened.
+  bool _updateLocked = false;
 
   StreamSubscription<PairingRequest>? _requests;
 
@@ -185,17 +205,30 @@ class _HomeShellState extends State<HomeShell> {
   /// carries the whole of what an install does.
   ///
   /// The card is where the work happens rather than here, because the rail has
-  /// nowhere to put any of it: 72 pixels holds neither a download's progress,
-  /// nor the question an update asks before it closes this program, nor the
-  /// sentence an attempt ends in. So the shell switches to the one surface that
-  /// has all three and passes the count down; the card answers the change, and
-  /// a press that arrives while one is already under way is dropped rather than
-  /// queued — two downloads of one package is one too many.
+  /// nowhere to put any of it: [WeChat.railWidth] pixels hold neither a
+  /// download's progress, nor the question an update asks before it closes this
+  /// program, nor the sentence an attempt ends in. So the shell switches to the
+  /// one surface that has all three and passes the count down; the card answers
+  /// the change, and a press that arrives while one is already under way is
+  /// dropped rather than queued — two downloads of one package is one too many.
   void _installUpdate() {
     setState(() {
       _index = _aboutSurface;
       _installRequests++;
     });
+  }
+
+  /// Reports that the update a press started has reached [busy].
+  ///
+  /// [UpdateNotice] is the shell's own channel for the rail; this is the other
+  /// direction, from the card the rail hands the work to. A second press must
+  /// not be possible while a download or the closing hand-over is running, so
+  /// the card tells the rail when it is that busy and when it has stopped.
+  /// `busy == false` arrives when the download ended in a failure — at that
+  /// point the same button is the retry, exactly as the card's own button is.
+  void _setUpdateLocked(bool busy) {
+    if (_updateLocked == busy) return;
+    setState(() => _updateLocked = busy);
   }
 
   @override
@@ -230,67 +263,100 @@ class _HomeShellState extends State<HomeShell> {
       AboutPage(
         offeredUpdate: widget.update?.answer,
         installRequest: _installRequests,
+        onUpdateBusyChanged: _setUpdateLocked,
       ),
     ];
-    final destinations = <NavigationDestination>[
-      NavigationDestination(
-        // The same badge as Transfers, because it counts the same thing: a
-        // Transfer waiting on an answer is the one event worth interrupting
-        // for, and it now has two places it can be answered from.
-        icon: Badge.count(
-          count: waiting,
-          isLabelVisible: waiting > 0,
-          child: const Icon(Icons.forum_outlined),
-        ),
-        selectedIcon: Badge.count(
-          count: waiting,
-          isLabelVisible: waiting > 0,
-          child: const Icon(Icons.forum),
-        ),
+    // The six surfaces, in the order both layouts show them. One list rather
+    // than one per layout: the rail and the bar are one decision about where to
+    // put the same six, and a list each would be two places to forget a seventh.
+    //
+    // Both surfaces that can raise the question carry the count, because they
+    // count one thing: a Transfer waiting on an answer. It is met first in the
+    // conversation it arrived in and answered on the Transfers surface.
+    final surfaces = <_Surface>[
+      _Surface(
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum,
         label: l10n.tabConversation,
+        badge: waiting,
       ),
-      NavigationDestination(
-        icon: const Icon(Icons.devices_outlined),
-        selectedIcon: const Icon(Icons.devices),
+      _Surface(
+        icon: Icons.devices_outlined,
+        selectedIcon: Icons.devices,
         label: l10n.tabDevices,
       ),
-      NavigationDestination(
-        icon: Badge.count(
-          count: waiting,
-          isLabelVisible: waiting > 0,
-          child: const Icon(Icons.swap_horiz_outlined),
-        ),
-        selectedIcon: Badge.count(
-          count: waiting,
-          isLabelVisible: waiting > 0,
-          child: const Icon(Icons.swap_horiz),
-        ),
+      _Surface(
+        icon: Icons.swap_horiz_outlined,
+        selectedIcon: Icons.swap_horiz,
         label: l10n.tabTransfers,
+        badge: waiting,
       ),
-      NavigationDestination(
-        icon: const Icon(Icons.content_paste_outlined),
-        selectedIcon: const Icon(Icons.content_paste),
+      _Surface(
+        icon: Icons.content_paste_outlined,
+        selectedIcon: Icons.content_paste,
         label: l10n.tabClipboard,
       ),
-      NavigationDestination(
-        icon: const Icon(Icons.settings_outlined),
-        selectedIcon: const Icon(Icons.settings),
+      _Surface(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
         label: l10n.tabSettings,
       ),
-      NavigationDestination(
-        icon: const Icon(Icons.info_outline),
-        selectedIcon: const Icon(Icons.info),
+      _Surface(
+        icon: Icons.info_outline,
+        selectedIcon: Icons.info,
         label: l10n.tabAbout,
       ),
     ];
 
-    // Wide windows get a rail, narrow ones a bar. The same destinations
-    // either way: this is one layout decision, not two screens.
+    // Wide windows get a rail, narrow ones a bar. The same six either way.
     final wide = MediaQuery.sizeOf(context).width >= 720;
     // Every surface, kept alive: switching tabs must not restart a page, and a
     // conversation half-typed into one must survive a look at another.
     final content = IndexedStack(index: _index, children: pages);
     final notice = widget.update;
+
+    // The rail, with whatever belongs below its foot.
+    Widget railWith(Widget? trailing) => AppNavRail(
+      selectedIndex: _index,
+      onDestinationSelected: _select,
+      destinations: [
+        // The rail draws one glyph per entry either way; the filled glyphs are
+        // the bar's, which is how Material says "you are here".
+        for (final surface in surfaces)
+          NavRailDestination(
+            icon: surface.icon,
+            label: surface.label,
+            badge: surface.badge,
+          ),
+      ],
+      pinnedCount: _toolSurfaces,
+      trailing: trailing,
+    );
+
+    // The update entry, when the notice has one to offer. Nothing while the
+    // question is out, and nothing when the answer is "you are up to date": an
+    // entry that is always there would be a permanent question mark on a rail
+    // whose whole job is to be a map of where things are. Read out here rather
+    // than inside the rail's own builder so that "nothing to say" can be no
+    // entry at all — the rail's column has a gap between its children, and a
+    // zero-height child would still be charged one.
+    final rail = notice == null
+        ? railWith(null)
+        : ListenableBuilder(
+            listenable: notice,
+            builder: (context, _) {
+              final version = notice.version;
+              return railWith(
+                version == null
+                    ? null
+                    : _UpdateEntry(
+                        version: version,
+                        onInstall: _installUpdate,
+                        enabled: !_updateLocked,
+                      ),
+              );
+            },
+          );
 
     return Scaffold(
       // No `AppBar` on purpose. The window's own title bar already carries the
@@ -302,46 +368,7 @@ class _HomeShellState extends State<HomeShell> {
       body: wide
           ? Row(
               children: [
-                NavigationRail(
-                  selectedIndex: _index,
-                  onDestinationSelected: _select,
-                  labelType: NavigationRailLabelType.all,
-                  // The update entry is pinned rather than listed with the six.
-                  // It is not a surface: pressing it leaves the application for
-                  // a browser. A destination in the middle of the list would also
-                  // make every tab below it move the day a seventh surface
-                  // arrives, and the tabs are what a user has learned by
-                  // position.
-                  trailingAtBottom: true,
-                  trailing: notice == null
-                      ? null
-                      : ListenableBuilder(
-                          listenable: notice,
-                          builder: (context, _) {
-                            final version = notice.version;
-                            // Nothing to say while the question is out, and
-                            // nothing to say when the answer is "you are up to
-                            // date": an entry that is always there would be a
-                            // permanent question mark on a rail whose whole job
-                            // is to be a map of where things are.
-                            if (version == null) {
-                              return const SizedBox.shrink();
-                            }
-                            return _UpdateEntry(
-                              version: version,
-                              onInstall: _installUpdate,
-                            );
-                          },
-                        ),
-                  destinations: [
-                    for (final destination in destinations)
-                      NavigationRailDestination(
-                        icon: destination.icon,
-                        selectedIcon: destination.selectedIcon,
-                        label: Text(destination.label),
-                      ),
-                  ],
-                ),
+                rail,
                 VerticalDivider(
                   width: 1,
                   color: WeChatColors.of(context).divider,
@@ -355,7 +382,14 @@ class _HomeShellState extends State<HomeShell> {
           : NavigationBar(
               selectedIndex: _index,
               onDestinationSelected: _select,
-              destinations: destinations,
+              destinations: [
+                for (final surface in surfaces)
+                  NavigationDestination(
+                    icon: _badged(surface.icon, surface.badge),
+                    selectedIcon: _badged(surface.selectedIcon, surface.badge),
+                    label: surface.label,
+                  ),
+              ],
             ),
     );
   }
@@ -370,13 +404,17 @@ class _HomeShellState extends State<HomeShell> {
 /// here: the About card already says exactly this fact, in exactly this shape,
 /// and two spellings of one number is one place for them to drift apart.
 ///
-/// Drawn as a [TextButton] rather than as a [NavigationRailDestination]:
+/// Drawn as a [TextButton] rather than as a [NavRailDestination]:
 /// destinations switch the surface below, and this one hands a job to it — see
 /// [_HomeShellState._installUpdate], which is what the press does. It wears the
 /// same icon the About card's 「检查更新」 button does, so the two read as the
 /// same feature, and that icon is already in the shipped bundle's icon subset.
 class _UpdateEntry extends StatelessWidget {
-  const _UpdateEntry({required this.version, required this.onInstall});
+  const _UpdateEntry({
+    required this.version,
+    required this.onInstall,
+    required this.enabled,
+  });
 
   /// The newer version, named on the hover.
   final String version;
@@ -389,6 +427,10 @@ class _UpdateEntry extends StatelessWidget {
   /// "the user wants it"; where the work happens is the shell's decision.
   final VoidCallback onInstall;
 
+  /// Whether a press can start anything. False while an update is in flight,
+  /// so a second press cannot queue a second download.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -396,8 +438,9 @@ class _UpdateEntry extends StatelessWidget {
     return Padding(
       // Room to breathe under the last destination: without it the entry sits
       // flush against the bottom edge of the window and reads as a tab that has
-      // fallen off the end of the list.
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      // fallen off the end of the list. Nothing to the left or right, because
+      // the rail has already given its whole inside the same margin.
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Tooltip(
         message: l10n.aboutUpdateAvailable(version),
         child: TextButton(
@@ -408,15 +451,15 @@ class _UpdateEntry extends StatelessWidget {
           // download's progress, ask the one question before closing, and say
           // how an attempt ended — so the shell switches to it and counts the
           // press.
-          onPressed: onInstall,
-          // The colours are named rather than inherited: the rail's own theme
-          // styles destinations, and a `TextButton` inside one has no style of
-          // its own to fall back on — it would come out in the theme's default
-          // primary, which is not this design's green.
+          onPressed: enabled ? onInstall : null,
+          // The colour is named rather than inherited because the rest of the
+          // style is: the theme's text-button slot holds this green already, but
+          // its shape is a sentence on a padded button, and this entry is a
+          // glyph over two characters.
           style: TextButton.styleFrom(
             foregroundColor: colors.brandStrong,
-            // Wide enough to be a comfortable target, narrow enough to fit
-            // inside a 72px rail: the label below is two characters.
+            // As tall as a comfortable target: the width comes from the rail,
+            // as it does for every other entry.
             minimumSize: const Size(0, 52),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             shape: RoundedRectangleBorder(
@@ -443,3 +486,40 @@ class _UpdateEntry extends StatelessWidget {
     );
   }
 }
+
+/// One of the six surfaces, as both layouts need it.
+///
+/// Two glyphs and a count rather than either layout's own destination type, so
+/// that the order, the words and the counts are written once: the rail takes the
+/// outlined glyph, which is the one the design draws, and the bar takes both,
+/// because filling the current tab's glyph is how Material says where a reader
+/// is. Nothing here is a widget — a caller turns these into whichever
+/// destination type it hands its own component.
+class _Surface {
+  const _Surface({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    this.badge = 0,
+  });
+
+  /// The glyph when this surface is not the one on screen.
+  final IconData icon;
+
+  /// The glyph when it is. Unused by the rail, which draws [icon] either way.
+  final IconData selectedIcon;
+
+  /// The surface's name, on the rail and in the bar.
+  final String label;
+
+  /// How many Transfers are waiting for an answer, or zero for none.
+  final int badge;
+}
+
+/// [icon] with a count riding on it, for the surfaces that can raise one.
+///
+/// A function rather than a widget class because both of a surface's glyphs take
+/// the same count, and neither layout owns the badge: it belongs to the event
+/// the count is about, and each surface says how many of them it can show.
+Widget _badged(IconData icon, int count) =>
+    Badge.count(count: count, isLabelVisible: count > 0, child: Icon(icon));

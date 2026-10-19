@@ -37,7 +37,12 @@ import '../widgets.dart';
 /// build does before its window goes away is close itself on purpose.
 class AboutPage extends StatefulWidget {
   /// Shows what this build is, installing [offeredUpdate] when asked to.
-  const AboutPage({super.key, this.offeredUpdate, this.installRequest = 0});
+  const AboutPage({
+    super.key,
+    this.offeredUpdate,
+    this.installRequest = 0,
+    this.onUpdateBusyChanged,
+  });
 
   /// What the application's own update check found, when it was asked at all.
   ///
@@ -60,6 +65,13 @@ class AboutPage extends StatefulWidget {
   /// A counter rather than a pending flag, so that two presses are two
   /// installs and a rebuild in between is not one.
   final int installRequest;
+
+  /// What the shell's rail entry should hear about the phases of an update.
+  ///
+  /// The rail has no room for a download's progress, so the one thing it needs
+  /// from the card is whether its own entry may be pressed: while a download or
+  /// the closing hand-over is in flight a second press must not be possible.
+  final ValueChanged<bool>? onUpdateBusyChanged;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -107,6 +119,9 @@ class _AboutPageState extends State<AboutPage> {
     _leftOver = UpdateInstallResolution.installer.previousFailure();
   }
 
+  /// Tells the rail whether an update is in flight, when there is a rail.
+  void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
+
   @override
   void didUpdateWidget(AboutPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -115,7 +130,12 @@ class _AboutPageState extends State<AboutPage> {
     // version to fetch.
     final installRequest = widget.installRequest;
     if (installRequest == oldWidget.installRequest) return;
-    if (_asking || _busy) return;
+    // While a download is in flight or the page is asking GitHub, a second
+    // press is only the same request again, so it is dropped rather than
+    // queued twice. Once the package is ready, `_busy` is null again and a
+    // later press is what is behind the currently open question — it has to
+    // reach this same dialog, not become a second install.
+    if (_asking || (_busy && _prepared == null)) return;
     unawaited(_install(offered: widget.offeredUpdate ?? _answer));
   }
 
@@ -128,6 +148,7 @@ class _AboutPageState extends State<AboutPage> {
   /// Asks GitHub again, because somebody pressed the button that says so.
   Future<void> _check() async {
     setState(() => _asking = true);
+    _reportBusy(true);
     // The checker never throws — every failure is an [UpdateOutcome] — so there
     // is nothing to guard here but the widget's own lifetime.
     final answer = await UpdateResolution.checker.latest();
@@ -140,6 +161,7 @@ class _AboutPageState extends State<AboutPage> {
       // version nobody asked about is litter with a download in it.
       _prepared = null;
     });
+    _reportBusy(false);
   }
 
   /// Downloads the newer build, checks it, and hands this folder over to it.
@@ -157,9 +179,16 @@ class _AboutPageState extends State<AboutPage> {
   /// asked, which is the road this page's own button takes. Either way the
   /// answer is adopted as this page's own, so the card describes the update it
   /// is carrying out rather than staying silent about one that is under way.
+  ///
+  /// The rail is told about the phases out of band — after the build phase a
+  /// press-pushed `didUpdateWidget` is in, the parent shell must not be marked
+  /// dirty from inside it. The enter/exit edges of the update are reported by
+  /// the async work itself, so whichever press opened them lands with the
+  /// frame.
   Future<void> _install({UpdateCheck? offered}) async {
     final answer = offered ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
     setState(() => _answer = answer);
     var prepared = _prepared;
     if (prepared == null) {
@@ -181,6 +210,7 @@ class _AboutPageState extends State<AboutPage> {
           _failure = staged.failure;
           _progress = null;
         });
+        _reportBusy(false);
         return;
       }
       setState(() {
@@ -201,14 +231,25 @@ class _AboutPageState extends State<AboutPage> {
     if (!mounted) return;
     if (closing != true) {
       setState(() => _progress = null);
+      _reportBusy(false);
       return;
     }
+    setState(() {
+      // The question is past: what is left closes this program, so the buttons
+      // that opened the question have nothing left to say.
+      _progress = const UpdateInstallProgress(UpdateInstallStage.handingOver);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
     await UpdateInstallResolution.installer.apply(
       prepared,
       onProgress: (progress) {
         if (mounted) setState(() => _progress = progress);
       },
     );
+    // A scripted installer returns without ending the process; the real one
+    // never reaches here. Unlock only so a test that walks through the whole
+    // flow does not leave the rail pinned behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(false));
   }
 
   /// What an update that is under way is doing, as a sentence.
@@ -342,8 +383,9 @@ class _AboutPageState extends State<AboutPage> {
                     // what a user should press.
                     if (url != null)
                       TextButton.icon(
-                        onPressed: () =>
-                            unawaited(LinkResolution.opener.open(url)),
+                        onPressed: _asking || _busy
+                            ? null
+                            : () => unawaited(LinkResolution.opener.open(url)),
                         icon: const Icon(Icons.open_in_new, size: 18),
                         label: Text(l10n.aboutOpenDownload),
                       ),
