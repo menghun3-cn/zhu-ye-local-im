@@ -3,6 +3,7 @@ import '../host/close_behaviour.dart';
 import '../identity/device_descriptor.dart';
 import '../identity/fingerprint.dart';
 import '../identity/owner_group.dart';
+import '../update/update_check_interval.dart';
 
 /// A Device this one has dealt with before, remembered so it can be reached
 /// and recognised again without Discovery.
@@ -153,6 +154,7 @@ final class DeviceProfile {
     this.acceptsPairingRequests = true,
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
+    this.updateCheckInterval = UpdateCheckInterval.hourly,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
@@ -201,6 +203,15 @@ final class DeviceProfile {
   /// it describes, and is read at startup to tell the host what to do — see
   /// [CloseBehaviour].
   CloseBehaviour closeBehaviour;
+
+  /// How often this Device asks GitHub whether a newer build has been
+  /// published.
+  ///
+  /// Mutable and persisted, like [closeBehaviour]: the question "how often may
+  /// this app reach out" has no meaning for a process that is not running, so
+  /// the answer has to survive restarts. Defaults to hourly, which is what a
+  /// tool whose whole point is receiving things quietly was shipped for.
+  UpdateCheckInterval updateCheckInterval;
 
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
@@ -288,6 +299,7 @@ final class DeviceProfile {
     'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
     'closeBehaviour': closeBehaviour.wireName,
+    'updateCheckInterval': updateCheckInterval.wireName,
     'known': [for (final device in knownDevices) device.toJson()],
   };
 
@@ -341,6 +353,7 @@ final class DeviceProfile {
       acceptsPairingRequests: rawAccepts is bool ? rawAccepts : true,
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
       closeBehaviour: _closeBehaviour(json['closeBehaviour']),
+      updateCheckInterval: _updateCheckInterval(json['updateCheckInterval']),
     );
   }
 
@@ -351,7 +364,8 @@ final class DeviceProfile {
       '${_clipboardPeers.length} clipboard peers, '
       '${_known.length} known, '
       '${acceptsPairingRequests ? 'answering requests' : 'not answering'}, '
-      'close ${closeBehaviour.wireName})';
+      'close ${closeBehaviour.wireName}, '
+      'update ${updateCheckInterval.wireName})';
 
   /// Delegated to [DeviceDescriptor.sanitiseAlias], so a name is sanitised
   /// identically wherever it enters the system: a name typed into this
@@ -394,4 +408,15 @@ Map<String, Object?> _object(Object? value, String where) {
 CloseBehaviour _closeBehaviour(Object? value) {
   if (value is! String) return CloseBehaviour.minimiseToTray;
   return CloseBehaviour.fromWireName(value) ?? CloseBehaviour.minimiseToTray;
+}
+
+/// Reads the update-check interval, falling back to the default.
+///
+/// Tolerant in both directions, the same way [CloseBehaviour] is: a profile
+/// written before this key existed has none, and a value a *newer* version
+/// invented is not damage to an older one. Both of those mean "the user has
+/// not said otherwise", which is exactly what the default is for.
+UpdateCheckInterval _updateCheckInterval(Object? value) {
+  if (value is! String) return UpdateCheckInterval.hourly;
+  return UpdateCheckInterval.fromWireName(value) ?? UpdateCheckInterval.hourly;
 }

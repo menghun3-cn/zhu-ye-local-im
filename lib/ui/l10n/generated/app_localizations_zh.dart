@@ -490,6 +490,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCloseQuitHint => '关闭窗口就结束程序。';
 
   @override
+  String get settingsUpdate => '更新检查';
+
+  @override
+  String get settingsPeriodicUpdateTitle => '后台定期检查更新';
+
+  @override
+  String get settingsPeriodicUpdateOn => '程序会自己询问是否有更新版本。';
+
+  @override
+  String get settingsPeriodicUpdateOff => '只在手动点「检查更新」时询问。';
+
+  @override
+  String get settingsUpdateFrequency => '检查频率';
+
+  @override
+  String get settingsUpdateHint =>
+      '每次检查仅向 GitHub 询问发布版本，不发送本机任何内容；关闭后仍保留启动时的一次检查。';
+
+  @override
+  String get updateIntervalHourly => '每 1 小时';
+
+  @override
+  String get updateIntervalSixHours => '每 6 小时';
+
+  @override
+  String get updateIntervalDaily => '每天';
+
+  @override
+  String get updateIntervalThreeDays => '每 3 天';
+
+  @override
   String get factAlias => '名称';
 
   @override
@@ -518,7 +549,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutDescription =>
-      '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：所有传送都只在本网络内。唯一的例外是启动时向 GitHub 问一次版本号，不发送任何内容。';
+      '竹叶局域网传输在你自己的设备之间，通过局域网传送文本、文件和剪贴板内容。没有服务器、没有账号、也没有云端：所有传送都只在本网络内。唯一与外界通信的是向 GitHub 询问发布版本（启动时一次，之后按你在设置里选择的频率），不发送任何内容。';
 
   @override
   String aboutVersion(String version) {
