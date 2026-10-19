@@ -18,6 +18,19 @@ Future<Object?> _storedCloseBehaviour(UiDevice device) async {
   return profile is Map<Object?, Object?> ? profile['closeBehaviour'] : null;
 }
 
+/// The start-with-Windows switch, scoped to the window section.
+///
+/// The page also carries the update-check switch, so `find.byType` alone would
+/// match two. The window's switch is the one whose title names the system.
+Finder _startWithWindowsSwitch() => onPage(
+  windowA,
+  SettingsPage,
+  find.ancestor(
+    of: find.text(l10n.settingsStartWithWindows),
+    matching: find.byType(SwitchListTile),
+  ),
+);
+
 void main() {
   group('the window and startup settings', () {
     testWidgets('are absent on a platform that has no window of its own', (
@@ -41,10 +54,7 @@ void main() {
         onPage(windowA, SettingsPage, find.text(l10n.settingsWindowAndStartup)),
         findsNothing,
       );
-      expect(
-        onPage(windowA, SettingsPage, find.byType(SwitchListTile)),
-        findsNothing,
-      );
+      expect(_startWithWindowsSwitch(), findsNothing);
       expect(
         onPage(
           windowA,
@@ -52,6 +62,12 @@ void main() {
           find.byType(SegmentedButton<CloseBehaviour>),
         ),
         findsNothing,
+      );
+      // The update-check section is a preference this platform *can* honour,
+      // so it stays on the page alongside the rest of Settings.
+      expect(
+        onPage(windowA, SettingsPage, find.text(l10n.settingsUpdate)),
+        findsOneWidget,
       );
       // The rest of the surface is still there, so this is an absence and not a
       // page that failed to build.
@@ -189,11 +205,7 @@ void main() {
 
       expect(device.controller.autostartEnabled, isTrue);
       expect(
-        tester
-            .widget<SwitchListTile>(
-              onPage(windowA, SettingsPage, find.byType(SwitchListTile)),
-            )
-            .value,
+        tester.widget<SwitchListTile>(_startWithWindowsSwitch()).value,
         isTrue,
       );
       expect(
@@ -234,9 +246,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(
-        onPage(windowA, SettingsPage, find.byType(SwitchListTile)),
-      );
+      await tester.tap(_startWithWindowsSwitch());
       await pumpUntil(
         tester,
         () => device.controller.autostartEnabled,
@@ -273,9 +283,7 @@ void main() {
       await pumpWindow(tester, device, size: tallWindow);
       await openTab(tester, l10n.tabSettings, window: windowA);
 
-      await tester.tap(
-        onPage(windowA, SettingsPage, find.byType(SwitchListTile)),
-      );
+      await tester.tap(_startWithWindowsSwitch());
       await pumpUntil(
         tester,
         () => host.autostartRequests.isNotEmpty,
@@ -292,11 +300,7 @@ void main() {
         reason: 'the switch reports what will happen, not what was asked for',
       );
       expect(
-        tester
-            .widget<SwitchListTile>(
-              onPage(windowA, SettingsPage, find.byType(SwitchListTile)),
-            )
-            .value,
+        tester.widget<SwitchListTile>(_startWithWindowsSwitch()).value,
         isFalse,
         reason:
             'an on switch that nothing is behind is the one lie this '

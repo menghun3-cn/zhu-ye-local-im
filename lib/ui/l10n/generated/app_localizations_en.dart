@@ -510,6 +510,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCloseQuitHint => 'Closing the window ends the app.';
 
   @override
+  String get settingsUpdate => 'Update checks';
+
+  @override
+  String get settingsPeriodicUpdateTitle =>
+      'Check for updates in the background';
+
+  @override
+  String get settingsPeriodicUpdateOn =>
+      'The app checks for a newer build on its own.';
+
+  @override
+  String get settingsPeriodicUpdateOff =>
+      'The app only checks when you ask it to.';
+
+  @override
+  String get settingsUpdateFrequency => 'How often';
+
+  @override
+  String get settingsUpdateHint =>
+      'A check asks GitHub for the published version and sends nothing about this Device. Turning it off leaves the startup check alone.';
+
+  @override
+  String get updateIntervalHourly => 'Every hour';
+
+  @override
+  String get updateIntervalSixHours => 'Every 6 hours';
+
+  @override
+  String get updateIntervalDaily => 'Daily';
+
+  @override
+  String get updateIntervalThreeDays => 'Every 3 days';
+
+  @override
   String get factAlias => 'Alias';
 
   @override
@@ -539,7 +573,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutDescription =>
-      'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.';
+      'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The only thing that reaches outside is a question to GitHub about the published version — once at startup, then on the frequency you choose in Settings — and it sends no content of any kind.';
 
   @override
   String aboutVersion(String version) {
