@@ -1073,19 +1073,19 @@ abstract class AppLocalizations {
   /// No description provided for @aboutUpdateConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Close and update?'**
+  /// **'Update and restart?'**
   String get aboutUpdateConfirmTitle;
 
   /// No description provided for @aboutUpdateConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Close and update: the program closes first, updates itself, and reopens when it is done.'**
+  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Update and restart: the program closes first, updates itself, and reopens when it is done.'**
   String aboutUpdateConfirmBody(String version);
 
   /// No description provided for @aboutUpdateConfirmApply.
   ///
   /// In en, this message translates to:
-  /// **'Close and update'**
+  /// **'Update and restart'**
   String get aboutUpdateConfirmApply;
 
   /// No description provided for @aboutUpdateReady.

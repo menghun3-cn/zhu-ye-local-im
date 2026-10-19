@@ -443,6 +443,76 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
+  testWidgets('the actions the update offers go quiet while a download runs', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    // A download that has not answered yet, so the assertions can stand beside
+    // the middle of one.
+    final running = Completer<UpdatePrepareResult>();
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      progress: const [UpdateInstallProgress(UpdateInstallStage.downloading)],
+      hold: running,
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+
+    // All three ways to act on the update are inert for as long as the
+    // download is running: asking again would mix two answers, installing
+    // again would fetch the same package twice, and opening the page beside an
+    // in-flight fetch is the user leaving a thing they have asked to happen.
+    final check = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+    );
+    final install = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
+    );
+    final open = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, l10n.aboutOpenDownload),
+    );
+    expect(check.onPressed, isNull);
+    expect(install.onPressed, isNull);
+    expect(open.onPressed, isNull);
+
+    // Let it fail: the failure sentence reports why, and the same buttons are
+    // the way to answer it. The check and the install are alive again, and so
+    // is the manual page.
+    running.complete(
+      const UpdatePrepareResult.failed(UpdateInstallFailure.checksum),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text(l10n.updateFailureChecksum), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.widgetWithText(TextButton, l10n.aboutOpenDownload),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
   testWidgets('says why an update did not happen, and offers it again', (
     tester,
   ) async {
