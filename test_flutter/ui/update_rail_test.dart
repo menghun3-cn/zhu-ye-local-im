@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/ui/nav_rail.dart';
 import 'package:local_transfer/ui/pages/about_page.dart';
 import 'package:local_transfer/ui/update_check.dart';
 import 'package:local_transfer/ui/update_install.dart';
@@ -48,7 +51,7 @@ void main() {
   /// the pages — 「关于」 is both the last destination and the About card's own
   /// title.
   Finder inRail(Finder matching) => find.descendant(
-    of: windowA.within(find.byType(NavigationRail)),
+    of: windowA.within(find.byType(AppNavRail)),
     matching: matching,
   );
 
@@ -215,6 +218,43 @@ void main() {
     await shutdown(tester, [device]);
   });
 
+  testWidgets('goes quiet while the install is in flight, and after a '
+      'failure the same press is the retry', (tester) async {
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    // A download that is still running: the only way to stand beside the middle
+    // of one is to hold the installer's answer.
+    final running = Completer<UpdatePrepareResult>();
+    ScriptedUpdateInstaller.replace(supported: true, hold: running);
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
+
+    await tester.tap(updateEntry(windowA));
+    await pumpUntil(
+      tester,
+      () => updateEntry(windowA).evaluate().isNotEmpty,
+      description: 'the entry to still be drawn after the press',
+    );
+    await pumpUntil(tester, () {
+      final entry = tester.widget<TextButton>(updateEntry(windowA));
+      return entry.onPressed == null;
+    }, description: 'the update entry to be disabled while the download runs');
+
+    // The press that is still in flight cannot be started twice.
+    final entry = tester.widget<TextButton>(updateEntry(windowA));
+    expect(entry.onPressed, isNull);
+
+    // Let the download fail: the entry's own button is the retry, so the rail
+    // entry must come alive with it.
+    running.complete(
+      const UpdatePrepareResult.failed(UpdateInstallFailure.download),
+    );
+    await pumpUntil(tester, () {
+      final entry = tester.widget<TextButton>(updateEntry(windowA));
+      return entry.onPressed != null;
+    }, description: 'the update entry to be enabled again after the failure');
+
+    await shutdown(tester, [device]);
+  });
+
   testWidgets('says so on the card when the install cannot happen', (
     tester,
   ) async {
@@ -257,7 +297,7 @@ void main() {
       update: await noticeSaying(newerBuild),
     );
 
-    expect(windowA.within(find.byType(NavigationRail)), findsNothing);
+    expect(windowA.within(find.byType(AppNavRail)), findsNothing);
     expect(find.text(l10n.railUpdate), findsNothing);
 
     await shutdown(tester, [device]);
