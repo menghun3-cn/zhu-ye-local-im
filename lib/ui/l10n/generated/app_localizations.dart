@@ -908,6 +908,66 @@ abstract class AppLocalizations {
   /// **'Closing the window ends the app.'**
   String get settingsCloseQuitHint;
 
+  /// No description provided for @settingsUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update checks'**
+  String get settingsUpdate;
+
+  /// No description provided for @settingsPeriodicUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates in the background'**
+  String get settingsPeriodicUpdateTitle;
+
+  /// No description provided for @settingsPeriodicUpdateOn.
+  ///
+  /// In en, this message translates to:
+  /// **'The app checks for a newer build on its own.'**
+  String get settingsPeriodicUpdateOn;
+
+  /// No description provided for @settingsPeriodicUpdateOff.
+  ///
+  /// In en, this message translates to:
+  /// **'The app only checks when you ask it to.'**
+  String get settingsPeriodicUpdateOff;
+
+  /// No description provided for @settingsUpdateFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'How often'**
+  String get settingsUpdateFrequency;
+
+  /// No description provided for @settingsUpdateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A check asks GitHub for the published version and sends nothing about this Device. Turning it off leaves the startup check alone.'**
+  String get settingsUpdateHint;
+
+  /// No description provided for @updateIntervalHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Every hour'**
+  String get updateIntervalHourly;
+
+  /// No description provided for @updateIntervalSixHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 6 hours'**
+  String get updateIntervalSixHours;
+
+  /// No description provided for @updateIntervalDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get updateIntervalDaily;
+
+  /// No description provided for @updateIntervalThreeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 3 days'**
+  String get updateIntervalThreeDays;
+
   /// No description provided for @factAlias.
   ///
   /// In en, this message translates to:
@@ -965,7 +1025,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDescription.
   ///
   /// In en, this message translates to:
-  /// **'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The one exception is a single question to GitHub at startup about the version it has published, which sends no content of any kind.'**
+  /// **'Zhuye Local Transfer moves text, files and clipboard entries between your own Devices over the local network. There is no server, no account and no cloud: every transfer stays inside this network. The only thing that reaches outside is a question to GitHub about the published version — once at startup, then on the frequency you choose in Settings — and it sends no content of any kind.'**
   String get aboutDescription;
 
   /// No description provided for @aboutVersion.

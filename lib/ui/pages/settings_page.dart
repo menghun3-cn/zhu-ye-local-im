@@ -318,6 +318,81 @@ class SettingsPage extends StatelessWidget {
           ),
         ],
         const SizedBox(height: WeChat.sectionGap),
+        SectionHeader(title: l10n.settingsUpdate),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(WeChat.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value:
+                      controller.updateCheckInterval != UpdateCheckInterval.off,
+                  onChanged: (value) => unawaited(
+                    guarded(
+                      context,
+                      () => controller.setUpdateCheckInterval(
+                        value
+                            ? UpdateCheckInterval.hourly
+                            : UpdateCheckInterval.off,
+                      ),
+                    ),
+                  ),
+                  title: Text(l10n.settingsPeriodicUpdateTitle),
+                  subtitle: Text(
+                    controller.updateCheckInterval == UpdateCheckInterval.off
+                        ? l10n.settingsPeriodicUpdateOff
+                        : l10n.settingsPeriodicUpdateOn,
+                  ),
+                ),
+                if (controller.updateCheckInterval !=
+                    UpdateCheckInterval.off) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsUpdateFrequency,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizePreview,
+                      color: colors.secondaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SegmentedButton<UpdateCheckInterval>(
+                    segments: [
+                      for (final choice in [
+                        (UpdateCheckInterval.hourly, l10n.updateIntervalHourly),
+                        (
+                          UpdateCheckInterval.everySixHours,
+                          l10n.updateIntervalSixHours,
+                        ),
+                        (UpdateCheckInterval.daily, l10n.updateIntervalDaily),
+                        (
+                          UpdateCheckInterval.everyThreeDays,
+                          l10n.updateIntervalThreeDays,
+                        ),
+                      ])
+                        ButtonSegment<UpdateCheckInterval>(
+                          value: choice.$1,
+                          label: Text(choice.$2),
+                        ),
+                    ],
+                    selected: {controller.updateCheckInterval},
+                    onSelectionChanged: (selection) => unawaited(
+                      guarded(
+                        context,
+                        () =>
+                            controller.setUpdateCheckInterval(selection.first),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                HintText(l10n.settingsUpdateHint),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.settingsNotices),
         if (notices.isEmpty)
           HintText(l10n.nothingWentWrong)
