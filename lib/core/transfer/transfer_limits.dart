@@ -86,7 +86,9 @@ final class TransferLimits {
           '$maxTotalBytes';
     }
     return switch (offer.kind) {
-      PayloadKind.text || PayloadKind.clipboard => _inlineViolation(offer),
+      PayloadKind.text ||
+      PayloadKind.clipboard ||
+      PayloadKind.emoji => _inlineViolation(offer),
       // An image is a byte stream like any other: it arrives with a digest per
       // item and is checked against it, exactly as a file is. The only thing
       // that differs is how the receiver draws the result.

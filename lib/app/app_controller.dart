@@ -684,6 +684,22 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// The faces this Device's recent-emoji strip should draw, newest first.
+  List<String> get recentEmojis =>
+      _local?.profile.recentEmojis ?? const <String>[];
+
+  /// Makes [face] the most recently used, and persists the strip.
+  ///
+  /// A face the picker does not know is refused by the profile; persisting
+  /// here uses the same store everything else in the profile writes to, so a
+  /// strip survives a restart. The notification is what lets a picker already
+  /// on screen move the face to the front.
+  void rememberEmoji(String face) {
+    _requireLocal().profile.rememberEmoji(face);
+    unawaited(_persist());
+    _notify();
+  }
+
   /// Whether [peer] is on this Device's clipboard-sharing whitelist.
   bool isClipboardPeer(Fingerprint peer) =>
       _local?.profile.isClipboardPeer(peer) ?? false;
@@ -835,6 +851,14 @@ final class LocalTransferController {
   Future<OutgoingTransfer> sendText(String text, {Fingerprint? to}) async {
     final target = _target(to);
     final transfer = await target.engine.sendText(text);
+    _track(transfer, target.peer);
+    return transfer;
+  }
+
+  /// Sends [face] to a peer as an emoji Transfer.
+  Future<OutgoingTransfer> sendEmoji(String face, {Fingerprint? to}) async {
+    final target = _target(to);
+    final transfer = await target.engine.sendEmoji(face);
     _track(transfer, target.peer);
     return transfer;
   }
@@ -1391,6 +1415,7 @@ final class LocalTransferController {
   String? _landingFor(IncomingTransfer offer) {
     switch (offer.kind) {
       case PayloadKind.text:
+      case PayloadKind.emoji:
         return '';
       case PayloadKind.image:
         // The folder is the one received files already go to: what the user

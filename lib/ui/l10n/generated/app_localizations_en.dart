@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kindClipboard => 'Clipboard';
 
   @override
+  String get kindEmoji => 'Emoji';
+
+  @override
   String get stateAwaitingDecision => 'Waiting for an answer';
 
   @override
@@ -318,6 +321,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuSendFile => 'Send a file';
+
+  @override
+  String get menuSendEmoji => 'Send an emoji';
+
+  @override
+  String get emojiRecent => 'Recent';
 
   @override
   String get dropToSend => 'Let go to send';
