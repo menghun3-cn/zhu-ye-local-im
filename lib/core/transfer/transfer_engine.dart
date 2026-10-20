@@ -84,6 +84,14 @@ final class TransferEngine {
   Future<OutgoingTransfer> sendText(String text) =>
       _sendInline(PayloadKind.text, text);
 
+  /// Offers [face] to the peer as an emoji payload.
+  ///
+  /// A separate kind from text because an emoji is rendered as a large face on
+  /// the far side rather than as a line of words. The wire carries the exact
+  /// face, so two builds that both know the kind draw the same one.
+  Future<OutgoingTransfer> sendEmoji(String face) =>
+      _sendInline(PayloadKind.emoji, face);
+
   /// Offers clipboard content to a peer in the same Owner Group.
   ///
   /// A separate payload kind from text so that a receiver can tell content

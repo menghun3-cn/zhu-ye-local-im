@@ -1376,6 +1376,74 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
+    testWidgets('an emoji sent from the picker arrives as a large face', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to be listed',
+      );
+      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
+      await settleRoute(tester);
+
+      // The emoji button sits beside the file button; opening it shows the
+      // faces, and picking one sends it as its own message.
+      await tester.tap(
+        onConversation(windowA, find.byTooltip(l10n.menuSendEmoji)),
+      );
+      // The menu lives in the navigator's overlay, so the picker is found with
+      // a plain finder rather than through the conversation subtree.
+      await pumpUntil(
+        tester,
+        () => find.text(l10n.kindEmoji).evaluate().isNotEmpty,
+        description: 'the picker to open',
+      );
+      // The menu fades in over an animation; a tap during it is swallowed by
+      // the route's own IgnorePointer.
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('😀').first);
+
+      await pumpUntil(
+        tester,
+        () =>
+            onConversation(windowA, find.text('😀')).evaluate().isNotEmpty &&
+            alice.controller.transfers.single.state.isSettled,
+        description: 'the face to arrive as a message',
+      );
+
+      // Drawn the way an emoticon is: large, as a face rather than a line of
+      // words, with no transfer receipt under it.
+      final face = tester.widget<Text>(
+        onConversation(windowA, find.text('😀')).first,
+      );
+      expect(face.style?.fontSize, WeChat.emojiBubbleFontSize);
+      expect(
+        onConversation(
+          windowA,
+          find.text('${l10n.kindEmoji} · ${l10n.stateCompleted}'),
+        ),
+        findsNothing,
+        reason: 'an emoji is a message, not a transfer with a receipt',
+      );
+      // And it was remembered for the next time the picker opens.
+      expect(alice.controller.recentEmojis, ['😀']);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
     testWidgets('Enter sends and leaves the caret in the box', (tester) async {
       final hub = MemoryBeaconHub();
       final alice = await startUiDevice(tester, hub.a, 'Alice');

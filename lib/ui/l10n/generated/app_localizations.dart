@@ -242,6 +242,12 @@ abstract class AppLocalizations {
   /// **'Clipboard'**
   String get kindClipboard;
 
+  /// No description provided for @kindEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Emoji'**
+  String get kindEmoji;
+
   /// No description provided for @stateAwaitingDecision.
   ///
   /// In en, this message translates to:
@@ -583,6 +589,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send a file'**
   String get menuSendFile;
+
+  /// No description provided for @menuSendEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Send an emoji'**
+  String get menuSendEmoji;
+
+  /// No description provided for @emojiRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get emojiRecent;
 
   /// No description provided for @dropToSend.
   ///

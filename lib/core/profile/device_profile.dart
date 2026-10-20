@@ -1,4 +1,6 @@
 import '../clipboard/clipboard_capability.dart';
+import '../emoji/emoji_table.dart';
+import '../emoji/recent_emoji_store.dart';
 import '../host/close_behaviour.dart';
 import '../identity/device_descriptor.dart';
 import '../identity/fingerprint.dart';
@@ -151,6 +153,7 @@ final class DeviceProfile {
     Set<Fingerprint> favorites = const {},
     Set<Fingerprint> clipboardPeers = const {},
     Map<String, KnownDevice> known = const {},
+    List<String> recentEmojis = const [],
     this.acceptsPairingRequests = true,
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
@@ -162,7 +165,9 @@ final class DeviceProfile {
        _clipboardPeers = {...clipboardPeers}
          ..removeWhere((peer) => peer == self),
        _known = {...known}
-         ..removeWhere((_, device) => device.fingerprint == self);
+         ..removeWhere((_, device) => device.fingerprint == self) {
+    setRecentEmojis(recentEmojis);
+  }
 
   /// This Device's own Fingerprint, from its [OwnerIdentity].
   ///
@@ -216,6 +221,7 @@ final class DeviceProfile {
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
   final Map<String, KnownDevice> _known;
+  List<String> _recentEmojis = const [];
 
   /// The Fingerprints marked as favorites, sorted.
   List<Fingerprint> get favorites => _favorites.toList()..sort();
@@ -274,6 +280,26 @@ final class DeviceProfile {
   /// What is known about [fingerprint], or null when the Device is unknown.
   KnownDevice? known(Fingerprint fingerprint) => _known[fingerprint.hex];
 
+  /// The faces the composer's Recent strip should draw, newest first.
+  List<String> get recentEmojis => List.unmodifiable(_recentEmojis);
+
+  /// Makes [face] the most recently used emoticon, and answers the strip.
+  ///
+  /// A face outside the picker's table is refused: the strip is the fast path
+  /// to faces this build can send, and a face nobody can choose again is not
+  /// worth the space it would take.
+  void rememberEmoji(String face) {
+    _recentEmojis = rememberRecentEmoji(emojiFaces, _recentEmojis, face: face);
+  }
+
+  void setRecentEmojis(List<String> faces) {
+    final known = emojiFaces.toSet();
+    _recentEmojis = [
+      for (final face in faces)
+        if (known.contains(face)) face,
+    ].take(recentEmojiLimit).toList();
+  }
+
   /// Every Known Device, sorted by fingerprint.
   List<KnownDevice> get knownDevices =>
       _known.values.toList()
@@ -301,6 +327,7 @@ final class DeviceProfile {
     'closeBehaviour': closeBehaviour.wireName,
     'updateCheckInterval': updateCheckInterval.wireName,
     'known': [for (final device in knownDevices) device.toJson()],
+    'recentEmojis': recentEmojis,
   };
 
   static DeviceProfile fromJson(Map<String, Object?> json) {
@@ -309,6 +336,7 @@ final class DeviceProfile {
     final rawClipboardPeers = json['clipboardPeers'];
     final rawKnown = json['known'];
     final rawAccepts = json['acceptPairingRequests'];
+    final rawRecentEmojis = json['recentEmojis'];
     final platform = DevicePlatform.fromWireName(_string(json, 'platform'));
     final self = Fingerprint(_string(json, 'self'));
     final group = rawGroup == null
@@ -339,6 +367,15 @@ final class DeviceProfile {
         known[device.fingerprint.hex] = device;
       }
     }
+    final recentEmojis = <String>[];
+    if (rawRecentEmojis is List) {
+      for (final entry in rawRecentEmojis) {
+        if (entry is! String) {
+          throw FormatException('"recentEmojis[]" must be a string');
+        }
+        recentEmojis.add(entry);
+      }
+    }
     return DeviceProfile(
       self: self,
       alias: _string(json, 'alias'),
@@ -347,6 +384,7 @@ final class DeviceProfile {
       favorites: favorites,
       clipboardPeers: clipboardPeers,
       known: known,
+      recentEmojis: recentEmojis,
       // A profile written before this key existed answers requests: the
       // listener is the flow, and a Device that silently stopped being
       // diallable after an upgrade would be a Device nobody can add.
