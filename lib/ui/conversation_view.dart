@@ -317,51 +317,70 @@ class _ConversationViewState extends State<ConversationView> {
     // peer the overlay would promise something the app cannot do.
     final canSend = peer != null;
 
-    final history = messages.isEmpty
-        ? Padding(
-            padding: const EdgeInsets.all(24),
-            child: HintText(l10n.conversationEmpty),
-          )
-        // Selectable, the way every other piece of text on a desktop is: a
-        // double-click takes a word and a drag takes a range. What it does
-        // *not* do is draw the platform's own copy toolbar — a right-click on a
-        // message opens the message's own menu instead, which knows about the
-        // selection and offers 复制 of it alongside 打开所在目录 and 删除. See
-        // [TransferContextMenu]; that is the one place the two are reconciled.
-        //
-        // The area wraps the whole list rather than each bubble, because a
-        // selection that stops at a bubble's edge is not what a user dragging
-        // across two messages is asking for.
-        //
-        // What it selects is published to the menus below it through
-        // [MessageSelection]. A [SelectableRegionState] cannot be reached from
-        // outside the widget that made it, so the selection has to be pushed
-        // from here rather than pulled from there.
-        : SelectionArea(
-            onSelectionChanged: (content) =>
-                setState(() => _selectedText = content?.plainText),
-            child: ListView.builder(
-              controller: _scroll,
-              reverse: true,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) => MessageBubble(
-                view: messages[index],
-                controller: controller,
-                defaultIncomingDirectory: widget.defaultIncomingDirectory,
-                // A Device with no name is named by its address, and by the last
-                // number of it inside the avatar — see `PeerView.avatarLabel`.
-                // With no peer in the list at all there is only the Fingerprint,
-                // which is stable and its own, so the avatar is still the same
-                // one every time.
-                peerName: peer?.displayName ?? widget.peer.short(),
-                peerLabel: peer?.avatarLabel,
-                peerSeed: widget.peer.hex,
-                selfName: self.displayName,
-                selfSeed: self.fingerprint.hex,
-              ),
-            ),
-          );
+    // The cap on a bubble is a share of the **chat area** — the column the
+    // conversation is drawn in — so it is measured once, here, where that
+    // width is known. A cap that each bubble measured for itself would be a
+    // cap on the list's inner width, and it would shift whenever the list's
+    // padding changed rather than whenever the window did.
+    //
+    // A [LayoutBuilder] re-reads the width on every change of it, so
+    // resizing the window — or the divider between the list and the
+    // conversation — moves the cap with the area instead of leaving it
+    // behind.
+    final history = LayoutBuilder(
+      builder: (context, constraints) {
+        final bubbleMaxWidth =
+            constraints.maxWidth * WeChat.bubbleMaxWidthFactor;
+        return messages.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: HintText(l10n.conversationEmpty),
+              )
+            // Selectable, the way every other piece of text on a desktop is: a
+            // double-click takes a word and a drag takes a range. What it does
+            // *not* do is draw the platform's own copy toolbar — a right-click
+            // on a message opens the message's own menu instead, which knows
+            // about the selection and offers 复制 of it alongside 打开所在目录
+            // and 删除. See [TransferContextMenu]; that is the one place the
+            // two are reconciled.
+            //
+            // The area wraps the whole list rather than each bubble, because a
+            // selection that stops at a bubble's edge is not what a user
+            // dragging across two messages is asking for.
+            //
+            // What it selects is published to the menus below it through
+            // [MessageSelection]. A [SelectableRegionState] cannot be reached
+            // from outside the widget that made it, so the selection has to
+            // be pushed from here rather than pulled from there.
+            : SelectionArea(
+                onSelectionChanged: (content) =>
+                    setState(() => _selectedText = content?.plainText),
+                child: ListView.builder(
+                  controller: _scroll,
+                  reverse: true,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) => MessageBubble(
+                    view: messages[index],
+                    controller: controller,
+                    defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                    // The cap every bubble in this conversation is drawn to.
+                    bubbleMaxWidth: bubbleMaxWidth,
+                    // A Device with no name is named by its address, and by
+                    // the last number of it inside the avatar — see
+                    // `PeerView.avatarLabel`. With no peer in the list at all
+                    // there is only the Fingerprint, which is stable and its
+                    // own, so the avatar is still the same one every time.
+                    peerName: peer?.displayName ?? widget.peer.short(),
+                    peerLabel: peer?.avatarLabel,
+                    peerSeed: widget.peer.hex,
+                    selfName: self.displayName,
+                    selfSeed: self.fingerprint.hex,
+                  ),
+                ),
+              );
+      },
+    );
     return MessageSelection(
       // What the user has selected, so that a right-click on a message can
       // offer to copy it. Published here — around the whole conversation rather
@@ -1249,6 +1268,7 @@ class MessageBubble extends StatelessWidget {
     required this.peerSeed,
     required this.selfName,
     required this.selfSeed,
+    required this.bubbleMaxWidth,
   });
 
   /// The Transfer this bubble is for.
@@ -1275,6 +1295,14 @@ class MessageBubble extends StatelessWidget {
 
   /// What colours this Device's own avatar.
   final String selfSeed;
+
+  /// How wide this bubble may get.
+  ///
+  /// Measured once by the conversation, which is where the width of the chat
+  /// area is known, and handed to every bubble in the conversation alike — a
+  /// cap that each bubble measured for itself would be a cap on the list's
+  /// inner width rather than on the chat.
+  final double bubbleMaxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -1316,6 +1344,7 @@ class MessageBubble extends StatelessWidget {
                       : MessageBubbleShape(
                           colour: background,
                           outgoing: outgoing,
+                          maxWidth: bubbleMaxWidth,
                           child: _contents(context, l10n),
                         ),
                 ),
