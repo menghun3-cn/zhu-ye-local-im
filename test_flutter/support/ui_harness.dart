@@ -1020,6 +1020,24 @@ Future<void> sendText(
   });
 }
 
+/// Hands [device] a face as a payload of its own kind, through the
+/// controller rather than the screen.
+///
+/// The composer does not send faces that way any more — a face picked in the
+/// picker is part of the text — but a peer running v0.1.10 or v0.1.11 still
+/// does, so the kind has to keep working on the wire and on screen.
+Future<void> sendEmojiPayload(
+  WidgetTester tester,
+  UiDevice device,
+  String face, {
+  Fingerprint? to,
+}) async {
+  await tester.runAsync(() async {
+    final sent = await device.controller.sendEmoji(face, to: to);
+    await untilTrue(() => sent.isSettled, 'the sent face to settle');
+  });
+}
+
 /// Whether [window]'s pairing card says this Device is answering requests.
 ///
 /// Read off the card's switch rather than the controller, and read off the
