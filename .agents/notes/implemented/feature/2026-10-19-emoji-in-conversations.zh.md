@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-10-19-emoji-in-conversations.md) | 中文
 
+> **部分被取代**：
+> [表情是输入框里的一个字符](2026-10-20-an-emoji-is-a-character-in-the-box.md) ——
+> 现在选中表情是把它放进输入框，而不是直接发出去。线上那个种类、最近使用，
+> 以及把脸画大的做法，仍按本篇所述。
+
 ## Problem
 
 一个会话能发文本、文件、图片，却发不了让聊天像聊天的小表情。微信用户习惯在附件

@@ -163,18 +163,23 @@ class _ConversationViewState extends State<ConversationView> {
     );
   }
 
-  /// Sends [face] as a message of its own, and remembers it as recent.
+  /// Puts [face] into the composer, and remembers it as recent.
   ///
-  /// A face is a complete message the way a sent file is, so it goes out
-  /// immediately rather than waiting for 发送: putting it in the box would
-  /// leave the user with "how do I send a face now". The recent strip is
-  /// updated on the same tap, so the next open of the picker has the face at
-  /// the front.
-  void _sendEmoji(LocalTransferController controller, String face) {
+  /// Picking a face is typing a face: it goes into the box and leaves with
+  /// whatever else is in it when 发送 is pressed, the same way a face typed
+  /// with the keyboard does. It used to go out on the tap as a message of its
+  /// own, which meant a person who wanted to write a word next to their
+  /// face had to send twice — and a face that is part of a sentence is
+  /// ordinary text, not a sticker.
+  ///
+  /// The recent strip is updated on the same tap, so the next open of the
+  /// picker has the face at the front.
+  ///
+  /// The insertion itself belongs to the composer, which owns the field and
+  /// the caret in it: a face belongs where the caret is, not at the end of
+  /// whatever happened to be typed before the picker was opened.
+  void _insertEmoji(LocalTransferController controller, String face) {
     controller.rememberEmoji(face);
-    unawaited(
-      guarded(context, () => controller.sendEmoji(face, to: widget.peer)),
-    );
   }
 
   /// Asks for files and puts what came back in the composer.
@@ -426,11 +431,7 @@ class _ConversationViewState extends State<ConversationView> {
             onSend: () => _sendMessage(controller),
             onPaste: () => _pasteIntoComposer(controller),
             onAttach: canSend ? () => unawaited(_pickFiles()) : null,
-            onEmoji: canSend
-                ? (face) {
-                    _sendEmoji(controller, face);
-                  }
-                : null,
+            onEmoji: canSend ? (face) => _insertEmoji(controller, face) : null,
             recentEmojis: controller.recentEmojis,
             autoFocus: widget.autoFocusComposer,
           ),
@@ -509,9 +510,9 @@ class ConversationComposer extends StatefulWidget {
 
   /// Called with the face the user chose from the emoticon picker.
   ///
-  /// Bundled with the send action rather than staged: an emoji is a message
-  /// on its own, and a face dropped into the text box would read as typing
-  /// something the sender did not type.
+  /// A face is a character the user chose, so it goes into the box and leaves
+  /// with the rest of the message when 发送 is pressed — the same way a face
+  /// typed with the keyboard does.
   ///
   /// Null when the peer is no longer known well enough to send to it.
   ///
@@ -584,6 +585,34 @@ class _ConversationComposerState extends State<ConversationComposer> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focus.requestFocus();
     });
+  }
+
+  /// Puts [text] where the caret is in the field.
+  ///
+  /// The same rule the field itself follows: a selection is replaced, and
+  /// the caret lands after what was inserted. A face picked from the picker
+  /// is a character typed into the field, so it goes where the person was
+  /// writing — not at the end of the line, which is where appending would
+  /// put it.
+  void _insertAtCaret(String text) {
+    final value = widget.message.value;
+    final selection = value.selection;
+    if (!selection.isValid) {
+      // Never focused, so there is no caret to insert at: the text goes on
+      // the end, which is what the field does with a caret it does not have.
+      widget.message.value = TextEditingValue(
+        text: value.text + text,
+        selection: TextSelection.collapsed(
+          offset: value.text.length + text.length,
+        ),
+      );
+      return;
+    }
+    widget.message.value = TextEditingValue(
+      text: value.text.replaceRange(selection.start, selection.end, text),
+      selection: TextSelection.collapsed(offset: selection.start + text.length),
+    );
+    _focus.requestFocus();
   }
 
   @override
@@ -675,7 +704,10 @@ class _ConversationComposerState extends State<ConversationComposer> {
                 ),
                 const SizedBox(width: 10),
                 EmojiPickerButton(
-                  onPick: (face) => widget.onEmoji?.call(face),
+                  onPick: (face) {
+                    widget.onEmoji?.call(face);
+                    _insertAtCaret(face);
+                  },
                   enabled: widget.onEmoji != null,
                   recent: widget.recentEmojis,
                 ),
