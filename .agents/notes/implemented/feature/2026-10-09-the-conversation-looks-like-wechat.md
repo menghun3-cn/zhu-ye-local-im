@@ -50,6 +50,13 @@ secondary text `#888`, selected row `#C9C9C9`, hover `#E9E9E9`, badge
 bubble radius 6, bubble padding 12×9, bubble max width 60%, message gap 16,
 list width 250, row height 64.
 
+The bubble max width of 60% is a share of the **chat area**, and the chat
+area is a column the user can resize by dragging the divider between the
+conversation list and the conversation; see [A divider the user can
+drag](../../feature/2026-10-20-a-divider-the-user-can-drag.md). The 60% was
+written down here from the beginning and applied later; see [A bubble grew as
+wide as the conversation](../../bug-fix/2026-10-20-a-bubble-grew-as-wide-as-the-conversation.md).
+
 Both `MaterialApp`s — the live one and `StartupFailureApp` — take
 `WeChat.theme()`. The failure window is styled the same way on purpose: a
 window that fails to start is the one place a user is most likely to be looking

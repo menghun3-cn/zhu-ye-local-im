@@ -35,6 +35,10 @@ Status: implemented
 另加一个 `conversationRowVPadding`（10）承担从前那个数提供的呼吸感。行的其余部分一点没动：
 第二行、内缩的分隔线、行内动作，都在。
 
+300 是列表**开始时**的宽度。用户可以拖动列表与会话之间的那条分隔条来改它——见
+[一条能拖的分隔条](../../feature/2026-10-20-a-divider-the-user-can-drag.md)。
+`conversationListWidth` 仍然是默认值，也是分隔条各个边界推算的来源。
+
 **文件夹成了页面上的输入框。** 设置页现在画一个带标签的 `TextField`，值取
 `incomingDirectory ?? defaultIncomingDirectory`，`suffixIcon` 里放一个 `IconButton`，
 经既有的 `PickerResolution` 缝唤起平台自己的文件夹选择器。回车与失焦都提交 —— 没有
