@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-20-a-divider-the-user-can-drag.md
+#   git hash-object -- 2026-10-20-a-divider-the-user-can-drag.zh.md
+2026-10-20-a-divider-the-user-can-drag.md: d2c093e365889f4bf37ebb01fcf75f1bd3e0c60a
+2026-10-20-a-divider-the-user-can-drag.zh.md: a464e000f20fe075f51fbe1e3d627a7d48119dc6

@@ -121,6 +121,7 @@ class MessageBubbleShape extends StatelessWidget {
     required this.colour,
     required this.outgoing,
     required this.child,
+    this.maxWidth,
   });
 
   /// The bubble's fill.
@@ -131,6 +132,15 @@ class MessageBubbleShape extends StatelessWidget {
 
   /// The bubble's contents.
   final Widget child;
+
+  /// How wide the bubble may get, or null for as wide as it needs.
+  ///
+  /// The cap belongs to the *chat area*, not to the bubble: a bubble that
+  /// grew with its text would one day be a single line across a 2560-pixel
+  /// window, and the reader would have to scroll sideways to find the end of
+  /// a sentence. Capped, the text wraps and the bubble grows downward
+  /// instead, which is what a message in a column is supposed to do.
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -151,19 +161,28 @@ class MessageBubbleShape extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Flexible(
-          child: Container(
-            padding: WeChat.bubblePadding,
-            decoration: BoxDecoration(
-              color: colour,
-              borderRadius: radius,
-              border: outgoing
-                  ? null
-                  : Border.all(
-                      color: WeChatColors.of(context).divider,
-                      width: 1,
-                    ),
+          child: ConstrainedBox(
+            // The floor is what keeps a one-word message from being a dot:
+            // a bubble has to look like a bubble even when there is barely
+            // anything in it.
+            constraints: BoxConstraints(
+              minWidth: WeChat.bubbleMinWidth,
+              maxWidth: maxWidth ?? double.infinity,
             ),
-            child: child,
+            child: Container(
+              padding: WeChat.bubblePadding,
+              decoration: BoxDecoration(
+                color: colour,
+                borderRadius: radius,
+                border: outgoing
+                    ? null
+                    : Border.all(
+                        color: WeChatColors.of(context).divider,
+                        width: 1,
+                      ),
+              ),
+              child: child,
+            ),
           ),
         ),
       ],
