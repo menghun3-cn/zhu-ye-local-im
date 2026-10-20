@@ -40,6 +40,7 @@ void main() {
             onSend: () => sent.add(message.text),
             onPaste: () async => false,
             onAttach: () {},
+            onEmoji: (_) {},
           ),
         ),
       ),

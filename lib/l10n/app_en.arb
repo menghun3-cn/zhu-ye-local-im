@@ -53,6 +53,7 @@
   "kindFiles": "Files",
   "kindImages": "Images",
   "kindClipboard": "Clipboard",
+  "kindEmoji": "Emoji",
 
   "stateAwaitingDecision": "Waiting for an answer",
   "stateTransferring": "Transferring",
@@ -171,6 +172,8 @@
   "trusted": "trusted",
 
   "menuSendFile": "Send a file",
+  "menuSendEmoji": "Send an emoji",
+  "emojiRecent": "Recent",
   "dropToSend": "Let go to send",
   "trustDevice": "Trust this Device",
   "stopTrustingDevice": "Stop trusting this Device",
