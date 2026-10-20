@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/wechat/bubble.dart';
+import 'package:local_transfer/ui/wechat/splitter.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -197,6 +198,47 @@ void main() {
       width,
       lessThanOrEqualTo(chatAreaWidth(tester)),
       reason: 'the bubble stays inside a narrow chat area',
+    );
+
+    await shutdown(tester, [alice, bob]);
+  });
+
+  testWidgets('the cap follows the splitter, because the chat area moved', (
+    tester,
+  ) async {
+    const body = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final (:alice, :bob, :size) = await conversationWith(
+      tester,
+      body,
+      size: const Size(1600, 800),
+    );
+
+    final before = bubbleWidth(tester, body);
+
+    // The splitter is dragged, so the chat area is what changes. The bubble
+    // is capped at a share of the chat area, so it has to move with it —
+    // this is the two decisions meeting, and neither of them mentions the
+    // other: the cap is a share of the chat area, and the chat area is
+    // whatever the splitter left of it.
+    final splitter = find.byType(PaneSplitter);
+    final gesture = await tester.startGesture(tester.getCenter(splitter));
+    await tester.pump();
+    await gesture.moveBy(const Offset(120, 0));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    final after = bubbleWidth(tester, body);
+    expect(
+      after,
+      lessThan(before),
+      reason: 'the list took room, so the chat area narrowed, so the cap did',
+    );
+    // And it is still exactly the cap of the *new* chat area.
+    expect(
+      after,
+      closeTo(chatAreaWidth(tester) * WeChat.bubbleMaxWidthFactor, 1),
+      reason: 'the cap is a share of the chat area, whatever it now is',
     );
 
     await shutdown(tester, [alice, bob]);
