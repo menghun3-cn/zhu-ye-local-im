@@ -6,6 +6,7 @@ import '../protocol/frame.dart';
 import '../protocol/messages.dart';
 import '../security/secure_link.dart';
 import '../transfer/transfer_channel.dart';
+import 'keep_alive.dart';
 
 /// One Session, split between the conversations that share it.
 ///
@@ -24,7 +25,11 @@ import '../transfer/transfer_channel.dart';
 /// transfer engine is their only consumer, and a second controller in the path
 /// would copy nothing but add a buffer that has to be drained.
 final class SessionHub {
-  SessionHub(this._link) {
+  SessionHub(
+    this._link, {
+    this.keepAliveInterval = Duration.zero,
+    this.keepAliveTimeout = defaultKeepAliveTimeout,
+  }) {
     _subscription = _link.messages.listen(
       _dispatch,
       onError: _fail,
@@ -35,6 +40,17 @@ final class SessionHub {
   final SecureLink _link;
 
   late final StreamSubscription<WireMessage> _subscription;
+
+  /// How often a liveness probe goes out, when the peer speaks one.
+  ///
+  /// Zero turns the probing off, which is what a test that is not about
+  /// liveness wants and what a peer on a build without it gets.
+  final Duration keepAliveInterval;
+
+  /// How long a peer may go without answering before the Session is lost.
+  final Duration keepAliveTimeout;
+
+  KeepAlive? _keepAlive;
 
   final StreamController<WireMessage> _transferMessages =
       StreamController<WireMessage>();
@@ -62,6 +78,33 @@ final class SessionHub {
   /// Whether [close] has been called.
   bool get isClosed => _closed;
 
+  /// Starts probing the peer, if the peer said it speaks the probe.
+  ///
+  /// Called by the layer that owns the Session, once the Session exists and
+  /// is the only reader of the link's message stream — the keep-alive answers
+  /// travel on the same stream the Session reads, and two readers of a
+  /// single-subscription stream mean one of them silently loses every frame.
+  void startKeepAlive() {
+    if (_closed || _keepAlive != null) return;
+    if (keepAliveInterval <= Duration.zero) return;
+    // A peer that did not announce the capability is never probed: it would
+    // meet a message it does not understand.
+    if (!_link.peer.keepAlive) return;
+    final keepAlive = KeepAlive(
+      send: _link.send,
+      interval: keepAliveInterval,
+      timeout: keepAliveTimeout,
+      onTimeout: () {
+        // The peer stopped answering. The Session is closed rather than
+        // left open: it is not usable any more, and the layers above need
+        // to hear that it is gone so they can open a new one.
+        unawaited(close());
+      },
+    );
+    _keepAlive = keepAlive;
+    keepAlive.start();
+  }
+
   /// Tears the Session down: the subscription, both views, and the link.
   ///
   /// Closes the link as well as the views, because the hub is what owns it —
@@ -69,6 +112,9 @@ final class SessionHub {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    final keepAlive = _keepAlive;
+    _keepAlive = null;
+    if (keepAlive != null) await keepAlive.close();
     await _subscription.cancel();
     // Deliberately not awaited: a controller's close future only completes
     // once its done event has been delivered, which never happens for a view
@@ -84,6 +130,24 @@ final class SessionHub {
     switch (message) {
       case ClipboardMessage():
         _clipboardMessages.add(message);
+      case PingMessage():
+        // The peer is probing us. Answering it is what keeps the probe
+        // symmetrical: a peer that waits for an answer it never gets would
+        // decide we are gone. The answer is sent whether or not this side
+        // probes in return — a peer that probes us has said it speaks the
+        // probe, and leaving it unanswered would cost it its Session for
+        // no reason.
+        unawaited(
+          _link.send(PongMessage(message.id)).catchError((Object _) {}),
+        );
+      case PongMessage():
+        // The liveness conversation, not the transfer conversation. The
+        // keep-alive is driven by this hub, which is the single reader of
+        // the link's stream, so the answer is handed to it rather than
+        // forwarded: the transfer engine has no business seeing it and
+        // would report it as a message it does not recognise.
+        _keepAlive?.onMessage(message);
+        break;
       case HelloMessage():
       case HelloAckMessage():
       case SessionConfirmMessage():
@@ -108,6 +172,11 @@ final class SessionHub {
 
   void _finish() {
     if (!_closed) _closed = true;
+    // The peer went away, so the probing has to stop: a timer that kept
+    // running would send probes into a closed link for ever.
+    final keepAlive = _keepAlive;
+    _keepAlive = null;
+    if (keepAlive != null) unawaited(keepAlive.close());
     unawaited(_transferMessages.close());
     unawaited(_clipboardMessages.close());
   }

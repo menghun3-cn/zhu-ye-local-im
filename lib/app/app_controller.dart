@@ -85,6 +85,10 @@ final class LocalTransferController {
     MessageStore? messageStore,
     HostShell? hostShell,
     DateTime Function()? clock,
+    this.keepAliveInterval = defaultKeepAliveInterval,
+    this.keepAliveTimeout = defaultKeepAliveTimeout,
+    this.wrapSocket,
+    this.dialSocket,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -143,6 +147,36 @@ final class LocalTransferController {
   final HostShell? _hostShell;
 
   final DateTime Function() _clock;
+
+  /// How often a liveness probe goes out on an open Session.
+  ///
+  /// Zero turns the probing off, which is what a peer on a build without the
+  /// probe gets — it is never sent one, and its disappearance is noticed the
+  /// way it was before, when the socket finally errors out. The default is a
+  /// real interval, because a Session whose peer has vanished silently is a
+  /// Session that looks connected and is not.
+  final Duration keepAliveInterval;
+
+  /// How long a peer may go without answering before the Session is lost.
+  ///
+  /// Only a test shortens this: the shipped value is several times the
+  /// probing interval, because a peer that is merely slow is not a peer that
+  /// is gone.
+  final Duration keepAliveTimeout;
+
+  /// Wraps the socket an accepted Session runs on.
+  ///
+  /// The seam exists for the black-hole case: a connection that stays open
+  /// and silently swallows everything written to it is what a lost route
+  /// looks like, and it cannot be produced by closing a socket — a closed
+  /// socket reports itself. Only a test replaces it.
+  final ByteTransport Function(Socket socket)? wrapSocket;
+
+  /// Dials a peer, for the seam the same reason [wrapSocket] exists.
+  ///
+  /// Only a test replaces it, and only to make a dial fail the way a dial
+  /// fails while the network is down.
+  final Future<Socket> Function(String host, int port)? dialSocket;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -571,6 +605,7 @@ final class LocalTransferController {
     _watch.add(pairing.requests.listen(_pairingRequests.add));
     await _syncLayers();
     await _syncPairingListener();
+    _startReconnectSweep();
     _notify();
   }
 
@@ -581,6 +616,7 @@ final class LocalTransferController {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _stopReconnectSweep();
     await _teardownSessionLayer();
     await _discoveryWatch?.cancel();
     _discoveryWatch = null;
@@ -1151,6 +1187,10 @@ final class LocalTransferController {
       final manager = LinkManager(
         local: _descriptorOf(local.profile),
         sessionSecret: wanted,
+        keepAliveInterval: keepAliveInterval,
+        keepAliveTimeout: keepAliveTimeout,
+        wrapSocket: wrapSocket,
+        dialSocket: dialSocket,
       );
       await manager.serve(port: _sessionListenPort);
       _manager = manager;
@@ -1216,6 +1256,22 @@ final class LocalTransferController {
     _discoveryKey = key;
     _discovered = discovery.currentPeers;
     _discoveryWatch = discovery.peers.listen((peers) {
+      // A peer that has just appeared, or that is somewhere new, is worth
+      // dialling at once, whatever the last few attempts said. The backoff
+      // exists for a peer that is not answering at the address we have; a
+      // peer that has announced itself has just told us it is there.
+      final previous = {
+        for (final peer in _discovered)
+          peer.fingerprint.hex: peer.address.address,
+      };
+      for (final peer in peers) {
+        final wasKnown = previous[peer.fingerprint.hex];
+        if (wasKnown != null && wasKnown == peer.address.address) continue;
+        final known = _local?.profile.known(peer.fingerprint)?.lastAddress;
+        if (wasKnown == null && known == peer.address.address) continue;
+        _autoDue.remove(peer.fingerprint.hex);
+        _autoFailures.remove(peer.fingerprint.hex);
+      }
       _discovered = peers;
       _autoConnectPeers();
       _notify();
@@ -1225,10 +1281,41 @@ final class LocalTransferController {
 
   /// The peers an automatic connect is currently trying, by fingerprint hex.
   ///
-  /// Discovery re-reports a peer on every visible change — a new address, a
-  /// restarted service — and this is what keeps a slow attempt from stacking
-  /// a second one on top of the first.
+  /// This is what keeps a slow attempt from stacking a second one on top of
+  /// the first.
   final Set<String> _autoConnecting = {};
+
+  /// When each peer's next automatic attempt becomes due, by fingerprint hex.
+  ///
+  /// Absent means "as soon as the sweep next runs". A peer that has just been
+  /// discovered is dialled at once; a peer whose dial keeps failing is left
+  /// alone for longer and longer, so a Device that is switched off does not
+  /// cost a dial every two seconds for ever.
+  ///
+  /// The value is a number of *sweeps* rather than a point in time, so the
+  /// pause is measured by the same clock that runs the sweep. A deadline
+  /// against a wall clock would be judged by a different clock, and the two
+  /// could disagree about when a peer is due.
+  final Map<String, int> _autoDue = {};
+
+  /// How many consecutive automatic attempts have failed, by fingerprint hex.
+  final Map<String, int> _autoFailures = {};
+
+  /// The timer that keeps the open Sessions in step with the paired peers.
+  Timer? _reconnectTimer;
+
+  /// How many sweeps have run since the sweep started.
+  ///
+  /// The count is what the retry pause is measured in, so it only ever moves
+  /// when the sweep actually runs.
+  int _sweeps = 0;
+
+  /// How often the sweep looks for a peer that should be connected.
+  ///
+  /// Short enough that a network coming back feels immediate, long enough
+  /// that the sweep costs nothing measurable: it only dials a peer that is
+  /// paired and not connected, and a connected peer is left alone.
+  static const Duration _reconnectInterval = Duration(seconds: 2);
 
   /// Opens Sessions to every paired peer Discovery has placed.
   ///
@@ -1243,56 +1330,132 @@ final class LocalTransferController {
   ///
   /// Discovery only emits on a visible change — a peer that is new, or new
   /// where it is — so this does not fire on every routine announce. An
-  /// attempt that fails simply stops: the Connect button stays on the
-  /// conversation row, and a firewall is not worth a notice every time the
-  /// app starts.
+  /// attempt that fails is not retried here: the sweep comes back, and the
+  /// pause between attempts grows with every failure, so a Device that is
+  /// switched off costs less and less attention the longer it stays off. The
+  /// Connect button stays on the conversation row, and a firewall is not
+  /// worth a notice every time the app starts.
   void _autoConnectPeers() {
+    _reconcilePeers();
+  }
+
+  /// Brings the set of open Sessions in line with the paired peers.
+  ///
+  /// Called on every discovery change *and* on a timer, because neither
+  /// alone is enough to bring a Session back after a network outage:
+  ///
+  /// * Discovery reports a peer only when something a user could see about
+  ///   it changes — it is new, or it is somewhere else. A peer that comes
+  ///   back at the same address after a short outage changes nothing, so
+  ///   discovery says nothing at all and there is no event to react to.
+  /// * A lost Session is not something discovery knows about. The Session
+  ///   layer reports it, and the report has to be turned into a dial — for
+  ///   the peer to be dialled, something has to notice it is no longer
+  ///   connected.
+  ///
+  /// The sweep is what covers both: it looks at the paired peers and dials
+  /// the ones that are not connected, over and over, with a growing pause
+  /// between attempts so a peer that is switched off costs less and less
+  /// attention the longer it stays off.
+  ///
+  /// The peers come from the Owner Group rather than from Discovery's list,
+  /// because a peer that has dropped off the link is exactly the one that
+  /// has to be dialled: the Group is the record of who belongs here, and
+  /// Discovery's list is the record of who is reachable *right now*.
+  void _reconcilePeers() {
     final local = _local;
     if (local == null || _closed) return;
-    for (final discovered in _discovered) {
-      final peer = discovered.fingerprint;
+    for (final peer in local.profile.group.members) {
       if (peer == local.profile.self) continue;
-      // Only paired peers. An unpaired Device needs its user's consent, and
-      // that consent is what the Pairing flow exists to collect; skipping it
-      // here would make discovery a way to join without being asked.
-      if (!local.profile.group.contains(peer)) continue;
       if (_wired.containsKey(peer.hex)) continue;
+      // A peer that is being dialled right now is left alone: a second dial
+      // to the same peer would lose the race to the one already running, and
+      // losing it is reported as a failure.
+      if (_autoConnecting.contains(peer.hex)) continue;
+      final due = _autoDue[peer.hex];
+      if (due != null && _sweeps < due) continue;
       if (!_autoConnecting.add(peer.hex)) continue;
       unawaited(_autoConnect(peer));
     }
   }
 
-  /// One automatic connect: a few dials, then quiet.
+  /// One automatic connect: one dial, and a note of when to try again.
   ///
-  /// Unlike [connectAfterPairing] this is not racing a peer that is certainly
-  /// coming up — the beacon that triggered it is evidence the peer is already
-  /// serving — so the retry exists for the narrow gap between a beacon
-  /// arriving and the peer's socket listening, and gives up after it.
+  /// Unlike [connectAfterPairing] this is not racing a peer that is
+  /// certainly coming up, so a failure here is not retried immediately: the
+  /// sweep comes back, and the pause between attempts grows with every
+  /// failure. That is what makes a peer that is simply switched off cheap to
+  /// wait for, and what lets a peer whose network has come back be reached
+  /// without anybody asking.
   Future<void> _autoConnect(Fingerprint peer) async {
     try {
-      for (var tries = 0; tries < 3; tries++) {
-        if (_closed) return;
-        if (_wired.containsKey(peer.hex)) return;
-        try {
-          await connect(peer);
-          return;
-        } on HandshakeException {
-          // Both ends of a pair auto-connect, and one dial of the two loses:
-          // the Session layer closes a second Session to a peer it already
-          // holds. A Session by now is the race resolving the good way.
-          if (_wired.containsKey(peer.hex)) return;
-        } on SocketException {
-          // Nothing listening where the beacon said, or the peer is
-          // unreachable from here; the next try, or the peer's own dial,
-          // is the way through.
-        } on AppStateException {
-          // No address for the peer yet; the next beacon brings one.
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 400));
+      await connect(peer);
+      _autoFailures.remove(peer.hex);
+      _autoDue.remove(peer.hex);
+    } on HandshakeException {
+      // Both ends of a pair auto-connect, and one dial of the two loses:
+      // the Session layer closes a second Session to a peer it already
+      // holds. A Session by now is the race resolving the good way.
+      if (_wired.containsKey(peer.hex)) {
+        _autoFailures.remove(peer.hex);
+        _autoDue.remove(peer.hex);
+        return;
       }
+      _scheduleRetry(peer);
+    } on SocketException {
+      // Nothing listening where the beacon said, or the peer is
+      // unreachable from here; the next sweep, or the peer's own dial,
+      // is the way through.
+      _scheduleRetry(peer);
+    } on AppStateException catch (error) {
+      if (error.refusal == AppRefusal.sessionAlreadyOpen) {
+        // The peer dialled us first. The Session is up, which is what this
+        // dial was for.
+        _autoFailures.remove(peer.hex);
+        _autoDue.remove(peer.hex);
+        return;
+      }
+      // No address for the peer yet; the next beacon brings one.
+      _scheduleRetry(peer);
     } finally {
       _autoConnecting.remove(peer.hex);
     }
+  }
+
+  /// Notes that a peer's dial failed, and when to try again.
+  ///
+  /// The pause grows with every failure and stops growing at half a minute,
+  /// so a peer that is switched off is still retried — and is picked up
+  /// within half a minute of coming back — without costing a dial every
+  /// couple of seconds for ever.
+  void _scheduleRetry(Fingerprint peer) {
+    final failures = (_autoFailures[peer.hex] ?? 0) + 1;
+    _autoFailures[peer.hex] = failures;
+    // The pause is counted in sweeps, and the sweeps are the interval the
+    // pause is measured against: one sweep is the shortest pause, and the
+    // longest is a quarter of a minute.
+    final sweeps = 1 << (failures - 1);
+    _autoDue[peer.hex] =
+        _sweeps + (sweeps > _maxRetrySweeps ? _maxRetrySweeps : sweeps);
+  }
+
+  /// The longest a peer that keeps failing is left alone before another try.
+  static const int _maxRetrySweeps = 15;
+
+  /// Starts the sweep that keeps the Sessions in step with the paired peers.
+  void _startReconnectSweep() {
+    _reconnectTimer?.cancel();
+    _sweeps = 0;
+    _reconnectTimer = Timer.periodic(_reconnectInterval, (_) {
+      _sweeps += 1;
+      _reconcilePeers();
+    });
+  }
+
+  /// Stops the sweep.
+  void _stopReconnectSweep() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 
   Future<void> _teardownSessionLayer() async {
@@ -1382,6 +1545,14 @@ final class LocalTransferController {
     final wired = _wired.remove(peer.hex);
     if (wired != null) unawaited(wired.dispose());
     _clipboard?.detachPeer(peer);
+    // A Session that ended is a peer that should be connected again. The
+    // sweep would get there on its own within a couple of seconds, but the
+    // common case — a peer that restarted, or a network that blinked — is
+    // one that is back almost immediately, and waiting for the sweep is a
+    // visible delay in a conversation that should never have ended.
+    _autoDue.remove(peer.hex);
+    _autoFailures.remove(peer.hex);
+    _reconcilePeers();
     _notify();
   }
 

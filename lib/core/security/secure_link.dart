@@ -116,6 +116,7 @@ final class SecureLink {
     required DeviceDescriptor local,
     required PairingSecret secret,
     Duration timeout = const Duration(seconds: 15),
+    bool keepAlive = false,
     Random? random,
   }) async {
     try {
@@ -125,6 +126,7 @@ final class SecureLink {
         local: local,
         secret: secret,
         timeout: timeout,
+        keepAlive: keepAlive,
         random: random,
       );
     } on HandshakeException {
@@ -140,6 +142,7 @@ final class SecureLink {
     required DeviceDescriptor local,
     required PairingSecret secret,
     required Duration timeout,
+    required bool keepAlive,
     Random? random,
   }) async {
     final channel = _FrameChannel(transport);
@@ -153,6 +156,7 @@ final class SecureLink {
       device: local,
       ephemeralPublicKey: Uint8List.fromList(myPublicKey.bytes),
       nonce: myNonce,
+      keepAlive: keepAlive,
     );
 
     final PeerHandshake theirs;

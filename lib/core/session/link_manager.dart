@@ -7,6 +7,7 @@ import '../identity/pairing_secret.dart';
 import '../protocol/messages.dart';
 import '../security/secure_link.dart';
 import '../transport/byte_transport.dart';
+import 'keep_alive.dart';
 import 'session_hub.dart';
 
 /// The TCP port a Device listens on for Sessions by default.
@@ -137,11 +138,17 @@ final class LinkManager {
     required DeviceDescriptor local,
     required PairingSecret sessionSecret,
     this.handshakeTimeout = const Duration(seconds: 15),
+    this.keepAliveInterval = defaultKeepAliveInterval,
+    this.keepAliveTimeout = defaultKeepAliveTimeout,
+    ByteTransport Function(Socket socket)? wrapSocket,
+    Future<Socket> Function(String host, int port)? dialSocket,
   }) : // Named parameters cannot be private fields, so each is assigned here.
        // ignore: prefer_initializing_formals
        _local = local,
        // ignore: prefer_initializing_formals
-       _sessionSecret = sessionSecret;
+       _sessionSecret = sessionSecret,
+       _wrapSocket = wrapSocket ?? SocketByteTransport.fromSocket,
+       _dialSocket = dialSocket ?? _defaultDial;
 
   /// Returns [local] with its listening port replaced, or unchanged when it
   /// already matches.
@@ -164,6 +171,40 @@ final class LinkManager {
 
   /// How long a handshake may take before the Session is abandoned.
   final Duration handshakeTimeout;
+
+  /// How often a liveness probe goes out, when the peer speaks one.
+  ///
+  /// Zero turns the probing off. The default is a real interval, because a
+  /// Session whose peer has vanished silently is a Session that looks
+  /// connected and is not — see [KeepAlive].
+  final Duration keepAliveInterval;
+
+  /// How long a peer may go without answering before the Session is lost.
+  ///
+  /// Only a test shortens this: the shipped value is several times the
+  /// probing interval, because a peer that is merely slow is not a peer that
+  /// is gone.
+  final Duration keepAliveTimeout;
+
+  /// Wraps the socket an accepted connection runs on.
+  ///
+  /// The seam exists for the black-hole case: a connection that stays open
+  /// and silently swallows everything written to it is what a lost route
+  /// looks like, and it cannot be produced by closing a socket — a closed
+  /// socket reports itself. Only a test replaces it.
+  ///
+  /// It wraps both ends of a connection: the socket accepted from a peer and
+  /// the socket dialled out to one.
+  final ByteTransport Function(Socket socket) _wrapSocket;
+
+  /// Dials a peer, for the seam the same reason [_wrapSocket] exists.
+  ///
+  /// Only a test replaces it, and only to make a dial fail the way a dial
+  /// fails while the network is down.
+  final Future<Socket> Function(String host, int port) _dialSocket;
+
+  static Future<Socket> _defaultDial(String host, int port) =>
+      Socket.connect(host, port, timeout: const Duration(seconds: 10));
 
   final Map<String, ManagedSession> _sessions = {};
   final StreamController<LinkEvent> _events =
@@ -244,9 +285,13 @@ final class LinkManager {
     if (_closed) {
       throw StateError('this LinkManager is closed');
     }
-    final SocketByteTransport transport;
+    final ByteTransport transport;
+    final InternetAddress? address;
     try {
-      transport = await SocketByteTransport.connect(host, port);
+      final socket = await _dialSocket(host, port);
+      socket.setOption(SocketOption.tcpNoDelay, true);
+      address = socket.remoteAddress;
+      transport = _wrapSocket(socket);
     } on SocketException catch (error) {
       throw HandshakeException('cannot reach $host:$port: ${error.message}');
     }
@@ -255,7 +300,7 @@ final class LinkManager {
       role: LinkRole.initiator,
       secret: secret ?? _sessionSecret,
       expectedFingerprint: expectedFingerprint,
-      address: transport.remoteAddress,
+      address: address,
     );
   }
 
@@ -288,7 +333,7 @@ final class LinkManager {
       socket.destroy();
       return;
     }
-    final transport = SocketByteTransport.fromSocket(socket);
+    final transport = _wrapSocket(socket);
     var adopted = false;
     try {
       await _establish(
@@ -326,6 +371,7 @@ final class LinkManager {
         local: advertised,
         secret: secret,
         timeout: handshakeTimeout,
+        keepAlive: keepAliveInterval > Duration.zero,
       );
     } on HandshakeException {
       await transport.close();
@@ -354,11 +400,21 @@ final class LinkManager {
     }
 
     final session = ManagedSession(
-      hub: SessionHub(link),
+      hub: SessionHub(
+        link,
+        keepAliveInterval: keepAliveInterval,
+        keepAliveTimeout: keepAliveTimeout,
+      ),
       role: role,
       address: address,
       transport: transport,
     );
+    // The probing starts only once the Session exists, and only once this
+    // side is the Session's single reader of the link's message stream: a
+    // probe sent before the answer could arrive is a probe whose answer is
+    // missed, and a second reader of a single-subscription stream silently
+    // loses every frame.
+    session.hub.startKeepAlive();
     _sessions[peer.hex] = session;
     unawaited(
       session.done.then(
