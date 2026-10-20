@@ -98,6 +98,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get kindClipboard => '剪贴板';
 
   @override
+  String get kindEmoji => '表情';
+
+  @override
   String get stateAwaitingDecision => '等待对方确认';
 
   @override
@@ -310,6 +313,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get menuSendFile => '发送文件';
+
+  @override
+  String get menuSendEmoji => '发送表情';
+
+  @override
+  String get emojiRecent => '最近使用';
 
   @override
   String get dropToSend => '松手即发送';

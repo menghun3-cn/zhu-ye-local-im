@@ -31,7 +31,10 @@ enum PayloadKind {
   image('image'),
 
   /// Clipboard content captured by Mirroring.
-  clipboard('clipboard');
+  clipboard('clipboard'),
+
+  /// A single emoji face.
+  emoji('emoji');
 
   const PayloadKind(this.wireName);
 
