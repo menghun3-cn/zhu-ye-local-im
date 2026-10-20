@@ -243,4 +243,53 @@ void main() {
 
     await shutdown(tester, [alice, bob]);
   });
+  testWidgets('the narrowest conversation still fits a sentence on a line', (
+    tester,
+  ) async {
+    // The minimum the splitter will let the conversation be, and the width
+    // the tokens say a line of [WeChat.messageCharsPerLine] Chinese
+    // characters needs. Asserted by *measuring* the text rather than by
+    // restating the arithmetic the constant was derived from: a line that
+    // wraps here is a line the user reads as fragments.
+    final chat = WeChat.conversationPaneMinWidth;
+    final textColumn =
+        chat * WeChat.bubbleMaxWidthFactor - WeChat.bubblePaddingHorizontal * 2;
+    const sentence = '我们下午三点在老地方见面好吗';
+
+    // A sentence of the length the minimum is supposed to guarantee.
+    expect(
+      sentence.length,
+      WeChat.messageCharsPerLine,
+      reason: 'the sentence is one clause of the promised length',
+    );
+
+    final painter = TextPainter(
+      text: TextSpan(
+        text: sentence,
+        style: TextStyle(
+          fontSize: WeChat.fontSizeBody,
+          height: WeChat.lineHeightBody,
+          // The font the application actually sets. Measured with the
+          // test's own fallback the characters come out narrower than a
+          // full-width em, and the test would then be checking a font no
+          // user ever sees.
+          fontFamily: WeChat.fontFamily,
+          fontFamilyFallback: WeChat.fontFamilyFallback,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout(maxWidth: textColumn);
+
+    expect(
+      painter.width,
+      lessThanOrEqualTo(textColumn),
+      reason: 'a line of that many characters fits the narrowest conversation',
+    );
+    expect(
+      painter.didExceedMaxLines,
+      isFalse,
+      reason: 'and it fits on one line rather than wrapping',
+    );
+  });
 }
