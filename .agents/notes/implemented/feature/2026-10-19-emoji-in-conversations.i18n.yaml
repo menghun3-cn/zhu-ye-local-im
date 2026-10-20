@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- .agents/notes/implemented/feature/2026-10-19-emoji-in-conversations.md
 #   git hash-object -- .agents/notes/implemented/feature/2026-10-19-emoji-in-conversations.zh.md
-2026-10-19-emoji-in-conversations.md: 3b42de8e5ce1ae28cdb829568462a5277445e5eb
-2026-10-19-emoji-in-conversations.zh.md: c49f0271db6d1925c73983fb0ffacba69bbf21f9
+2026-10-19-emoji-in-conversations.md: a2f2bbed273a0f5b7c92d6514943fe819ef7056c
+2026-10-19-emoji-in-conversations.zh.md: 15aaa675a9b15b09b380429e9e50e6d764b6876f
