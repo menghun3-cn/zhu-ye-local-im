@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// The colours of one theme — the light page the design was drawn on, or the
 /// dark page the same roles move to.
@@ -425,9 +426,15 @@ class WeChat {
 
   /// 气泡内边距。
   static const EdgeInsets bubblePadding = EdgeInsets.symmetric(
-    horizontal: 12,
+    horizontal: bubblePaddingHorizontal,
     vertical: 9,
   );
+
+  /// 气泡内边距的左右各一份——也就是气泡里文字真正拿到的宽度被扣掉的量。
+  ///
+  /// 单列一个数，是因为 `EdgeInsets.horizontal` 不是常量表达式，而
+  /// [conversationPaneMinWidth] 要在常量里算出来。
+  static const double bubblePaddingHorizontal = 12;
 
   /// 图片缩略图的圆角。
   ///
@@ -462,11 +469,21 @@ class WeChat {
   /// 两条消息之间的纵向间距。
   static const double messageGap = 16;
 
-  /// 气泡最大宽度占可用宽度的比例。
+  /// 气泡最大宽度占**聊天区域**宽度的比例。
   ///
   /// 一个比例而不是固定像素：微信的窄屏气泡和宽屏气泡都不会撑满，
   /// 而固定 460 像素在 2560 宽的窗口里显得很短，在 600 宽的窗口里又过长。
+  ///
+  /// 比例乘的是**聊天区域**（整个会话面板）的宽度，不是文字剩下的地方：
+  /// 后者已经扣掉了头像，气泡按它算就会比微信的窄一截。
   static const double bubbleMaxWidthFactor = 0.6;
+
+  /// 气泡的最小宽度。
+  ///
+  /// 一条只有一个字的消息，气泡也不该缩成一个小点。48 像素里去掉左右各 12
+  /// 的内边距，还剩 24 像素——刚好放得下一个字，也刚好是一个气泡该有的
+  /// 最小体量。
+  static const double bubbleMinWidth = 48;
 
   /// 文件传输气泡宽度随内容自适应时的**下限**。
   ///
@@ -502,6 +519,81 @@ class WeChat {
   /// 300 而不是 250：1280 宽的窗口里，250 会让「最后一句话」那一行截断得
   /// 太频繁 —— 摘要刚说半句就上省略号，列表就不再能扫读。
   static const double conversationListWidth = 300;
+
+  /// 会话列表宽度的**下限**。
+  ///
+  /// 拖动分隔条时列表不能被拖没：一列 200 像素还能读出「最后一句话」是什
+  /// 么，100 像素就只剩一个头一个字了，而读不出来的列表比没有列表更糟。
+  static const double conversationListMinWidth = 220;
+
+  /// 会话列表宽度的**上限**。
+  ///
+  /// 同样是为了会话本身留地方：会话列窄到 320 像素以下，长消息每行只剩十来
+  /// 个字，读起来是在数行而不是在读话。列表再宽也没有第二份内容可放。
+  static const double conversationListMaxWidth = 480;
+
+  /// 一条消息的一行至少要装得下的**汉字**数。
+  ///
+  /// 14 个字。这个数是「会话列最少要有多宽」的根据，不是随手定的：14 个
+  /// 汉字是一句常用的话的长度（比它更短的句子塞不下一件完整的事，更长的
+  /// 会被断开），而一行装不下 14 个字，消息就碎成每行十来个字的碎片，读
+  /// 起来是在数行而不是在读话。
+  ///
+  /// 按汉字算而不是按「字」算，是因为汉字是全角的：14 个汉字的宽度就是
+  /// 14 个正文字号。混排的拉丁字母只有全角的一半宽，所以中英混排时一行
+  /// 装得下的「字」比这个多——按最坏的情况取。
+  static const double messageCharsPerLine = 14;
+
+  /// 一个全角汉字的宽度，按正文字号算。
+  ///
+  /// 一个全角字符占一个 em，也就是一个正文字号那么宽。这不是量出来的，
+  /// 是排版里的定义：全角字符的 advance 就是字号本身。
+  static const double fullWidthCharWidth = fontSizeBody;
+
+  /// 正文用的字体。
+  ///
+  /// 中文优先：Windows 上 Material 默认的 Roboto 不含汉字，会回退到
+  /// 系统字体；显式点名雅黑能让中英混排的基线一致。
+  static const String fontFamily = 'Microsoft YaHei UI';
+
+  /// 正文字体的回退链。
+  static const List<String> fontFamilyFallback = [
+    'Microsoft YaHei',
+    'PingFang SC',
+    'Roboto',
+  ];
+
+  /// 会话列的**最小**宽度。
+  ///
+  /// 这个数是**推出来的**，不是猜的。一条消息的气泡最多占会话列的
+  /// [bubbleMaxWidthFactor]，气泡自己还要去掉左右各 12 的内边距，所以一
+  /// 行能装下的汉字数是：
+  ///
+  /// ```
+  /// 0.6 × 会话列宽 − 24 ≥ messageCharsPerLine × fullWidthCharWidth
+  /// ```
+  ///
+  /// 解出来是 (14 × 14 + 24) / 0.6 = 366.67，取 367。低于这个宽度，一行
+  /// 就装不下 [messageCharsPerLine] 个字，消息会碎掉。
+  ///
+  /// 拖动分隔条时列表不能把会话挤到这个宽度以下：会话是这个界面的主
+  /// 体，让步的是列表。
+  static const double conversationPaneMinWidth =
+      (messageCharsPerLine * fullWidthCharWidth + bubblePaddingHorizontal * 2) /
+      bubbleMaxWidthFactor;
+
+  /// 分隔条的宽度。
+  ///
+  /// 比一条发丝线宽，是为了**能被抓住**：1 像素的线在鼠标下几乎点不中。8
+  /// 像素是桌面上可拖动分隔条的常见宽度，而视觉上它仍然只画一条发丝线
+  /// ——宽的是**可点的范围**，不是画出来的东西。
+  static const double splitterWidth = 8;
+
+  /// 分隔条被按住时，光标变成的样子。
+  ///
+  /// 横向拖动就是 `resizeColumn`。
+  static const SystemMouseCursor splitterCursor =
+      SystemMouseCursors.resizeColumn;
 
   /// 会话列表一行的上下内边距。
   ///
@@ -645,6 +737,21 @@ class WeChat {
   /// [fieldHeight]。
   static const double composerControl = 34;
 
+  /// 表情面板里一个表情格子的边长。
+  ///
+  /// 32 让一行放下八个格子（含间距）后仍是微信桌面端面板的窄度 —— 面板宽度
+  /// 就按 `8 × 32 + 7 × 2` 计算，不另起一个数。
+  static const double emojiTileSide = 32;
+
+  /// 表情面板里一个表情的字号。比工具栏字形大一档，让格子里的脸一眼可辨。
+  static const double emojiTileFontSize = 22;
+
+  /// 会话气泡里一个表情的字号。
+  ///
+  /// 比普通正文大三倍半，让单发的一个表情像微信里那样读作一张「贴纸」而不是
+  /// 一行文字。
+  static const double emojiBubbleFontSize = 48;
+
   // ---------------------------------------------------------------- 主题
 
   /// The [ThemeData] the app runs on, for one [WeChatColors] palette.
@@ -721,8 +828,8 @@ class WeChat {
       extensions: [colors],
       // 中文优先：Windows 上 Material 默认的 Roboto 不含汉字，会回退到
       // 系统字体；显式点名雅黑能让中英混排的基线一致。
-      fontFamily: 'Microsoft YaHei UI',
-      fontFamilyFallback: const ['Microsoft YaHei', 'PingFang SC', 'Roboto'],
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback,
       // Icons on a quiet surface are grey unless a component says otherwise;
       // an icon that inherited `onSurface` would be near-black and shout.
       iconTheme: IconThemeData(color: colors.secondaryText, size: 20),

@@ -47,6 +47,54 @@ void main() {
       expect(profile.alias, 'Unnamed device');
     });
 
+    group('recent emojis', () {
+      test('a new profile has no recents', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        expect(profile.recentEmojis, isEmpty);
+      });
+
+      test('remembering moves the face to the front and persists', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.rememberEmoji('😀');
+        profile.rememberEmoji('😂');
+        profile.rememberEmoji('😀');
+        expect(profile.recentEmojis, ['😀', '😂']);
+
+        final decoded = DeviceProfile.fromJson(profile.toJson());
+        expect(decoded.recentEmojis, ['😀', '😂']);
+      });
+
+      test('a face outside the table never enters the strip', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+          recentEmojis: ['😀', '👻', '😂'],
+        );
+        expect(profile.recentEmojis, ['😀', '😂']);
+        profile.rememberEmoji('👻');
+        expect(profile.recentEmojis, ['😀', '😂']);
+      });
+
+      test('a profile written before the key exists reads with no recents', () {
+        final json = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        ).toJson();
+        json.remove('recentEmojis');
+        expect(DeviceProfile.fromJson(json).recentEmojis, isEmpty);
+      });
+    });
+
     group('favorites', () {
       test('marking and unmarking is reflected in isFavorite', () {
         final profile = DeviceProfile(

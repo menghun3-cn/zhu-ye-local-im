@@ -48,6 +48,20 @@ void main() {
       await peers.close();
     });
 
+    test('an emoji keeps its own payload kind and its face', () async {
+      final peers = await connectedPeers();
+      final receiver = peers.receiverAtBob();
+
+      final sent = await peers.alice.engine.sendEmoji('😀');
+      expect(await sent.outcome, isA<TransferCompleted>());
+      await receiver.answered(1);
+
+      expect(receiver.receipts.single.transfer.kind, PayloadKind.emoji);
+      expect(receiver.receipts.single.inlineText, '😀');
+
+      await peers.close();
+    });
+
     test('several files travel as one transfer and stay apart', () async {
       final peers = await connectedPeers();
       final receiver = peers.receiverAtBob();

@@ -33,6 +33,7 @@ void main() {
             onSend: () {},
             onPaste: () async => false,
             onAttach: () {},
+            onEmoji: (_) {},
             attachments: attachments,
             onRemoveAttachment: (_) {},
           ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,7 @@ import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../wechat/bubble.dart';
+import '../wechat/splitter.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -95,6 +97,20 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// what triggers the request, so a flag left standing would make the *next*
   /// arrival a no-op.
   bool _focusComposer = false;
+
+  /// How wide the conversation list is, in logical pixels.
+  ///
+  /// The width the user has dragged it to, or [WeChat.conversationListWidth]
+  /// until they drag it. Held as a number rather than as a share of the
+  /// window, because the list has a width a person can recognise — the same
+  /// 300 pixels on every screen — and a share would make the list wider on
+  /// a wide screen for no reason the user asked for.
+  ///
+  /// The *drawn* width is not this number: it is this number after
+  /// [_clampedListWidth] has applied the window's own limits. Keeping the
+  /// user's choice here and the limits there is what lets a window that
+  /// shrinks give the room back without throwing the choice away.
+  double _listWidth = WeChat.conversationListWidth;
 
   @override
   void initState() {
@@ -267,46 +283,73 @@ class _ConversationsPageState extends State<ConversationsPage> {
       );
     }
 
-    return Row(
-      children: [
-        Container(
-          width: WeChat.conversationListWidth,
-          color: colors.sidebarBackground,
-          child: _list(context, l10n, conversations, selected: current),
-        ),
-        VerticalDivider(width: 1, color: colors.divider),
-        Expanded(
-          child: current == null
-              // The pane a conversation would open into, so it wears the
-              // conversation's own white rather than the page's grey.
-              ? ColoredBox(
-                  color: colors.conversationBackground,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: HintText(l10n.conversationPickOne),
-                  ),
-                )
-              : ConversationView(
-                  // Keyed by peer so switching conversations rebuilds the
-                  // composer and the scroll position rather than carrying the
-                  // previous one's over.
-                  key: ValueKey(current.peer.fingerprint.hex),
-                  peer: current.peer.fingerprint,
-                  defaultIncomingDirectory: widget.defaultIncomingDirectory,
-                  autoFocusComposer: focusComposer,
-                  header: _PaneHeader(
-                    title: current.peer.displayName,
-                    // The address, and — when the Session has gone — that it
-                    // has. A conversation outlives its Session, so this is the
-                    // only place that says whether typing here would reach
-                    // anybody, and a pane that looked the same either way would
-                    // be inviting a message into a void.
-                    subtitle: _subtitleFor(current.peer, l10n),
-                    offline: !current.peer.isConnected,
-                  ),
-                ),
-        ),
-      ],
+    // The two panes share whatever this surface is given, and the split
+    // between them is the user's to make.
+    //
+    // The width is *measured* rather than derived from the window: this
+    // surface does not know how much of the window the shell has already
+    // taken for its rail, and subtracting a known constant for it is a
+    // guess that a change to the shell would silently invalidate. The
+    // [LayoutBuilder] says what the two panes actually have between them,
+    // which is the only number the list's bounds are derived from.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The room the list may grow into, before the conversation is
+        // squeezed: the width the two panes share, less the splitter between
+        // them, less what the conversation needs to keep.
+        final room =
+            constraints.maxWidth -
+            WeChat.splitterWidth -
+            WeChat.conversationPaneMinWidth;
+        return Row(
+          children: [
+            Container(
+              width: _clampedListWidth(room),
+              color: colors.sidebarBackground,
+              child: _list(context, l10n, conversations, selected: current),
+            ),
+            // The line between the panes, which the user drags to move it. It
+            // stands where the divider was, and it *is* the divider: what it
+            // draws is the same hairline, so a surface that is not being
+            // resized looks exactly as it did before the splitter existed.
+            PaneSplitter(
+              enabled: room > WeChat.conversationListMinWidth,
+              onDrag: (delta) => setState(() => _listWidth += delta),
+            ),
+            Expanded(
+              child: current == null
+                  // The pane a conversation would open into, so it wears the
+                  // conversation's own white rather than the page's grey.
+                  ? ColoredBox(
+                      color: colors.conversationBackground,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: HintText(l10n.conversationPickOne),
+                      ),
+                    )
+                  : ConversationView(
+                      // Keyed by peer so switching conversations rebuilds the
+                      // composer and the scroll position rather than carrying
+                      // the previous one's over.
+                      key: ValueKey(current.peer.fingerprint.hex),
+                      peer: current.peer.fingerprint,
+                      defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                      autoFocusComposer: focusComposer,
+                      header: _PaneHeader(
+                        title: current.peer.displayName,
+                        // The address, and — when the Session has gone — that
+                        // it has. A conversation outlives its Session, so this
+                        // is the only place that says whether typing here
+                        // would reach anybody, and a pane that looked the same
+                        // either way would be inviting a message into a void.
+                        subtitle: _subtitleFor(current.peer, l10n),
+                        offline: !current.peer.isConnected,
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -320,6 +363,44 @@ class _ConversationsPageState extends State<ConversationsPage> {
     final address = describePeerAddress(peer, l10n);
     if (peer.isConnected) return address;
     return '$address · ${l10n.conversationDisconnected}';
+  }
+
+  /// How wide the list is drawn, once every limit is applied.
+  ///
+  /// The width the user dragged it to, held to three bounds:
+  ///
+  /// - the list's own floor ([WeChat.conversationListMinWidth]), because a
+  ///   list narrower than that cannot show a name and a preview;
+  /// - the list's own ceiling ([WeChat.conversationListMaxWidth]), because
+  ///   there is no second thing to put in the space;
+  /// - and what the **conversation** still needs, which is the bound that
+  ///   matters when the window is small.
+  ///
+  /// That last one is the one worth arguing for. A list dragged to 480
+  /// pixels in an 800-pixel window would leave the conversation 300 pixels
+  /// of which the rail has already taken 84 — the messages would be a
+  /// two-word column. The conversation is what this surface is *for*, so it
+  /// is the list that gives way.
+  ///
+  /// All three live here and nowhere else. The drag itself does not clamp:
+  /// a clamp in the drag handler and a clamp at the draw site are two rules
+  /// that can disagree, and a test that breaks one of them would then be
+  /// testing the other.
+  ///
+  /// [room] is what the two panes have between them, less what the
+  /// conversation needs to keep — measured by the caller, which is where the
+  /// two panes' actual width is known.
+  double _clampedListWidth(double room) {
+    final ceiling = math.min(WeChat.conversationListMaxWidth, room);
+    return _listWidth.clamp(
+      WeChat.conversationListMinWidth,
+      // A window too narrow to hold the list's floor and the conversation's
+      // minimum at once: the floor wins, because the list is the pane the
+      // user is looking at and the conversation is already at its minimum.
+      ceiling < WeChat.conversationListMinWidth
+          ? WeChat.conversationListMinWidth
+          : ceiling,
+    );
   }
 
   /// The list of conversations, with [selected] marked when it is present.

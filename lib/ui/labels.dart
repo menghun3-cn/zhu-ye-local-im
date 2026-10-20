@@ -25,6 +25,7 @@ IconData iconForKind(PayloadKind kind) => switch (kind) {
   PayloadKind.file => Icons.description_outlined,
   PayloadKind.image => Icons.image_outlined,
   PayloadKind.clipboard => Icons.content_paste,
+  PayloadKind.emoji => Icons.emoji_emotions_outlined,
 };
 
 /// A short name for a Payload's kind.
@@ -33,6 +34,7 @@ String labelForKind(PayloadKind kind, AppLocalizations l10n) => switch (kind) {
   PayloadKind.file => l10n.kindFiles,
   PayloadKind.image => l10n.kindImages,
   PayloadKind.clipboard => l10n.kindClipboard,
+  PayloadKind.emoji => l10n.kindEmoji,
 };
 
 /// Where a Transfer has got to, in a word.

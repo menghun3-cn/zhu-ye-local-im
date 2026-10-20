@@ -10,6 +10,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'clipboard_paste.dart';
 import 'controller_scope.dart';
+import 'emoji_picker.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
@@ -162,6 +163,20 @@ class _ConversationViewState extends State<ConversationView> {
     );
   }
 
+  /// Sends [face] as a message of its own, and remembers it as recent.
+  ///
+  /// A face is a complete message the way a sent file is, so it goes out
+  /// immediately rather than waiting for 发送: putting it in the box would
+  /// leave the user with "how do I send a face now". The recent strip is
+  /// updated on the same tap, so the next open of the picker has the face at
+  /// the front.
+  void _sendEmoji(LocalTransferController controller, String face) {
+    controller.rememberEmoji(face);
+    unawaited(
+      guarded(context, () => controller.sendEmoji(face, to: widget.peer)),
+    );
+  }
+
   /// Asks for files and puts what came back in the composer.
   ///
   /// Picking is not sending: the files wait in the box until 发送 is pressed, so
@@ -302,51 +317,70 @@ class _ConversationViewState extends State<ConversationView> {
     // peer the overlay would promise something the app cannot do.
     final canSend = peer != null;
 
-    final history = messages.isEmpty
-        ? Padding(
-            padding: const EdgeInsets.all(24),
-            child: HintText(l10n.conversationEmpty),
-          )
-        // Selectable, the way every other piece of text on a desktop is: a
-        // double-click takes a word and a drag takes a range. What it does
-        // *not* do is draw the platform's own copy toolbar — a right-click on a
-        // message opens the message's own menu instead, which knows about the
-        // selection and offers 复制 of it alongside 打开所在目录 and 删除. See
-        // [TransferContextMenu]; that is the one place the two are reconciled.
-        //
-        // The area wraps the whole list rather than each bubble, because a
-        // selection that stops at a bubble's edge is not what a user dragging
-        // across two messages is asking for.
-        //
-        // What it selects is published to the menus below it through
-        // [MessageSelection]. A [SelectableRegionState] cannot be reached from
-        // outside the widget that made it, so the selection has to be pushed
-        // from here rather than pulled from there.
-        : SelectionArea(
-            onSelectionChanged: (content) =>
-                setState(() => _selectedText = content?.plainText),
-            child: ListView.builder(
-              controller: _scroll,
-              reverse: true,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) => MessageBubble(
-                view: messages[index],
-                controller: controller,
-                defaultIncomingDirectory: widget.defaultIncomingDirectory,
-                // A Device with no name is named by its address, and by the last
-                // number of it inside the avatar — see `PeerView.avatarLabel`.
-                // With no peer in the list at all there is only the Fingerprint,
-                // which is stable and its own, so the avatar is still the same
-                // one every time.
-                peerName: peer?.displayName ?? widget.peer.short(),
-                peerLabel: peer?.avatarLabel,
-                peerSeed: widget.peer.hex,
-                selfName: self.displayName,
-                selfSeed: self.fingerprint.hex,
-              ),
-            ),
-          );
+    // The cap on a bubble is a share of the **chat area** — the column the
+    // conversation is drawn in — so it is measured once, here, where that
+    // width is known. A cap that each bubble measured for itself would be a
+    // cap on the list's inner width, and it would shift whenever the list's
+    // padding changed rather than whenever the window did.
+    //
+    // A [LayoutBuilder] re-reads the width on every change of it, so
+    // resizing the window — or the divider between the list and the
+    // conversation — moves the cap with the area instead of leaving it
+    // behind.
+    final history = LayoutBuilder(
+      builder: (context, constraints) {
+        final bubbleMaxWidth =
+            constraints.maxWidth * WeChat.bubbleMaxWidthFactor;
+        return messages.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: HintText(l10n.conversationEmpty),
+              )
+            // Selectable, the way every other piece of text on a desktop is: a
+            // double-click takes a word and a drag takes a range. What it does
+            // *not* do is draw the platform's own copy toolbar — a right-click
+            // on a message opens the message's own menu instead, which knows
+            // about the selection and offers 复制 of it alongside 打开所在目录
+            // and 删除. See [TransferContextMenu]; that is the one place the
+            // two are reconciled.
+            //
+            // The area wraps the whole list rather than each bubble, because a
+            // selection that stops at a bubble's edge is not what a user
+            // dragging across two messages is asking for.
+            //
+            // What it selects is published to the menus below it through
+            // [MessageSelection]. A [SelectableRegionState] cannot be reached
+            // from outside the widget that made it, so the selection has to
+            // be pushed from here rather than pulled from there.
+            : SelectionArea(
+                onSelectionChanged: (content) =>
+                    setState(() => _selectedText = content?.plainText),
+                child: ListView.builder(
+                  controller: _scroll,
+                  reverse: true,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) => MessageBubble(
+                    view: messages[index],
+                    controller: controller,
+                    defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                    // The cap every bubble in this conversation is drawn to.
+                    bubbleMaxWidth: bubbleMaxWidth,
+                    // A Device with no name is named by its address, and by
+                    // the last number of it inside the avatar — see
+                    // `PeerView.avatarLabel`. With no peer in the list at all
+                    // there is only the Fingerprint, which is stable and its
+                    // own, so the avatar is still the same one every time.
+                    peerName: peer?.displayName ?? widget.peer.short(),
+                    peerLabel: peer?.avatarLabel,
+                    peerSeed: widget.peer.hex,
+                    selfName: self.displayName,
+                    selfSeed: self.fingerprint.hex,
+                  ),
+                ),
+              );
+      },
+    );
     return MessageSelection(
       // What the user has selected, so that a right-click on a message can
       // offer to copy it. Published here — around the whole conversation rather
@@ -392,6 +426,12 @@ class _ConversationViewState extends State<ConversationView> {
             onSend: () => _sendMessage(controller),
             onPaste: () => _pasteIntoComposer(controller),
             onAttach: canSend ? () => unawaited(_pickFiles()) : null,
+            onEmoji: canSend
+                ? (face) {
+                    _sendEmoji(controller, face);
+                  }
+                : null,
+            recentEmojis: controller.recentEmojis,
             autoFocus: widget.autoFocusComposer,
           ),
         ],
@@ -443,6 +483,8 @@ class ConversationComposer extends StatefulWidget {
     required this.onSend,
     required this.onPaste,
     required this.onAttach,
+    this.onEmoji,
+    this.recentEmojis = const [],
     this.attachments = const [],
     this.onRemoveAttachment,
     this.autoFocus = false,
@@ -464,6 +506,21 @@ class ConversationComposer extends StatefulWidget {
   /// whether a choice turns out to be a picture or a file is not this control's
   /// to say — see [_pickFiles] and [_stagePaths].
   final VoidCallback? onAttach;
+
+  /// Called with the face the user chose from the emoticon picker.
+  ///
+  /// Bundled with the send action rather than staged: an emoji is a message
+  /// on its own, and a face dropped into the text box would read as typing
+  /// something the sender did not type.
+  ///
+  /// Null when the peer is no longer known well enough to send to it.
+  ///
+  /// The same condition as [onAttach]: the face button is a way to send, and
+  /// a way to send to nobody is not a button, it is a lie.
+  final ValueChanged<String>? onEmoji;
+
+  /// The faces to draw first in the picker, newest first.
+  final List<String> recentEmojis;
 
   /// Files and pictures chosen for this message that have not gone out yet.
   ///
@@ -615,6 +672,12 @@ class _ConversationComposerState extends State<ConversationComposer> {
                       child: const Icon(Icons.add, size: 18),
                     ),
                   ),
+                ),
+                const SizedBox(width: 10),
+                EmojiPickerButton(
+                  onPick: (face) => widget.onEmoji?.call(face),
+                  enabled: widget.onEmoji != null,
+                  recent: widget.recentEmojis,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1205,6 +1268,7 @@ class MessageBubble extends StatelessWidget {
     required this.peerSeed,
     required this.selfName,
     required this.selfSeed,
+    required this.bubbleMaxWidth,
   });
 
   /// The Transfer this bubble is for.
@@ -1231,6 +1295,14 @@ class MessageBubble extends StatelessWidget {
 
   /// What colours this Device's own avatar.
   final String selfSeed;
+
+  /// How wide this bubble may get.
+  ///
+  /// Measured once by the conversation, which is where the width of the chat
+  /// area is known, and handed to every bubble in the conversation alike — a
+  /// cap that each bubble measured for itself would be a cap on the list's
+  /// inner width rather than on the chat.
+  final double bubbleMaxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -1272,6 +1344,7 @@ class MessageBubble extends StatelessWidget {
                       : MessageBubbleShape(
                           colour: background,
                           outgoing: outgoing,
+                          maxWidth: bubbleMaxWidth,
                           child: _contents(context, l10n),
                         ),
                 ),
@@ -1518,6 +1591,9 @@ class MessageBubble extends StatelessWidget {
   /// bookkeeping to show.
   bool get _showsReceipt => view.kind == PayloadKind.file;
 
+  /// Whether this message is a single emoji face, drawn large like a sticker.
+  bool get _isEmoji => view.kind == PayloadKind.emoji;
+
   /// The ink inside this bubble.
   ///
   /// Two near-blacks rather than one. An outgoing bubble is a pale green, and
@@ -1557,6 +1633,16 @@ class MessageBubble extends StatelessWidget {
     double? contentWidth,
     WeChatColors colors,
   ) {
+    if (_isEmoji) {
+      final text = view.text;
+      return Text(
+        text == null || text.isEmpty ? '☺' : text,
+        style: const TextStyle(
+          fontSize: WeChat.emojiBubbleFontSize,
+          height: 1.2,
+        ),
+      );
+    }
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
       return Text(
