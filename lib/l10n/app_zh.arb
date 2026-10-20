@@ -29,6 +29,7 @@
   "kindFiles": "文件",
   "kindImages": "图片",
   "kindClipboard": "剪贴板",
+  "kindEmoji": "表情",
 
   "stateAwaitingDecision": "等待对方确认",
   "stateTransferring": "传输中",
@@ -96,6 +97,8 @@
   "trusted": "已信任",
 
   "menuSendFile": "发送文件",
+  "menuSendEmoji": "发送表情",
+  "emojiRecent": "最近使用",
   "dropToSend": "松手即发送",
   "trustDevice": "信任这台设备",
   "stopTrustingDevice": "不再信任这台设备",

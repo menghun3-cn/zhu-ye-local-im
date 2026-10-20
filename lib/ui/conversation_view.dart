@@ -10,6 +10,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'clipboard_paste.dart';
 import 'controller_scope.dart';
+import 'emoji_picker.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
@@ -159,6 +160,20 @@ class _ConversationViewState extends State<ConversationView> {
         if (!mounted) return;
         setState(() => _staged.clear());
       }),
+    );
+  }
+
+  /// Sends [face] as a message of its own, and remembers it as recent.
+  ///
+  /// A face is a complete message the way a sent file is, so it goes out
+  /// immediately rather than waiting for 发送: putting it in the box would
+  /// leave the user with "how do I send a face now". The recent strip is
+  /// updated on the same tap, so the next open of the picker has the face at
+  /// the front.
+  void _sendEmoji(LocalTransferController controller, String face) {
+    controller.rememberEmoji(face);
+    unawaited(
+      guarded(context, () => controller.sendEmoji(face, to: widget.peer)),
     );
   }
 
@@ -392,6 +407,12 @@ class _ConversationViewState extends State<ConversationView> {
             onSend: () => _sendMessage(controller),
             onPaste: () => _pasteIntoComposer(controller),
             onAttach: canSend ? () => unawaited(_pickFiles()) : null,
+            onEmoji: canSend
+                ? (face) {
+                    _sendEmoji(controller, face);
+                  }
+                : null,
+            recentEmojis: controller.recentEmojis,
             autoFocus: widget.autoFocusComposer,
           ),
         ],
@@ -443,6 +464,8 @@ class ConversationComposer extends StatefulWidget {
     required this.onSend,
     required this.onPaste,
     required this.onAttach,
+    this.onEmoji,
+    this.recentEmojis = const [],
     this.attachments = const [],
     this.onRemoveAttachment,
     this.autoFocus = false,
@@ -464,6 +487,21 @@ class ConversationComposer extends StatefulWidget {
   /// whether a choice turns out to be a picture or a file is not this control's
   /// to say — see [_pickFiles] and [_stagePaths].
   final VoidCallback? onAttach;
+
+  /// Called with the face the user chose from the emoticon picker.
+  ///
+  /// Bundled with the send action rather than staged: an emoji is a message
+  /// on its own, and a face dropped into the text box would read as typing
+  /// something the sender did not type.
+  ///
+  /// Null when the peer is no longer known well enough to send to it.
+  ///
+  /// The same condition as [onAttach]: the face button is a way to send, and
+  /// a way to send to nobody is not a button, it is a lie.
+  final ValueChanged<String>? onEmoji;
+
+  /// The faces to draw first in the picker, newest first.
+  final List<String> recentEmojis;
 
   /// Files and pictures chosen for this message that have not gone out yet.
   ///
@@ -615,6 +653,12 @@ class _ConversationComposerState extends State<ConversationComposer> {
                       child: const Icon(Icons.add, size: 18),
                     ),
                   ),
+                ),
+                const SizedBox(width: 10),
+                EmojiPickerButton(
+                  onPick: (face) => widget.onEmoji?.call(face),
+                  enabled: widget.onEmoji != null,
+                  recent: widget.recentEmojis,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1518,6 +1562,9 @@ class MessageBubble extends StatelessWidget {
   /// bookkeeping to show.
   bool get _showsReceipt => view.kind == PayloadKind.file;
 
+  /// Whether this message is a single emoji face, drawn large like a sticker.
+  bool get _isEmoji => view.kind == PayloadKind.emoji;
+
   /// The ink inside this bubble.
   ///
   /// Two near-blacks rather than one. An outgoing bubble is a pale green, and
@@ -1557,6 +1604,16 @@ class MessageBubble extends StatelessWidget {
     double? contentWidth,
     WeChatColors colors,
   ) {
+    if (_isEmoji) {
+      final text = view.text;
+      return Text(
+        text == null || text.isEmpty ? '☺' : text,
+        style: const TextStyle(
+          fontSize: WeChat.emojiBubbleFontSize,
+          height: 1.2,
+        ),
+      );
+    }
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
       return Text(

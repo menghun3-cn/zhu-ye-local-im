@@ -645,6 +645,21 @@ class WeChat {
   /// [fieldHeight]。
   static const double composerControl = 34;
 
+  /// 表情面板里一个表情格子的边长。
+  ///
+  /// 32 让一行放下八个格子（含间距）后仍是微信桌面端面板的窄度 —— 面板宽度
+  /// 就按 `8 × 32 + 7 × 2` 计算，不另起一个数。
+  static const double emojiTileSide = 32;
+
+  /// 表情面板里一个表情的字号。比工具栏字形大一档，让格子里的脸一眼可辨。
+  static const double emojiTileFontSize = 22;
+
+  /// 会话气泡里一个表情的字号。
+  ///
+  /// 比普通正文大三倍半，让单发的一个表情像微信里那样读作一张「贴纸」而不是
+  /// 一行文字。
+  static const double emojiBubbleFontSize = 48;
+
   // ---------------------------------------------------------------- 主题
 
   /// The [ThemeData] the app runs on, for one [WeChatColors] palette.
