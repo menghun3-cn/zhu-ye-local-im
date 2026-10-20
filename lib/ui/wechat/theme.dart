@@ -426,9 +426,15 @@ class WeChat {
 
   /// 气泡内边距。
   static const EdgeInsets bubblePadding = EdgeInsets.symmetric(
-    horizontal: 12,
+    horizontal: bubblePaddingHorizontal,
     vertical: 9,
   );
+
+  /// 气泡内边距的左右各一份——也就是气泡里文字真正拿到的宽度被扣掉的量。
+  ///
+  /// 单列一个数，是因为 `EdgeInsets.horizontal` 不是常量表达式，而
+  /// [conversationPaneMinWidth] 要在常量里算出来。
+  static const double bubblePaddingHorizontal = 12;
 
   /// 图片缩略图的圆角。
   ///
@@ -526,11 +532,55 @@ class WeChat {
   /// 个字，读起来是在数行而不是在读话。列表再宽也没有第二份内容可放。
   static const double conversationListMaxWidth = 480;
 
+  /// 一条消息的一行至少要装得下的**汉字**数。
+  ///
+  /// 14 个字。这个数是「会话列最少要有多宽」的根据，不是随手定的：14 个
+  /// 汉字是一句常用的话的长度（比它更短的句子塞不下一件完整的事，更长的
+  /// 会被断开），而一行装不下 14 个字，消息就碎成每行十来个字的碎片，读
+  /// 起来是在数行而不是在读话。
+  ///
+  /// 按汉字算而不是按「字」算，是因为汉字是全角的：14 个汉字的宽度就是
+  /// 14 个正文字号。混排的拉丁字母只有全角的一半宽，所以中英混排时一行
+  /// 装得下的「字」比这个多——按最坏的情况取。
+  static const double messageCharsPerLine = 14;
+
+  /// 一个全角汉字的宽度，按正文字号算。
+  ///
+  /// 一个全角字符占一个 em，也就是一个正文字号那么宽。这不是量出来的，
+  /// 是排版里的定义：全角字符的 advance 就是字号本身。
+  static const double fullWidthCharWidth = fontSizeBody;
+
+  /// 正文用的字体。
+  ///
+  /// 中文优先：Windows 上 Material 默认的 Roboto 不含汉字，会回退到
+  /// 系统字体；显式点名雅黑能让中英混排的基线一致。
+  static const String fontFamily = 'Microsoft YaHei UI';
+
+  /// 正文字体的回退链。
+  static const List<String> fontFamilyFallback = [
+    'Microsoft YaHei',
+    'PingFang SC',
+    'Roboto',
+  ];
+
   /// 会话列的**最小**宽度。
   ///
-  /// 拖动分隔条时列表不能把会话挤没：一列 320 像素还能读出长消息在说什么，
-  /// 200 像素就只剩每行十来个字了。
-  static const double conversationPaneMinWidth = 320;
+  /// 这个数是**推出来的**，不是猜的。一条消息的气泡最多占会话列的
+  /// [bubbleMaxWidthFactor]，气泡自己还要去掉左右各 12 的内边距，所以一
+  /// 行能装下的汉字数是：
+  ///
+  /// ```
+  /// 0.6 × 会话列宽 − 24 ≥ messageCharsPerLine × fullWidthCharWidth
+  /// ```
+  ///
+  /// 解出来是 (14 × 14 + 24) / 0.6 = 366.67，取 367。低于这个宽度，一行
+  /// 就装不下 [messageCharsPerLine] 个字，消息会碎掉。
+  ///
+  /// 拖动分隔条时列表不能把会话挤到这个宽度以下：会话是这个界面的主
+  /// 体，让步的是列表。
+  static const double conversationPaneMinWidth =
+      (messageCharsPerLine * fullWidthCharWidth + bubblePaddingHorizontal * 2) /
+      bubbleMaxWidthFactor;
 
   /// 分隔条的宽度。
   ///
@@ -778,8 +828,8 @@ class WeChat {
       extensions: [colors],
       // 中文优先：Windows 上 Material 默认的 Roboto 不含汉字，会回退到
       // 系统字体；显式点名雅黑能让中英混排的基线一致。
-      fontFamily: 'Microsoft YaHei UI',
-      fontFamilyFallback: const ['Microsoft YaHei', 'PingFang SC', 'Roboto'],
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback,
       // Icons on a quiet surface are grey unless a component says otherwise;
       // an icon that inherited `onSurface` would be near-black and shout.
       iconTheme: IconThemeData(color: colors.secondaryText, size: 20),

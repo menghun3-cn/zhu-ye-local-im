@@ -283,53 +283,73 @@ class _ConversationsPageState extends State<ConversationsPage> {
       );
     }
 
-    return Row(
-      children: [
-        Container(
-          width: _clampedListWidth(context),
-          color: colors.sidebarBackground,
-          child: _list(context, l10n, conversations, selected: current),
-        ),
-        // The line between the panes, which the user drags to move it. It
-        // stands where the divider was, and it *is* the divider: what it
-        // draws is the same hairline, so a surface that is not being resized
-        // looks exactly as it did before the splitter existed.
-        PaneSplitter(
-          enabled: _canDragDivider(context),
-          onDrag: (delta) => setState(() => _listWidth += delta),
-        ),
-        Expanded(
-          child: current == null
-              // The pane a conversation would open into, so it wears the
-              // conversation's own white rather than the page's grey.
-              ? ColoredBox(
-                  color: colors.conversationBackground,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: HintText(l10n.conversationPickOne),
-                  ),
-                )
-              : ConversationView(
-                  // Keyed by peer so switching conversations rebuilds the
-                  // composer and the scroll position rather than carrying the
-                  // previous one's over.
-                  key: ValueKey(current.peer.fingerprint.hex),
-                  peer: current.peer.fingerprint,
-                  defaultIncomingDirectory: widget.defaultIncomingDirectory,
-                  autoFocusComposer: focusComposer,
-                  header: _PaneHeader(
-                    title: current.peer.displayName,
-                    // The address, and — when the Session has gone — that it
-                    // has. A conversation outlives its Session, so this is the
-                    // only place that says whether typing here would reach
-                    // anybody, and a pane that looked the same either way would
-                    // be inviting a message into a void.
-                    subtitle: _subtitleFor(current.peer, l10n),
-                    offline: !current.peer.isConnected,
-                  ),
-                ),
-        ),
-      ],
+    // The two panes share whatever this surface is given, and the split
+    // between them is the user's to make.
+    //
+    // The width is *measured* rather than derived from the window: this
+    // surface does not know how much of the window the shell has already
+    // taken for its rail, and subtracting a known constant for it is a
+    // guess that a change to the shell would silently invalidate. The
+    // [LayoutBuilder] says what the two panes actually have between them,
+    // which is the only number the list's bounds are derived from.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The room the list may grow into, before the conversation is
+        // squeezed: the width the two panes share, less the splitter between
+        // them, less what the conversation needs to keep.
+        final room =
+            constraints.maxWidth -
+            WeChat.splitterWidth -
+            WeChat.conversationPaneMinWidth;
+        return Row(
+          children: [
+            Container(
+              width: _clampedListWidth(room),
+              color: colors.sidebarBackground,
+              child: _list(context, l10n, conversations, selected: current),
+            ),
+            // The line between the panes, which the user drags to move it. It
+            // stands where the divider was, and it *is* the divider: what it
+            // draws is the same hairline, so a surface that is not being
+            // resized looks exactly as it did before the splitter existed.
+            PaneSplitter(
+              enabled: room > WeChat.conversationListMinWidth,
+              onDrag: (delta) => setState(() => _listWidth += delta),
+            ),
+            Expanded(
+              child: current == null
+                  // The pane a conversation would open into, so it wears the
+                  // conversation's own white rather than the page's grey.
+                  ? ColoredBox(
+                      color: colors.conversationBackground,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: HintText(l10n.conversationPickOne),
+                      ),
+                    )
+                  : ConversationView(
+                      // Keyed by peer so switching conversations rebuilds the
+                      // composer and the scroll position rather than carrying
+                      // the previous one's over.
+                      key: ValueKey(current.peer.fingerprint.hex),
+                      peer: current.peer.fingerprint,
+                      defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                      autoFocusComposer: focusComposer,
+                      header: _PaneHeader(
+                        title: current.peer.displayName,
+                        // The address, and — when the Session has gone — that
+                        // it has. A conversation outlives its Session, so this
+                        // is the only place that says whether typing here
+                        // would reach anybody, and a pane that looked the same
+                        // either way would be inviting a message into a void.
+                        subtitle: _subtitleFor(current.peer, l10n),
+                        offline: !current.peer.isConnected,
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -366,11 +386,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// a clamp in the drag handler and a clamp at the draw site are two rules
   /// that can disagree, and a test that breaks one of them would then be
   /// testing the other.
-  double _clampedListWidth(BuildContext context) {
-    final ceiling = math.min(
-      WeChat.conversationListMaxWidth,
-      _roomForList(context),
-    );
+  ///
+  /// [room] is what the two panes have between them, less what the
+  /// conversation needs to keep — measured by the caller, which is where the
+  /// two panes' actual width is known.
+  double _clampedListWidth(double room) {
+    final ceiling = math.min(WeChat.conversationListMaxWidth, room);
     return _listWidth.clamp(
       WeChat.conversationListMinWidth,
       // A window too narrow to hold the list's floor and the conversation's
@@ -380,33 +401,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
           ? WeChat.conversationListMinWidth
           : ceiling,
     );
-  }
-
-  /// Whether the divider can be dragged at all.
-  ///
-  /// Only when there is room to give: a window so narrow that the list is
-  /// already down to the conversation's minimum has nothing left to hand
-  /// over, and a splitter that moves nothing is a divider pretending to be
-  /// something else.
-  bool _canDragDivider(BuildContext context) {
-    return _roomForList(context) > WeChat.conversationListMinWidth;
-  }
-
-  /// How wide the list may grow before the conversation starts to suffer.
-  ///
-  /// The width this surface has, less the rail and the hairline beside it,
-  /// less the splitter itself, less what the conversation needs to keep. The
-  /// rail is subtracted because it is not this surface's to give away — the
-  /// conversation column is narrower than the window on every wide layout,
-  /// and a splitter that did not know that would offer the user a list that
-  /// does not fit.
-  double _roomForList(BuildContext context) {
-    final available =
-        MediaQuery.sizeOf(context).width -
-        WeChat.railWidth -
-        1 -
-        WeChat.splitterWidth;
-    return available - WeChat.conversationPaneMinWidth;
   }
 
   /// The list of conversations, with [selected] marked when it is present.

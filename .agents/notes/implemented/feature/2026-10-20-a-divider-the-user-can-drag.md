@@ -46,6 +46,16 @@ area's width is whatever the splitter leaves.**
   still needs (320). The drag handler does not clamp. A clamp in the drag
   and a clamp at the draw site are two rules that can disagree, and a test
   that breaks one of them would then be testing the other.
+- **The conversation's minimum is derived, not chosen.** It is
+  `conversationPaneMinWidth`, computed from the other tokens:
+  `(messageCharsPerLine × fullWidthCharWidth + bubblePaddingHorizontal × 2) ÷
+  bubbleMaxWidthFactor` — 14 Chinese characters per line, a full-width
+  character being one em, the bubble's own padding taken off, and the cap
+  being a share of the column. That is 366.67, and the token is written as
+  the expression rather than as the number, so a change to the font size or
+  the cap moves it instead of leaving it stale. A test measures a real
+  sentence in the application's own font at that width, and it fails 10
+  pixels below it — the bound is tight, not conservative.
 - The **conversation is the one that gives way**. A list dragged to 480
   pixels in an 800-pixel window would leave the conversation 300 pixels of
   which the rail has already taken 84 — the messages would be a two-word
@@ -104,6 +114,14 @@ a window that grows gives the choice back.
 - The Conversations surface in a narrow window is unchanged: below 720
   logical pixels there is one pane at a time, and there is no splitter to
   drag.
+- **The width the two panes share is measured, not derived from the window.**
+  A `LayoutBuilder` around the row says what the panes actually have
+  between them. Subtracting a constant for the shell's rail — which is
+  what the first version of this did — is a guess that a change to the
+  shell would silently invalidate, and it would over-subtract the moment
+  the shell covered its content's `MediaQuery`. The surface does not know
+  how much of the window the shell has taken; it knows how much it was
+  given.
 - `test_flutter/ui/pane_splitter_test.dart` (new) pins four facts: the drag
   moves the list by the distance it was dragged, the list cannot go below
   its floor, the list cannot go above its ceiling, and the conversation
