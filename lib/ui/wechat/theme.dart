@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// The colours of one theme — the light page the design was drawn on, or the
 /// dark page the same roles move to.
@@ -512,6 +513,37 @@ class WeChat {
   /// 300 而不是 250：1280 宽的窗口里，250 会让「最后一句话」那一行截断得
   /// 太频繁 —— 摘要刚说半句就上省略号，列表就不再能扫读。
   static const double conversationListWidth = 300;
+
+  /// 会话列表宽度的**下限**。
+  ///
+  /// 拖动分隔条时列表不能被拖没：一列 200 像素还能读出「最后一句话」是什
+  /// 么，100 像素就只剩一个头一个字了，而读不出来的列表比没有列表更糟。
+  static const double conversationListMinWidth = 220;
+
+  /// 会话列表宽度的**上限**。
+  ///
+  /// 同样是为了会话本身留地方：会话列窄到 320 像素以下，长消息每行只剩十来
+  /// 个字，读起来是在数行而不是在读话。列表再宽也没有第二份内容可放。
+  static const double conversationListMaxWidth = 480;
+
+  /// 会话列的**最小**宽度。
+  ///
+  /// 拖动分隔条时列表不能把会话挤没：一列 320 像素还能读出长消息在说什么，
+  /// 200 像素就只剩每行十来个字了。
+  static const double conversationPaneMinWidth = 320;
+
+  /// 分隔条的宽度。
+  ///
+  /// 比一条发丝线宽，是为了**能被抓住**：1 像素的线在鼠标下几乎点不中。8
+  /// 像素是桌面上可拖动分隔条的常见宽度，而视觉上它仍然只画一条发丝线
+  /// ——宽的是**可点的范围**，不是画出来的东西。
+  static const double splitterWidth = 8;
+
+  /// 分隔条被按住时，光标变成的样子。
+  ///
+  /// 横向拖动就是 `resizeColumn`。
+  static const SystemMouseCursor splitterCursor =
+      SystemMouseCursors.resizeColumn;
 
   /// 会话列表一行的上下内边距。
   ///

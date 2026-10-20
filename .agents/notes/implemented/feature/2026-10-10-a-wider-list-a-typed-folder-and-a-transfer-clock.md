@@ -48,6 +48,12 @@ new `conversationRowVPadding` (10) for the breathing room the old number used to
 provide. Nothing else changed about the row: the second line, the inset divider
 and the in-row action all stay.
 
+The 300 is the width the list **starts** at. The user can drag the divider
+between the list and the conversation to change it; see [A divider the user can
+drag](../../feature/2026-10-20-a-divider-the-user-can-drag.md). The number
+`conversationListWidth` remains the default and the token the splitter's
+bounds are derived from.
+
 **The folder is a field on the page.** Settings now draws a labelled
 `TextField` whose value is `incomingDirectory ?? defaultIncomingDirectory`, with
 an `IconButton` in its `suffixIcon` that opens the platform's own folder chooser
