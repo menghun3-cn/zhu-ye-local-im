@@ -13,6 +13,7 @@ void main() {
     WidgetTester tester,
     List<String> picked, {
     List<String> recent = const [],
+    TextEditingController? message,
   }) {
     return tester.pumpWidget(
       MaterialApp(
@@ -22,7 +23,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: ConversationComposer(
-            message: TextEditingController(),
+            message: message ?? TextEditingController(),
             onSend: () {},
             onPaste: () async => false,
             onAttach: () {},
@@ -63,6 +64,72 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(picked, ['😀']);
+  });
+
+  testWidgets('a picked face goes into the box, it does not go out', (
+    tester,
+  ) async {
+    final l10n = lookupAppLocalizations(appLocale);
+    final picked = <String>[];
+    final message = TextEditingController();
+    await pumpComposer(tester, picked, message: message);
+
+    await tester.tap(find.byTooltip(l10n.menuSendEmoji));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
+
+    // The face is in the composer, waiting for 发送, and nothing was sent.
+    expect(message.text, '😀');
+    expect(find.text('😀'), findsOneWidget);
+  });
+
+  testWidgets('a face joins the words that were already typed', (tester) async {
+    final l10n = lookupAppLocalizations(appLocale);
+    final picked = <String>[];
+    final message = TextEditingController(text: '你好');
+    await pumpComposer(tester, picked, message: message);
+
+    await tester.tap(find.byTooltip(l10n.menuSendEmoji));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😀').first);
+    await tester.pumpAndSettle();
+
+    expect(message.text, '你好😀');
+  });
+
+  testWidgets('the panel is drawn plainly, not dimmed', (tester) async {
+    final l10n = lookupAppLocalizations(appLocale);
+    final picked = <String>[];
+    await pumpComposer(tester, picked);
+
+    await tester.tap(find.byTooltip(l10n.menuSendEmoji));
+    await tester.pumpAndSettle();
+
+    // A menu entry that is a panel used to be a disabled menu item, and the
+    // framework draws a disabled item dimmed — which put a grey veil over
+    // the faces. The panel is drawn as a panel, so nothing in it carries the
+    // disabled state.
+    final heading = tester.widget<Text>(find.text(l10n.kindEmoji));
+    final style = heading.style;
+    final dimmed = style?.color == WeChatColors.light.disabledText;
+    expect(dimmed, isFalse);
+
+    // And the panel has a surface of its own, so the faces do not sit on the
+    // menu's tinted item background.
+    final panel = tester.widget<Container>(
+      find
+          .ancestor(
+            of: find.text(l10n.kindEmoji),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    expect(
+      (panel.color ?? Colors.transparent).a,
+      1.0,
+      reason: 'the panel paints its own opaque surface',
+    );
   });
 
   testWidgets('the whole table fits in the grid and every face is tappable', (
