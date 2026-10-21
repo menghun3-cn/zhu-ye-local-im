@@ -50,6 +50,11 @@ tracked script.**
   discover neither the pure-Dart suite nor the widget suite correctly.
 - The corrupt content is gone. The README is 58 lines: what the project is,
   five screenshots, and how to build and test it.
+- The README's development section ends at the debug-build commands. The
+  paragraph that explained how to regenerate the pictures — the command, and
+  the account of why the script rewrites tracked documentation and is
+  therefore not a gate — was removed: the account is this note's, and the
+  command is the script's own header comment. The README is 49 lines.
 
 ### What the pictures show
 
@@ -134,7 +139,9 @@ interface changes.
 **Given up.** The repository now carries five binary assets, and the capture
 script is one more thing that can go stale — a maintainer who changes the
 interface and does not re-run the script ships pictures of the old interface.
-The README says how to regenerate them, but nothing enforces it.
+Nothing enforces the refresh, and the README no longer says how to do it:
+the command lives in the script's header comment, which is one file away
+from the script that has to be run.
 
 **Owed.** The capture depends on Windows font paths and on a fixed LAN address
 (`192.168.1.115`); it runs on the machine that ran it, and on a machine with a

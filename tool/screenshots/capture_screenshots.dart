@@ -78,10 +78,6 @@ final List<String> written = [];
 
 Future<void> main() async {
   await _runCapture();
-  print(
-    'wrote ${written.length} pictures into ${outputDirectory.path}:\n'
-    '${written.map((path) => '  ${path.replaceAll('\\', '/')}').join('\n')}',
-  );
 }
 
 /// Runs the whole capture.
@@ -171,6 +167,15 @@ Future<void> _runCapture() async {
     );
 
     await shutdown(tester, [me, peer]);
+
+    // Printed from inside the test body, not from `main`: `testWidgets`
+    // only registers the test, so a summary printed after the registration
+    // would report the pictures of a run that has not happened yet — and
+    // report zero of them, every time.
+    print(
+      'wrote ${written.length} pictures into ${outputDirectory.path}:\n'
+      '${written.map((path) => '  ${path.replaceAll('\\', '/')}').join('\n')}',
+    );
   });
 }
 
