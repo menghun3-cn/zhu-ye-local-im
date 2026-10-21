@@ -880,7 +880,11 @@ class _RowAction extends StatelessWidget {
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: VisualDensity.compact,
       textStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: WeChat.fontSizeMeta),
+        TextStyle(
+          fontSize: WeChat.fontSizeMeta,
+          fontFamily: WeChat.fontFamily,
+          fontFamilyFallback: WeChat.fontFamilyFallback,
+        ),
       ),
     );
     return TextButton(

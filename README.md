@@ -10,298 +10,49 @@
 
 ## 截图
 
-> 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
+以下截图由 `tool/screenshots/capture_screenshots.dart` 驱动真实的界面代码生成，图片存放在
+[`docs/screenshots/`](docs/screenshots/)。截图中的设备名、IP 地址与端口均为示例。
 
-![局域网传输工具首页](design-preview/_shots/index.png)
+![会话界面](docs/screenshots/conversation.png)
 
-![设备列表](design-preview/_shots/device.png)
+![设备列表](docs/screenshots/devices.png)
 
-![会话界面](design-preview/_shots/conversation.png)
+![剪贴板同步](docs/screenshots/clipboard.png)
 
-![文件传输](design-preview/_shots/transfers.png)
+![文件传输](docs/screenshots/transfers.png)
 
-![剪贴板同步](design-preview/_shots/clipboard.png)
-
-![设置界面](design-preview/_shots/settings.png)
+![设置界面](docs/screenshots/settings.png)
 
 ## 开发
 
 开发环境需要当前稳定版 Flutter（3.47.x / Dart 3.13.x）。
 
-`sh
+常用命令：
+
+```sh
 flutter pub get
 flutter analyze
 dart format --set-exit-if-changed .
-flutter test
-`
+dart test
+flutter test test_flutter
+```
 
-Windows 和 Android 构建检查：
+`test/` 里是不需要 widget 树的纯 Dart 测试，由 `dart test` 跑起来；`test_flutter/` 里是导入
+`package:flutter_test` 的 widget 测试，由 `flutter test test_flutter` 跑起来。门禁的划分见
+[AGENTS.md](AGENTS.md#5-门禁)。
 
-`sh
+Windows 和 Android 调试构建检查：
+
+```sh
 flutter build windows --debug
 flutter build apk --debug
-`
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
-1 + # 局域网传输工具（Local Transfer）
-2 + 
-3 + 是一款点对点的局域网传输工具，用于在局域网内的设备之间传输文本、文件和剪贴板内容。无需服务器、无需账号、无需云端。
-4 + 
-5 + - 支持平台（v1）：Windows、Android
-6 + - 产品术语表：[CONTEXT.md](CONTEXT.md)
-7 + - 仓库约定（分支、提交、质量门禁）：[AGENTS.md](AGENTS.md)
-8 + - 架构与平台决策：[.agents/notes/](.agents/notes/)
-9 + - 基于真实硬件验证的平台事实：[docs/](docs/)
-10 + 
-11 + ## 截图
-12 + 
-13 + > 注意：截图中已对敏感信息（如 IP 地址、设备名称等）进行打码处理。
-14 + 
-15 + ![首页](design-preview/_shots/index.png)
-16 + 
-17 + ![设备列表](design-preview/_shots/device.png)
-18 + 
-19 + ![会话界面](design-preview/_shots/conversation.png)
-20 + 
-21 + ![文件传输](design-preview/_shots/transfers.png)
-22 + 
-23 + ![剪贴板同步](design-preview/_shots/clipboard.png)
-24 + 
-25 + ![设置界面](design-preview/_shots/settings.png)
-26 + 
-27 + ## 开发环境
-28 + 
-29 + 开发环境要求 Flutter 版本 >= 3.47.x 和 Dart 版本 >= 3.13.x。
-30 + 
-31 + 常用命令：
-32 + ```sh
-33 + flutter pub get
-34 + flutter analyze
-35 + dart format --set-exit-if-changed .
-36 + flutter test
-37 + ```
-38 + 
-39 + Windows 和 Android 调试构建检查：
-40 + 
-41 + ```sh
-42 + flutter build windows --debug
-43 + flutter build apk --debug
-44 + ```
+```
+
+重新生成上面的截图：
+
+```sh
+flutter test tool/screenshots/capture_screenshots.dart
+```
+
+这个脚本会重写 `docs/screenshots/` 里的图片，因此它不在 `test_flutter/` 里 —— 一个每次运行都改写
+仓库文档的测试套件，没人会相信它是绿的。
