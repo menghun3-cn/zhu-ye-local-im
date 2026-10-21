@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-10-21-the-readme-showed-nothing.md
 #   git hash-object 2026-10-21-the-readme-showed-nothing.zh.md
-2026-10-21-the-readme-showed-nothing.md: 47cefc0f95ad6bcf6c94cf8a6f515485616cfec4
-2026-10-21-the-readme-showed-nothing.zh.md: bc7307b11309970fbf35826187b75732ca488672
+2026-10-21-the-readme-showed-nothing.md: 0be9f05880560a24c48fb4c385936015d6a65705
+2026-10-21-the-readme-showed-nothing.zh.md: 5bfc0c988c842f7372ab293d7a73d86d5649115c

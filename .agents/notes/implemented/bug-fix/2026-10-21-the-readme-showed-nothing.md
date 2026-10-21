@@ -70,6 +70,28 @@ wrongly:
 The device names, addresses and ports in the pictures are examples, and the
 README says so.
 
+### The pictures are reproducible
+
+A capture that produces a different picture on every run cannot be compared
+with the one it replaced, so the script pins the two facts that would
+otherwise vary:
+
+- **The identity.** A Device mints an Ed25519 key pair on first launch, and
+  its Fingerprint is derived from that key — so an unpinned capture shows a
+  different Fingerprint every time, and the diff is made of fingerprints
+  rather than of the interface. `SeededProfileStore` hands each Device a
+  fixed seed, and the Fingerprint that comes out of it is a fixed fact of the
+  capture.
+- **The ports.** A Device told port 0 takes whatever the operating system
+  hands it. The capture pins four ports above the project's default range,
+  because a copy of the application is usually running on the machine that
+  takes the pictures and it holds the default session port already — a
+  socket cannot be bound twice.
+
+Two consecutive runs of the script now produce byte-identical PNGs, which is
+what makes the images reviewable as a diff: a change in the picture is a
+change in the interface.
+
 ## Testing
 
 - `flutter test tool/screenshots/capture_screenshots.dart` completes and writes
@@ -77,6 +99,7 @@ README says so.
   with real glyphs, the conversation shows a text bubble, a file bubble and an
   image bubble, and the picture in it is decoded rather than left as a
   placeholder.
+- Two consecutive runs produce byte-identical files, verified by SHA-256.
 - The six gates pass, unchanged by the README itself.
 
 ## Alternatives considered

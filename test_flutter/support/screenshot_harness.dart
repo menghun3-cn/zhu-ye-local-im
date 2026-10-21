@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -7,6 +8,65 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
+
+/// A profile store that hands out one fixed identity.
+///
+/// A Device mints a fresh key pair on first launch, and its Fingerprint is
+/// derived from that key — so two runs of the same capture show two
+/// different fingerprints, and the picture changes for a reason that has
+/// nothing to do with the interface. A seed makes the identity a fixed fact
+/// of the capture instead of a fresh one every time, so re-running it
+/// reproduces the same picture.
+final class SeededProfileStore implements ProfileStore {
+  /// Builds a store over the Ed25519 seed [seed].
+  ///
+  /// The seed is the private half of the Owner's key pair, and the
+  /// Fingerprint the Device announces is derived from the public half, so
+  /// the same seed always yields the same Device.
+  static Future<SeededProfileStore> overSeed(
+    List<int> seed, {
+    required String alias,
+    required DevicePlatform platform,
+  }) async {
+    final identity = await OwnerIdentity.fromSeed(seed);
+    final profile = DeviceProfile(
+      self: identity.fingerprint,
+      alias: alias,
+      platform: platform,
+    );
+    return SeededProfileStore._(await _profileJson(identity, profile));
+  }
+
+  SeededProfileStore._(this._json);
+
+  /// The stored profile, in the shape a [ProfileStore] holds it.
+  Map<String, Object?>? _json;
+
+  @override
+  Future<Map<String, Object?>?> load() async => _json;
+
+  @override
+  Future<void> save(Map<String, Object?> incoming) async {
+    _json = jsonDecode(jsonEncode(incoming)) as Map<String, Object?>;
+  }
+
+  /// The JSON a Device's profile is stored as.
+  ///
+  /// The same shape [saveLocalProfile] writes, built here rather than
+  /// through it because that one wants a [LocalProfile] and this wants the
+  /// seed it was made from.
+  static Future<Map<String, Object?>> _profileJson(
+    OwnerIdentity identity,
+    DeviceProfile profile,
+  ) async => {
+    'version': 1,
+    'identity': {
+      'kind': 'ed25519-seed',
+      'seed': toBase64Url(await identity.exportSeed()),
+    },
+    'profile': profile.toJson(),
+  };
+}
 
 /// The fonts a captured window needs, and where they are on this machine.
 ///
