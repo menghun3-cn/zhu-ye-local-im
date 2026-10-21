@@ -74,7 +74,14 @@ class EmojiPickerButton extends StatelessWidget {
             ),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text('☺', style: TextStyle(fontSize: 16)),
+          child: const Text(
+            '☺',
+            style: TextStyle(
+              fontSize: 16,
+              fontFamily: WeChat.fontFamily,
+              fontFamilyFallback: WeChat.fontFamilyFallback,
+            ),
+          ),
         ),
       ),
     );
