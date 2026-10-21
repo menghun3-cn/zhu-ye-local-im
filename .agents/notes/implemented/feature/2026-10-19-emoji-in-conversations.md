@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-10-19-emoji-in-conversations.zh.md)
 
+> **Superseded in part** by
+> [an emoji is a character in the box](2026-10-20-an-emoji-is-a-character-in-the-box.md):
+> picking a face now puts it in the composer instead of sending it. The wire
+> kind, the recents and the large-face rendering are as decided here.
+
 ## Problem
 
 A conversation could carry text, files and pictures, but not the small

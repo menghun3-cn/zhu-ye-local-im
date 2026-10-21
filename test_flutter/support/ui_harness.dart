@@ -109,7 +109,12 @@ final class UiDevice {
   final MemorySystemClipboard clipboard;
 
   /// Where the profile is kept — in memory, so nothing is left on disk.
-  final MemoryProfileStore store;
+  ///
+  /// A [ProfileStore] rather than a [MemoryProfileStore], because a test may
+  /// hand in a store that hands out a fixed identity: a Device mints a key
+  /// pair on first launch, and a picture of a Device whose Fingerprint
+  /// changes on every run is a picture that changes for no reason.
+  final ProfileStore store;
 
   /// Where the conversation is kept — in memory too, and handed back so that a
   /// test can stand a second Device up over the same one. That is the only way
@@ -158,6 +163,7 @@ Future<UiDevice> startUiDevice(
   int pairingPort = 0,
   ClipboardMode clipboardMode = ClipboardMode.off,
   String? profilePath,
+  ProfileStore? profileStore,
   String? defaultIncomingDirectory,
   DevicePlatform platform = DevicePlatform.windows,
   MessageStore? messageStore,
@@ -171,7 +177,7 @@ Future<UiDevice> startUiDevice(
 }) async {
   late final UiDevice device;
   await tester.runAsync(() async {
-    final store = MemoryProfileStore();
+    final store = profileStore ?? MemoryProfileStore();
     final clipboard = MemorySystemClipboard();
     // Handed in when a test wants a conversation to survive a restart: the
     // second Device over the same store is the restart.
@@ -1017,6 +1023,24 @@ Future<void> sendText(
   await tester.runAsync(() async {
     final sent = await device.controller.sendText(body, to: to);
     await untilTrue(() => sent.isSettled, 'the sent text to settle');
+  });
+}
+
+/// Hands [device] a face as a payload of its own kind, through the
+/// controller rather than the screen.
+///
+/// The composer does not send faces that way any more — a face picked in the
+/// picker is part of the text — but a peer running v0.1.10 or v0.1.11 still
+/// does, so the kind has to keep working on the wire and on screen.
+Future<void> sendEmojiPayload(
+  WidgetTester tester,
+  UiDevice device,
+  String face, {
+  Fingerprint? to,
+}) async {
+  await tester.runAsync(() async {
+    final sent = await device.controller.sendEmoji(face, to: to);
+    await untilTrue(() => sent.isSettled, 'the sent face to settle');
   });
 }
 
