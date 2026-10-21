@@ -136,6 +136,7 @@ final class PeerHandshake {
     required this.ephemeralPublicKey,
     required this.nonce,
     this.protocolVersion = wireProtocolVersion,
+    this.keepAlive = false,
   });
 
   /// The announcing Device's stable identity.
@@ -154,6 +155,15 @@ final class PeerHandshake {
   /// stop the Session before any payload is interpreted, not surface later as
   /// a mysterious decode failure.
   final int protocolVersion;
+
+  /// Whether this Device speaks the Session keep-alive.
+  ///
+  /// A capability rather than a version, because the two sides of a keep-alive
+  /// are not required to be the same build: a Device that does not speak it
+  /// is never sent a probe, so a peer on an older build neither sees a
+  /// message it would misread nor has to be excluded from the Session for
+  /// that reason. The flag is only ever read, never required.
+  final bool keepAlive;
 
   /// The announcing Device's stable identity.
   Fingerprint get fingerprint => device.fingerprint;
@@ -175,6 +185,7 @@ final class PeerHandshake {
     'pv': protocolVersion,
     'eph': toBase64Url(ephemeralPublicKey),
     'nonce': toBase64Url(nonce),
+    'ka': keepAlive,
   };
 
   static PeerHandshake fromJson(Map<String, Object?> json) => PeerHandshake(
@@ -182,6 +193,7 @@ final class PeerHandshake {
     ephemeralPublicKey: fromBase64Url(_string(json, 'eph')),
     nonce: fromBase64Url(_string(json, 'nonce')),
     protocolVersion: _int(json, 'pv'),
+    keepAlive: json['ka'] == true,
   );
 
   @override
@@ -218,12 +230,62 @@ sealed class WireMessage {
       'cancel' => CancelMessage.fromJson(json),
       'clipboard' => ClipboardMessage.fromJson(json),
       'confirm' => SessionConfirmMessage.fromJson(json),
+      'ping' => PingMessage.fromJson(json),
+      'pong' => PongMessage.fromJson(json),
       'pairAdmit' => PairAdmitMessage.fromJson(json),
       'pairConfirmed' => PairConfirmedMessage.fromJson(json),
       'error' => ErrorMessage.fromJson(json),
       _ => throw FormatException('unknown message type "$type"'),
     };
   }
+}
+
+/// Asks the peer whether it is still there.
+///
+/// A TCP connection that has been black-holed — the cable pulled, the router
+/// rebooted, the Wi-Fi associated with a network that has no route to the
+/// peer — does not announce itself. The socket stays open, the operating
+/// system keeps accepting the bytes that go nowhere, and the Device that
+/// lost its peer keeps showing it as connected. A probe is what turns that
+/// silence into an answer: a peer that is gone never answers, and the
+/// Session is closed rather than left for ever.
+///
+/// It carries nothing but its own identity, so the reply can be recognised
+/// as answering *this* probe rather than some earlier one.
+final class PingMessage extends WireMessage {
+  const PingMessage(this.id);
+
+  /// Identifies this probe, so a reply can be matched to it.
+  final String id;
+
+  @override
+  String get type => 'ping';
+
+  @override
+  Map<String, Object?> toJson() => {'id': id};
+
+  static PingMessage fromJson(Map<String, Object?> json) =>
+      PingMessage(_string(json, 'id'));
+}
+
+/// Answers a [PingMessage].
+///
+/// Carries the id of the probe being answered, so a peer that owes several
+/// outstanding probes can tell which one this is.
+final class PongMessage extends WireMessage {
+  const PongMessage(this.id);
+
+  /// The probe being answered.
+  final String id;
+
+  @override
+  String get type => 'pong';
+
+  @override
+  Map<String, Object?> toJson() => {'id': id};
+
+  static PongMessage fromJson(Map<String, Object?> json) =>
+      PongMessage(_string(json, 'id'));
 }
 
 /// Opens a Session: the initiator's identity and ephemeral key.

@@ -313,10 +313,13 @@ final class TransferEngine {
       case PairAdmitMessage():
       case PairConfirmedMessage():
       case ClipboardMessage():
+      case PingMessage():
+      case PongMessage():
       case ErrorMessage():
         // Not the transfer layer's business: the handshake is history by the
-        // time an engine exists, mirroring has its own listener, and a protocol
-        // error is reported per Transfer rather than session-wide.
+        // time an engine exists, mirroring has its own listener, the liveness
+        // probe belongs to the Session, and a protocol error is reported per
+        // Transfer rather than session-wide.
         break;
     }
   }

@@ -557,10 +557,15 @@ class WeChat {
   static const String fontFamily = 'Microsoft YaHei UI';
 
   /// 正文字体的回退链。
+  ///
+  /// 链上每一步都是「上一张脸没有的某一个字」。前三个都是正文脸，
+  /// 最后一个是符号脸 —— 表情按钮上的 `☺` 这样的字，正文脸里没有，
+  /// 没有这一级它就落到系统默认字体上，而系统默认字体未必有它。
   static const List<String> fontFamilyFallback = [
     'Microsoft YaHei',
     'PingFang SC',
     'Roboto',
+    'Segoe UI Symbol',
   ];
 
   /// 会话列的**最小**宽度。
@@ -867,7 +872,12 @@ class WeChat {
         side: BorderSide(color: colors.divider),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        labelStyle: TextStyle(fontSize: fontSizeMeta, color: colors.bubbleText),
+        labelStyle: TextStyle(
+          fontSize: fontSizeMeta,
+          color: colors.bubbleText,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
+        ),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
         ),
@@ -878,6 +888,8 @@ class WeChat {
         subtitleTextStyle: TextStyle(
           fontSize: fontSizePreview,
           color: colors.secondaryText,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
         ),
         horizontalTitleGap: 12,
       ),
@@ -940,7 +952,11 @@ class WeChat {
             ),
           ),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: fontSizePreview),
+            TextStyle(
+              fontSize: fontSizePreview,
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFamilyFallback,
+            ),
           ),
           visualDensity: VisualDensity.compact,
         ),
@@ -967,7 +983,11 @@ class WeChat {
           minimumSize: const WidgetStatePropertyAll(Size(0, buttonHeight)),
           tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: fontSizeLabel),
+            TextStyle(
+              fontSize: fontSizeLabel,
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFamilyFallback,
+            ),
           ),
         ),
       ),
@@ -994,7 +1014,11 @@ class WeChat {
           minimumSize: const WidgetStatePropertyAll(Size(0, buttonHeight)),
           tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: fontSizeLabel),
+            TextStyle(
+              fontSize: fontSizeLabel,
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFamilyFallback,
+            ),
           ),
         ),
       ),
@@ -1013,6 +1037,8 @@ class WeChat {
             color: states.contains(WidgetState.selected)
                 ? colors.brandStrong
                 : colors.secondaryText,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFamilyFallback,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
@@ -1110,18 +1136,26 @@ class WeChat {
         labelStyle: TextStyle(
           fontSize: fontSizeInput,
           color: colors.secondaryText,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
         ),
         floatingLabelStyle: TextStyle(
           fontSize: fontSizeInput,
           color: colors.brandStrong,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
         ),
         helperStyle: TextStyle(
           fontSize: fontSizeMeta,
           color: colors.secondaryText,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
         ),
         hintStyle: TextStyle(
           fontSize: fontSizeInput,
           color: colors.disabledText,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
         ),
       ),
     );

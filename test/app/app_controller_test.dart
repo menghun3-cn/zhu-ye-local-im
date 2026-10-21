@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -54,6 +55,106 @@ final class CountingMessageStore implements MessageStore {
   }
 }
 
+/// Sockets that can be made to swallow everything written to them.
+///
+/// This is what a lost route looks like to a TCP connection: the socket is
+/// open, the bytes reach the operating system and go nowhere, and nothing is
+/// ever closed. A closed socket reports itself, so the black hole cannot be
+/// produced by closing one.
+final class _BlackHoleSockets {
+  final List<_BlackHoleSocket> _sockets = [];
+
+  /// Wraps a socket so that it can be black-holed later.
+  ByteTransport wrap(Socket socket) {
+    final wrapped = _BlackHoleSocket(socket);
+    _sockets.add(wrapped);
+    return wrapped;
+  }
+
+  /// Makes every wrapped socket dark.
+  ///
+  /// Both ends of the pair go dark, because a dialed connection is wrapped
+  /// like any other: the test has to mean what it says on both sides.
+  void blackHole() {
+    for (final socket in _sockets) {
+      socket.dropped = true;
+    }
+  }
+}
+
+final class _BlackHoleSocket implements ByteTransport {
+  _BlackHoleSocket(this._socket) {
+    _socket.listen(
+      (bytes) {
+        if (dropped) return;
+        _incoming.add(bytes);
+      },
+      onDone: () {
+        if (!_incoming.isClosed) _incoming.close();
+        _complete();
+      },
+    );
+  }
+
+  final Socket _socket;
+  final StreamController<List<int>> _incoming = StreamController<List<int>>();
+  final Completer<void> _closed = Completer<void>();
+
+  /// Whether the socket is dark: what is written goes nowhere, and nothing
+  /// that arrives is delivered either.
+  bool dropped = false;
+
+  @override
+  Stream<List<int>> get incoming => _incoming.stream;
+
+  @override
+  void add(List<int> bytes) {
+    if (dropped) return;
+    _socket.add(bytes);
+  }
+
+  @override
+  Future<void> get done => _closed.future;
+
+  @override
+  Future<void> close() async {
+    _socket.destroy();
+    if (!_incoming.isClosed) await _incoming.close();
+    _complete();
+    await done;
+  }
+
+  void _complete() {
+    if (!_closed.isCompleted) _closed.complete();
+  }
+}
+
+/// A network that can be taken down and brought back.
+///
+/// While it is down every dial fails, the way a dial fails when there is no
+/// route to the peer. Nothing announces that the network is back: the only
+/// thing that can notice is whatever keeps trying.
+final class _DownNetwork {
+  bool _up = true;
+
+  /// Whether the network is up.
+  bool get isUp => _up;
+
+  /// Takes the network down.
+  void goDown() => _up = false;
+
+  /// Brings the network back.
+  void goUp() => _up = true;
+
+  /// Dials a peer, failing while the network is down.
+  Future<Socket> dial(String host, int port) async {
+    if (!_up) {
+      throw const SocketException('the network is down');
+    }
+    return Socket.connect(host, port);
+  }
+}
+
 /// Brings a Device up on [transport], with an ephemeral port for everything.
 Future<TestDevice> startDevice(
   BeaconTransport transport,
@@ -61,10 +162,15 @@ Future<TestDevice> startDevice(
   ClipboardMode clipboardMode = ClipboardMode.off,
   String? defaultIncomingDirectory,
   MessageStore? messageStore,
+  ProfileStore? store,
+  Duration keepAliveInterval = defaultKeepAliveInterval,
+  Duration keepAliveTimeout = defaultKeepAliveTimeout,
+  ByteTransport Function(Socket socket)? wrapSocket,
+  Future<Socket> Function(String host, int port)? dialSocket,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
-    store: MemoryProfileStore(),
+    store: store ?? MemoryProfileStore(),
     beaconTransport: transport,
     clipboard: clipboard,
     alias: alias,
@@ -83,6 +189,10 @@ Future<TestDevice> startDevice(
     // and then stands a second Device up over the same one — which is a
     // restart, as far as the conversation is concerned.
     messageStore: messageStore,
+    keepAliveInterval: keepAliveInterval,
+    keepAliveTimeout: keepAliveTimeout,
+    wrapSocket: wrapSocket,
+    dialSocket: dialSocket,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -917,6 +1027,232 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(alice.controller.sessions, isEmpty);
       expect(bob.controller.sessions, isEmpty);
+    });
+  });
+
+  group('a Session that ends', () {
+    test('is opened again with no tap', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up',
+      );
+
+      // Let everything settle. Pairing leaves discovery events in flight —
+      // a Device that was unpaired announced no port and one that is paired
+      // announces one — and each of those is a *change*, which is a thing
+      // discovery reports and the re-dial can hang off. The outage below has
+      // to happen on a quiet link, or the test would pass for the wrong
+      // reason.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+
+      // The link dies. This is what a network outage looks like from the
+      // Session layer: the connection ends and both Devices are told.
+      await bob.controller.sessions.first.close();
+
+      // Nothing below this line asks for a connection. The peer has not
+      // changed in any way a user could see — same name, same address, same
+      // port — so discovery has nothing to report, and the re-dial has to
+      // come from the Session that ended.
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come back on both Devices',
+      );
+    });
+
+    test('is opened again even when discovery says nothing changed', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up',
+      );
+
+      // The peer is still exactly where it was — same address, same port,
+      // same name — so the discovery list does not change, and a peer that
+      // was never dropped from it can never be re-reported by it. The
+      // re-dial has to come from somewhere else.
+      final before = alice.controller.peers
+          .firstWhere((peer) => peer.alias == 'Bob')
+          .address;
+      await bob.controller.sessions.first.close();
+      await until(
+        () => alice.controller.sessions.isNotEmpty,
+        description: 'the Session to come back on Alice',
+      );
+      final after = alice.controller.peers
+          .firstWhere((peer) => peer.alias == 'Bob')
+          .address;
+      expect(
+        after,
+        before,
+        reason: 'the peer never moved, so this is the same peer again',
+      );
+    });
+
+    test(
+      'is not opened again for a peer that was never in the group',
+      () async {
+        final hub = MemoryBeaconHub();
+        final alice = await startDevice(hub.a, 'Alice');
+        final bob = await startDevice(hub.b, 'Bob');
+        // The two are on the same link and see each other, but they were never
+        // paired. A Session that ends must not become a way to talk to a Device
+        // the user never admitted — and neither may the sweep that keeps
+        // Sessions in step.
+        await until(
+          () => alice.controller.peers.any((peer) => peer.alias == 'Bob'),
+          description: 'Alice to see Bob',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(alice.controller.sessions, isEmpty);
+        expect(bob.controller.sessions, isEmpty);
+      },
+    );
+
+    test('is opened again after the peer went silent', () async {
+      // The shape of a lost route rather than a closed socket: the
+      // connection stays open, everything written to it goes nowhere, and
+      // nothing is ever closed. Nothing reports the loss, so the only thing
+      // that can notice it is the liveness probe — and the only thing that
+      // can fix it is the re-dial.
+      final hub = MemoryBeaconHub();
+      final swallowed = _BlackHoleSockets();
+      final alice = await startDevice(
+        hub.a,
+        'Alice',
+        keepAliveInterval: const Duration(milliseconds: 50),
+        keepAliveTimeout: const Duration(milliseconds: 300),
+        wrapSocket: swallowed.wrap,
+      );
+      final bob = await startDevice(
+        hub.b,
+        'Bob',
+        keepAliveInterval: const Duration(milliseconds: 50),
+        keepAliveTimeout: const Duration(milliseconds: 300),
+        wrapSocket: swallowed.wrap,
+      );
+      await pairUp(alice, bob);
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up',
+      );
+
+      // The network loses its route: every byte Alice writes goes nowhere
+      // and Bob never answers.
+      // The Session that was up is the one that has to go. A black-holed
+      // connection does not report itself, so this is the only evidence that
+      // anything noticed.
+      final stale = alice.controller.sessions.first;
+      swallowed.blackHole();
+      await until(
+        () => !alice.controller.sessions.any(
+          (session) => identical(session, stale),
+        ),
+        description: 'the stale Session to be given up on',
+      );
+
+      // Nothing below this line asks for a connection. The peer has not
+      // changed in any way a user could see, and the socket has not reported
+      // anything — so both the notice and the re-dial have to come from the
+      // probe finding no answer.
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come back on both Devices',
+      );
+    });
+
+    test(
+      'is opened for a peer that was not up when the pairing finished',
+      () async {
+        // A Device that was paired while its peer was down: the group says the
+        // peer belongs here, and the peer is serving again a moment later.
+        // Nothing reports that the peer is up — discovery may well have seen
+        // it at the same address all along — so the Session has to be opened by
+        // something that keeps looking.
+        final hub = MemoryBeaconHub();
+        final alice = await startDevice(hub.a, 'Alice');
+        final bobStore = MemoryProfileStore();
+        final bob = await startDevice(hub.b, 'Bob', store: bobStore);
+        await pairUp(alice, bob);
+        await until(
+          () =>
+              alice.controller.sessions.isNotEmpty &&
+              bob.controller.sessions.isNotEmpty,
+          description: 'the Session to come up',
+        );
+
+        // Bob goes away entirely, and Alice lets go of the Session he was on.
+        await bob.controller.close();
+        await until(
+          () => alice.controller.sessions.isEmpty,
+          description: 'the Session to Alice to end',
+        );
+
+        // Bob comes back as the same Device — the same profile, so the same
+        // identity and the same group. The two of them are expected to find
+        // each other without anybody tapping anything.
+        final bobAgain = await startDevice(hub.b, 'Bob', store: bobStore);
+        await until(
+          () =>
+              alice.controller.sessions.isNotEmpty &&
+              bobAgain.controller.sessions.isNotEmpty,
+          description: 'the Session to come back on both Devices',
+        );
+      },
+    );
+
+    test('is opened once the network comes back', () async {
+      // The shape of a real outage: the Session ends *because* the network
+      // went down, so the first attempt to dial it back fails too. Nothing
+      // else changes — the peer is still at the same address, and discovery
+      // has nothing new to say — so the pair comes back only because
+      // something keeps trying.
+      final hub = MemoryBeaconHub();
+      final down = _DownNetwork();
+      final alice = await startDevice(hub.a, 'Alice', dialSocket: down.dial);
+      final bob = await startDevice(hub.b, 'Bob', dialSocket: down.dial);
+      await pairUp(alice, bob);
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up',
+      );
+
+      // The network goes down: the Session ends, and every dial from now on
+      // fails the way a dial fails when there is no route.
+      down.goDown();
+      await bob.controller.sessions.first.close();
+      await until(
+        () => alice.controller.sessions.isEmpty,
+        description: 'the Session to Alice to end',
+      );
+
+      // The network comes back. Nothing announces it, and no user does
+      // anything: the sweep has to notice on its own.
+      down.goUp();
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come back on both Devices',
+      );
     });
   });
 

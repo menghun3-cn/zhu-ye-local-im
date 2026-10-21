@@ -10,6 +10,13 @@ import 'wechat/theme.dart';
 /// desktop client does instead of taking over the bottom half of the window.
 /// It is anchored to the button that opened it, so the eye that found the 表情
 /// glyph lands on the faces nearest to it.
+///
+/// Picking a face puts it **into the composer**, it does not send it. A face
+/// is a character the user chose, and it goes out with whatever else is in
+/// the box, when 发送 is pressed — the same way a face typed with the keyboard
+/// goes out. Sending it on the tap would have made the face a message of its
+/// own, which is a different thing: a person who picks a face and then wants
+/// to write a word next to it would have to send twice.
 class EmojiPickerButton extends StatelessWidget {
   /// Builds the button over [onPick].
   const EmojiPickerButton({
@@ -67,7 +74,14 @@ class EmojiPickerButton extends StatelessWidget {
             ),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text('☺', style: TextStyle(fontSize: 16)),
+          child: const Text(
+            '☺',
+            style: TextStyle(
+              fontSize: 16,
+              fontFamily: WeChat.fontFamily,
+              fontFamilyFallback: WeChat.fontFamilyFallback,
+            ),
+          ),
         ),
       ),
     );
@@ -100,14 +114,53 @@ class EmojiPickerButton extends StatelessWidget {
       // is what keeps the panel on whichever side of the warp the button is
       // on, and `showMenu` still clamps it into the window.
       position: RelativeRect.fromRect(anchor, Offset.zero & overlay.size),
-      items: [
-        PopupMenuItem<void>(
-          enabled: false,
-          padding: EdgeInsets.zero,
-          child: EmojiPanel(recent: recent, onPick: onPick),
-        ),
-      ],
+      items: [_EmojiPanelEntry(recent: recent, onPick: onPick)],
     );
+  }
+}
+
+/// The popup entry that holds the picker's body.
+///
+/// It is an entry of its own rather than a [PopupMenuItem] because of what
+/// that widget does with a panel. A menu item is a *choice*, so it is drawn
+/// as one: the entry's own text goes to the label colour, and — when the item
+/// is disabled — the whole of it is dimmed, text and icons alike. The way to
+/// put a panel in a menu is to make the item disabled, since an enabled item
+/// pops the menu the moment it is tapped, and a panel is not a choice.
+///
+/// That left the faces behind a veil: the panel's own text took the disabled
+/// colour and the icons lost 38% of their opacity, so the panel read as a
+/// sheet of frosted glass laid over the faces rather than as the faces
+/// themselves.
+///
+/// Drawing the panel here instead draws it as a panel — no disabled state, no
+/// menu-item padding, no tint — and the entry is not a choice, so it does not
+/// close the menu when the panel is tapped. The panel closes itself, by
+/// popping the route, once a face has been picked.
+class _EmojiPanelEntry extends PopupMenuEntry<void> {
+  const _EmojiPanelEntry({required this.recent, required this.onPick});
+
+  /// The faces to draw first, newest first.
+  final List<String> recent;
+
+  /// Called with the face the user chose.
+  final ValueChanged<String> onPick;
+
+  @override
+  double get height => double.infinity;
+
+  @override
+  bool represents(void value) => false;
+
+  @override
+  State<_EmojiPanelEntry> createState() => _EmojiPanelEntryState();
+}
+
+/// The state of the picker's popup entry.
+class _EmojiPanelEntryState extends State<_EmojiPanelEntry> {
+  @override
+  Widget build(BuildContext context) {
+    return EmojiPanel(recent: widget.recent, onPick: widget.onPick);
   }
 }
 
@@ -149,6 +202,12 @@ class EmojiPanel extends StatelessWidget {
     return Container(
       width: 8 * WeChat.emojiTileSide + 7 * 2,
       padding: const EdgeInsets.all(10),
+      // The panel draws its own surface. The popup it lives in has one too,
+      // but a menu entry is a menu *item* and the framework draws those with
+      // the menu's own padding and colour; giving the panel a surface of its
+      // own is what makes the faces sit on a clean sheet rather than on a
+      // tinted item that reads as a layer over them.
+      color: colors.surface,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

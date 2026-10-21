@@ -1400,7 +1400,7 @@ void main() {
       await settleRoute(tester);
 
       // The emoji button sits beside the file button; opening it shows the
-      // faces, and picking one sends it as its own message.
+      // faces, and picking one puts it in the composer.
       await tester.tap(
         onConversation(windowA, find.byTooltip(l10n.menuSendEmoji)),
       );
@@ -1416,6 +1416,23 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('😀').first);
 
+      // The face is in the box and has not gone out on its own.
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.widgetWithText(TextField, '😀'),
+        ).evaluate().isNotEmpty,
+        description: 'the face to land in the composer',
+      );
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'picking a face does not send anything by itself',
+      );
+
+      // 发送 releases it, and it travels as the words of the message.
+      await tester.tap(onConversation(windowA, find.text(l10n.send)));
       await pumpUntil(
         tester,
         () =>
@@ -1424,8 +1441,62 @@ void main() {
         description: 'the face to arrive as a message',
       );
 
-      // Drawn the way an emoticon is: large, as a face rather than a line of
-      // words, with no transfer receipt under it.
+      // A face picked in the composer is a character in the message, so the
+      // message is a text message and the face is drawn as its words.
+      expect(
+        alice.controller.transfers.single.kind,
+        PayloadKind.text,
+        reason: 'a face picked in the composer is part of the text',
+      );
+      expect(
+        onConversation(
+          windowA,
+          find.text('${l10n.kindEmoji} · ${l10n.stateCompleted}'),
+        ),
+        findsNothing,
+        reason: 'a text message carries no transfer receipt',
+      );
+      // And it was remembered for the next time the picker opens.
+      expect(alice.controller.recentEmojis, ['😀']);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a face sent as a payload of its own still arrives large', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ConversationsPage,
+          find.text('Bob'),
+        ).evaluate().isNotEmpty,
+        description: 'the conversation to be listed',
+      );
+      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
+      await settleRoute(tester);
+
+      // v0.1.10 and v0.1.11 sent a face as a payload of its own, and a peer
+      // running one of those still sends that. The kind stays on the wire and
+      // on screen: the face is drawn large, the way it was when it arrived.
+      await sendEmojiPayload(tester, alice, '😀', to: bob.fingerprint);
+      await pumpUntil(
+        tester,
+        () =>
+            onConversation(windowA, find.text('😀')).evaluate().isNotEmpty &&
+            alice.controller.transfers.single.state.isSettled,
+        description: 'the face to arrive as a message',
+      );
+
       final face = tester.widget<Text>(
         onConversation(windowA, find.text('😀')).first,
       );
@@ -1438,8 +1509,6 @@ void main() {
         findsNothing,
         reason: 'an emoji is a message, not a transfer with a receipt',
       );
-      // And it was remembered for the next time the picker opens.
-      expect(alice.controller.recentEmojis, ['😀']);
 
       await shutdown(tester, [alice, bob]);
     });

@@ -36,6 +36,7 @@ export 'protocol/frame.dart';
 export 'protocol/messages.dart';
 export 'security/hkdf.dart';
 export 'security/secure_link.dart';
+export 'session/keep_alive.dart';
 export 'session/link_manager.dart';
 export 'session/session_hub.dart';
 export 'transfer/byte_source.dart';
