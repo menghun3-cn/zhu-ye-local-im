@@ -1,0 +1,9 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- .agents/notes/implemented/bug-fix/2026-10-21-a-grey-face-is-a-font-ordering.md
+#   git hash-object -- .agents/notes/implemented/bug-fix/2026-10-21-a-grey-face-is-a-font-ordering.zh.md
+2026-10-21-a-grey-face-is-a-font-ordering.md: ca93e2f2f2726893d373db4cae15cd91dcb315dd
+2026-10-21-a-grey-face-is-a-font-ordering.zh.md: 88edfd8474bd96d7291ed94ae55d4565aa954ea9
+

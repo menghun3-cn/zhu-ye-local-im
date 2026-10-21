@@ -13,6 +13,19 @@
 /// gestures and small objects — in a fixed order, so a picker never has to
 /// invent one.
 ///
+/// **A face here has to be drawable in colour.** A code point the machine
+/// has no colour glyph for comes out as an empty box, and the code point
+/// that asks for the plain outline instead of the coloured face comes out
+/// grey. Two things keep both out of the table, and both are checked by
+/// `test/emoji/emoji_colour_test.dart`:
+///
+/// * Every code point here has a colour glyph in the system's colour font.
+///   A face that no font can draw is replaced, not left as a box.
+/// * A code point whose Unicode default is the *text* presentation — the
+///   plain outline — carries the variation selector U+FE0F, which is what
+///   asks for the coloured face. `✋` without it is a black outline; `✋️`
+///   with it is a raised hand.
+///
 /// Sorted the way a picker would order a grid: feelings first, then actions,
 /// then objects. Ordering is a property of this table and not of the Recent
 /// strip, which is always in recency order.
@@ -49,18 +62,18 @@ const List<EmojiEntry> emojiTable = [
   EmojiEntry(emoji: '✌️', name: 'victory'),
   EmojiEntry(emoji: '🤞', name: 'crossed fingers'),
   EmojiEntry(emoji: '👌', name: 'ok'),
-  EmojiEntry(emoji: '✋', name: 'raised hand'),
+  EmojiEntry(emoji: '✋️', name: 'raised hand'),
   EmojiEntry(emoji: '👋', name: 'wave'),
   EmojiEntry(emoji: '🤔', name: 'thinking'),
   EmojiEntry(emoji: '🤗', name: 'hug'),
   EmojiEntry(emoji: '🤫', name: 'shush'),
   EmojiEntry(emoji: '🤭', name: 'giggle'),
   EmojiEntry(emoji: '😶', name: 'no mouth'),
-  EmojiEntry(emoji: '🫡', name: 'salute'),
+  EmojiEntry(emoji: '🙌', name: 'raising hands'),
   EmojiEntry(emoji: '❌', name: 'cross mark'),
   EmojiEntry(emoji: '✅', name: 'check mark'),
-  EmojiEntry(emoji: '❓', name: 'question'),
-  EmojiEntry(emoji: '❗', name: 'exclamation'),
+  EmojiEntry(emoji: '❓️', name: 'question'),
+  EmojiEntry(emoji: '❗️', name: 'exclamation'),
 
   // Objects and sweetness.
   EmojiEntry(emoji: '❤️', name: 'heart'),
@@ -72,7 +85,7 @@ const List<EmojiEntry> emojiTable = [
   EmojiEntry(emoji: '💔', name: 'broken heart'),
   EmojiEntry(emoji: '💯', name: 'hundred'),
   EmojiEntry(emoji: '🔥', name: 'fire'),
-  EmojiEntry(emoji: '⭐', name: 'star'),
+  EmojiEntry(emoji: '⭐️', name: 'star'),
   EmojiEntry(emoji: '🎉', name: 'tada'),
   EmojiEntry(emoji: '🎂', name: 'birthday'),
   EmojiEntry(emoji: '🌹', name: 'rose'),
@@ -82,7 +95,7 @@ const List<EmojiEntry> emojiTable = [
   EmojiEntry(emoji: '🌈', name: 'rainbow'),
   EmojiEntry(emoji: '☀️', name: 'sun'),
   EmojiEntry(emoji: '🌙', name: 'moon'),
-  EmojiEntry(emoji: '⚡', name: 'zap'),
+  EmojiEntry(emoji: '⚡️', name: 'zap'),
 ];
 
 /// Every face the composer can offer, in [emojiTable]'s order.
