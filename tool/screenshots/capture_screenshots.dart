@@ -46,6 +46,24 @@ const String capturedAddress = '192.168.1.115';
 const String capturedAlias = '我的笔记本';
 const String pairedAlias = '书房台式机';
 
+/// The ports the captured Devices are shown listening on.
+///
+/// A Device that is told port 0 takes whatever the operating system hands
+/// it, so the port in the picture would be a different one on every run —
+/// and a picture whose only difference from the last one is a port is a
+/// picture that cannot be compared with the last one.
+///
+/// Not the project's own default ports: a copy of the application is
+/// usually running on the machine that takes these pictures, and it holds
+/// 47655 already — a socket cannot be bound twice, and the capture would
+/// fail to serve a Session. These are above the default range for that
+/// reason, and they are four rather than two because both Devices run in
+/// this one process.
+const int capturedSessionPort = 47855;
+const int capturedPairingPort = 47856;
+const int peerSessionPort = 47857;
+const int peerPairingPort = 47858;
+
 /// The folder the captured Device is shown as saving received files into.
 ///
 /// A real path rather than the harness's own temporary one: a picture that
@@ -81,12 +99,31 @@ Future<void> _runCapture() async {
     final address = InternetAddress(capturedAddress);
 
     final home = tempDirectory('local-transfer-shot-');
+    // A fixed identity for each Device. A Device mints a key pair on first
+    // launch and its Fingerprint is derived from that key, so without this
+    // every run of the capture would produce a different picture for a
+    // reason that has nothing to do with the interface — and re-running the
+    // script to refresh the README's images would leave a diff made of
+    // fingerprints.
+    final meStore = await SeededProfileStore.overSeed(
+      List<int>.filled(32, 0x11),
+      alias: capturedAlias,
+      platform: DevicePlatform.windows,
+    );
+    final peerStore = await SeededProfileStore.overSeed(
+      List<int>.filled(32, 0x22),
+      alias: pairedAlias,
+      platform: DevicePlatform.windows,
+    );
     final me = await startUiDevice(
       tester,
       AddressedBeaconTransport(hub.a, address),
       capturedAlias,
       clipboardMode: ClipboardMode.stage,
       defaultIncomingDirectory: capturedIncomingDirectory,
+      profileStore: meStore,
+      sessionListenPort: capturedSessionPort,
+      pairingPort: capturedPairingPort,
     );
     final peer = await startUiDevice(
       tester,
@@ -94,6 +131,9 @@ Future<void> _runCapture() async {
       pairedAlias,
       platform: DevicePlatform.windows,
       defaultIncomingDirectory: home.path,
+      profileStore: peerStore,
+      sessionListenPort: peerSessionPort,
+      pairingPort: peerPairingPort,
     );
 
     await _pair(tester, me, peer);

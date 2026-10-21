@@ -55,4 +55,5 @@ flutter test tool/screenshots/capture_screenshots.dart
 ```
 
 这个脚本会重写 `docs/screenshots/` 里的图片，因此它不在 `test_flutter/` 里 —— 一个每次运行都改写
-仓库文档的测试套件，没人会相信它是绿的。
+仓库文档的测试套件，没人会相信它是绿的。同一份源码连跑两次产出的是逐字节相同的图，
+所以这些图能当 diff 来审：图变了，就是界面变了。
