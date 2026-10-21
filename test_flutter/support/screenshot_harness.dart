@@ -108,6 +108,17 @@ class ScreenshotFonts {
   /// Where that face lives on a Windows machine.
   static const String symbolPath = r'C:\Windows\Fonts\seguisym.ttf';
 
+  /// The family the colour faces come from.
+  ///
+  /// The symbol face draws the emoji code points as plain outlines, in the
+  /// text colour — a face drawn by it is grey. The emoji face draws the
+  /// same code points in colour, and the theme's chain asks for it first,
+  /// so a captured window shows the faces as a user would see them.
+  static const String emojiFamily = 'Segoe UI Emoji';
+
+  /// Where that face lives on a Windows machine.
+  static const String emojiPath = r'C:\Windows\Fonts\seguiemj.ttf';
+
   /// Where the Material icons live inside a Flutter checkout.
   static const String iconsPath =
       r'D:\tools\flutter\bin\cache\artifacts\material_fonts\materialicons-regular.otf';
@@ -144,6 +155,7 @@ class ScreenshotFonts {
   /// actually has its glyphs.
   static String _pathFor(String family) => switch (family) {
     'Segoe UI Symbol' => symbolPath,
+    'Segoe UI Emoji' => emojiPath,
     _ => cjkPath,
   };
 
