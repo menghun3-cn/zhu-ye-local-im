@@ -939,6 +939,8 @@ class _ComposerField extends StatelessWidget {
                   fontSize: WeChat.fontSizeInput,
                   height: WeChat.lineHeightBody,
                   color: colors.bubbleText,
+                  fontFamily: WeChat.fontFamily,
+                  fontFamilyFallback: WeChat.fontFamilyFallback,
                 ),
                 decoration: InputDecoration(
                   hintText: hint,
@@ -962,6 +964,8 @@ class _ComposerField extends StatelessWidget {
                   hintStyle: TextStyle(
                     fontSize: WeChat.fontSizeInput,
                     color: colors.secondaryText,
+                    fontFamily: WeChat.fontFamily,
+                    fontFamilyFallback: WeChat.fontFamilyFallback,
                   ),
                 ),
               ),
@@ -1048,6 +1052,8 @@ class _SendButton extends StatelessWidget {
             fontSize: WeChat.fontSizeLabel,
             fontWeight: FontWeight.w600,
             height: 1,
+            fontFamily: WeChat.fontFamily,
+            fontFamilyFallback: WeChat.fontFamilyFallback,
           ),
         ),
       ),
@@ -1840,7 +1846,11 @@ class _BubbleAction extends StatelessWidget {
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: VisualDensity.compact,
       textStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: WeChat.fontSizePreview),
+        TextStyle(
+          fontSize: WeChat.fontSizePreview,
+          fontFamily: WeChat.fontFamily,
+          fontFamilyFallback: WeChat.fontFamilyFallback,
+        ),
       ),
     );
     return TextButton(onPressed: onPressed, style: style, child: Text(label));
