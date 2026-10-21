@@ -52,6 +52,48 @@ void main() {
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
     });
 
+    test('the styles Material builds for itself name the font too', () {
+      final theme = WeChat.theme(WeChatColors.light);
+      // `ThemeData.fontFamily` reaches the *default text theme* and nothing
+      // else: a component style such as a button's own `textStyle` is a
+      // standalone `TextStyle` that names no family, and
+      // `AnimatedDefaultTextStyle` replaces the ambient style rather than
+      // merging into it. A style that names no family therefore does not
+      // inherit the theme's — it falls back to the platform's, which is a
+      // different face with different Chinese coverage.
+      final styles = <String, TextStyle?>{
+        'a filled button': theme.filledButtonTheme.style?.textStyle?.resolve(
+          <WidgetState>{},
+        ),
+        'a text button': theme.textButtonTheme.style?.textStyle?.resolve(
+          <WidgetState>{},
+        ),
+        'a segmented button': theme.segmentedButtonTheme.style?.textStyle
+            ?.resolve(<WidgetState>{}),
+        'a list tile subtitle': theme.listTileTheme.subtitleTextStyle,
+        'a chip label': theme.chipTheme.labelStyle,
+        'a navigation label': theme.navigationBarTheme.labelTextStyle?.resolve(
+          <WidgetState>{},
+        ),
+        'a field label': theme.inputDecorationTheme.labelStyle,
+        'a field hint': theme.inputDecorationTheme.hintStyle,
+      };
+      styles.forEach((what, style) {
+        expect(
+          style?.fontFamily,
+          WeChat.fontFamily,
+          reason:
+              '$what would draw in the platform default rather than in '
+              'the theme\'s own face',
+        );
+        expect(
+          style?.fontFamilyFallback,
+          WeChat.fontFamilyFallback,
+          reason: '$what needs the chain for the glyphs the first face lacks',
+        );
+      });
+    });
+
     test('a received bubble is a soft grey on the board\'s white', () {
       // The two fills were the same white once, told apart by a hairline only —
       // which in a real window read as an outlined empty box rather than as a

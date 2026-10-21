@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-21-the-readme-showed-nothing.md
+#   git hash-object 2026-10-21-the-readme-showed-nothing.zh.md
+2026-10-21-the-readme-showed-nothing.md: 47cefc0f95ad6bcf6c94cf8a6f515485616cfec4
+2026-10-21-the-readme-showed-nothing.zh.md: bc7307b11309970fbf35826187b75732ca488672
