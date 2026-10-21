@@ -153,183 +153,159 @@ void main() {
     );
   });
 
-  group('the box a message is typed into', () {
-    /// The box the typed text sits in, which is the composer's own container.
+  group('the input area, as WeChat draws it', () {
+    /// The board the whole input area is drawn on.
     ///
-    /// Not the `TextField` itself: the field inside it draws nothing at all —
-    /// no border, no minimum height — because the container around it is the
-    /// thing a user sees. Measuring the field would be measuring a widget with
-    /// no fill, no frame and no say in how tall the row is.
-    ///
-    /// An `AnimatedContainer` rather than a `Container`, because the box has
-    /// two states: at rest it is a hairline of `borderStrong`, and while the
-    /// field holds focus the hairline becomes `brandStrong` with a 3px ring of
-    /// `brandSoft` around it — the design's `:focus-within` on
-    /// `.composer__box`.
-    double boxHeight(WidgetTester tester) => tester
-        .getSize(
-          find
-              .ancestor(
-                of: find.byType(TextField),
-                matching: find.byType(AnimatedContainer),
-              )
-              .first,
-        )
-        .height;
+    /// The container with the board's colour, found by the field inside it
+    /// rather than by type: the board is a plain `Container`, and the field is
+    /// the one thing that is certainly inside it.
+    BoxDecoration boardDecoration(WidgetTester tester) =>
+        (tester
+                .widget<Container>(
+                  find
+                      .ancestor(
+                        of: find.byType(TextField),
+                        matching: find.byType(Container),
+                      )
+                      .first,
+                )
+                .decoration!)
+            as BoxDecoration;
 
-    Rect boxRect(WidgetTester tester) => tester.getRect(
-      find
-          .ancestor(
-            of: find.byType(TextField),
-            matching: find.byType(AnimatedContainer),
-          )
-          .first,
-    );
-
-    testWidgets('is the height the design draws', (tester) async {
+    testWidgets('is a rounded board of its own', (tester) async {
       await pumpComposer(tester, <String>[]);
 
-      // Measured rather than asked for, because the number that matters is the
-      // one on screen: a `constraints` a later change overrode would leave the
-      // token correct and the box the wrong size.
+      // WeChat's input area is a *card* laid on the conversation: a lighter
+      // board with rounded corners, floating with a margin from the window's
+      // edge. It is not a strip welded to the bottom and not a hairline above.
+      final decoration = boardDecoration(tester);
       expect(
-        boxHeight(tester),
-        WeChat.fieldHeight,
-        reason: 'the design\'s .composer__box is 44 tall',
+        decoration.color,
+        WeChatColors.light.composerBoard,
+        reason: 'the board is a panel of its own colour',
       );
-      // Which is taller than the strip this box used to be. The complaint was
-      // that it was a strip rather than a box, so the assertion is against the
-      // number it was, not just against a token that could be lowered to match.
       expect(
-        boxHeight(tester),
-        greaterThan(32),
-        reason: 'and taller than the strip it was before',
+        decoration.borderRadius,
+        BorderRadius.circular(WeChat.composerBoardRadius),
+        reason: 'and it is rounded, the way the reference is',
+      );
+      // The board *does* carry a hairline: the reference draws one around the
+      // input area, and it is what says where the board ends — the two greys
+      // are a step apart as well, so the line is not the only thing doing it.
+      expect(decoration.border, isNotNull);
+      final border = decoration.border! as Border;
+      expect(border.top.width, 1);
+      expect(border.top.color, WeChatColors.light.composerBoardBorder);
+    });
+
+    testWidgets('the text area is the height the reference draws', (
+      tester,
+    ) async {
+      await pumpComposer(tester, <String>[]);
+
+      // Measured rather than asked for, because the number that matters is
+      // the one on screen: a `constraints` a later change overrode would leave
+      // the token correct and the field the wrong size.
+      final height = tester
+          .getSize(
+            find
+                .ancestor(
+                  of: find.byType(TextField),
+                  matching: find.byType(ConstrainedBox),
+                )
+                .first,
+          )
+          .height;
+      expect(
+        height,
+        greaterThanOrEqualTo(WeChat.composerFieldHeight),
+        reason: 'the reference\'s text area is 56 tall for one line',
       );
     });
 
-    testWidgets('the two buttons beside it are a step shorter', (tester) async {
+    testWidgets('the text is written straight onto the board', (tester) async {
+      await pumpComposer(tester, <String>[]);
+
+      // No frame at all: WeChat's input area draws no border around the text,
+      // so the field must not draw one either. The earlier design drew a
+      // hairline box with a brand ring while focused; both belonged to that
+      // frame.
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.decoration?.border, InputBorder.none);
+      expect(field.decoration?.enabledBorder, InputBorder.none);
+      expect(field.decoration?.focusedBorder, InputBorder.none);
+
+      // And there is no box around it either: the board *is* the frame.
+      expect(
+        find.ancestor(
+          of: find.byType(TextField),
+          matching: find.byType(AnimatedContainer),
+        ),
+        findsNothing,
+        reason: 'the board is the only frame there is',
+      );
+    });
+
+    testWidgets('the tools are bare glyphs in a row', (tester) async {
       final l10n = lookupAppLocalizations(appLocale);
       await pumpComposer(tester, <String>[]);
 
-      // The design's `.btn` is 34 against the box's 44, and the three controls
-      // are aligned on their *bottoms* (`align-items: flex-end`). One height
-      // for all three was the old layout; the difference is the design's, so
-      // it is asserted rather than smoothed away — and asserting the bottoms
-      // is what keeps a later "centre them instead" from being silent.
-      final box = boxRect(tester);
-      for (final control in [
-        tester.getRect(find.byTooltip(l10n.menuSendFile)),
-        tester.getRect(find.widgetWithText(FilledButton, l10n.send)),
-      ]) {
-        expect(
-          control.height,
-          WeChat.composerControl,
-          reason: 'the design\'s .btn is 34 tall',
-        );
-        expect(
-          control.bottom,
-          box.bottom,
-          reason: 'and it sits on the box\'s bottom edge, not its top',
-        );
-      }
-    });
-
-    testWidgets('keeps an outline even though text fields no longer do', (
-      tester,
-    ) async {
-      await pumpComposer(tester, <String>[]);
-
-      // The field itself draws none of it. Every outline the theme gives a text
-      // field is turned off here on purpose, because the box around it is the
-      // frame — a field drawing its own inside the composer's would be a box in
-      // a box. So the assertion is about the *container*, which is what a user
-      // would call the field's border.
-      final field = tester.widget<TextField>(find.byType(TextField));
+      // A face and a file, side by side on the lower edge of the board.
+      final face = tester.getRect(find.byTooltip(l10n.menuSendEmoji));
+      final file = tester.getRect(find.byTooltip(l10n.menuSendFile));
+      expect(face.left, lessThan(file.left), reason: 'the face comes first');
       expect(
-        field.decoration?.border,
-        InputBorder.none,
-        reason: 'the field defers to the box around it',
+        face.center.dy,
+        closeTo(file.center.dy, 0.01),
+        reason: 'and the two share a line',
       );
 
-      final box = tester.widget<AnimatedContainer>(
-        find
-            .ancestor(
-              of: find.byType(TextField),
-              matching: find.byType(AnimatedContainer),
-            )
-            .first,
-      );
-      final decoration = box.decoration! as BoxDecoration;
+      // Each is a line-drawn glyph rather than a framed button: a row of
+      // little squares would read as a form, and WeChat's does not.
       expect(
-        decoration.color,
-        isNotNull,
-        reason: 'the composer draws the field\'s fill itself',
+        find.descendant(
+          of: find.byTooltip(l10n.menuSendFile),
+          matching: find.byType(OutlinedButton),
+        ),
+        findsNothing,
+        reason: 'a tool is a glyph, not a button with a border',
       );
-      // And it draws the hairline the design's `.composer__box` has at rest:
-      // a box with no outline is a blank, not somewhere to type.
       expect(
-        decoration.border,
-        isNotNull,
-        reason: 'the box is what reads as a field, and it has a border',
+        find.descendant(
+          of: find.byTooltip(l10n.menuSendFile),
+          matching: find.byIcon(Icons.folder_outlined),
+        ),
+        findsOneWidget,
+      );
+
+      // The glyph is drawn at the size the reference measures. The
+      // framework's own IconButton padding is 8 on every side, and inside a
+      // 28pt box that squashes a 22pt glyph down to 12 — a tool that looks
+      // half the size it is supposed to be.
+      expect(
+        tester
+            .getSize(find.byIcon(Icons.sentiment_satisfied_alt_outlined))
+            .width,
+        WeChat.composerIconSize,
+        reason: 'the face is drawn at the size the reference measures',
+      );
+
+      // And the step between two tools is 45, which is what the reference
+      // measures from one glyph's centre to the next.
+      expect(
+        file.left - face.left,
+        WeChat.composerIconBox + WeChat.composerIconGap,
+        reason: 'the tools are 45 apart, as in the reference',
       );
     });
 
-    testWidgets('the box answers focus the way the design does', (
-      tester,
-    ) async {
-      await pumpComposer(tester, <String>[]);
-      final boxFinder = find
-          .ancestor(
-            of: find.byType(TextField),
-            matching: find.byType(AnimatedContainer),
-          )
-          .first;
-      BoxDecoration decoration() =>
-          (tester.widget<AnimatedContainer>(boxFinder).decoration!)
-              as BoxDecoration;
-
-      // At rest: the hairline of border-strong, and no ring.
-      expect(
-        decoration().border?.top.color,
-        WeChatColors.light.borderStrong,
-        reason: 'the design\'s .composer__box at rest is a border-strong line',
-      );
-      expect(
-        decoration().boxShadow ?? const <BoxShadow>[],
-        isEmpty,
-        reason: 'and no ring until the field is being typed into',
-      );
-
-      await tester.tap(find.byType(TextField));
-      // Settled rather than pumped once: the border and the ring are animated
-      // over 160ms, and a single pump would read the halfway values.
-      await tester.pump(const Duration(milliseconds: 200));
-
-      expect(
-        decoration().border?.top.color,
-        WeChatColors.light.brandStrong,
-        reason: ':focus-within turns the line brand-strong',
-      );
-      final ring = decoration().boxShadow!;
-      expect(ring, hasLength(1), reason: 'one ring, not a stack of shadows');
-      expect(ring.single.color, WeChatColors.light.brandSoft);
-      expect(
-        ring.single.spreadRadius,
-        3,
-        reason: 'the design\'s 0 0 0 3px brand-soft ring',
-      );
-    });
-
-    testWidgets('the send button is filled and bottom-aligned with the box', (
+    testWidgets('the send sits at the bottom right of the board', (
       tester,
     ) async {
       final l10n = lookupAppLocalizations(appLocale);
       await pumpComposer(tester, <String>[]);
       await type(tester, 'ready');
 
-      // Filled rather than a word: sending is the action of this surface. It
-      // used to be a `TextButton`, which is the shape for a step that is *not*
-      // the point of the screen.
       final send = find.widgetWithText(FilledButton, l10n.send);
       expect(send, findsOneWidget);
       expect(
@@ -338,41 +314,74 @@ void main() {
         reason: 'the send is the action here, so it is drawn as one',
       );
 
-      // In the action green, with the ink that goes on that green — white on
-      // the deep light-mode one.
+      final sendRect = tester.getRect(send);
+      expect(sendRect.height, WeChat.composerSendHeight);
+      expect(sendRect.width, WeChat.composerSendWidth);
+
+      // Bottom right of the board, the way WeChat puts it: the text area is
+      // the wide thing at the top, and the send is down at the far end of the
+      // tools' line. The insets are measured from the board's **inner**
+      // edge, because the hairline is drawn inside the board's own box.
+      final board = tester.getRect(
+        find
+            .ancestor(
+              of: find.byType(TextField),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final inner = WeChat.composerBoardBorderWidth;
+      expect(
+        sendRect.right,
+        closeTo(board.right - inner - WeChat.composerSendRightInset, 0.01),
+        reason: 'the send is against the board\'s right edge',
+      );
+      expect(
+        sendRect.bottom,
+        closeTo(board.bottom - inner - WeChat.composerSendBottomInset, 0.01),
+        reason: 'and against its bottom edge',
+      );
+    });
+
+    testWidgets('the send is grey until there is something to send', (
+      tester,
+    ) async {
+      final l10n = lookupAppLocalizations(appLocale);
+      await pumpComposer(tester, <String>[]);
+
+      final send = find.widgetWithText(FilledButton, l10n.send);
       final style = tester.widget<FilledButton>(send).style!;
+
+      // Empty box: a grey send. The difference between grey and green is the
+      // button's whole message, so it is asserted rather than assumed.
       expect(
         style.backgroundColor?.resolve(const <WidgetState>{}),
-        WeChatColors.light.brandStrong,
+        WeChatColors.light.composerSendDisabled,
+        reason: 'an empty box has nothing to send, and the button says so',
       );
       expect(
         style.foregroundColor?.resolve(const <WidgetState>{}),
+        WeChatColors.light.onComposerSendDisabled,
+      );
+      // The button still answers the click: grey says "there is nothing here
+      // to send", and a control that stopped answering would swallow the
+      // click and the focus with it.
+      expect(
+        tester.widget<FilledButton>(send).onPressed,
+        isNotNull,
+        reason: 'the send always answers the click',
+      );
+
+      await type(tester, 'ready');
+      final live = tester.widget<FilledButton>(send).style!;
+      expect(
+        live.backgroundColor?.resolve(const <WidgetState>{}),
+        WeChatColors.light.brandStrong,
+        reason: 'with something in the box the send is the action green',
+      );
+      expect(
+        live.foregroundColor?.resolve(const <WidgetState>{}),
         WeChatColors.light.onBrandStrong,
-      );
-
-      // And it carries the arrow the design puts beside the word.
-      expect(
-        find.descendant(of: send, matching: find.byIcon(Icons.arrow_forward)),
-        findsOneWidget,
-        reason: '发送 is followed by the design\'s arrow',
-      );
-
-      // A step shorter than the box it sends from, sitting on its bottom edge:
-      // the design's 34px `.btn` under a 44px `.composer__box`, aligned on the
-      // bottom. The old complaint was a pill shorter than the composer *and*
-      // floating in the middle of it; what the design asks for is shorter and
-      // bottom-aligned, which is what is asserted here.
-      final sendRect = tester.getRect(send);
-      expect(sendRect.height, WeChat.composerControl);
-      expect(
-        sendRect.bottom,
-        boxRect(tester).bottom,
-        reason: 'aligned on the bottom edge, as flex-end does',
-      );
-      expect(
-        sendRect.width,
-        greaterThanOrEqualTo(60),
-        reason: 'wide enough for the word plus its own padding',
       );
     });
   });
