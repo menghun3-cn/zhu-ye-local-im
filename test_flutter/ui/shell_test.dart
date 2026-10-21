@@ -52,6 +52,29 @@ void main() {
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Microsoft YaHei UI');
     });
 
+    test('the colour face comes before the monochrome one', () {
+      // The chain is a list, and its order is the whole mechanism: the first
+      // font that has a glyph wins. `Segoe UI Symbol` covers every emoji code
+      // point as a plain outline, so putting it in front turns every face
+      // in the picker grey — a defect that no amount of looking at this
+      // repository's diff would explain.
+      const chain = WeChat.fontFamilyFallback;
+      const colour = 'Segoe UI Emoji';
+      const mono = 'Segoe UI Symbol';
+
+      expect(
+        chain,
+        contains(colour),
+        reason: 'the colour face is on the chain',
+      );
+      expect(chain, contains(mono), reason: 'the symbol face is on the chain');
+      expect(
+        chain.indexOf(colour),
+        lessThan(chain.indexOf(mono)),
+        reason: 'the colour face has to win the race',
+      );
+    });
+
     test('the styles Material builds for itself name the font too', () {
       final theme = WeChat.theme(WeChatColors.light);
       // `ThemeData.fontFamily` reaches the *default text theme* and nothing
