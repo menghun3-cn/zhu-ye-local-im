@@ -4,6 +4,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
+import 'top_toast.dart';
 
 /// Runs something the app layer is allowed to refuse, and says so where the
 /// user is looking.
@@ -13,18 +14,26 @@ import 'labels.dart';
 /// the refusal belongs on screen as a word rather than in an unhandled
 /// exception. The messenger and the strings are taken before the await, because
 /// the widget that started the call may be gone by the time it answers.
+///
+/// The refusal is a **toast at the top** rather than a [SnackBar] at the
+/// bottom. The bottom of the window is where the input area is, so a message
+/// about a message that could not be sent would otherwise be laid over the
+/// box the user is about to type the next one into.
 Future<void> guarded(
   BuildContext context,
   Future<void> Function() action,
 ) async {
-  final messenger = ScaffoldMessenger.of(context);
   final l10n = AppLocalizations.of(context);
+  // The overlay is taken **before** the await, for the same reason the
+  // strings are: the widget that started the call may be gone by the time
+  // the call answers, and a toast with nowhere to be drawn would be a
+  // refusal that says nothing.
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
   try {
     await action();
   } on Object catch (error) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(describeFailure(error, l10n))),
-    );
+    if (overlay == null) return;
+    await TopToast.showIn(overlay, describeFailure(error, l10n));
   }
 }
 

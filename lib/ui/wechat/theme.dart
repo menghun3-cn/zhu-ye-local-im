@@ -54,6 +54,12 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     required this.inverseSurface,
     required this.onInverseSurface,
     required this.inversePrimary,
+    required this.composerBoard,
+    required this.composerBoardBorder,
+    required this.composerIcon,
+    required this.composerIconActive,
+    required this.composerSendDisabled,
+    required this.onComposerSendDisabled,
   });
 
   /// Whether these colours belong on a light page or a dark one.
@@ -193,6 +199,46 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
   /// [inverseSurface] 上的品牌色。
   final Color inversePrimary;
 
+  /// 会话输入区那块**白板**的底。
+  ///
+  /// 微信桌面端的输入区是一块比会话背景更亮的白板 —— 会话历史是浅灰
+  /// （`#F5F5F5`），输入区是白（`#FAFAFA`），输入框又是纯白。这三档的差
+  /// 靠明度分层，不靠描边。
+  ///
+  /// 与 [surface] 分开：卡片、对话框、输入框都取 [surface] 的纯白，这一档
+  /// 略灰一点，是**板子**而不是**面**。
+  final Color composerBoard;
+
+  /// 板子那一圈**发丝线**。
+  ///
+  /// 微信桌面端的输入区是浮在会话上的一块白板，四周有一圈极细的边
+  /// （量出来是 #E0E0E0 的一像素）。这条边不是把板子和会话分开 —— 两者的
+  /// 底色本来就差着两档 —— 它是板子**自己**的轮廓：没有它，白板和更白的
+  /// 会话背景之间就没有一样东西说「到这里为止」。
+  final Color composerBoardBorder;
+
+  /// 输入区工具图标的颜色。
+  ///
+  /// 深灰而不是黑：微信的工具图标是线描的，笔画本身已经足够细，再压黑会
+  /// 显得比正文重。
+  final Color composerIcon;
+
+  /// 输入区工具图标**按下**时的颜色。
+  ///
+  /// 一档更深的灰 —— 微信按下一个工具图标时它会变深，而不是变色。
+  final Color composerIconActive;
+
+  /// 发送按钮在**框里没有内容**时的底色。
+  ///
+  /// 微信的发送键此时是灰的：可以按，但按了什么也不会发生。灰底是这个意思
+  /// 的视觉写法，比把它画成绿底再配一句提示更安静。
+  final Color composerSendDisabled;
+
+  /// 发送按钮禁用时上面的字。
+  ///
+  /// 比底色深一档、但仍读得出「按了也不会发生」。
+  final Color onComposerSendDisabled;
+
   /// The palette the design was drawn in.
   static const WeChatColors light = WeChatColors(
     brightness: Brightness.light,
@@ -226,6 +272,12 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     inverseSurface: Color(0xFF2E2E2E),
     onInverseSurface: Colors.white,
     inversePrimary: Color(0xFFA9EA7C),
+    composerBoard: Color(0xFFFAFAFA),
+    composerBoardBorder: Color(0xFFE0E0E0),
+    composerIcon: Color(0xFF4C4C4C),
+    composerIconActive: Color(0xFF1F1F1F),
+    composerSendDisabled: Color(0xFFEDEDED),
+    onComposerSendDisabled: Color(0xFFA5A5A5),
   );
 
   /// The same roles, on a dark page.
@@ -272,6 +324,12 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     inverseSurface: Color(0xFFE3E6EC),
     onInverseSurface: Color(0xFF171A21),
     inversePrimary: Color(0xFF8FD46F),
+    composerBoard: Color(0xFF1B1F26),
+    composerBoardBorder: Color(0xFF2C313A),
+    composerIcon: Color(0xFF9AA3AF),
+    composerIconActive: Color(0xFFD6DBE3),
+    composerSendDisabled: Color(0xFF2A2F38),
+    onComposerSendDisabled: Color(0xFF6E7684),
   );
 
   /// The palette of the theme [context] is reading.
@@ -351,6 +409,28 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
         t,
       )!,
       inversePrimary: Color.lerp(inversePrimary, other.inversePrimary, t)!,
+      composerBoard: Color.lerp(composerBoard, other.composerBoard, t)!,
+      composerBoardBorder: Color.lerp(
+        composerBoardBorder,
+        other.composerBoardBorder,
+        t,
+      )!,
+      composerIcon: Color.lerp(composerIcon, other.composerIcon, t)!,
+      composerIconActive: Color.lerp(
+        composerIconActive,
+        other.composerIconActive,
+        t,
+      )!,
+      composerSendDisabled: Color.lerp(
+        composerSendDisabled,
+        other.composerSendDisabled,
+        t,
+      )!,
+      onComposerSendDisabled: Color.lerp(
+        onComposerSendDisabled,
+        other.onComposerSendDisabled,
+        t,
+      )!,
     );
   }
 }
@@ -725,17 +805,159 @@ class WeChat {
   /// [fieldHeight]。
   static const double fieldVPadding = 10;
 
-  /// 会话输入行上两个**按钮**的高度：附件按钮与发送按钮。
+  /// 会话输入区**一整块**的高度。
   ///
-  /// 34 是设计稿 `.btn` 的 `min-height`（`.btn--icon` 同宽，是一个正方形）。
-  /// 输入框**不**取这个数：它取 [fieldHeight]（44，设计稿 `.composer__box`
-  /// 的 `min-height`），三个控件在行内**底端对齐**（设计稿
-  /// `align-items: flex-end`）——按钮比框矮一档是设计稿明确的布局，不是参差。
+  /// 微信桌面端的输入区不是「一行控件加几根图标」，而是一块**圆角白板**：
+  /// 输入框在板子的上半，工具图标排在板子的下缘，发送按钮在板子的右下角。
+  /// 板子的高度由里面的东西决定，而不是反过来 —— 板子是**内容**的载体，
+  /// 不是内容被塞进去的容器。
   ///
-  /// 从前三个控件共用同一个 40，理由写的是「一行控件不同高会看出参差」；
-  /// 设计稿给的不是这个答案，所以这里改成按钮自己的高度，输入框回到
-  /// [fieldHeight]。
-  static const double composerControl = 34;
+  /// 板子的最小高度：56 的文字区 + 28 的工具行 + 上下各 12 的留白。
+  ///
+  /// 文字多于一行时板子跟着长 —— 微信的输入区也是被输入的内容顶高的，不是
+  /// 固定高度里塞一个滚动条。
+  static const double composerBoardHeight = 108;
+
+  /// 输入框在板子里的高度。
+  ///
+  /// 微信的输入框是**无框**的一段高：它和板子是同一块白，靠光标与占位文字
+  /// 说出「往这里写」，而不是靠一圈描边。桌面端量得 56 —— 一行文字上下各留
+  /// 两行半的空，光标不会贴着任何一条边。
+  ///
+  /// 与 [fieldHeight]（44）分开：那是**对话框里**的输入框的高度，单行、标准
+  /// 触控高度；会话里的这一块是另一个形状，两处不共用一个数。
+  static const double composerFieldHeight = 56;
+
+  /// 输入框的左右内边距。
+  ///
+  /// 12 —— 输入框不画自己的边，但文字离板子的边仍有这一指宽的空。
+  ///
+  /// 与 [fieldHPadding] 同值但**不是同一个数**：那一个量的是对话框里的输入
+  /// 框，这一个量的是会话输入区里的文字。分开写，是为了以后其中一处挪动时
+  /// 不会连带另一处。
+  static const double composerFieldHPadding = 12;
+
+  /// 输入框内文字与上下边缘的距离。
+  ///
+  /// 单行文字在 [composerFieldHeight] 高的空里居中：上下各留
+  /// (56 − 行高) / 2 的空，而不是一个写死的内边距 —— 文字变多时行会从中间
+  /// 往上长，两边始终对称。
+  static const double composerFieldVPadding = 16;
+
+  /// 输入框里的字号。
+  ///
+  /// 微信桌面端会话里是 15 —— 比对话框输入框（[fontSizeInput] 14）大半档，
+  /// 因为会话正文本身就是这个尺寸（[fontSizeBody]），输入框和正文应当是同一
+  /// 档字。
+  static const double composerFontSize = 15;
+
+  /// 工具条上一个图标的边长。
+  ///
+  /// 微信的工具图标是**线描**的，笔画约 1.5px，视觉尺寸 21 左右。这里给的是
+  /// 可点区域，不是图标本身。
+  static const double composerIconBox = 28;
+
+  /// 工具条上一个图标的实际视觉大小。
+  ///
+  /// Material 的 [Icon] 的 `size` 就是图标框的边长，而线描图标真正的墨迹只
+  /// 占框的一部分 —— 微信量的是墨迹，所以这是与微信对齐的那个数。
+  static const double composerIconSize = 22;
+
+  /// 工具图标之间的间距。
+  ///
+  /// 微信的图标之间留得比字距宽，但仍在一个「图标组」的读法里 —— 不是分开
+  /// 的几颗按钮，而是一排工具。
+  ///
+  /// 17 是按**图标框**之间的距离给的，图标中心之间的步距因此是 45 —— 微信
+  /// 桌面端量出来的正是这个数（表情在 33，盒子在 78，差 45）。
+  static const double composerIconGap = 17;
+
+  /// 板子与窗口边缘之间的距离。
+  ///
+  /// 10 让板子浮在窗口边缘上，而不是贴着边。
+  static const double composerBoardMargin = 10;
+
+  /// 板子内部四周的留白。
+  ///
+  /// 12 —— 文字与图标各自离板子边缘一指宽。
+  static const double composerBoardPadding = 12;
+
+  /// 板子那圈发丝线的粗细。
+  ///
+  /// 1 —— 量出来的。板子的**内容**从线的内侧开始算，所以板子里的每一个
+  /// 留白都是从内沿量起的，不是从外沿。
+  static const double composerBoardBorderWidth = 1;
+
+  /// 发送按钮的宽。
+  ///
+  /// 微信桌面端的「发送」是一块接近方形的小按钮，两个字加两侧内边距共 60。
+  /// 它在框里没有内容时是**灰底**的，有内容时才变成绿的 —— 见
+  /// [WeChatColors.composerSendDisabled]。
+  static const double composerSendWidth = 60;
+
+  /// 发送按钮的高。
+  ///
+  /// 31，与宽度一起构成那块接近方形的按钮。
+  static const double composerSendHeight = 31;
+
+  /// 发送按钮的圆角。
+  ///
+  /// 6 —— 比 [controlRadius] 小一档。微信这一颗按钮的角比输入区的板子更
+  /// 紧：量出来的圆角半径是 6，而板子是 8。
+  static const double composerSendRadius = 6;
+
+  /// 发送按钮里字的大小。
+  ///
+  /// [fontSizeLabel] 13，与微信一致。
+  static const double composerSendFontSize = 13;
+
+  /// 发送按钮离板子右边的距离。
+  ///
+  /// 13 —— 量出来的（按钮右沿 1546，板子内侧 1559）。与 [composerBoardPadding]
+  /// （12）差着一像素，因为按钮贴的是**角**，不是边：微信把发送键放在板子
+  /// 的右下角，角上的空比边上大一点。
+  static const double composerSendRightInset = 13;
+
+  /// 发送按钮离板子下沿的距离。
+  ///
+  /// 10 —— 量出来的（按钮下沿 90，板子内侧 100）。
+  static const double composerSendBottomInset = 10;
+
+  /// 圆角白板的圆角。
+  ///
+  /// 8 —— 与 [controlRadius] 同档，与微信桌面端量出来的那个角一致。
+  static const double composerBoardRadius = 8;
+
+  /// 顶部 toast 的字号。
+  ///
+  /// [fontSizeBody] 14 —— 与 toast 顶替掉的那个 SnackBar 一样（它用的是
+  /// `bodyMedium`）。toast 换的是**位置**，不是长相。
+  static const double toastFontSize = 14;
+
+  /// 顶部 toast 离窗口顶边的距离。
+  ///
+  /// 48 —— 贴着边会被窗口的标题栏压住，所以往下留一截。
+  static const double toastTopMargin = 48;
+
+  /// 顶部 toast 的左右内边距。
+  ///
+  /// 24 —— 与 SnackBar 的 `fixed` 行为一致。
+  static const double toastHPadding = 24;
+
+  /// 顶部 toast 的上下内边距。
+  ///
+  /// 14 —— 与 SnackBar 一致。
+  static const double toastVPadding = 14;
+
+  /// 顶部 toast 最多有多宽。
+  ///
+  /// 520 —— 一行放得下最长的那句话，再宽就成了横幅。
+  static const double toastMaxWidth = 520;
+
+  /// 顶部 toast 停留多久。
+  ///
+  /// 3 秒 —— 与 SnackBar 的默认时长一样。
+  static const Duration toastDuration = Duration(seconds: 3);
 
   /// 表情面板里一个表情格子的边长。
   ///

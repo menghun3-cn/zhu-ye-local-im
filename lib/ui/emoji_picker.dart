@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/core.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'wechat/composer_tool.dart';
 import 'wechat/theme.dart';
 
 /// The button that opens the emoticon picker, and the picker it opens.
@@ -17,7 +18,7 @@ import 'wechat/theme.dart';
 /// goes out. Sending it on the tap would have made the face a message of its
 /// own, which is a different thing: a person who picks a face and then wants
 /// to write a word next to it would have to send twice.
-class EmojiPickerButton extends StatelessWidget {
+class EmojiPickerButton extends StatefulWidget {
   /// Builds the button over [onPick].
   const EmojiPickerButton({
     super.key,
@@ -37,51 +38,27 @@ class EmojiPickerButton extends StatelessWidget {
   final List<String> recent;
 
   @override
+  State<EmojiPickerButton> createState() => _EmojiPickerButtonState();
+}
+
+/// The state of the face tool.
+class _EmojiPickerButtonState extends State<EmojiPickerButton> {
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colors = WeChatColors.of(context);
-    return Tooltip(
-      message: l10n.menuSendEmoji,
-      child: SizedBox(
-        width: WeChat.composerControl,
-        height: WeChat.composerControl,
-        child: OutlinedButton(
-          onPressed: enabled ? () => _open(context) : null,
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.resolveWith((states) {
-              return states.contains(WidgetState.hovered)
-                  ? colors.listHover
-                  : Colors.transparent;
-            }),
-            foregroundColor: WidgetStatePropertyAll(colors.bubbleText),
-            side: WidgetStateProperty.resolveWith((states) {
-              return BorderSide(
-                color: states.contains(WidgetState.hovered)
-                    ? colors.disabledText
-                    : colors.borderStrong,
-              );
-            }),
-            shape: const WidgetStatePropertyAll(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(
-                  Radius.circular(WeChat.controlRadius),
-                ),
-              ),
-            ),
-            padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-            minimumSize: const WidgetStatePropertyAll(
-              Size(WeChat.composerControl, WeChat.composerControl),
-            ),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text('☺', style: TextStyle(fontSize: 16)),
-        ),
-      ),
+    return ComposerTool(
+      tooltip: l10n.menuSendEmoji,
+      icon: Icons.sentiment_satisfied_alt_outlined,
+      onPressed: widget.enabled ? () => open(context) : null,
     );
   }
 
   /// Where the whole panel lives while it is open.
-  void _open(BuildContext context) {
+  ///
+  /// Public because the composer draws the tool itself: the glyph sits in the
+  /// row of tools, and the panel has to be anchored to *that* glyph rather
+  /// than to a button of its own somewhere else.
+  void open(BuildContext context) {
     final overlay = Overlay.of(context).context.findRenderObject();
     if (overlay is! RenderBox) return;
     final button = context.findRenderObject();
@@ -107,7 +84,7 @@ class EmojiPickerButton extends StatelessWidget {
       // is what keeps the panel on whichever side of the warp the button is
       // on, and `showMenu` still clamps it into the window.
       position: RelativeRect.fromRect(anchor, Offset.zero & overlay.size),
-      items: [_EmojiPanelEntry(recent: recent, onPick: onPick)],
+      items: [_EmojiPanelEntry(recent: widget.recent, onPick: widget.onPick)],
     );
   }
 }
