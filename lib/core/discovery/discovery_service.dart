@@ -40,7 +40,14 @@ final class DiscoveryService {
   final BeaconTransport transport;
 
   /// What this Device announces about itself.
-  final DeviceDescriptor local;
+  ///
+  /// Settable because the ports this Device listens on are not all known
+  /// when the service starts: the Pairing listener comes up after the
+  /// Session layer, and its port has to be announced too. A second service
+  /// over the same transport is not an option — a transport's receive stream
+  /// is single-subscription, and a single-subscription stream cannot be
+  /// listened to a second time even after the first subscription is gone.
+  DeviceDescriptor local;
 
   /// How often this Device tells the link it is here.
   final Duration announceInterval;
@@ -56,18 +63,32 @@ final class DiscoveryService {
   Timer? _sweepTimer;
   bool _running = false;
 
-  /// Encoded once: the descriptor behind it never changes for this process.
-  late final Uint8List _announceBytes = Beacon(
-    kind: BeaconKind.announce,
-    device: local,
-    nonce: _nonce,
-  ).encode();
+  /// The beacon bytes, re-encoded when the descriptor behind them changes.
+  late Uint8List _announceBytes = _encode(BeaconKind.announce);
+  late Uint8List _probeBytes = _encode(BeaconKind.probe);
 
-  late final Uint8List _probeBytes = Beacon(
-    kind: BeaconKind.probe,
-    device: local,
-    nonce: _nonce,
-  ).encode();
+  Uint8List _encode(BeaconKind kind) =>
+      Beacon(kind: kind, device: local, nonce: _nonce).encode();
+
+  /// Changes what this Device announces, without rebuilding the service.
+  ///
+  /// The ports this Device listens on become known one after another: the
+  /// Session layer binds first, the Pairing listener after it. Each of them
+  /// has to be announced, and a second service over the same transport is not
+  /// possible — a transport's receive stream is single-subscription.
+  ///
+  /// So the descriptor is swapped in place and the beacon bytes are
+  /// re-encoded. The next announce carries the new one; peers learn it on
+  /// that cycle.
+  void updateLocal(DeviceDescriptor descriptor) {
+    if (descriptor == local) return;
+    local = descriptor;
+    _announceBytes = _encode(BeaconKind.announce);
+    _probeBytes = _encode(BeaconKind.probe);
+    // Say so now rather than at the next tick: a peer that is waiting to be
+    // told where to dial should not wait out a whole announce period.
+    announce();
+  }
 
   /// Whether the service is currently announcing and listening.
   bool get isRunning => _running;

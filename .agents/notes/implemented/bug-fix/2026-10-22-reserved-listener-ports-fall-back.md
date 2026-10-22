@@ -63,6 +63,47 @@ still reaches the host because the host says where it answers. The same
 race was the reason the end-to-end suite failed intermittently under a full
 parallel run.
 
+The Windows packaging smoke test asserts on the ports the built application
+actually holds, not on the fixed numbers. GitHub's Windows runners reserve
+`47622-47721`, which contains both the Session and the Pairing port, so the
+application there falls back — correctly — and an assertion on `47656` would
+read that fallback as a broken package. What the smoke test checks is that
+both TCP listeners and the UDP discovery socket are up; which port numbers
+they carry is the system's business.
+
+## A changing descriptor must not rebuild the Discovery service
+
+The two ports this Device listens on are not known at the same moment. The
+Session layer binds first, the Pairing listener after it, so the descriptor
+the controller hands to Discovery changes at least once after the service has
+started.
+
+That change used to rebuild the service: a new `DiscoveryService` over the
+same transport. The transport's receive stream is single-subscription, and a
+single-subscription stream cannot be listened to a second time — not even
+after the first subscription has been cancelled. The second service therefore
+threw `Bad state: Stream has already been listened to` out of `start()`.
+The application treated that as a fatal startup error and closed every
+listener, so the packaged application came up with its UDP socket and no TCP
+listeners at all.
+
+The in-memory transport used by the tests broadcasts, and a broadcast stream
+can be listened to any number of times. The memory hub therefore could not
+show this defect; only a real socket does.
+
+The way out is that a descriptor that changes describes the *same* Device.
+The Fingerprint is the identity; the name, the capabilities, and the ports
+are facts about it that change as the layers come up. So the running service
+is handed the new descriptor, re-encodes its beacon, and announces it
+immediately — the peer does not wait out a whole announce period to learn
+where to dial. There is one service per Device per transport, and it stays
+the only listener on it.
+
+`test/discovery/single_subscription_transport_test.dart` pins both halves of
+this: a second service over a single-subscription transport throws, and
+handing a changed descriptor to the running one keeps it running with the
+new ports.
+
 ## Consequences
 
 - A paired Device starts and serves Sessions when its preferred port is
@@ -76,6 +117,8 @@ parallel run.
   fallback, the user has to enter the port shown by the application.
 - A manual Pairing address uses the discovered Pairing port when Discovery
   knows that host, and otherwise keeps the `47656` default.
+- Discovery keeps one service per Device, and a Device whose ports or name
+  change keeps announcing under the same identity.
 
 ## Alternatives considered
 
@@ -96,3 +139,8 @@ perform it on behalf of the user.
 doing what their callers asked, and a caller that explicitly selected a port
 could no longer rely on the result. The controller is the layer that knows the
 port is only a preference and can advertise the replacement.
+
+**Give the transport a broadcast receive stream** — it would make a second
+listener harmless, but the real UDP socket has one datagram stream, and
+pretending otherwise in the core layer only hides the mistake. The defect
+was in rebuilding the service, not in the transport.
