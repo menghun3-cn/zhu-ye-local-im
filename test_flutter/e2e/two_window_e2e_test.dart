@@ -118,6 +118,12 @@ void main() {
         tester,
         () => bob.offers.isNotEmpty,
         description: 'Bob to be offered the file',
+        // This suite runs beside the rest of the widget suite, where a debug
+        // build can spend well over the usual twenty seconds between the click
+        // and the offer. The transfer itself is still bounded by its own
+        // socket timeouts; this only keeps the UI wait from becoming the
+        // failure.
+        timeout: const Duration(seconds: 60),
       );
       await openTab(tester, l10n.tabTransfers, window: windowB);
       await pumpUntil(

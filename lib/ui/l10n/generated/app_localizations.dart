@@ -656,6 +656,12 @@ abstract class AppLocalizations {
   /// **'Pair'**
   String get pair;
 
+  /// No description provided for @repairPairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair again'**
+  String get repairPairing;
+
   /// No description provided for @connect.
   ///
   /// In en, this message translates to:

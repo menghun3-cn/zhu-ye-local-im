@@ -1288,6 +1288,71 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
+    testWidgets('a group member without a Session layer is offered Pair again', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+
+      // Reproduce a one-sided membership: both profiles remember each other,
+      // but Bob no longer holds the group secret. On restart he serves no
+      // Session and announces no port, while Alice still sees him as a member.
+      await shutdown(tester, [alice, bob]);
+      await tester.runAsync(() async {
+        final json = (await bob.store.load())!;
+        final session = Map<String, Object?>.from(json['session']! as Map);
+        session.remove('groupSecret');
+        json['session'] = session;
+        await bob.store.save(json);
+      });
+      final aliceAfterRestart = await startUiDevice(
+        tester,
+        hub.join(),
+        'Alice',
+        profileStore: alice.store,
+      );
+      final bobAfterRestart = await startUiDevice(
+        tester,
+        hub.join(),
+        'Bob',
+        profileStore: bob.store,
+      );
+
+      await pumpWindow(tester, aliceAfterRestart);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => aliceAfterRestart.controller.peers.any(
+          (peer) =>
+              peer.fingerprint == bobAfterRestart.fingerprint &&
+              peer.isInGroup &&
+              peer.address != null &&
+              !peer.isDiallable,
+        ),
+        description: 'Bob to be discovered as a group member with no port',
+      );
+
+      expect(
+        conversationHasButton(windowA, button: l10n.repairPairing, name: 'Bob'),
+        isTrue,
+        reason: 'a stale membership needs a way back into the group',
+      );
+      expect(
+        conversationHasButton(windowA, button: l10n.connect, name: 'Bob'),
+        isFalse,
+        reason: 'Connect has no Session port to dial',
+      );
+      expect(
+        conversationHasButton(windowA, button: l10n.pair, name: 'Bob'),
+        isFalse,
+        reason: 'the Device is already listed as a group member',
+      );
+
+      await shutdown(tester, [aliceAfterRestart, bobAfterRestart]);
+    });
+
     testWidgets('text sent from the pane arrives with no answer needed', (
       tester,
     ) async {

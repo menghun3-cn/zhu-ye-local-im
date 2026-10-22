@@ -358,6 +358,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pair => 'Pair';
 
   @override
+  String get repairPairing => 'Pair again';
+
+  @override
   String get connect => 'Connect';
 
   @override
