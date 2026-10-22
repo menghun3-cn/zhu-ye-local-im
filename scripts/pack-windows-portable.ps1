@@ -30,9 +30,9 @@
     步骤整跑时才重做，增量构建会让字体停在上一次、新图标切不进去。
 
 .PARAMETER Smoke
-    打包后解压到临时目录并启动 8 秒，检查进程响应、UDP 47654 与两个 TCP 端口
-    是否绑上，然后关闭。TCP 端口不要求是 47655/47656：固定端口被系统保留时应用
-    会回退到别的端口（v0.1.14 起），那是正确行为，不是失败。
+    打包后解压到临时目录并启动 8 秒，检查进程响应、UDP 47654 与至少一个 TCP
+    端口是否绑上，然后关闭。TCP 端口不要求是 47655/47656：固定端口被系统保留时
+    应用会回退到别的端口（v0.1.14 起），那是正确行为，不是失败。
     注意：Start-Process 起的子进程会随本 PowerShell 会话结束
     被回收，所以采样必须和启动在同一次调用内完成 —— 本脚本自己管这件事。
 
@@ -540,7 +540,7 @@ if ($Smoke) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $sandbox)
     Write-Host "    解压到 $sandbox"
 
-    # 上一轮冒烟留下的实例要清掉：它占着 47654 和两个 TCP 端口，新的一份就会
+    # 上一轮冒烟留下的实例要清掉：它占着 47654 和配对端口，新的一份就会
     # 绑不上端口，而监听器是"绑不上就回退到别的端口并记一条 notice"，不会退出
     # —— 于是冒烟会报端口不对，看起来像产品坏了，实际是上一份还活着。
     Get-Process -Name 'local_transfer' -ErrorAction SilentlyContinue |
@@ -555,11 +555,16 @@ if ($Smoke) {
         # 刚被上一个进程关掉时还会在 TIME_WAIT 里停留一会儿。只读一次等于在赌
         # 那 8 秒够用，实测会偶发假失败（同一份 app.so 重跑就过）——所以轮询。
         #
-        # 这里等的是"两个 TCP 端口都在听"，而不是"47655 和 47656 在听"：Windows
-        # 会为 WinNAT、Hyper-V、WSL 保留一段端口，而 GitHub 的 Windows runner 上
+        # 这里等的是"有 TCP 端口在听"，而不是"47656 在听"：Windows 会为
+        # WinNAT、Hyper-V、WSL 保留一段端口，而 GitHub 的 Windows runner 上
         # 47655/47656 正好落在保留段里。应用对此的处理是回退到任意可用端口（这
         # 是 v0.1.14 起的行为），所以断言具体端口号会把一次正确的回退判成产品坏
-        # 掉。真正要验的是"该听的两个端口都在听"，端口号是多少由系统决定。
+        # 掉。真正要验的是"该听的端口在听"，端口号是多少由系统决定。
+        #
+        # 未配对的新装应用只有**一个** TCP 监听：配对监听器。会话层要等配对成立
+        # 之后才起 —— 没有共享密钥就没有东西可服务。所以这里等的是"至少一个"，
+        # 而"一个都没有"才是坏包的样子：v0.1.14 那个回归里，发现层重建服务时
+        # 抛了异常，所有监听器一起被关掉，TCP 是空的。
         $udp = @()
         $tcp = @()
         $deadline = (Get-Date).AddSeconds(30)
@@ -570,14 +575,14 @@ if ($Smoke) {
                 ForEach-Object { $_.LocalPort })
             $tcp = @(Get-NetTCPConnection -OwningProcess $p.Id -State Listen -ErrorAction SilentlyContinue |
                 ForEach-Object { $_.LocalPort })
-            if (($udp -contains 47654) -and ($tcp.Count -ge 2)) { break }
+            if (($udp -contains 47654) -and ($tcp.Count -ge 1)) { break }
             Start-Sleep -Milliseconds 500
         }
 
         Write-Host "    pid $($p.Id) 响应对答=$($p.Responding) 内存=$([math]::Round($p.WorkingSet64/1MB,1))MB"
         Write-Host "    UDP $($udp -join ',')   TCP $($tcp -join ',')"
         if ($udp -notcontains 47654) { throw 'UDP 47654 没绑上 —— 自动发现不会工作' }
-        if ($tcp.Count -lt 2) { throw 'TCP 端口没监听 —— 别人配不上对、也连不上' }
+        if ($tcp.Count -lt 1) { throw 'TCP 端口没监听 —— 别人配不上对' }
         if ($tcp -contains 47656) {
             Write-Host '    端口正常（配对端口是固定的那个）'
         }

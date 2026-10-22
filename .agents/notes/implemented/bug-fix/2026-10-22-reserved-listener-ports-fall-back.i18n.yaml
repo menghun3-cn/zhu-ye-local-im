@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-10-22-reserved-listener-ports-fall-back.md
 #   git hash-object -- 2026-10-22-reserved-listener-ports-fall-back.zh.md
-2026-10-22-reserved-listener-ports-fall-back.md: b13c25107290fbb2bee39f4a9c4ee79d9e9470f2
-2026-10-22-reserved-listener-ports-fall-back.zh.md: 878c8d430e5e0728f5377f3e5aa63055f1084769
+2026-10-22-reserved-listener-ports-fall-back.md: 0292667641a259807c8396d7dfabb9b3ec1a742b
+2026-10-22-reserved-listener-ports-fall-back.zh.md: 903684124a1f448abfb8218793bd927240afaae3
