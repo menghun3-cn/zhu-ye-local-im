@@ -44,8 +44,10 @@ void main() {
 
     final file = tester.getRect(find.byTooltip(l10n.menuSendFile));
     final emoji = tester.getRect(find.byTooltip(l10n.menuSendEmoji));
-    expect(emoji.left, greaterThan(file.right));
-    expect(emoji.top, file.top);
+    // WeChat's order: the face comes **first**, then the file. The two share
+    // the tools' line at the lower edge of the board.
+    expect(emoji.left, lessThan(file.left));
+    expect(emoji.center.dy, closeTo(file.center.dy, 0.01));
   });
 
   testWidgets('picking a face calls onEmoji with that face', (tester) async {

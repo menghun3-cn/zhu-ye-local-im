@@ -31,15 +31,16 @@ compact`，输入框主题上设了 `border: InputBorder.none` 配 `isDense: tru
 ### 标准尺寸的控件
 
 `WeChat` 新增一组标准度量——`buttonHeight`（36）、`buttonHPadding`（16）、`fieldHeight`
-（44）、`fieldHPadding`（12）、`fieldVPadding`（10）、`composerControl`（40）——主题里
-两个按钮主题和 `inputDecorationTheme` 都由它们构成。
+（44）、`fieldHPadding`（12）、`fieldVPadding`（10）——主题里两个按钮主题和
+`inputDecorationTheme` 都由它们构成。
 
 - `TextButton` 和 `FilledButton` 现在一样高，因为两者在对话框底部并肩站着，一行两个不同
   高度的按钮看起来是坏的。真正属于**行内**的动作——对话列表的行内按钮、气泡自己的应答、
   发送按钮——一律在**自己的调用点**覆盖掉这几个度量，而不是指望主题是小号的。
 - 每个输入框都有真正的描边，用 `borderStrong`，聚焦时换成更粗的品牌色线。唯一不要描边的
-  是会话输入框：它套在一层填充里，那层填充**就是**它的边框；它在自己的调用点把六个边框
-  槽位全关掉、把约束清零。
+  是会话输入框：它直接写在自己所在的那块白板上；它在自己的调用点把六个边框槽位全关掉、
+  把约束清零。（会话输入区后来按微信桌面端重画了，见[输入区是微信的](2026-10-21-the-composer-is-wechat-and-refusals-land-at-the-top.md)，
+  那个输入框的尺寸现在记在那里。）
 - 「检查更新」变成 `FilledButton.icon`，也就是应用里其他所有主操作早就在穿的样式；
   「打开下载页」保持 `TextButton.icon`，因为它打开的是一个页面，不是在这个窗口里做一件事。
 
@@ -129,9 +130,6 @@ compact`，输入框主题上设了 `border: InputBorder.none` 配 `isDense: tru
 `test_flutter/ui/about_page_test.dart`：「检查更新」是 `FilledButton`，「打开下载页」仍然
 是 `TextButton`。
 
-`test_flutter/ui/composer_keys_test.dart`：输入框的盒子是 `composerControl` 高、比对话框
-里的 `fieldHeight` 矮；发送按钮是填充按钮且不矮于它所在的输入框。
-
 `test_flutter/ui/delete_message_test.dart`：原有的断言不变——调和这件事的全部意义就是让
 它们继续成立：「复制文字」和「删除」都还在右键文字消息打开的菜单上。新增一条：正文可以被
 选中，且选区存在时菜单给的是「复制」、拿走的是整条「复制文字」、而「删除」不换。
@@ -142,6 +140,7 @@ compact`，输入框主题上设了 `border: InputBorder.none` 配 `isDense: tru
   测试没受影响，按尺寸测量的都过了。
 - 会话输入框是唯一退出新输入框样式的地方，所以以后改 `inputDecorationTheme` 不会影响它。
   这是刻意的——它不是面板上的一个字段，它是频道里的一个字段——但它确实是第二个要看的地方。
+  （它现在干脆不画框了，因为会话输入区后来按微信桌面端重画了，见[输入区是微信的](2026-10-21-the-composer-is-wechat-and-refusals-land-at-the-top.md)。）
 - `conversationDisconnected` 现在读作 离线 / "Offline"，而不是 连接已断开 / "Session
   closed"。更短，事实一样：离线 就是用户对一台够不着的设备说的话。
 - 窄布局里打开一个对话也会标记已读，从「设备」页走到对话的也一样——每一条显示对话的路都
