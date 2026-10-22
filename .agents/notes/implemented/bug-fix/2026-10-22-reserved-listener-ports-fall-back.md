@@ -68,8 +68,15 @@ actually holds, not on the fixed numbers. GitHub's Windows runners reserve
 `47622-47721`, which contains both the Session and the Pairing port, so the
 application there falls back — correctly — and an assertion on `47656` would
 read that fallback as a broken package. What the smoke test checks is that
-both TCP listeners and the UDP discovery socket are up; which port numbers
-they carry is the system's business.
+the TCP listener and the UDP discovery socket are up; which port numbers they
+carry is the system's business.
+
+It checks for *one* TCP listener, not two. A freshly installed application
+that has not been paired yet listens on the Pairing port only: the Session
+layer comes up after a Pairing succeeds, because without a shared secret
+there is nothing to serve. Zero TCP listeners is what a broken package looks
+like — that is exactly how the regression below showed up in the failed
+`v0.1.14` release run.
 
 ## A changing descriptor must not rebuild the Discovery service
 
