@@ -159,6 +159,8 @@ final class _DownNetwork {
 Future<TestDevice> startDevice(
   BeaconTransport transport,
   String alias, {
+  int sessionListenPort = 0,
+  int pairingPort = 0,
   ClipboardMode clipboardMode = ClipboardMode.off,
   String? defaultIncomingDirectory,
   MessageStore? messageStore,
@@ -176,8 +178,8 @@ Future<TestDevice> startDevice(
     alias: alias,
     // Port 0 for both, so several Devices run on one host and a test never
     // fights another test over a fixed port.
-    sessionListenPort: 0,
-    pairingPort: 0,
+    sessionListenPort: sessionListenPort,
+    pairingPort: pairingPort,
     clipboardMode: clipboardMode,
     // Null unless a test says otherwise, and null is a real answer here: a
     // platform that offers no folder is the one case where an image is still
@@ -455,6 +457,107 @@ void main() {
         description: 'Bob to hear the new name',
       );
     });
+  });
+
+  group('binding the Session listener', () {
+    test(
+      'falls back to a free port when the preferred one cannot be bound',
+      () async {
+        final hub = MemoryBeaconHub();
+        final blocker = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
+        addTearDown(blocker.close);
+        final blockedPort = blocker.port;
+
+        // Pair first, so the Device that hits the blocked port is one that
+        // has a group secret — the case that used to be fatal, because a
+        // paired Device binds the Session port while starting.
+        final alice = await startDevice(hub.a, 'Alice');
+        final bobStore = MemoryProfileStore();
+        final bob = await startDevice(hub.b, 'Bob', store: bobStore);
+        await pairUp(alice, bob);
+
+        // Bob restarts with the blocked port as its preference. The old
+        // Bob is gone; the new one answers on a port of its own.
+        await bob.controller.close();
+        final bobAgain = await startDevice(
+          hub.b,
+          'Bob',
+          store: bobStore,
+          sessionListenPort: blockedPort,
+        );
+        final fallbackPort = bobAgain.controller.listenPort;
+
+        expect(fallbackPort, isNotNull);
+        expect(fallbackPort, isNot(blockedPort));
+        expect(
+          bobAgain.controller.notices,
+          contains(
+            'session port $blockedPort could not be bound; '
+            'listening on $fallbackPort instead',
+          ),
+        );
+
+        // And the pair still reaches each other on the port that was
+        // actually bound: a fallback that only avoided the crash would
+        // leave two Devices that can see each other and never talk.
+        await until(
+          () =>
+              alice.controller.sessions.isNotEmpty &&
+              bobAgain.controller.sessions.isNotEmpty,
+          description: 'Discovery to reconnect the pair on the fallback port',
+        );
+      },
+    );
+  });
+
+  group('binding the Pairing listener', () {
+    test(
+      'falls back to a free port and advertises where it is answering',
+      () async {
+        final hub = MemoryBeaconHub();
+        final blocker = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
+        addTearDown(blocker.close);
+        final blockedPort = blocker.port;
+
+        final alice = await startDevice(
+          hub.a,
+          'Alice',
+          pairingPort: blockedPort,
+        );
+        final fallbackPort = alice.controller.pairingPort;
+
+        expect(fallbackPort, isNotNull);
+        expect(fallbackPort, isNot(blockedPort));
+        expect(
+          alice.controller.notices,
+          contains(
+            'pairing port $blockedPort could not be bound; '
+            'answering on $fallbackPort instead',
+          ),
+        );
+
+        final bob = await startDevice(hub.b, 'Bob');
+        await until(
+          () => bob.controller.peers.any(
+            (peer) =>
+                peer.fingerprint == alice.fingerprint &&
+                peer.pairingPort == fallbackPort,
+          ),
+          description: 'Bob to learn the Pairing fallback port from Discovery',
+        );
+
+        final request = alice.controller.pairingRequests.first;
+        final joinFuture = bob.controller.pairWith(
+          host: InternetAddress.loopbackIPv4.address,
+        );
+        final hostAttempt = await (await request).admit();
+        final guestAttempt = await joinFuture;
+        await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
+
+        expect(alice.controller.isPaired, isTrue);
+        expect(bob.controller.isPaired, isTrue);
+      },
+    );
   });
 
   group('transfers between two paired Devices', () {

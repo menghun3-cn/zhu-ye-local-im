@@ -71,6 +71,7 @@ final class PeerView {
     required this.platform,
     required this.address,
     required this.sessionPort,
+    this.pairingPort,
     required this.isConnected,
     required this.isInGroup,
     required this.isFavorite,
@@ -94,6 +95,12 @@ final class PeerView {
   /// Null means the peer is not accepting Sessions at all — which is what an
   /// unpaired Device announces — so there is nothing to dial.
   final int? sessionPort;
+
+  /// The port the peer answers Pairing requests on, if it announced one.
+  ///
+  /// Null is normal for an older peer or one that is not accepting Pairings;
+  /// the Pairing flow then keeps its well-known-port fallback.
+  final int? pairingPort;
 
   /// Whether a Session with this peer is open right now.
   final bool isConnected;

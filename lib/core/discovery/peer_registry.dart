@@ -35,6 +35,9 @@ final class DiscoveredPeer {
   /// The TCP port to open a Session to, or null if the peer accepts none.
   int? get sessionPort => device.listenPort;
 
+  /// The TCP port to send a Pairing request to, or null if it announced none.
+  int? get pairingPort => device.pairingPort;
+
   /// Whether a Session can be opened to this peer at all.
   bool get isReachable => device.listenPort != null;
 
