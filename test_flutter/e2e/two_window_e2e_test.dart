@@ -34,15 +34,17 @@ void main() {
       addTearDown(PickerResolution.reset);
       final picker = ScriptedPicker.install();
       final hub = MemoryBeaconHub();
-      // Alice receives, so she listens where the guest's Pair tap dials by
-      // default, which is what a receiving Device does in the shipped
-      // configuration. Bob is a guest and can take any free port.
-      final alice = await startUiDevice(
-        tester,
-        hub.a,
-        'Alice',
-        pairingPort: defaultPairingPort,
-      );
+      // Alice receives, so she listens on the Pairing port — which is what a
+      // receiving Device does in the shipped configuration. Bob is a guest
+      // and can take any free port.
+      //
+      // The port is Alice's own rather than the well-known one. `flutter
+      // test` runs the test files side by side, and another file stands a
+      // Device up on the well-known Pairing port; the two would race for it,
+      // and the loser would fail a test that has nothing wrong with it. The
+      // guest still dials the port Alice announced, because a Device says
+      // where it answers — see the `pairingPort` in the beacon.
+      final alice = await startUiDevice(tester, hub.a, 'Alice', pairingPort: 0);
       final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
 
@@ -183,7 +185,10 @@ void main() {
         tester,
         hub.a,
         'Alice',
-        pairingPort: defaultPairingPort,
+        // The same reasoning as the first test: a free port of Alice's own
+        // rather than the well-known one, so a test file running beside this
+        // one cannot take it away.
+        pairingPort: 0,
       );
       final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
@@ -253,7 +258,10 @@ void main() {
         tester,
         MemoryBeaconHub().a,
         'Alice',
-        pairingPort: defaultPairingPort,
+        // A free port of Alice's own, for the same reason as the two tests
+        // above: the well-known Pairing port belongs to whoever gets there
+        // first, and this file must not depend on being first.
+        pairingPort: 0,
       );
       final bob = await startUiDevice(tester, MemoryBeaconHub().a, 'Bob');
       await pairDevices(tester, alice, bob);

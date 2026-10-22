@@ -12,6 +12,7 @@ import 'dialogs.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'reveal.dart';
+import 'top_toast.dart';
 
 /// What can be done with a Transfer, in one place.
 ///
@@ -116,12 +117,13 @@ bool canRevealTransfer(TransferView view) => view.localPath != null;
 Future<void> revealTransfer(BuildContext context, TransferView view) async {
   final path = view.localPath;
   if (path == null) return;
-  final messenger = ScaffoldMessenger.of(context);
   final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
   // The one call goes through the seam, so a widget test can assert the folder
   // it was asked for without an Explorer window opening on the test machine.
   if (await RevealResolution.revealer.reveal(path)) return;
-  messenger.showSnackBar(SnackBar(content: Text(l10n.cannotOpenFolder)));
+  if (overlay == null) return;
+  await TopToast.showIn(overlay, l10n.cannotOpenFolder);
 }
 
 /// Whether [view] is a picture whose bytes are on this machine and can
@@ -149,21 +151,23 @@ bool canCopyImage(TransferView view) =>
 Future<void> copyTransferImage(BuildContext context, TransferView view) async {
   final path = view.localPath;
   if (path == null) return;
-  final messenger = ScaffoldMessenger.of(context);
   final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
   final Uint8List bytes;
   try {
     bytes = await File(path).readAsBytes();
   } on Object {
     // The file the Transfer points at is not there any more. That is a copy
     // that cannot happen rather than one that failed halfway.
-    messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyImage)));
+    if (overlay == null) return;
+    await TopToast.showIn(overlay, l10n.cannotCopyImage);
     return;
   }
   // Through the seam, so a widget test can assert the bytes that reached the
   // clipboard without a `testWidgets` body ever touching a platform channel.
   if (await PasteResolution.paste.writeImage(bytes)) return;
-  messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyImage)));
+  if (overlay == null) return;
+  await TopToast.showIn(overlay, l10n.cannotCopyImage);
 }
 
 /// Whether [view] is a text message whose words can be put on the clipboard.
@@ -187,12 +191,13 @@ bool canCopyText(TransferView view) =>
 Future<void> copyTransferText(BuildContext context, TransferView view) async {
   final text = view.text;
   if (text == null) return;
-  final messenger = ScaffoldMessenger.of(context);
   final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
   try {
     await Clipboard.setData(ClipboardData(text: text));
   } on Object {
-    messenger.showSnackBar(SnackBar(content: Text(l10n.cannotCopyText)));
+    if (overlay == null) return;
+    await TopToast.showIn(overlay, l10n.cannotCopyText);
   }
 }
 

@@ -479,7 +479,10 @@ class _PairWithPeerDialogState extends State<_PairWithPeerDialog> {
     }
     final PairingAttempt attempt;
     try {
-      attempt = await widget.controller.pairWith(host: address);
+      attempt = await widget.controller.pairWith(
+        host: address,
+        port: widget.peer.pairingPort,
+      );
     } on Object catch (error) {
       if (mounted) setState(() => _failure = error);
       return;

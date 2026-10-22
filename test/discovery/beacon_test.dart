@@ -43,6 +43,29 @@ void main() {
       expect(decoded.device.capability, device.capability);
     });
 
+    test('carries the port the Device answers Pairing requests on', () {
+      // The reason a Device that answers on a port other than the well-known
+      // one can be added at all: a peer has to be told where to ask.
+      final answering = DeviceDescriptor(
+        fingerprint: device.fingerprint,
+        alias: device.alias,
+        platform: device.platform,
+        capability: device.capability,
+        listenPort: device.listenPort,
+        pairingPort: 52001,
+      );
+
+      final decoded = Beacon.decode(
+        Beacon(
+          kind: BeaconKind.announce,
+          device: answering,
+          nonce: '0123456789abcdef',
+        ).encode(),
+      );
+
+      expect(decoded.device.pairingPort, 52001);
+    });
+
     test('a probe round-trips as a probe, not as an announce', () {
       final decoded = Beacon.decode(
         Beacon(
