@@ -269,6 +269,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sessionsNeedPairing => 'pair this Device to accept Sessions';
+
+  @override
   String get notAcceptingSessions => 'not accepting Sessions';
 
   @override

@@ -16,8 +16,10 @@ Status: implemented
 `flutter create --org cn.hnasct --project-name local_transfer --platforms=windows,android .`，
 随后对生成结果做六处调整。
 
-**标识。** Dart 包名 `local_transfer`；Android 的 `namespace` 与 `applicationId` 为
-`cn.hnasct.local_transfer`；Windows runner 为 `local_transfer`。
+**标识。** Dart 包名 `local_transfer`；Android 的 `namespace` 与 `applicationId`
+在生成时为 `cn.hnasct.local_transfer`，现为 `io.menghun3_cn.zhu_ye_local_im`（见
+[Android 标识笔记](../architecture/2026-10-22-android-application-identity.zh.md)）；
+Windows runner 为 `local_transfer`。
 
 **平台范围。** 只存在 `windows/` 与 `android/`，与[ v1 范围笔记](2026-09-29-v1-scope-windows-and-android.md)
 一致。不生成其他平台目录，因此不存在无人构建的构建链路。
@@ -61,7 +63,9 @@ Linux、Web —— 没有门禁构建它们，也没有人维护它们，而"之
 代价是大量工具生成的表面积 —— 49 个文件，其中多数是平台脚手架。一次 Flutter 升级会重写其中许多，
 这些 diff 是机械噪声，但仍须评审。
 
-`applicationId` 现为 `cn.hnasct.local_transfer`，且事实上永久：Android 应用 ID 在应用发布后不可更改。
+Android `applicationId` 生成时为 `cn.hnasct.local_transfer`，现为
+`io.menghun3_cn.zhu_ye_local_im`。应用 ID 不能原地更改，因此这次标识迁移是一个新安装与
+新的私有数据沙箱，而不是旧包的升级。
 
 `.metadata` 记录了生成该工程的 Flutter channel 与 revision，因此工具可以判断何时欠下一次迁移。
 

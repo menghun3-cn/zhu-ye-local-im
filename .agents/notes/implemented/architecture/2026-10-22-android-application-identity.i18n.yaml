@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-22-android-application-identity.md
+#   git hash-object 2026-10-22-android-application-identity.zh.md
+2026-10-22-android-application-identity.md: 96a5df3dd3434d3bbec3ad2d38fdfabbbc0b1cc4
+2026-10-22-android-application-identity.zh.md: 690ac9b92e082cb2dacd96a45463b0b627de7870

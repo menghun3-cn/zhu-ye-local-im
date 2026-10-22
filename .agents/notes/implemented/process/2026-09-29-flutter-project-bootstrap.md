@@ -24,7 +24,10 @@ with `flutter create --org cn.hnasct --project-name local_transfer --platforms=w
 and the generated result is then adjusted in six ways.
 
 **Identity.** Dart package `local_transfer`; Android `namespace` and `applicationId`
-`cn.hnasct.local_transfer`; Windows runner `local_transfer`.
+`cn.hnasct.local_transfer` at generation time, now
+`io.menghun3_cn.zhu_ye_local_im` (see
+[the Android identity note](../architecture/2026-10-22-android-application-identity.md));
+Windows runner `local_transfer`.
 
 **Platform scope.** Only `windows/` and `android/` exist, matching
 [the v1 scope note](2026-09-29-v1-scope-windows-and-android.md). No other platform
@@ -81,8 +84,10 @@ The cost is a large amount of tool-generated surface — 49 files, most of them 
 scaffolding. A Flutter upgrade rewrites many of them, and those diffs are mechanical
 noise that still has to be reviewed.
 
-`applicationId` is now `cn.hnasct.local_transfer` and is effectively permanent: an
-Android application ID cannot change once the app has been released.
+The Android `applicationId` was generated as `cn.hnasct.local_transfer`; it is now
+`io.menghun3_cn.zhu_ye_local_im`. An application ID cannot change in place, so the
+identity migration is a new installation and a new private-data sandbox rather
+than an upgrade of the old package.
 
 `.metadata` records the Flutter channel and revision that generated the project, so
 tooling can tell when a migration is owed.

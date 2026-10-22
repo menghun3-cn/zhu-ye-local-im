@@ -23,7 +23,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   /// The answer `MainActivity.kt` gives: this app's private files directory.
-  const androidFilesDir = '/data/user/0/cn.hnasct.local_transfer/files';
+  const androidFilesDir = '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files';
 
   /// A Windows environment, with the separators the host really uses.
   const windowsEnvironment = {
