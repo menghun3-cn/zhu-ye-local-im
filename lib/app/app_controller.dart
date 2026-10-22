@@ -1287,6 +1287,20 @@ final class LocalTransferController {
         '${descriptor.alias}\u0000${descriptor.listenPort}\u0000'
         '${descriptor.pairingPort}\u0000${descriptor.fingerprint.hex}';
     if (_discovery != null && _discoveryKey == key) return;
+    // A descriptor that only differs in the ports this Device listens on is
+    // the same Device: it is handed to the running service, which re-encodes
+    // its beacon and announces the new one. Rebuilding the service instead
+    // would mean a second listener over the same transport, and a transport's
+    // receive stream is single-subscription — the second one throws.
+    //
+    // The ports become known one after another: the Session layer binds
+    // first, the Pairing listener after it, so on a fresh start this runs
+    // more than once with a service already up.
+    if (_discovery != null && _sameDevice(descriptor, _discovery!.local)) {
+      _discovery!.updateLocal(descriptor);
+      _discoveryKey = key;
+      return;
+    }
     final previous = _discovery;
     _discovery = null;
     _discoveryKey = null;
@@ -1885,6 +1899,17 @@ final class LocalTransferController {
       pairingPort: pairingPort,
     );
   }
+
+  /// Whether two descriptors describe the same Device.
+  ///
+  /// The Fingerprint is the identity; everything else — the name, the
+  /// capabilities, the ports this Device listens on — is a fact about it that
+  /// changes as the layers come up and as the user renames it. It is the same
+  /// Device either way, and Discovery keeps one service per Device: a second
+  /// one over the same transport would fight for the transport's single
+  /// receive stream.
+  bool _sameDevice(DeviceDescriptor a, DeviceDescriptor b) =>
+      a.fingerprint == b.fingerprint;
 
   DeviceDescriptor _descriptorOf(DeviceProfile profile) => DeviceDescriptor(
     fingerprint: profile.self,
