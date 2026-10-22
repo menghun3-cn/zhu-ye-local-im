@@ -108,6 +108,7 @@
   "nothingToDialYet": "暂时无法连接：还没有发现这台设备",
   "nothingKnownAboutPeer": "不知道这台设备在哪里",
   "pair": "配对",
+  "repairPairing": "重新配对",
   "connect": "连接",
 
   "transfersEmptyHint": "还没有传输过文件。文字内容在对话里，不在这里显示。",

@@ -513,12 +513,7 @@ class _ConversationTile extends StatelessWidget {
     final colors = WeChatColors.of(context);
     final peer = entry.peer;
     final latest = entry.latest;
-    // Dialling needs both an address to dial and a peer in the group: a Device
-    // from somebody else's group would fail the handshake, so offering the
-    // button would be offering a failure. Pairing needs only an address — the
-    // whole point of it is to bring a Device that is not in the group in.
-    final canConnect = peer.isDiallable && peer.isInGroup;
-    final canPair = !peer.isInGroup && peer.address != null;
+    final action = _actionFor(peer);
     // The top-right corner is the clock, where the desktop client puts it: the
     // time the last thing was said, or — for a conversation nobody has said
     // anything in yet — when the Device was last heard from.
@@ -527,7 +522,7 @@ class _ConversationTile extends StatelessWidget {
     // went. Never both: a row holds two lines and no more, and two answers to
     // "what is this conversation doing" would neither fit nor agree.
     final lower =
-        _actionFor(context, peer, canConnect, canPair) ??
+        _actionButtonFor(context, peer, action) ??
         _summary(context, peer, latest);
     // An unread row is *louder*: the name goes semibold, and the preview steps
     // up from secondary ink to body ink. That is the difference a user reads at
@@ -679,31 +674,59 @@ class _ConversationTile extends StatelessWidget {
     return labelForKind(last.kind, l10n);
   }
 
+  /// What the user can do with this peer from its conversation row.
+  ///
+  /// Dialling needs both an address to dial and a peer in the group: a Device
+  /// from somebody else's group would fail the handshake, so offering the
+  /// button would be offering a failure. Pairing needs only an address — the
+  /// whole point of it is to bring a Device that is not in the group in.
+  ///
+  /// A Device can also be in this Owner Group without answering on a Session
+  /// port. That is what a stale or one-sided membership looks like: this side
+  /// remembers the Device as a member, while the Device itself has lost its
+  /// group secret and therefore serves no Session. It has an address and can
+  /// answer Pairing requests, so Pair again is the way back; without this case
+  /// the row offers neither Connect nor Pair.
+  _PeerAction? _actionFor(PeerView peer) {
+    if (peer.isConnected) return null;
+    if (peer.isInGroup && peer.isDiallable) return _PeerAction.connect;
+    if (peer.address == null) return null;
+    return peer.isInGroup ? _PeerAction.repairPairing : _PeerAction.pair;
+  }
+
   /// The row's action button, when it has one.
   ///
   /// A connected peer has no reconnect button — the Session is up, and pressing
   /// again would be refused as a second one.
-  Widget? _actionFor(
+  Widget? _actionButtonFor(
     BuildContext context,
     PeerView peer,
-    bool canConnect,
-    bool canPair,
+    _PeerAction? action,
   ) {
-    if (peer.isConnected || !(canConnect || canPair)) return null;
+    if (action == null) return null;
     return Tooltip(
-      message: canConnect ? l10n.openSession : l10n.pairWithThisDevice,
-      child: canConnect
-          ? _RowAction(
-              label: l10n.connect,
-              primary: true,
-              onPressed: () => guarded(context, () => _connect(context)),
-            )
-          : _RowAction(
-              label: l10n.pair,
-              primary: false,
-              onPressed: () =>
-                  showPairWithPeerDialog(context, controller, peer),
-            ),
+      message: switch (action) {
+        _PeerAction.connect => l10n.openSession,
+        _PeerAction.pair ||
+        _PeerAction.repairPairing => l10n.pairWithThisDevice,
+      },
+      child: switch (action) {
+        _PeerAction.connect => _RowAction(
+          label: l10n.connect,
+          primary: true,
+          onPressed: () => guarded(context, () => _connect(context)),
+        ),
+        _PeerAction.pair => _RowAction(
+          label: l10n.pair,
+          primary: false,
+          onPressed: () => showPairWithPeerDialog(context, controller, peer),
+        ),
+        _PeerAction.repairPairing => _RowAction(
+          label: l10n.repairPairing,
+          primary: false,
+          onPressed: () => showPairWithPeerDialog(context, controller, peer),
+        ),
+      },
     );
   }
 
@@ -750,6 +773,8 @@ class _ConversationTile extends StatelessWidget {
     await controller.connect(entry.peer.fingerprint);
   }
 }
+
+enum _PeerAction { connect, pair, repairPairing }
 
 /// A row that answers the mouse the way the desktop client's list does.
 ///
