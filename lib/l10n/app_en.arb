@@ -183,6 +183,7 @@
   "nothingToDialYet": "Nothing to dial yet: this Device has not been seen",
   "nothingKnownAboutPeer": "Nothing known about where this Device is",
   "pair": "Pair",
+  "repairPairing": "Pair again",
   "connect": "Connect",
 
   "transfersEmptyHint": "No files have been transferred yet. Text messages live in their conversations, not here.",

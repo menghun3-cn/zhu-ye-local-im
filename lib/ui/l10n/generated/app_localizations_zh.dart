@@ -348,6 +348,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pair => '配对';
 
   @override
+  String get repairPairing => '重新配对';
+
+  @override
   String get connect => '连接';
 
   @override
