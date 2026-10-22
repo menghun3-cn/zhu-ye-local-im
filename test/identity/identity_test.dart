@@ -170,6 +170,19 @@ void main() {
       );
     });
 
+    test('rejects a pairing port outside the valid range', () {
+      expect(
+        () => DeviceDescriptor(
+          fingerprint: Fingerprint('a' * 64),
+          alias: 'x',
+          platform: DevicePlatform.windows,
+          capability: ClipboardCapability.forPlatform(DevicePlatform.windows),
+          pairingPort: 70000,
+        ),
+        throwsA(isA<RangeError>()),
+      );
+    });
+
     test('round-trips through JSON, applying sanitisation on the way in', () {
       final original = DeviceDescriptor(
         fingerprint: Fingerprint('b' * 64),
@@ -177,6 +190,7 @@ void main() {
         platform: DevicePlatform.android,
         capability: ClipboardCapability.forPlatform(DevicePlatform.android),
         listenPort: 51000,
+        pairingPort: 52000,
       );
       final decoded = DeviceDescriptor.fromJson(original.toJson());
       expect(decoded.fingerprint, original.fingerprint);
@@ -184,6 +198,7 @@ void main() {
       expect(decoded.platform, DevicePlatform.android);
       expect(decoded.capability, original.capability);
       expect(decoded.listenPort, 51000);
+      expect(decoded.pairingPort, 52000);
     });
 
     test('rejects a malformed descriptor', () {
@@ -202,6 +217,16 @@ void main() {
           'alias': 'x',
           'platform': 'beos',
           'clip': {'canOriginate': true, 'canApply': true},
+        }),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => DeviceDescriptor.fromJson({
+          'fp': 'a' * 64,
+          'alias': 'x',
+          'platform': 'windows',
+          'clip': {'canOriginate': true, 'canApply': true},
+          'pairPort': 70000,
         }),
         throwsA(isA<FormatException>()),
       );
