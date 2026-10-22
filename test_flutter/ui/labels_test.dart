@@ -29,6 +29,7 @@ void main() {
     platform: DevicePlatform.windows,
     address: address,
     sessionPort: sessionPort,
+    pairingPort: null,
     isConnected: connected,
     isInGroup: inGroup,
     isFavorite: false,

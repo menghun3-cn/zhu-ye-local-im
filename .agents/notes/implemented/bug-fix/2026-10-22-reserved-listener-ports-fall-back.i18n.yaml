@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-22-reserved-listener-ports-fall-back.md
+#   git hash-object -- 2026-10-22-reserved-listener-ports-fall-back.zh.md
+2026-10-22-reserved-listener-ports-fall-back.md: b548e470a0fc3af4ca82e6887347dd9269ae0b5f
+2026-10-22-reserved-listener-ports-fall-back.zh.md: 8e36946f92757e84b6925e69e7f2fa0cec4662d9
