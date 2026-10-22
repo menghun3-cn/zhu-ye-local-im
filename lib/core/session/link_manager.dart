@@ -163,6 +163,7 @@ final class LinkManager {
       platform: local.platform,
       capability: local.capability,
       listenPort: port,
+      pairingPort: local.pairingPort,
     );
   }
 

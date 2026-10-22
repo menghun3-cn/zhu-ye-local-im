@@ -14,10 +14,15 @@ final class DeviceDescriptor {
     required this.platform,
     required this.capability,
     this.listenPort,
+    this.pairingPort,
   }) : alias = sanitiseAlias(alias) {
-    final port = listenPort;
-    if (port != null && (port < 1 || port > 65535)) {
-      throw RangeError.value(port, 'listenPort', 'must be in 1..65535');
+    for (final (name, port) in [
+      ('listenPort', listenPort),
+      ('pairingPort', pairingPort),
+    ]) {
+      if (port != null && (port < 1 || port > 65535)) {
+        throw RangeError.value(port, name, 'must be in 1..65535');
+      }
     }
   }
 
@@ -46,6 +51,12 @@ final class DeviceDescriptor {
   /// The port the Device listens on, if it accepts connections.
   final int? listenPort;
 
+  /// The port the Device answers Pairing requests on, if it does.
+  ///
+  /// This is separate from [listenPort]: a Session is accepted on one listener
+  /// and a Pairing on another, and either can have fallen back to a free port.
+  final int? pairingPort;
+
   /// Normalises a peer-supplied or locally chosen Alias.
   ///
   /// Control characters are dropped rather than escaped: a name containing a
@@ -69,13 +80,13 @@ final class DeviceDescriptor {
     'platform': platform.wireName,
     'clip': capability.toJson(),
     if (listenPort != null) 'port': listenPort,
+    if (pairingPort != null) 'pairPort': pairingPort,
   };
 
   static DeviceDescriptor fromJson(Map<String, Object?> json) {
     final rawAlias = json['alias'];
     final rawPlatform = json['platform'];
     final rawClip = json['clip'];
-    final rawPort = json['port'];
     if (rawAlias is! String) {
       throw FormatException('"alias" must be a string');
     }
@@ -85,15 +96,13 @@ final class DeviceDescriptor {
     if (rawClip is! Map) {
       throw FormatException('"clip" must be an object');
     }
-    if (rawPort != null && rawPort is! int) {
-      throw FormatException('"port" must be an int when present');
-    }
     return DeviceDescriptor(
       fingerprint: Fingerprint(_requireString(json, 'fp')),
       alias: rawAlias,
       platform: DevicePlatform.fromWireName(rawPlatform),
       capability: ClipboardCapability.fromJson(rawClip.cast<String, Object?>()),
-      listenPort: rawPort as int?,
+      listenPort: _portFromJson(json, 'port'),
+      pairingPort: _portFromJson(json, 'pairPort'),
     );
   }
 
@@ -105,6 +114,15 @@ String _requireString(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! String) {
     throw FormatException('"$key" must be a string');
+  }
+  return value;
+}
+
+int? _portFromJson(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) return null;
+  if (value is! int || value < 1 || value > 65535) {
+    throw FormatException('"$key" must be an int in 1..65535 when present');
   }
   return value;
 }
