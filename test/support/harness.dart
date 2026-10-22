@@ -9,6 +9,7 @@ DeviceDescriptor testDevice(
   DevicePlatform platform = DevicePlatform.windows,
   String? alias,
   int? listenPort,
+  int? pairingPort,
 }) {
   return DeviceDescriptor(
     fingerprint: Fingerprint.ofPublicKey(utf8.encode(label)),
@@ -16,6 +17,7 @@ DeviceDescriptor testDevice(
     platform: platform,
     capability: ClipboardCapability.forPlatform(platform),
     listenPort: listenPort,
+    pairingPort: pairingPort,
   );
 }
 

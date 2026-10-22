@@ -55,7 +55,9 @@ final class LocalTransferController {
   /// the app passes the real ones, and a test passes in-memory ones, with no
   /// branch between the two. [sessionListenPort] and [pairingPort] accept 0,
   /// which binds any free port — what a test wants, and what a second copy of
-  /// the app on one host would need.
+  /// the app on one host would need. A non-zero [sessionListenPort] or
+  /// [pairingPort] is a preference rather than a requirement: when the operating
+  /// system refuses it, that listener binds any free port instead.
   ///
   /// [defaultIncomingDirectory] is where an offer the controller answers on its
   /// own lands when the profile names no folder of its own to prefer. It is
@@ -356,6 +358,7 @@ final class LocalTransferController {
         ..platform = discovered.device.platform
         ..address = discovered.address.address
         ..sessionPort = discovered.sessionPort
+        ..pairingPort = discovered.pairingPort
         ..lastSeen ??= discovered.lastSeen
         ..fromDiscovery = true;
     }
@@ -397,6 +400,7 @@ final class LocalTransferController {
           platform: entry.platform,
           address: entry.address,
           sessionPort: entry.sessionPort,
+          pairingPort: entry.pairingPort,
           isConnected: entry.connected,
           isInGroup: profile.group.contains(entry.fingerprint),
           isFavorite: profile.isFavorite(entry.fingerprint),
@@ -662,7 +666,10 @@ final class LocalTransferController {
   /// Resolving is not being paired: it waits for the other user to allow the
   /// request, and throws [PairingException] if they refuse or never answer.
   Future<PairingAttempt> pairWith({required String host, int? port}) =>
-      _requirePairing().joinOpen(host: host, port: port ?? defaultPairingPort);
+      _requirePairing().joinOpen(
+        host: host,
+        port: port ?? _pairingPortAt(host) ?? defaultPairingPort,
+      );
 
   /// Opens a Session with [peer] right after a Pairing has completed.
   ///
@@ -1192,7 +1199,7 @@ final class LocalTransferController {
         wrapSocket: wrapSocket,
         dialSocket: dialSocket,
       );
-      await manager.serve(port: _sessionListenPort);
+      await _serveSessionLayer(manager);
       _manager = manager;
       _managerKey = key;
       _managerSecret = wanted;
@@ -1201,7 +1208,27 @@ final class LocalTransferController {
         onError: (Object error) => _notice('the link manager failed: $error'),
       );
     }
-    await _syncDiscovery(_requireManager().advertised);
+    await _syncDiscovery(_announcedDescriptor());
+  }
+
+  /// Starts the Session listener on the preferred port, or any free port.
+  ///
+  /// The fixed port is what lets a peer dial without Discovery, but it is not
+  /// worth failing startup over. Windows can reserve a range for WinNAT or
+  /// Hyper-V and refuse every bind inside it with `WSAEACCES`; another process
+  /// can hold the port just as effectively. Discovery advertises the port the
+  /// manager actually bound, so falling back keeps automatic reconnects working.
+  Future<void> _serveSessionLayer(LinkManager manager) async {
+    try {
+      await manager.serve(port: _sessionListenPort);
+    } on SocketException {
+      if (_sessionListenPort == 0) rethrow;
+      await manager.serve(port: 0);
+      _notice(
+        'session port $_sessionListenPort could not be bound; '
+        'listening on ${manager.listenPort} instead',
+      );
+    }
   }
 
   /// Makes the Pairing listener match the profile.
@@ -1222,21 +1249,43 @@ final class LocalTransferController {
     if (wanted == pairing.isReceiving) return;
     try {
       if (wanted) {
-        await pairing.receive(port: _pairingPort);
+        await _servePairingLayer(pairing);
       } else {
         await pairing.stopReceiving();
       }
     } on Object catch (error) {
       _notice('this Device cannot answer Pairing requests: $error');
     }
+    await _syncDiscovery(_announcedDescriptor());
+  }
+
+  /// Starts the Pairing listener on the preferred port, or any free port.
+  ///
+  /// The same WinNAT and Hyper-V reservations that can deny the Session port can
+  /// deny the Pairing port. A fallback keeps this Device answerable, and the
+  /// actual port travels in Discovery so another Device still knows where to
+  /// send the request.
+  Future<void> _servePairingLayer(PairingService pairing) async {
+    try {
+      await pairing.receive(port: _pairingPort);
+    } on PairingException {
+      if (_pairingPort == 0) rethrow;
+      final port = await pairing.receive(port: 0);
+      _notice(
+        'pairing port $_pairingPort could not be bound; '
+        'answering on $port instead',
+      );
+    }
   }
 
   Future<void> _syncDiscovery(DeviceDescriptor? advertised) async {
     final local = _requireLocal();
-    final descriptor = advertised ?? _descriptorOf(local.profile);
+    final descriptor = _withPairingPort(
+      advertised ?? _descriptorOf(local.profile),
+    );
     final key =
         '${descriptor.alias}\u0000${descriptor.listenPort}\u0000'
-        '${descriptor.fingerprint.hex}';
+        '${descriptor.pairingPort}\u0000${descriptor.fingerprint.hex}';
     if (_discovery != null && _discoveryKey == key) return;
     final previous = _discovery;
     _discovery = null;
@@ -1807,8 +1856,35 @@ final class LocalTransferController {
     return (address: address, port: defaultSessionPort);
   }
 
+  int? _pairingPortAt(String host) {
+    for (final discovered in _discovered) {
+      if (discovered.address.address == host) return discovered.pairingPort;
+    }
+    return null;
+  }
+
   String _keyOf(LocalProfile local) =>
       '${local.profile.alias}\u0000${local.profile.self.hex}';
+
+  DeviceDescriptor _announcedDescriptor() {
+    final local = _requireLocal();
+    return _withPairingPort(
+      _manager?.advertised ?? _descriptorOf(local.profile),
+    );
+  }
+
+  DeviceDescriptor _withPairingPort(DeviceDescriptor descriptor) {
+    final pairingPort = _pairing?.receivingPort;
+    if (descriptor.pairingPort == pairingPort) return descriptor;
+    return DeviceDescriptor(
+      fingerprint: descriptor.fingerprint,
+      alias: descriptor.alias,
+      platform: descriptor.platform,
+      capability: descriptor.capability,
+      listenPort: descriptor.listenPort,
+      pairingPort: pairingPort,
+    );
+  }
 
   DeviceDescriptor _descriptorOf(DeviceProfile profile) => DeviceDescriptor(
     fingerprint: profile.self,
@@ -2085,6 +2161,7 @@ final class _PeerFacts {
   DevicePlatform? platform;
   String? address;
   int? sessionPort;
+  int? pairingPort;
   DateTime? lastSeen;
   bool connected = false;
 
