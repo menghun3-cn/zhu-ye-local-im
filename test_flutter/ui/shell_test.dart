@@ -429,6 +429,43 @@ void main() {
       await shutdown(tester, [device]);
     });
 
+    testWidgets(
+      'a narrow conversation keeps its back button below the system inset',
+      (tester) async {
+        const statusBar = EdgeInsets.only(top: 28);
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(tester, hub.b, 'Bob');
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+        await pumpWindow(tester, alice, size: narrowWindow, padding: statusBar);
+
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Bob'),
+          description: 'Bob to appear in the conversation list',
+        );
+        await openConversation(tester, windowA, name: 'Bob');
+
+        final back = windowA.within(find.byIcon(Icons.arrow_back));
+        expect(back, findsOneWidget);
+        expect(
+          tester.getTopLeft(back).dy,
+          greaterThanOrEqualTo(statusBar.top),
+          reason:
+              'the shell has no AppBar, so its body must reserve the status '
+              'bar before drawing the conversation header',
+        );
+
+        await tester.tap(back);
+        await settleRoute(tester);
+        expect(conversationListed(windowA, 'Bob'), isTrue);
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
+
     testWidgets('puts no title bar above the surfaces', (tester) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);

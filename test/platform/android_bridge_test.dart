@@ -17,9 +17,10 @@ import 'package:test/test.dart';
 /// rot the moment somebody tidied a constant.
 const String _seamsPath = 'lib/ui/seams.dart';
 const String _kotlinPath =
-    'android/app/src/main/kotlin/cn/hnasct/local_transfer/MainActivity.kt';
+    'android/app/src/main/kotlin/io/menghun3_cn/zhu_ye_local_im/MainActivity.kt';
 const String _manifestPath = 'android/app/src/main/AndroidManifest.xml';
 const String _gradlePath = 'android/app/build.gradle.kts';
+const String _androidId = 'io.menghun3_cn.zhu_ye_local_im';
 
 String _read(String path) {
   final file = File(path);
@@ -69,6 +70,7 @@ void main() {
     });
 
     test('Dart asks for the channel Kotlin registers, by name', () {
+      expect(channel, '$_androidId/paths');
       expect(
         kotlin,
         contains('"$channel"'),
@@ -131,6 +133,11 @@ void main() {
         RegExp(r'namespace\s*=\s*"([^"]+)"'),
         'the Gradle namespace',
       );
+      final applicationId = _capture(
+        gradle,
+        RegExp(r'applicationId\s*=\s*"([^"]+)"'),
+        'the Android application ID',
+      );
       final package = _capture(
         kotlin,
         RegExp(r'^package\s+(\S+)', multiLine: true),
@@ -144,6 +151,23 @@ void main() {
             'namespace, so a Kotlin class in another package would simply '
             'never be instantiated — and the app would launch with no channel '
             'at all',
+      );
+      expect(
+        applicationId,
+        namespace,
+        reason:
+            'the installed application ID and the namespace that resolves '
+            '.MainActivity have to name the same application identity',
+      );
+      expect(
+        applicationId,
+        _androidId,
+        reason: 'the Android identity is the one users install and upgrade',
+      );
+      expect(
+        manifest,
+        contains('android:label="竹叶局域网传输"'),
+        reason: 'the launcher must show the product name, not local_transfer',
       );
 
       // And the class really is where its package says it is.

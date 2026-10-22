@@ -6,7 +6,7 @@
          the application. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="local_transfer"
+        android:label="竹叶局域网传输"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

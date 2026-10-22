@@ -201,7 +201,7 @@ DevicePlatform currentPlatform() {
 /// implemented it throws [MissingPluginException], which is handled as
 /// "nowhere to write" rather than as a failure.
 const MethodChannel defaultPathsChannel = MethodChannel(
-  'cn.hnasct.local_transfer/paths',
+  'io.menghun3_cn.zhu_ye_local_im/paths',
 );
 
 /// The method [defaultPathsChannel] is asked for.

@@ -27,7 +27,7 @@ if (hasReleaseKey) {
 }
 
 android {
-    namespace = "cn.hnasct.local_transfer"
+    namespace = "io.menghun3_cn.zhu_ye_local_im"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "cn.hnasct.local_transfer"
+        applicationId = "io.menghun3_cn.zhu_ye_local_im"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

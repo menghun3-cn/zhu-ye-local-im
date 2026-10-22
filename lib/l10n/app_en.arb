@@ -147,6 +147,7 @@
   "@sessionsOpen": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "sessionsNeedPairing": "pair this Device to accept Sessions",
   "notAcceptingSessions": "not accepting Sessions",
   "onPort": "on port {port}",
   "@onPort": {

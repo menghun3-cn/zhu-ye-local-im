@@ -365,18 +365,25 @@ class _HomeShellState extends State<HomeShell> {
       // Devices surface with the rest of what this Device says about itself,
       // not pinned above six pages that have nothing to do with it. What is
       // left is a strip of chrome doing no work, so it goes.
-      body: wide
-          ? Row(
-              children: [
-                rail,
-                VerticalDivider(
-                  width: 1,
-                  color: WeChatColors.of(context).divider,
-                ),
-                Expanded(child: content),
-              ],
-            )
-          : content,
+      body: SafeArea(
+        // The bottom navigation bar and every composer already account for
+        // the bottom inset. The top inset belongs here because the shell has
+        // no AppBar to reserve it, including above a conversation's own
+        // compact back button on a narrow screen.
+        bottom: false,
+        child: wide
+            ? Row(
+                children: [
+                  rail,
+                  VerticalDivider(
+                    width: 1,
+                    color: WeChatColors.of(context).divider,
+                  ),
+                  Expanded(child: content),
+                ],
+              )
+            : content,
+      ),
       bottomNavigationBar: wide
           ? null
           : NavigationBar(

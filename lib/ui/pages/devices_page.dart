@@ -120,9 +120,14 @@ class _SelfCard extends StatelessWidget {
             FactLine(l10n.factSessions, l10n.sessionsOpen(self.openSessions)),
             FactLine(
               l10n.factListening,
-              // The port is the honest answer to "can anything reach me": an
-              // unpaired Device binds none, and says so.
-              port == null ? l10n.notAcceptingSessions : l10n.onPort(port),
+              // Discovery and pairing do not need a group secret; accepting
+              // Sessions does. Say which of those is missing rather than
+              // leaving an unpaired Device looking broken.
+              port != null
+                  ? l10n.onPort(port)
+                  : controller.isPaired
+                  ? l10n.notAcceptingSessions
+                  : l10n.sessionsNeedPairing,
             ),
           ],
         ),
