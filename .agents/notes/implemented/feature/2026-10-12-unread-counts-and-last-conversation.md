@@ -43,8 +43,8 @@ anybody dragging across three words is asking for.
 
 `WeChat` gains a family of standard metrics — `buttonHeight` (36),
 `buttonHPadding` (16), `fieldHeight` (44), `fieldHPadding` (12), `fieldVPadding`
-(10), `composerControl` (40) — and the theme's button themes and
-`inputDecorationTheme` are built from them.
+(10) — and the theme's button themes and `inputDecorationTheme` are built from
+them.
 
 - A `TextButton` and a `FilledButton` are now the same height, because the two
   sit shoulder to shoulder at the foot of a dialog and a row of buttons at two
@@ -54,8 +54,11 @@ anybody dragging across three words is asking for.
   on the theme being small.
 - Every field gets a real outline, in `borderStrong`, with a brand hairline and a
   wider brand line on focus. The one field that wants no outline is the
-  conversation composer's, which sits inside a fill that *is* its outline; it
-  turns all six border slots off and zeroes the constraints at its own call site.
+  conversation composer's, which is written straight onto the board it sits
+  on; it turns all six border slots off and zeroes the constraints at its own
+  call site. (The composer was redrawn to match WeChat's desktop client
+  afterwards — see [the composer is WeChat's](2026-10-21-the-composer-is-wechat-and-refusals-land-at-the-top.md),
+  which is where that field's metrics now live.)
 - 检查更新 became a `FilledButton.icon`, the style every other primary action in
   the application already wears; 打开下载页 stayed a `TextButton.icon`, because
   it opens a page rather than doing something in this window.
@@ -190,7 +193,9 @@ both still on the menu a right-click on a text message opens.
 - The composer is the one place that opts out of the new field styling, so a
   future change to `inputDecorationTheme` will not reach it. That is deliberate
   — it is not a field on a panel, it is a field in a channel — but it is a
-  second place to look.
+  second place to look. (It now draws no frame at all, since the composer was
+  redrawn to match WeChat's desktop client; see [the composer is
+  WeChat's](2026-10-21-the-composer-is-wechat-and-refusals-land-at-the-top.md).)
 - `conversationDisconnected` now reads 离线 / "Offline" rather than 连接已断开 /
   "Session closed". Shorter, and the same fact: 离线 is what a user says about a
   Device they cannot reach.
