@@ -40,9 +40,9 @@ void main() {
         profileFilePath(
           platform: DevicePlatform.android,
           environment: const {},
-          appDataDirectory: '/data/user/0/cn.hnasct.local_transfer/files',
+          appDataDirectory: '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files',
         ),
-        '/data/user/0/cn.hnasct.local_transfer/files/profile.json',
+        '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files/profile.json',
       );
     });
 
@@ -97,9 +97,9 @@ void main() {
         defaultIncomingDirectory(
           platform: DevicePlatform.android,
           environment: const {},
-          appDataDirectory: '/data/user/0/cn.hnasct.local_transfer/files',
+          appDataDirectory: '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files',
         ),
-        '/data/user/0/cn.hnasct.local_transfer/files/incoming',
+        '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files/incoming',
       );
     });
 

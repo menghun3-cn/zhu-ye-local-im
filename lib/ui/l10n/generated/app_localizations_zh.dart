@@ -261,6 +261,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sessionsNeedPairing => '配对后接受连接';
+
+  @override
   String get notAcceptingSessions => '不接受连接';
 
   @override

@@ -1,4 +1,4 @@
-package cn.hnasct.local_transfer
+package io.menghun3_cn.zhu_ye_local_im
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,7 +20,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "cn.hnasct.local_transfer/paths",
+            "io.menghun3_cn.zhu_ye_local_im/paths",
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "appDataDirectory" -> result.success(filesDir.absolutePath)

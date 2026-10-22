@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 open} other{{count} open}}'**
   String sessionsOpen(int count);
 
+  /// No description provided for @sessionsNeedPairing.
+  ///
+  /// In en, this message translates to:
+  /// **'pair this Device to accept Sessions'**
+  String get sessionsNeedPairing;
+
   /// No description provided for @notAcceptingSessions.
   ///
   /// In en, this message translates to:

@@ -46,7 +46,7 @@ void main() {
       // The listening fact is the honest answer to "can anything reach me":
       // an unpaired Device binds no port and says so.
       expect(
-        onPage(windowA, DevicesPage, find.text(l10n.notAcceptingSessions)),
+        onPage(windowA, DevicesPage, find.text(l10n.sessionsNeedPairing)),
         findsOneWidget,
       );
       expect(

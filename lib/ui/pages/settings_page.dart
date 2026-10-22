@@ -212,7 +212,11 @@ class SettingsPage extends StatelessWidget {
                 ),
                 FactLine(
                   l10n.factListening,
-                  port == null ? l10n.notAcceptingSessions : l10n.onPort(port),
+                  port != null
+                      ? l10n.onPort(port)
+                      : controller.isPaired
+                      ? l10n.notAcceptingSessions
+                      : l10n.sessionsNeedPairing,
                 ),
                 FactLine(
                   l10n.factPairingRequests,

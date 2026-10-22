@@ -330,11 +330,17 @@ const _instantTheme = PageTransitionsTheme(
 /// the shipping tree. Without the delegates every `AppLocalizations.of` below
 /// throws, and a window built with the platform's locale instead would show a
 /// different language from the window a user gets.
-Widget _pane(Key key, UiDevice device, Size size, UpdateNotice? update) {
+Widget _pane(
+  Key key,
+  UiDevice device,
+  Size size,
+  UpdateNotice? update, {
+  EdgeInsets padding = EdgeInsets.zero,
+}) {
   return SizedBox(
     key: key,
     child: MediaQuery(
-      data: MediaQueryData(size: size),
+      data: MediaQueryData(size: size, padding: padding, viewPadding: padding),
       child: ControllerScope(
         controller: device.controller,
         child: MaterialApp(
@@ -375,12 +381,13 @@ Future<void> pumpWindow(
   UiDevice device, {
   Size size = wideWindow,
   UpdateNotice? update,
+  EdgeInsets padding = EdgeInsets.zero,
 }) async {
   _resizeView(tester, size);
   await tester.pumpWidget(
     Directionality(
       textDirection: TextDirection.ltr,
-      child: _pane(windowAKey, device, size, update),
+      child: _pane(windowAKey, device, size, update, padding: padding),
     ),
   );
   await tester.pump();

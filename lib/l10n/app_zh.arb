@@ -78,6 +78,7 @@
   "clipboardCanApply": "可接收：{value}",
   "groupDevices": "{count, plural, other{{count} 台设备}}",
   "sessionsOpen": "{count, plural, other{{count} 个已打开}}",
+  "sessionsNeedPairing": "配对后接受连接",
   "notAcceptingSessions": "不接受连接",
   "onPort": "端口 {port}",
 
