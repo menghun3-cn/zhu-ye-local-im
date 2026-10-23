@@ -132,8 +132,7 @@ Future<void> _runCapture() async {
       pairingPort: peerPairingPort,
     );
 
-    await _pair(tester, me, peer);
-    await _connect(tester, me, peer);
+    await pairDevices(tester, me, peer);
     await _talk(tester, me, peer);
 
     await pumpWindow(tester, me, size: captureSize);
@@ -175,53 +174,6 @@ Future<void> _runCapture() async {
     print(
       'wrote ${written.length} pictures into ${outputDirectory.path}:\n'
       '${written.map((path) => '  ${path.replaceAll('\\', '/')}').join('\n')}',
-    );
-  });
-}
-
-/// Pairs the two Devices, answering the request here rather than by a tap.
-///
-/// A picture has no user to answer a Pairing question, so the answer is given
-/// at the level the request arrives at. Everything below that — the
-/// handshake, the group secret, the Session — is the shipping path.
-Future<void> _pair(WidgetTester tester, UiDevice host, UiDevice guest) async {
-  await tester.runAsync(() async {
-    await _until(
-      () => host.controller.isAcceptingPairings,
-      'the host to answer Pairing requests',
-    );
-    final port = host.controller.pairingPort!;
-    final joining = guest.controller.pairWith(
-      host: InternetAddress.loopbackIPv4.address,
-      port: port,
-    );
-    final request = await host.controller.pairingRequests.first.timeout(
-      const Duration(seconds: 15),
-    );
-    final hostAttempt = await request.admit();
-    final guestAttempt = await joining;
-    await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
-    await _until(
-      () => host.controller.isServing && guest.controller.isServing,
-      'both Devices to serve Sessions',
-    );
-  });
-}
-
-/// Opens the Session the two Devices talk over.
-///
-/// Dialled over the machine's own LAN address rather than over loopback, so
-/// the address the picture shows is the one the Session really runs on. A
-/// loopback Session would put `127.0.0.1` in the picture, which is a fact
-/// about the harness rather than about the product.
-Future<void> _connect(WidgetTester tester, UiDevice me, UiDevice peer) async {
-  await tester.runAsync(() async {
-    await me.controller.connectAfterPairing(peer.fingerprint);
-    await _until(
-      () =>
-          me.controller.sessions.isNotEmpty &&
-          peer.controller.sessions.isNotEmpty,
-      'the Session to come up on both Devices',
     );
   });
 }

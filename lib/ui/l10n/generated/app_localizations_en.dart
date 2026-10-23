@@ -37,7 +37,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String failurePairing(String detail) {
-    return 'Pairing failed: $detail';
+    return 'Automatic connection failed: $detail';
   }
 
   @override
@@ -81,7 +81,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get refusalNotPaired =>
-      'This Device is not paired, so it accepts no Sessions.';
+      'This Device has not joined a group yet, so it accepts no Sessions.';
 
   @override
   String refusalNoFreeFileName(String name) {
@@ -269,10 +269,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sessionsNeedPairing => 'pair this Device to accept Sessions';
+  String get sessionsAutoConnectPending =>
+      'establishing a connection automatically';
 
   @override
-  String get notAcceptingSessions => 'not accepting Sessions';
+  String get connectionNotReady => 'connection channel not ready';
 
   @override
   String onPort(int port) {
@@ -280,30 +281,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get pairingCardPairedTitle => 'Pair another Device';
+  String get automaticConnectionsTitle => 'Automatic connections';
 
   @override
-  String get pairingCardUnpairedTitle => 'Pair this Device to send anything';
+  String get automaticConnectionsBody =>
+      'Devices running this app on the same local network connect automatically when they are discovered. Send text, images, files and emoji directly; no pairing or request to accept.';
 
   @override
-  String get pairingCardPairedBody =>
-      'Devices in one Owner Group can open Sessions with each other. Pairing adds one, and is also what lets a clipboard be shared.';
+  String get automaticConnectionsReady =>
+      'Ready: discovered Devices connect automatically';
 
   @override
-  String get pairingCardUnpairedBody =>
-      'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.';
+  String get automaticConnectionsUnavailable =>
+      'This Device cannot accept automatic connections right now, but it can still connect outwards.';
 
   @override
-  String get acceptPairingRequests => 'Answer pairing requests';
-
-  @override
-  String get pairingListening => 'Answering requests from other Devices';
-
-  @override
-  String get pairingNotListening => 'Not answering requests';
-
-  @override
-  String get factPairingRequests => 'Pairing requests';
+  String get factAutomaticConnections => 'Automatic connections';
 
   @override
   String get peerNameNotAnnounced => 'name not announced yet';
@@ -344,9 +337,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSession => 'Open a Session';
 
   @override
-  String get pairWithThisDevice => 'Pair with this Device';
-
-  @override
   String get nothingToDialYet =>
       'Nothing to dial yet: this Device has not been seen';
 
@@ -355,13 +345,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing known about where this Device is';
 
   @override
-  String get pair => 'Pair';
-
-  @override
-  String get repairPairing => 'Pair again';
-
-  @override
   String get connect => 'Connect';
+
+  @override
+  String get connectingAutomatically => 'Connecting automatically';
+
+  @override
+  String get autoReconnectPending => 'will reconnect automatically';
+
+  @override
+  String get autoConnectingSoon =>
+      'waiting for the other Device to become reachable';
 
   @override
   String get transfersEmptyHint =>
@@ -461,7 +455,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clipboardPeersEmpty =>
-      'No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.';
+      'No connected Devices yet; when one appears automatically, come back and tick it for clipboard sharing.';
 
   @override
   String get clipboardNoteBoth =>
@@ -575,7 +569,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noIdentityHint =>
-      'This Device has nowhere to keep its identity, so it runs in memory: it works, and it has to be paired again after every restart.';
+      'This Device has nowhere to keep its identity, so it runs in memory: it works, and after a restart it must discover other Devices and connect automatically again.';
 
   @override
   String get factReceivedFiles => 'Received files';
@@ -712,36 +706,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
-  String get pairingRequestTitle => 'Pairing request';
-
-  @override
-  String pairingRequestFrom(String alias) {
-    return '$alias wants to pair with this Device.';
-  }
-
-  @override
-  String get pairingRequestUnnamed => 'a Device with no name yet';
-
-  @override
-  String get pairingRequestClaimHint =>
-      'The name is the caller\'s own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.';
-
-  @override
-  String get pairingCompleting => 'Finishing the Pairing…';
-
-  @override
-  String get acceptPairing => 'Allow';
-
-  @override
-  String connectToPeerTitle(String peer) {
-    return 'Connect to $peer';
-  }
-
-  @override
-  String get reachingOtherDevice =>
-      'Reaching the other Device, waiting for its user to allow it…';
-
-  @override
   String get manualAddressTitle => 'Reach a Device by address';
 
   @override
@@ -781,11 +745,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationListEmpty =>
-      'No conversations yet. A Device this one finds shows up here on its own, ready to connect.';
+      'No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.';
 
   @override
   String get conversationPickOne =>
-      'Pick a conversation on the left, or connect a Device first.';
+      'Pick a conversation on the left, or wait for a nearby Device to connect automatically.';
 
   @override
   String get conversationDisconnected => 'Offline';

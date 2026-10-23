@@ -25,7 +25,9 @@ import '../support/ui_harness.dart';
 /// that would notice the UI coming up in a language nobody asked for.
 void main() {
   group('two windows on one machine', () {
-    testWidgets('pair by clicking, then move a file across', (tester) async {
+    testWidgets('automatic discovery connects, then moves a file across', (
+      tester,
+    ) async {
       // The picker seam is a static, so it is put back however this test ends.
       // `addTearDown` and not `tearDown`: the latter declares a hook and only
       // works while the suite is still being declared, so calling it from
@@ -34,32 +36,23 @@ void main() {
       addTearDown(PickerResolution.reset);
       final picker = ScriptedPicker.install();
       final hub = MemoryBeaconHub();
-      // Alice receives, so she listens on the Pairing port — which is what a
-      // receiving Device does in the shipped configuration. Bob is a guest
-      // and can take any free port.
-      //
-      // The port is Alice's own rather than the well-known one. `flutter
-      // test` runs the test files side by side, and another file stands a
-      // Device up on the well-known Pairing port; the two would race for it,
-      // and the loser would fail a test that has nothing wrong with it. The
-      // guest still dials the port Alice announced, because a Device says
-      // where it answers — see the `pairingPort` in the beacon.
+      // Alice's ephemeral Pairing port keeps this file from racing another
+      // widget test for the well-known port. Discovery advertises whichever
+      // port a Device actually bound.
       final alice = await startUiDevice(tester, hub.a, 'Alice', pairingPort: 0);
       final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
 
-      await pairThroughWindows(
+      await waitForAutomaticConnection(
         tester,
         windowA,
         windowB,
-        hostDevice: alice,
-        guestDevice: bob,
+        leftDevice: alice,
+        rightDevice: bob,
       );
 
-      // Both windows now say they are in a group, which is the user-visible
-      // proof that the two clicks did what they promised — and the Session the
-      // guest opened after confirming is already up on both sides, so there is
-      // nothing to dial by hand before sending.
+      // Both windows now report the connection Discovery established. There
+      // was no Pair button, request dialog or confirmation step.
 
       // A file big enough to cross several chunks, so framing and reassembly
       // are on the path rather than one message that happens to fit.
@@ -199,15 +192,15 @@ void main() {
       final bob = await startUiDevice(tester, hub.b, 'Bob');
       await pumpTwoWindows(tester, alice, bob);
 
-      await pairThroughWindows(
+      await waitForAutomaticConnection(
         tester,
         windowA,
         windowB,
-        hostDevice: alice,
-        guestDevice: bob,
+        leftDevice: alice,
+        rightDevice: bob,
       );
-      // The Session the guest opened after confirming is already up on both
-      // sides, so there is nothing to dial by hand before mirroring.
+      // Discovery has already opened the Session, so there is nothing to dial
+      // by hand before mirroring.
       for (final window in [windowA, windowB]) {
         await openTab(tester, l10n.tabClipboard, window: window);
         await tester.tap(
@@ -218,14 +211,10 @@ void main() {
       expect(alice.controller.clipboardMode, ClipboardMode.mirror);
       expect(bob.controller.clipboardMode, ClipboardMode.mirror);
 
-      // Pairing got these two into one Owner Group, and that is as far as it
-      // goes: the clipboard is shared only with the Devices each side has
-      // added to the list on the Clipboard surface, and that list starts empty.
-      // Each Device adds the other, which is what the two users would do — done
-      // through the controller rather than by ticking the boxes, because what
-      // is under test *here* is that a copy crosses a real socket once the
-      // consent exists, and the boxes themselves are covered by the Clipboard
-      // surface's own widget test.
+      // Automatic connection got these two into one Owner Group, and that is
+      // as far as it goes: the clipboard is shared only with the Devices each
+      // side has added on the Clipboard surface, and that list starts empty.
+      // Each Device adds the other, which is what the two users would do.
       alice.controller.setClipboardPeer(bob.fingerprint, value: true);
       bob.controller.setClipboardPeer(alice.fingerprint, value: true);
       await tester.pump();
@@ -260,19 +249,21 @@ void main() {
       // Two groups on one machine. Carol dials Bob's address — the only thing
       // the Manual Address path gives up, since nothing was discovered to pin —
       // so the handshake is what has to turn her away.
+      final firstHub = MemoryBeaconHub();
       final alice = await startUiDevice(
         tester,
-        MemoryBeaconHub().a,
+        firstHub.a,
         'Alice',
         // A free port of Alice's own, for the same reason as the two tests
         // above: the well-known Pairing port belongs to whoever gets there
         // first, and this file must not depend on being first.
         pairingPort: 0,
       );
-      final bob = await startUiDevice(tester, MemoryBeaconHub().a, 'Bob');
+      final bob = await startUiDevice(tester, firstHub.b, 'Bob');
       await pairDevices(tester, alice, bob);
-      final carol = await startUiDevice(tester, MemoryBeaconHub().a, 'Carol');
-      final dave = await startUiDevice(tester, MemoryBeaconHub().a, 'Dave');
+      final secondHub = MemoryBeaconHub();
+      final carol = await startUiDevice(tester, secondHub.a, 'Carol');
+      final dave = await startUiDevice(tester, secondHub.b, 'Dave');
       await pairDevices(tester, carol, dave);
 
       await pumpWindow(tester, carol);
@@ -309,8 +300,18 @@ void main() {
             .isNotEmpty,
         description: 'the refusal to be shown to Carol',
       );
-      expect(carol.controller.sessions, isEmpty);
-      expect(bob.controller.sessions, isEmpty);
+      expect(
+        carol.controller.sessions.any(
+          (session) => session.peer == bob.fingerprint,
+        ),
+        isFalse,
+      );
+      expect(
+        bob.controller.sessions.any(
+          (session) => session.peer == carol.fingerprint,
+        ),
+        isFalse,
+      );
 
       await shutdown(tester, [alice, bob, carol, dave]);
     });

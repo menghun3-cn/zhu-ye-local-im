@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-10-08-connect-from-the-conversation-list.md) | 中文
 
+> **部分被取代**：
+> [发现设备后自动连接](../bug-fix/2026-10-23-discovery-connects-automatically.zh.md)
+> —— 发现的设备仍会进入对话列表，但信任与第一条会话已经自动建立。列表只保留
+> 「连接」作为重试，不再提供「配对」。
+
 ## Problem
 
 一次对话是怎么开始的，本来有三个毛病，而这三个毛病其实是同一件事的三个侧面。

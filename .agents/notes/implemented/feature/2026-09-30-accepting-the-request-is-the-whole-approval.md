@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-09-30-accepting-the-request-is-the-whole-approval.zh.md)
 
+> **Superseded** by
+> [Discovery connects automatically](../bug-fix/2026-10-23-discovery-connects-automatically.md):
+> there is no request button to press. Discovery starts the exchange and the
+> receiving controller admits it.
+
 ## Problem
 
 Pairing had already lost the typed code, but it still ended in a comparison:

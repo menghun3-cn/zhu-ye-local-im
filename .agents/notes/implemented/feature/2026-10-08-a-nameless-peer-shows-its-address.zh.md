@@ -2,6 +2,11 @@
 
 Status: implemented
 
+> **部分被取代**：
+> [发现设备后自动连接](../bug-fix/2026-10-23-discovery-connects-automatically.zh.md)
+> —— 对端名称里回退到地址的规则仍保留，但使用 `callerAddress` 和
+> `pairingRequestUnnamed` 的配对弹窗已经不存在。
+
 ## Problem
 
 一台应答了 Discovery 却没有报上 Alias 的设备，在界面上是一片空白；而两台这样的设备

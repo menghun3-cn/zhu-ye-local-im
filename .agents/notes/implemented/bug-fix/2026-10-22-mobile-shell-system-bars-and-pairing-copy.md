@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-10-22-mobile-shell-system-bars-and-pairing-copy.zh.md)
 
+> **Superseded in part** by
+> [Discovery connects automatically](2026-10-23-discovery-connects-automatically.md):
+> the `SafeArea` decision remains, while the listening fact now reports
+> automatic-connection readiness rather than the old pairing boundary copy.
+
 ## Problem
 
 The home shell deliberately has no `AppBar`, but its `Scaffold.body` drew the

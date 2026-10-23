@@ -23,7 +23,7 @@
     "conversationDisconnected",
     "aboutUpdateNotes",
     "conversationEmpty",
-    "pairingRequestClaimHint",
+    "automaticConnectionsBody",
     "peerNameNotAnnounced",
     "clipboardPeersHint",
     "transfersEmptyHint",

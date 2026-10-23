@@ -18,8 +18,8 @@ export 'views.dart';
 /// ## What it owns
 ///
 /// * a [DiscoveryService] over an injected [BeaconTransport];
-/// * a [PairingService] over an injected [ProfileStore], answering Pairing
-///   requests for as long as the profile says to;
+/// * a [PairingService] over an injected [ProfileStore], answering every
+///   discovered Device's automatic Pairing attempt;
 /// * a [LinkManager] — but only once this Device holds a group secret, because
 ///   a Device with no secret has nothing to authenticate a peer with, so it
 ///   serves no Sessions and announces no port;
@@ -43,11 +43,12 @@ export 'views.dart';
 /// that question exists for — a file is something the user goes looking for
 /// later, and where it was filed is worth being asked about.
 ///
-/// It never answers a Pairing request on the user's behalf either. A Device that
-/// dialled this one arrives on [pairingRequests] and waits there; only
-/// [PairingRequest.admit] or [PairingRequest.refuse] settles it. That is the
-/// whole reason a Device can answer requests while nobody is sitting at it: the
-/// listener is permanent, but nothing is admitted without a tap.
+/// It treats discovery as the connection gesture. Once another copy of the
+/// application is visible on the local link, the two Devices prove their Owner
+/// identities, establish a group secret and open a Session automatically.
+/// Sending still requires choosing a recipient, file acceptance stays a
+/// per-Transfer decision, and sharing the clipboard remains a separate
+/// per-Device opt-in.
 final class LocalTransferController {
   /// Builds a controller over the seams a platform provides.
   ///
@@ -193,8 +194,6 @@ final class LocalTransferController {
   /// than relying on this stream to be patient.
   final StreamController<IncomingTransfer> _incoming =
       StreamController<IncomingTransfer>.broadcast();
-  final StreamController<PairingRequest> _pairingRequests =
-      StreamController<PairingRequest>.broadcast();
   final Map<String, _WiredSession> _wired = {};
   final List<_Tracked> _transfers = [];
   final List<MessageRecord> _history = [];
@@ -251,13 +250,6 @@ final class LocalTransferController {
   /// whose landing directory only the user can name.
   Stream<IncomingTransfer> get incoming => _incoming.stream;
 
-  /// Devices asking to pair with this one, in arrival order.
-  ///
-  /// A question rather than an event: whoever is listening has to answer it,
-  /// because the Device on the other end is waiting. Emitted only while this
-  /// Device is answering requests — see [acceptsPairingRequests].
-  Stream<PairingRequest> get pairingRequests => _pairingRequests.stream;
-
   /// Everything that went wrong in a way that was not fatal, newest last.
   ///
   /// Refusals and notices the core layers report through `onNotice` land here,
@@ -283,18 +275,10 @@ final class LocalTransferController {
   /// Whether a peer can be dialled, i.e. whether this Device is serving.
   bool get isServing => _manager?.isServing ?? false;
 
-  /// Whether this Device is set to answer Pairing requests at all.
-  ///
-  /// The user's intent. Distinct from [isAcceptingPairings], which is whether
-  /// the listener is actually up: the two differ when the port is taken — by a
-  /// second copy of this app on one host, which cannot be dialled either.
-  bool get acceptsPairingRequests =>
-      _local?.profile.acceptsPairingRequests ?? false;
+  /// Whether this Device can accept automatic connections right now.
+  bool get isAutomaticConnectionsReady => _pairing?.isReceiving ?? false;
 
-  /// Whether this Device is answering Pairing requests right now.
-  bool get isAcceptingPairings => _pairing?.isReceiving ?? false;
-
-  /// The port Pairing requests are answered on, or null when not answering.
+  /// The port automatic Pairing attempts are answered on, if one is bound.
   int? get pairingPort => _pairing?.receivingPort;
 
   /// The port Sessions are accepted on, or null when not serving.
@@ -402,6 +386,9 @@ final class LocalTransferController {
           sessionPort: entry.sessionPort,
           pairingPort: entry.pairingPort,
           isConnected: entry.connected,
+          isConnecting:
+              _autoPairing.contains(entry.fingerprint.hex) ||
+              _autoConnecting.contains(entry.fingerprint.hex),
           isInGroup: profile.group.contains(entry.fingerprint),
           isFavorite: profile.isFavorite(entry.fingerprint),
           lastSeen: entry.lastSeen,
@@ -599,14 +586,16 @@ final class LocalTransferController {
         // Not `_notice` directly: a stream's error handler has to accept an
         // Object, and that mismatch is a run-time failure rather than a
         // compile-time one.
-        onError: (Object error) => _notice('pairing failed: $error'),
+        onError: (Object error) =>
+            _notice('automatic connection failed: $error'),
       ),
     );
-    // Requests are forwarded into this controller's own stream rather than
-    // handed out directly: a listener that subscribes before `start` has
-    // finished would otherwise be talking to a service that does not exist yet,
-    // and would never hear the first request.
-    _watch.add(pairing.requests.listen(_pairingRequests.add));
+    _watch.add(
+      pairing.requests.listen(
+        (request) => unawaited(_acceptPairingAutomatically(request)),
+        onError: (Object error) => _notice('automatic pairing failed: $error'),
+      ),
+    );
     await _syncLayers();
     await _syncPairingListener();
     _startReconnectSweep();
@@ -635,36 +624,14 @@ final class LocalTransferController {
     await _pairing?.close();
     await _clipboard?.close();
     if (!_incoming.isClosed) await _incoming.close();
-    if (!_pairingRequests.isClosed) await _pairingRequests.close();
     if (!_changes.isClosed) await _changes.close();
   }
 
-  /// Sets whether this Device answers Pairing requests, and persists it.
+  /// Pairs with a Device that answers automatic attempts at [host].
   ///
-  /// Turning it off takes the listener down; turning it back on tries to bring
-  /// it up. Either way the preference is written, so a Device that was told not
-  /// to answer does not quietly start answering again after a restart.
-  Future<void> setAcceptsPairingRequests(bool value) async {
-    final local = _requireLocal();
-    if (local.profile.acceptsPairingRequests == value) return;
-    local.profile.acceptsPairingRequests = value;
-    await _syncPairingListener();
-    await _persist();
-    _notify();
-  }
-
-  /// Pairs with a Device that is answering requests at [host], without a code.
-  ///
-  /// The initiating side of the click-to-pair flow: [host] is the address
-  /// Discovery saw the Device at, and the exchange ends wherever the other
-  /// user's answer leaves it — refused, or resolved to an attempt this side
-  /// then confirms. [port] defaults to the well-known Pairing port, which is
-  /// where a Device answers requests — the port to dial is the *peer's*, not
-  /// this Device's own binding, which is why it is not read from this
-  /// controller's configuration.
-  ///
-  /// Resolving is not being paired: it waits for the other user to allow the
-  /// request, and throws [PairingException] if they refuse or never answer.
+  /// This is the lower-level initiating half used by automatic discovery and
+  /// by tests. Resolving still leaves the attempt to be confirmed by both sides;
+  /// the controller performs that confirmation automatically.
   Future<PairingAttempt> pairWith({required String host, int? port}) =>
       _requirePairing().joinOpen(
         host: host,
@@ -1231,30 +1198,21 @@ final class LocalTransferController {
     }
   }
 
-  /// Makes the Pairing listener match the profile.
-  ///
-  /// Called wherever [acceptsPairingRequests] can have changed, so the listener
-  /// and the switch cannot disagree — a Device that says it is not answering
-  /// but is would be the kind of lie that costs trust in the whole screen.
+  /// Brings the automatic Pairing listener up.
   ///
   /// Failing to bind is reported rather than raised: the usual cause is a
   /// second copy of the app on one host, and that user can still dial out and
   /// pair, so an unanswerable Device is a degraded one rather than a broken
-  /// one. [isAcceptingPairings] stays honest about which of the two it is.
+  /// one. [isAutomaticConnectionsReady] stays honest about which it is.
   Future<void> _syncPairingListener() async {
     final pairing = _pairing;
     final local = _local;
     if (pairing == null || local == null || _closed) return;
-    final wanted = local.profile.acceptsPairingRequests;
-    if (wanted == pairing.isReceiving) return;
+    if (pairing.isReceiving) return;
     try {
-      if (wanted) {
-        await _servePairingLayer(pairing);
-      } else {
-        await pairing.stopReceiving();
-      }
+      await _servePairingLayer(pairing);
     } on Object catch (error) {
-      _notice('this Device cannot answer Pairing requests: $error');
+      _notice('this Device cannot accept automatic connections: $error');
     }
     await _syncDiscovery(_announcedDescriptor());
   }
@@ -1272,8 +1230,8 @@ final class LocalTransferController {
       if (_pairingPort == 0) rethrow;
       final port = await pairing.receive(port: 0);
       _notice(
-        'pairing port $_pairingPort could not be bound; '
-        'answering on $port instead',
+        'automatic connection port $_pairingPort could not be bound; '
+        'listening on $port instead',
       );
     }
   }
@@ -1364,6 +1322,13 @@ final class LocalTransferController {
   /// How many consecutive automatic attempts have failed, by fingerprint hex.
   final Map<String, int> _autoFailures = {};
 
+  /// Peers for which this Device is currently establishing automatic trust.
+  final Set<String> _autoPairing = {};
+
+  /// Backoff for discovery handshakes that could not be completed.
+  final Map<String, int> _autoPairFailures = {};
+  final Map<String, int> _autoPairDue = {};
+
   /// The timer that keeps the open Sessions in step with the paired peers.
   Timer? _reconnectTimer;
 
@@ -1380,29 +1345,17 @@ final class LocalTransferController {
   /// paired and not connected, and a connected peer is left alone.
   static const Duration _reconnectInterval = Duration(seconds: 2);
 
-  /// Opens Sessions to every paired peer Discovery has placed.
+  /// Establishes trust and opens Sessions for every reachable peer.
   ///
-  /// A paired Device that has just been discovered is not a stranger to be
-  /// introduced: the user already paired it, and the Session it needs is the
-  /// same one the Connect button opens, so the controller opens it on the
-  /// user's behalf. Both ends try, because neither knows which direction the
-  /// network allows — a Device whose inbound is firewalled cannot be reached,
-  /// but it can still do the reaching — and two dials to one peer resolve the
-  /// way the Session layer always resolves a duplicate: one Session survives,
-  /// and the loser finds the peer connected instead.
-  ///
-  /// Discovery only emits on a visible change — a peer that is new, or new
-  /// where it is — so this does not fire on every routine announce. An
-  /// attempt that fails is not retried here: the sweep comes back, and the
-  /// pause between attempts grows with every failure, so a Device that is
-  /// switched off costs less and less attention the longer it stays off. The
-  /// Connect button stays on the conversation row, and a firewall is not
-  /// worth a notice every time the app starts.
+  /// Discovery only emits on a visible change, so this runs immediately when
+  /// a peer appears. The periodic sweep covers the cases discovery cannot:
+  /// start-up order, a lost Session, and an outage that ends at the same
+  /// address without producing an event.
   void _autoConnectPeers() {
     _reconcilePeers();
   }
 
-  /// Brings the set of open Sessions in line with the paired peers.
+  /// Brings trust and Sessions in line with the Devices on the local link.
   ///
   /// Called on every discovery change *and* on a timer, because neither
   /// alone is enough to bring a Session back after a network outage:
@@ -1428,8 +1381,36 @@ final class LocalTransferController {
   void _reconcilePeers() {
     final local = _local;
     if (local == null || _closed) return;
+    final discovered = {
+      for (final peer in _discovered) peer.fingerprint.hex: peer,
+    };
+    // A profile can keep its roster while losing the secret that makes the
+    // roster usable. That Device cannot dial itself out of the state; the
+    // discovery handshake is what restores the missing half.
+    if (!local.hasGroupSecret) {
+      for (final peer in _discovered) {
+        if (local.profile.self == peer.fingerprint) continue;
+        if (_maybePairAutomatically(peer)) break;
+      }
+      return;
+    }
     for (final peer in local.profile.group.members) {
       if (peer == local.profile.self) continue;
+      final visible = discovered[peer.hex];
+      // A remembered member that advertises no Session port has either lost
+      // its group state or has not finished coming up. The discovery handshake
+      // is what restores it, and must happen before there is anything to dial.
+      if (visible != null &&
+          visible.pairingPort != null &&
+          visible.sessionPort == null) {
+        _maybePairAutomatically(visible);
+        continue;
+      }
+      // The Device that initiated the discovery handshake owns the first
+      // Session dial. Letting the sweep dial here at the same time creates a
+      // second connection in each direction; each end can then keep a
+      // different one and close the other, leaving neither Session usable.
+      if (_autoPairing.contains(peer.hex)) continue;
       if (_wired.containsKey(peer.hex)) continue;
       // A peer that is being dialled right now is left alone: a second dial
       // to the same peer would lose the race to the one already running, and
@@ -1440,6 +1421,119 @@ final class LocalTransferController {
       if (!_autoConnecting.add(peer.hex)) continue;
       unawaited(_autoConnect(peer));
     }
+    for (final peer in _discovered) {
+      if (local.profile.self == peer.fingerprint) continue;
+      if (local.profile.group.contains(peer.fingerprint)) continue;
+      _maybePairAutomatically(peer);
+    }
+  }
+
+  /// Starts the one discovery handshake for a pair, when this side owns it.
+  ///
+  /// Both Devices see the other and both run this method. Only the smaller
+  /// Fingerprint dials, so a fresh pair cannot create two random group secrets
+  /// at once. The other side accepts the request automatically.
+  bool _maybePairAutomatically(DiscoveredPeer peer) {
+    final local = _local;
+    if (local == null || _closed || _pairing == null) return false;
+    if (local.profile.self.compareTo(peer.fingerprint) >= 0) return false;
+    if (peer.pairingPort == null) return false;
+    if (!_autoPairing.add(peer.fingerprint.hex)) return false;
+    final due = _autoPairDue[peer.fingerprint.hex];
+    if (due != null && _sweeps < due) {
+      _autoPairing.remove(peer.fingerprint.hex);
+      return false;
+    }
+    _notify();
+    unawaited(_autoPair(peer));
+    return true;
+  }
+
+  /// One automatic trust exchange followed by an automatic Session.
+  Future<void> _autoPair(DiscoveredPeer peer) async {
+    var paired = false;
+    try {
+      final attempt = await pairWith(
+        host: peer.address.address,
+        port: peer.pairingPort,
+      );
+      if (attempt.peer.fingerprint != peer.fingerprint) {
+        await attempt.cancel();
+        throw const PairingException(
+          'the Device that answered did not match the one discovery found',
+        );
+      }
+      await _confirmPairing(attempt);
+      paired = true;
+      _autoPairFailures.remove(peer.fingerprint.hex);
+      _autoPairDue.remove(peer.fingerprint.hex);
+    } on Object {
+      // Automatic trust is best effort on this sweep. It is retried with the
+      // same bounded backoff as a Session dial, rather than shown as a modal
+      // interruption the user did not ask for.
+      _schedulePairRetry(peer.fingerprint);
+    }
+    if (!paired) {
+      _autoPairing.remove(peer.fingerprint.hex);
+      _notify();
+      return;
+    }
+    try {
+      await connectAfterPairing(peer.fingerprint);
+    } on Object {
+      _scheduleRetry(peer.fingerprint);
+    } finally {
+      _autoPairing.remove(peer.fingerprint.hex);
+      _notify();
+    }
+  }
+
+  /// Accepts a discovery handshake from the peer that dialled this Device.
+  Future<void> _acceptPairingAutomatically(PairingRequest request) async {
+    PairingAttempt? attempt;
+    final peer = request.caller.fingerprint;
+    _autoPairing.add(peer.hex);
+    _notify();
+    try {
+      attempt = await request.admit();
+      if (attempt.peer.fingerprint != peer) {
+        throw const PairingException(
+          'the Device that answered did not match the one it announced',
+        );
+      }
+      await _confirmPairing(attempt);
+      // The peer that initiated the handshake also dials the first Session.
+      // If that direction is blocked, the reconnect sweep will try this
+      // direction once this Device leaves _autoPairing.
+    } on Object {
+      if (attempt != null) {
+        await attempt.cancel();
+      } else {
+        await request.refuse();
+      }
+    } finally {
+      _autoPairing.remove(peer.hex);
+      _notify();
+    }
+  }
+
+  /// Serializes commits so two discovery handshakes cannot overwrite rosters.
+  Future<PairingOutcome> _confirmPairing(PairingAttempt attempt) {
+    final run = _pairingChain
+        .catchError((Object _) {})
+        .then((_) => attempt.confirm());
+    _pairingChain = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
+  }
+
+  Future<void> _pairingChain = Future<void>.value();
+
+  void _schedulePairRetry(Fingerprint peer) {
+    final failures = (_autoPairFailures[peer.hex] ?? 0) + 1;
+    _autoPairFailures[peer.hex] = failures;
+    final sweeps = 1 << (failures - 1);
+    _autoPairDue[peer.hex] =
+        _sweeps + (sweeps > _maxRetrySweeps ? _maxRetrySweeps : sweeps);
   }
 
   /// One automatic connect: one dial, and a note of when to try again.
@@ -1465,6 +1559,10 @@ final class LocalTransferController {
         return;
       }
       _scheduleRetry(peer);
+      final visible = _discoveredPeerFor(peer);
+      if (visible != null && visible.pairingPort != null) {
+        _maybePairAutomatically(visible);
+      }
     } on SocketException {
       // Nothing listening where the beacon said, or the peer is
       // unreachable from here; the next sweep, or the peer's own dial,
@@ -1480,9 +1578,18 @@ final class LocalTransferController {
       }
       // No address for the peer yet; the next beacon brings one.
       _scheduleRetry(peer);
+      final visible = _discoveredPeerFor(peer);
+      if (visible != null) _maybePairAutomatically(visible);
     } finally {
       _autoConnecting.remove(peer.hex);
     }
+  }
+
+  DiscoveredPeer? _discoveredPeerFor(Fingerprint peer) {
+    for (final discovered in _discovered) {
+      if (discovered.fingerprint == peer) return discovered;
+    }
+    return null;
   }
 
   /// Notes that a peer's dial failed, and when to try again.
@@ -1539,9 +1646,6 @@ final class LocalTransferController {
     _clipboard?.setGroup(next.profile.group);
     _clipboard?.setAllowedPeers(next.profile.clipboardPeers);
     unawaited(_syncLayersSafely());
-    // A profile written by something other than [setAcceptsPairingRequests] —
-    // restored from disk, say — must not leave the listener behind the switch.
-    unawaited(_syncPairingListener());
     _notify();
   }
 

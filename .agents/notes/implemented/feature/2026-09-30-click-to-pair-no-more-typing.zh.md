@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-09-30-click-to-pair-no-more-typing.md) | 中文
 
+> **部分被取代**：
+> [发现设备后自动连接](../bug-fix/2026-10-23-discovery-connects-automatically.zh.md)
+> —— 现在自动发现会直接开始配对，不需要点击或人工准入。开放配对的密钥协商，以及
+> 由发起端拨出会话，仍然按本篇所述。
+
 ## Problem
 
 打包出来的应用第一次真机试用就撞上了：Join 对话框要求填地址、端口和一个

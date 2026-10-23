@@ -7,7 +7,6 @@ import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../conversation_view.dart';
-import '../dialogs.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
@@ -362,7 +361,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
   String _subtitleFor(PeerView peer, AppLocalizations l10n) {
     final address = describePeerAddress(peer, l10n);
     if (peer.isConnected) return address;
-    return '$address · ${l10n.conversationDisconnected}';
+    return '$address · '
+        '${peer.isConnecting ? l10n.connectingAutomatically : l10n.conversationDisconnected}';
   }
 
   /// How wide the list is drawn, once every limit is applied.
@@ -472,12 +472,9 @@ class _Conversation {
 /// A row in the conversation list: who it is, where it got to, and what can be
 /// done with it.
 ///
-/// This row carries the whole of connecting. A found Device appears here before
-/// anybody has done anything about it, and the one button that matters is on
-/// the row: Connect when there is an address to dial and a group to dial into,
-/// Pair when the Device is not in the group yet — pairing is how a Device gets
-/// in — and nothing when there is neither, because a button that can only fail
-/// is worse than no button.
+/// Discovery establishes group trust and connects automatically. A discovered
+/// Device appears here with no admission action; Connect remains only as a
+/// retry for a known member that is visibly diallable but not connected.
 ///
 /// The facts are read the same way the Devices card reads them, so the two
 /// surfaces cannot disagree about what a row is offering.
@@ -502,8 +499,8 @@ class _ConversationTile extends StatelessWidget {
   /// it without arranging a whole conversation to produce it.
   final int unread;
 
-  /// Used to dial, and to open the pairing window. The tile is the only place a
-  /// Session is started from, so it needs the controller and not just the view.
+  /// Used to retry a Session dial. The tile needs the controller rather than
+  /// only the view so that retry can call it.
   final LocalTransferController controller;
 
   final VoidCallback onTap;
@@ -676,22 +673,14 @@ class _ConversationTile extends StatelessWidget {
 
   /// What the user can do with this peer from its conversation row.
   ///
-  /// Dialling needs both an address to dial and a peer in the group: a Device
-  /// from somebody else's group would fail the handshake, so offering the
-  /// button would be offering a failure. Pairing needs only an address — the
-  /// whole point of it is to bring a Device that is not in the group in.
-  ///
-  /// A Device can also be in this Owner Group without answering on a Session
-  /// port. That is what a stale or one-sided membership looks like: this side
-  /// remembers the Device as a member, while the Device itself has lost its
-  /// group secret and therefore serves no Session. It has an address and can
-  /// answer Pairing requests, so Pair again is the way back; without this case
-  /// the row offers neither Connect nor Pair.
+  /// Discovery establishes membership and opens the Session on its own. A
+  /// Connect button remains only as a retry when a known member is visibly
+  /// diallable but not connected yet; there is deliberately no Pair or Pair
+  /// again action to put the user back into the old admission flow.
   _PeerAction? _actionFor(PeerView peer) {
     if (peer.isConnected) return null;
     if (peer.isInGroup && peer.isDiallable) return _PeerAction.connect;
-    if (peer.address == null) return null;
-    return peer.isInGroup ? _PeerAction.repairPairing : _PeerAction.pair;
+    return null;
   }
 
   /// The row's action button, when it has one.
@@ -705,28 +694,12 @@ class _ConversationTile extends StatelessWidget {
   ) {
     if (action == null) return null;
     return Tooltip(
-      message: switch (action) {
-        _PeerAction.connect => l10n.openSession,
-        _PeerAction.pair ||
-        _PeerAction.repairPairing => l10n.pairWithThisDevice,
-      },
-      child: switch (action) {
-        _PeerAction.connect => _RowAction(
-          label: l10n.connect,
-          primary: true,
-          onPressed: () => guarded(context, () => _connect(context)),
-        ),
-        _PeerAction.pair => _RowAction(
-          label: l10n.pair,
-          primary: false,
-          onPressed: () => showPairWithPeerDialog(context, controller, peer),
-        ),
-        _PeerAction.repairPairing => _RowAction(
-          label: l10n.repairPairing,
-          primary: false,
-          onPressed: () => showPairWithPeerDialog(context, controller, peer),
-        ),
-      },
+      message: l10n.openSession,
+      child: _RowAction(
+        label: l10n.connect,
+        primary: true,
+        onPressed: () => guarded(context, () => _connect(context)),
+      ),
     );
   }
 
@@ -746,7 +719,13 @@ class _ConversationTile extends StatelessWidget {
       // already in a group with but cannot reach says as much as it can.
       if (peer.isConnected) return null;
       return Text(
-        peer.isDiallable ? l10n.nothingKnownAboutPeer : l10n.nothingToDialYet,
+        peer.isConnecting
+            ? l10n.connectingAutomatically
+            : peer.isDiallable
+            ? l10n.autoReconnectPending
+            : peer.address == null
+            ? l10n.nothingToDialYet
+            : l10n.autoConnectingSoon,
         style: TextStyle(
           fontSize: WeChat.fontSizeMeta,
           color: colors.secondaryText,
@@ -774,7 +753,7 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-enum _PeerAction { connect, pair, repairPairing }
+enum _PeerAction { connect }
 
 /// A row that answers the mouse the way the desktop client's list does.
 ///
