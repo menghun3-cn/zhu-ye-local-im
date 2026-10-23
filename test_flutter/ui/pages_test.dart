@@ -22,6 +22,18 @@ import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
 
+Finder _settingsIdentityField(TestWindow window) =>
+    onPage(window, SettingsPage, find.byType(TextFormField));
+
+Finder _settingsIncomingField(TestWindow window) => onPage(
+  window,
+  SettingsPage,
+  find.ancestor(
+    of: find.byTooltip(l10n.changeIncomingFolder),
+    matching: find.byType(TextField),
+  ),
+);
+
 void main() {
   group('the Devices surface', () {
     testWidgets('explains that discovered Devices connect automatically', (
@@ -63,6 +75,12 @@ void main() {
         onPage(windowA, DevicesPage, find.text(l10n.groupDevices(1))),
         findsOneWidget,
       );
+      // The platform did not report an address in this test, so the card says
+      // that rather than leaving a blank line where the address belongs.
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.localIpUnavailable)),
+        findsOneWidget,
+      );
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.byAddress)),
         findsOneWidget,
@@ -71,6 +89,31 @@ void main() {
         onPage(windowA, DevicesPage, find.byType(SwitchListTile)),
         findsNothing,
         reason: 'automatic connections have no opt-out switch',
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('shows every local address above the listening line', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        localAddresses: const ['192.168.1.24', '10.0.0.24'],
+      );
+      await pumpWindow(tester, device);
+      await openTab(tester, l10n.tabDevices, window: windowA);
+
+      expect(
+        onPage(windowA, DevicesPage, find.text(l10n.localIpAddress)),
+        findsOneWidget,
+      );
+      expect(
+        onPage(windowA, DevicesPage, find.text('192.168.1.24 · 10.0.0.24')),
+        findsOneWidget,
+        reason: 'the user can read the address another Device should dial',
       );
 
       await shutdown(tester, [device]);
@@ -662,7 +705,7 @@ void main() {
   });
 
   group('the Settings surface', () {
-    testWidgets('reports what this Device is and where things go', (
+    testWidgets('reports where things go without repeating the Devices card', (
       tester,
     ) async {
       final device = await startUiDevice(
@@ -678,32 +721,59 @@ void main() {
       await pumpWindow(tester, device, size: tallWindow);
       await openTab(tester, l10n.tabSettings, window: windowA);
 
+      // Identity belongs to the Devices surface. Repeating the name and
+      // Fingerprint here only made two places that can disagree.
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.settingsThisDevice)),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(onPage(windowA, SettingsPage, find.text('Alice')), findsOneWidget);
-      // The full Fingerprint, because it is the one thing a user can read out
-      // loud to tell two Devices apart.
+      expect(onPage(windowA, SettingsPage, find.text('Alice')), findsNothing);
       expect(
         onPage(
           windowA,
           SettingsPage,
           find.text(device.controller.self.fingerprint.hex),
         ),
+        findsNothing,
+      );
+      expect(
+        onPage(windowA, SettingsPage, find.text(l10n.factIdentity)),
         findsOneWidget,
       );
       expect(
-        onPage(
-          windowA,
-          SettingsPage,
-          find.text('C:/profiles/alice/profile.json'),
+        onPage(windowA, SettingsPage, find.text(l10n.factReceivedFiles)),
+        findsOneWidget,
+      );
+
+      final identity = tester.widget<TextFormField>(
+        _settingsIdentityField(windowA),
+      );
+      final incoming = tester.widget<TextField>(
+        _settingsIncomingField(windowA),
+      );
+      expect(identity.initialValue, 'C:/profiles/alice/profile.json');
+      expect(incoming.readOnly, isFalse);
+      expect(incoming.controller!.text, 'C:/downloads/LocalTransfer');
+
+      // Both paths wear the same field: a readonly fact must not look like a
+      // different kind of control from the folder the user can choose.
+      final identityField = tester.widget<TextField>(
+        find.descendant(
+          of: _settingsIdentityField(windowA),
+          matching: find.byType(TextField),
         ),
-        findsOneWidget,
+      );
+      expect(identityField.readOnly, isTrue);
+      expect(identityField.decoration!.filled, isTrue);
+      expect(
+        identityField.decoration!.fillColor,
+        incoming.decoration!.fillColor,
       );
       expect(
-        onPage(windowA, SettingsPage, find.text('C:/downloads/LocalTransfer')),
-        findsOneWidget,
+        (identityField.decoration!.enabledBorder! as OutlineInputBorder)
+            .borderRadius,
+        (incoming.decoration!.enabledBorder! as OutlineInputBorder)
+            .borderRadius,
       );
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.nothingWentWrong)),
@@ -721,8 +791,10 @@ void main() {
       await openTab(tester, l10n.tabSettings, window: windowA);
 
       expect(
-        onPage(windowA, SettingsPage, find.text(l10n.notStoredOnThisDevice)),
-        findsOneWidget,
+        tester
+            .widget<TextFormField>(_settingsIdentityField(windowA))
+            .initialValue,
+        l10n.notStoredOnThisDevice,
       );
       // A Device that will forget its pairing on restart has to say so, rather
       // than let the user find out the hard way.
@@ -760,7 +832,7 @@ void main() {
 
       // The field belongs to the page rather than to a dialog: the path can be
       // read and edited without opening anything first.
-      final field = onPage(windowA, SettingsPage, find.byType(TextField));
+      final field = _settingsIncomingField(windowA);
       expect(
         tester.widget<TextField>(field).controller!.text,
         'C:/downloads/LocalTransfer',
@@ -865,6 +937,50 @@ void main() {
 
       await shutdown(tester, [device]);
     });
+
+    testWidgets('the hourly update choice fits a narrow Android window', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        platform: DevicePlatform.android,
+        controlsWindow: false,
+      );
+      await pumpWindow(tester, device, size: const Size(360, 800));
+      await openTab(tester, l10n.tabSettings, window: windowA);
+
+      expect(
+        onPage(windowA, SettingsPage, find.text(l10n.updateIntervalHourly)),
+        findsOneWidget,
+      );
+      final segments = tester.widget<SegmentedButton<UpdateCheckInterval>>(
+        onPage(
+          windowA,
+          SettingsPage,
+          find.byType(SegmentedButton<UpdateCheckInterval>),
+        ),
+      );
+      expect(segments.selected, {UpdateCheckInterval.hourly});
+      // Scrolling the choices sideways is the deliberate fallback for a narrow
+      // phone: the control keeps its natural width instead of squeezing the
+      // labels into a misaligned second line.
+      final scroller = tester.widget<SingleChildScrollView>(
+        onPage(
+          windowA,
+          SettingsPage,
+          find.ancestor(
+            of: find.byType(SegmentedButton<UpdateCheckInterval>),
+            matching: find.byType(SingleChildScrollView),
+          ),
+        ),
+      );
+      expect(scroller.scrollDirection, Axis.horizontal);
+      expect(tester.takeException(), isNull);
+
+      await shutdown(tester, [device]);
+    });
   });
 
   group('the Conversations surface', () {
@@ -885,6 +1001,181 @@ void main() {
       );
 
       await shutdown(tester, [device]);
+    });
+
+    testWidgets('searches message text and attachment names', (tester) async {
+      final hub = MemoryBeaconHub();
+      final inbox = tempDirectory('local-transfer-search-in-');
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(
+        tester,
+        hub.b,
+        'Bob',
+        defaultIncomingDirectory: inbox.path,
+      );
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      await sendText(
+        tester,
+        alice,
+        'a message with a searchable needle',
+        to: bob.fingerprint,
+      );
+      final home = tempDirectory('local-transfer-search-out-');
+      final picture = File(
+        '${home.path}${Platform.pathSeparator}attachment-needle.png',
+      );
+      await writePng(tester, picture, width: 8, height: 8);
+      await tester.runAsync(() => alice.controller.sendImage(picture));
+      await pumpUntil(
+        tester,
+        () => bob.controller.transfers.any(
+          (view) => view.names.contains('attachment-needle.png'),
+        ),
+        description: 'the named attachment to reach Bob',
+      );
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'Alice to appear in the conversation list',
+      );
+      final search = onPage(
+        windowA,
+        ConversationsPage,
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.hintText == l10n.searchConversations,
+        ),
+      );
+      expect(search, findsOneWidget);
+
+      await tester.enterText(search, 'searchable needle');
+      await tester.pump();
+      expect(
+        conversationListed(windowA, 'Alice'),
+        isTrue,
+        reason: 'a conversation is found by what was said in it',
+      );
+
+      await tester.enterText(search, 'attachment-needle.png');
+      await tester.pump();
+      expect(
+        conversationListed(windowA, 'Alice'),
+        isTrue,
+        reason: 'a conversation is also found by the name of a sent file',
+      );
+
+      await tester.enterText(search, 'nothing-matches-this');
+      await tester.pump();
+      expect(conversationListed(windowA, 'Alice'), isFalse);
+      expect(find.text(l10n.conversationSearchEmpty), findsOneWidget);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('clearing the open chat asks first and leaves it empty', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await sendText(tester, alice, 'remove this message', to: bob.fingerprint);
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'Alice to appear in the conversation list',
+      );
+      await openConversation(tester, windowA, name: 'Alice');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('remove this message'),
+        ).evaluate().isNotEmpty,
+        description: 'the message to be open in the conversation',
+      );
+
+      final menu = onPage(
+        windowA,
+        ConversationsPage,
+        find.byIcon(Icons.more_horiz),
+      );
+      expect(menu, findsOneWidget);
+      await tester.tap(menu);
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.clearConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation menu to open',
+      );
+      // The item is in the tree while the popup is still animating, and the
+      // route ignores pointers until that animation is done.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.clearConversation)));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the clearing confirmation to open',
+      );
+      expect(find.text(l10n.clearConversationConfirmTitle), findsOneWidget);
+
+      await tapDialogButton(tester, l10n.cancel, window: windowA);
+      await pumpUntil(
+        tester,
+        () => !dialogIsOpen(windowA),
+        description: 'the cancellation to close',
+      );
+      expect(
+        onConversation(windowA, find.text('remove this message')).evaluate(),
+        isNotEmpty,
+        reason: 'answering no must not delete anything',
+      );
+
+      await tester.tap(menu);
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.clearConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation menu to open again',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.clearConversation)));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the clearing confirmation to open again',
+      );
+      await tester.tap(
+        windowA.within(find.text(l10n.clearConversationConfirmAction)),
+      );
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('remove this message'),
+        ).evaluate().isEmpty,
+        description: 'the confirmed clear to remove the message',
+      );
+      expect(
+        onConversation(windowA, find.text(l10n.conversationEmpty)).evaluate(),
+        isNotEmpty,
+      );
+
+      await shutdown(tester, [alice, bob]);
     });
 
     testWidgets('a connected Device shows up without pressing anything', (
@@ -2337,7 +2628,7 @@ void main() {
   });
 
   group('showing a landed file in its folder', () {
-    testWidgets('a received file offers its folder on a right-click', (
+    testWidgets('a completed file offers its folder from the card and a menu', (
       tester,
     ) async {
       // The real revealer hands over to Explorer, so the seam stands in for it:
@@ -2391,8 +2682,24 @@ void main() {
         description: 'the landed file to appear on the Transfers surface',
       );
 
-      // Nothing is offered while the file is still a question, and this one is
-      // not — so the only menu a right-click can raise is the folder action.
+      // The card itself carries the folder action at its trailing edge. This is
+      // the direct route: no menu, no right-click, just the place the file went.
+      final folderAction = onPage(
+        windowA,
+        TransfersPage,
+        find.byTooltip(l10n.openContainingFolder),
+      );
+      expect(folderAction, findsOneWidget);
+      await tester.tap(folderAction);
+      await pumpUntil(
+        tester,
+        () => revealer.revealed.isNotEmpty,
+        description: 'the card action to open the containing folder',
+      );
+      expect(revealer.revealed.single, landed);
+
+      // The same action remains in the context menu, so a user who reaches for
+      // the file name is not made to find the icon instead.
       await rightClick(
         tester,
         onPage(windowA, TransfersPage, find.text('report.bin')),
@@ -2409,10 +2716,10 @@ void main() {
       await tester.tap(windowA.within(find.text(l10n.openContainingFolder)));
       await pumpUntil(
         tester,
-        () => revealer.revealed.isNotEmpty,
+        () => revealer.revealed.length == 2,
         description: 'the folder to be opened',
       );
-      expect(revealer.revealed.single, landed);
+      expect(revealer.revealed.last, landed);
 
       await shutdown(tester, [alice, bob]);
     });

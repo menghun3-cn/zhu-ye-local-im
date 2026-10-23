@@ -545,4 +545,87 @@ void main() {
 
     expect(find.text(l10n.updateFailureHandover), findsOneWidget);
   });
+
+  testWidgets('Android downloads the APK and opens the system installer', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    final installer = ScriptedUpdateInstaller.replace(
+      supported: true,
+      restartsApplication: false,
+      prepared: const PreparedUpdate.android('LocalTransfer-9.9.9-android.apk'),
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+
+    expect(find.text(l10n.aboutUpdateInstallAndroid), findsOneWidget);
+    expect(find.text(l10n.aboutUpdateInstallHintAndroid), findsOneWidget);
+
+    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pumpUntilAsked(tester);
+
+    expect(find.text(l10n.aboutUpdateConfirmTitleAndroid), findsOneWidget);
+    expect(
+      find.text(l10n.aboutUpdateConfirmBodyAndroid('9.9.9')),
+      findsOneWidget,
+    );
+    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
+
+    expect(installer.applied.single.package, 'LocalTransfer-9.9.9-android.apk');
+    // Opening the installer is a hand-off, not the end of this process. Once
+    // the system page has been opened the card returns to a usable state so a
+    // cancelled install can be tried again with the APK already downloaded.
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text(l10n.aboutUpdateReadyAndroid), findsOneWidget);
+    final installButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, l10n.aboutUpdateInstallAndroid),
+    );
+    expect(installButton.onPressed, isNotNull);
+  });
+
+  testWidgets('Android explains a missing install permission', (tester) async {
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      restartsApplication: false,
+      prepared: const PreparedUpdate.android('LocalTransfer-9.9.9-android.apk'),
+      applyFailure: UpdateInstallFailure.permission,
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pumpUntilAsked(tester);
+    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
+
+    expect(find.text(l10n.updateFailurePermission), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutUpdateInstallAndroid),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('Android explains when the system installer did not open', (
+    tester,
+  ) async {
+    ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      restartsApplication: false,
+      prepared: const PreparedUpdate.android('LocalTransfer-9.9.9-android.apk'),
+      applyFailure: UpdateInstallFailure.installer,
+    );
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pumpUntilAsked(tester);
+    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
+
+    expect(find.text(l10n.updateFailureInstaller), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
 }

@@ -44,6 +44,16 @@ const String guardedFrom = '0.1.8';
 /// ones this test holds to.
 void main() {
   group('the changelog', () {
+    test('matches an English subject to a translated release note', () {
+      final release = Release('test', ['发现设备后自动建立设备组信任和会话。']);
+      final commit = Commit(
+        '0000000',
+        'fix: connect discovered devices automatically',
+      );
+
+      expect(release.mentions(commit), isTrue);
+    });
+
     test('has a version for every tag', () {
       final changelog = File('CHANGELOG.md').readAsLinesSync();
       final releases = readReleases(changelog);
@@ -116,7 +126,9 @@ final class Release {
     final fragments = distinguishingFragments(commit.subject);
     if (fragments.isEmpty) return true;
     for (final bullet in bullets) {
-      if (fragments.any(bullet.contains)) return true;
+      // Fragments are lower-cased. An authored bullet may capitalise the same
+      // word, and that is the same mention.
+      if (fragments.any(bullet.toLowerCase().contains)) return true;
     }
     return false;
   }
@@ -287,6 +299,18 @@ Set<String> distinguishingFragments(String subject) {
   final text = subject.replaceFirst(RegExp(r'^[a-z]+(\([^)]*\))?!?: '), '');
   final fragments = <String>{};
 
+  // Commit subjects are commonly English while the changelog is Chinese. Keep
+  // the names of recurring features searchable in both languages, so a
+  // translated release note is not reported as missing its commit.
+  const translated = <String, String>{
+    'automatically': '自动',
+    'connect': '连接',
+    'discovered': '发现',
+    'discovery': '发现',
+    'device': '设备',
+    'devices': '设备',
+  };
+
   // Latin words of four letters or more. Short words are excluded because
   // they are common to sentences that have nothing to do with each other —
   // the point of a fragment is to be distinctive.
@@ -294,6 +318,8 @@ Set<String> distinguishingFragments(String subject) {
     r'[A-Za-z][A-Za-z0-9_\-]{3,}',
   ).allMatches(text).map((m) => m.group(0)!.toLowerCase())) {
     fragments.add(word);
+    final translation = translated[word];
+    if (translation != null) fragments.add(translation);
   }
 
   // Pairs of Chinese characters: the shortest run of Chinese that can carry

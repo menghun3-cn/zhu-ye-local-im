@@ -16,6 +16,7 @@ import 'package:test/test.dart';
 /// that can be pinned on a Windows machine, and the part that would otherwise
 /// rot the moment somebody tidied a constant.
 const String _seamsPath = 'lib/ui/seams.dart';
+const String _androidInstallerPath = 'lib/ui/android_package_installer.dart';
 const String _kotlinPath =
     'android/app/src/main/kotlin/io/menghun3_cn/zhu_ye_local_im/MainActivity.kt';
 const String _manifestPath = 'android/app/src/main/AndroidManifest.xml';
@@ -191,6 +192,40 @@ void main() {
         contains('android.permission.INTERNET'),
         reason: 'without INTERNET every socket throws on Android',
       );
+    });
+  });
+
+  group('the Android update installer bridge', () {
+    test('Dart and Kotlin name the same channel and method', () {
+      final dart = _read(_androidInstallerPath);
+      final kotlin = _read(_kotlinPath);
+      final channel = _capture(
+        dart,
+        RegExp(r"androidUpdateChannel\s*=\s*MethodChannel\(\s*'([^']+)'"),
+        'the Android update channel',
+      );
+      final method = _capture(
+        dart,
+        RegExp(r"installApkMethod\s*=\s*'([^']+)'"),
+        'the Android install method',
+      );
+
+      expect(channel, 'cn.hnasct.local_transfer/update');
+      expect(kotlin, contains('"$channel"'));
+      expect(kotlin, contains('"$method"'));
+    });
+
+    test('the manifest grants the provider and install permission', () {
+      final manifest = _read(_manifestPath);
+      final paths = _read('android/app/src/main/res/xml/update_paths.xml');
+      final kotlin = _read(_kotlinPath);
+
+      expect(manifest, contains('android.permission.REQUEST_INSTALL_PACKAGES'));
+      expect(manifest, contains(r'${applicationId}.update_file_provider'));
+      expect(kotlin, contains(r'"$packageName.update_file_provider"'));
+      expect(paths, contains('path="update/"'));
+      expect(kotlin, contains('canRequestPackageInstalls()'));
+      expect(kotlin, contains('Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES'));
     });
   });
 }

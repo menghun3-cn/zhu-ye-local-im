@@ -101,6 +101,17 @@ void FlutterWindow::HandleHostMethodCall(
     return;
   }
 
+  if (method == "setUnread") {
+    const bool* value = std::get_if<bool>(call.arguments());
+    if (value == nullptr) {
+      result->Error("bad_arguments", "setUnread expects a bool");
+      return;
+    }
+    host_shell_.set_unread(*value);
+    result->Success();
+    return;
+  }
+
   result->NotImplemented();
 }
 
@@ -126,6 +137,21 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_ACTIVATE: {
+      const bool active = LOWORD(wparam) != WA_INACTIVE;
+      if (active) {
+        // The taskbar marker is about a window the user is not looking at.
+        // Clearing it here happens in the same message that gives the window
+        // focus, rather than after a round trip through Dart.
+        host_shell_.set_unread(false);
+      }
+      if (host_channel_) {
+        host_channel_->InvokeMethod(
+            "windowActive",
+            std::make_unique<flutter::EncodableValue>(active));
+      }
+      break;
+    }
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

@@ -216,6 +216,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '还没有发现任何设备。同一网络里运行本程序的设备会显示在这里；自动发现不到的设备，也可以按地址直接连接。';
 
   @override
+  String get localIpAddress => '本机 IP';
+
+  @override
+  String get localIpUnavailable => '暂时读不到本机地址';
+
+  @override
   String get rename => '重命名';
 
   @override
@@ -608,11 +614,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutUpdateHandingOver => '正在替换本目录并重启…';
 
   @override
+  String get aboutUpdateInstalling => '正在打开系统安装器…';
+
+  @override
   String get aboutUpdateFailedTitle => '更新没有完成';
 
   @override
   String get aboutUpdateInstallHint =>
       '点「下载并更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「更新并重启」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
+
+  @override
+  String get aboutUpdateInstallAndroid => '下载并安装';
+
+  @override
+  String get aboutUpdateInstallHintAndroid =>
+      '点「下载并安装」：程序把 APK 下载到应用自己的目录，按发布方公布的校验值核一遍，然后问一句「安装更新」——确认后会打开系统安装器。第一次安装时，系统可能会先让你允许本应用安装未知应用。';
 
   @override
   String get aboutUpdateConfirmTitle => '更新并重启？';
@@ -626,7 +642,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutUpdateConfirmApply => '更新并重启';
 
   @override
+  String get aboutUpdateConfirmTitleAndroid => '安装更新？';
+
+  @override
+  String aboutUpdateConfirmBodyAndroid(String version) {
+    return '新版本 $version 已经下载完成，并核对过发布方公布的校验值。点「打开安装器」：系统会接管安装，完成后可以重新打开本应用。';
+  }
+
+  @override
+  String get aboutUpdateConfirmApplyAndroid => '打开安装器';
+
+  @override
   String get aboutUpdateReady => '更新包已就绪。再点一次「下载并更新」即可安装，不用重新下载。';
+
+  @override
+  String get aboutUpdateReadyAndroid => '安装包已就绪。再点一次「下载并安装」即可打开系统安装器，不用重新下载。';
+
+  @override
+  String get aboutHowToUpgradeAndroid =>
+      '升级方式：点「下载并安装」获取并校验 APK，再交给系统安装器；也可以打开下载页手动下载。';
 
   @override
   String get updateFailureUnsupported => '这个平台不能自己替换，请手动下载新版本。';
@@ -651,6 +685,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateFailureHandover => '上一次替换没有完成。请手动下载新版本，解压后覆盖本目录。';
+
+  @override
+  String get updateFailurePermission =>
+      '还没有获得「安装未知应用」权限。请在系统设置里允许本应用安装未知应用，然后回来再点一次。';
+
+  @override
+  String get updateFailureInstaller => '系统安装器没有打开。请重试，或打开下载页手动安装 APK。';
 
   @override
   String get railUpdate => '更新';
@@ -706,6 +747,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get conversationListEmpty => '还没有对话。附近运行本程序的设备被发现后，会自动建立连接并出现在这里。';
+
+  @override
+  String get searchConversations => '搜索对话内容';
+
+  @override
+  String get conversationSearchEmpty => '没有找到匹配的对话或消息。';
+
+  @override
+  String get clearSearch => '清除搜索';
+
+  @override
+  String get clearConversation => '清空聊天记录';
+
+  @override
+  String get clearConversationConfirmTitle => '清空聊天记录？';
+
+  @override
+  String get clearConversationConfirmBody =>
+      '这个对话里的文字、文件和图片记录都会从本机清除，无法撤销。剪贴板记录不受影响。';
+
+  @override
+  String get clearConversationConfirmAction => '清空';
 
   @override
   String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';

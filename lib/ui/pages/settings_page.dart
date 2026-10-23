@@ -5,13 +5,33 @@ import 'package:flutter/material.dart';
 import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
-import '../dialogs.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../pickers.dart';
 import '../seams.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
+
+InputDecoration _pathDecoration({
+  required WeChatColors colors,
+  required String hintText,
+  required Widget suffixIcon,
+}) => InputDecoration(
+  isDense: true,
+  filled: true,
+  fillColor: colors.surfaceSunken,
+  hintText: hintText,
+  suffixIcon: suffixIcon,
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(WeChat.controlRadius),
+    borderSide: BorderSide(color: colors.divider),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(WeChat.controlRadius),
+    borderSide: BorderSide(color: colors.brandStrong),
+  ),
+  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+);
 
 /// Where received files land, as something the user can type into.
 ///
@@ -94,9 +114,9 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
 
   /// Opens the platform's own folder chooser and takes its answer.
   ///
-  /// The picker seam rather than [askForDirectory]: there is nothing left to
-  /// confirm in a dialog, because the field the answer lands in is already on
-  /// screen and already editable.
+  /// The picker seam rather than a confirmation dialog: there is nothing left
+  /// to confirm, because the field the answer lands in is already on screen
+  /// and already editable.
   Future<void> _browse() async {
     final chosen = await PickerResolution.picker.directory();
     if (chosen == null) return;
@@ -129,27 +149,13 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
           // Any keystroke may be the one that makes the box unsaved, so the
           // line under it has to be redrawn as the user types.
           onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true,
-            fillColor: colors.surfaceSunken,
+          decoration: _pathDecoration(
+            colors: colors,
             hintText: l10n.noDefaultFolder,
             suffixIcon: IconButton(
               tooltip: l10n.changeIncomingFolder,
               onPressed: () => unawaited(_browse()),
               icon: const Icon(Icons.folder_open_outlined, size: 18),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(WeChat.controlRadius),
-              borderSide: BorderSide(color: colors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(WeChat.controlRadius),
-              borderSide: BorderSide(color: colors.brandStrong),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 10,
             ),
           ),
         ),
@@ -161,6 +167,45 @@ class _IncomingFolderFieldState extends State<_IncomingFolderField> {
                 : chosen == null
                 ? l10n.incomingFolderUnset
                 : l10n.incomingFolderHint,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The identity file's location, in the same field shape as the folder the
+/// user can edit. The lock is the only difference: the path is a fact about
+/// where this Device keeps its secret, not a preference.
+class _IdentityPathField extends StatelessWidget {
+  const _IdentityPathField({required this.path});
+
+  final String? path;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.factIdentity,
+          style: TextStyle(
+            fontSize: WeChat.fontSizePreview,
+            color: colors.secondaryText,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          initialValue: path ?? l10n.notStoredOnThisDevice,
+          readOnly: true,
+          enableInteractiveSelection: true,
+          style: const TextStyle(fontSize: WeChat.fontSizeInput),
+          decoration: _pathDecoration(
+            colors: colors,
+            hintText: l10n.notStoredOnThisDevice,
+            suffixIcon: const Icon(Icons.lock_outline, size: 18),
           ),
         ),
       ],
@@ -181,60 +226,12 @@ class SettingsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
     final colors = WeChatColors.of(context);
-    final self = controller.self;
-    final port = controller.listenPort;
     final notices = controller.notices;
     final profilePath = seams.profilePath;
 
     return ListView(
       padding: WeChat.pagePadding,
       children: [
-        SectionHeader(title: l10n.settingsThisDevice),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(WeChat.cardPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FactLine(l10n.factAlias, self.alias),
-                // The whole Fingerprint, selectable: it is the one thing a
-                // user can read out loud to tell two Devices apart, and the
-                // short form is for lists, not for this.
-                FactLine(l10n.factFingerprint, self.fingerprint.hex),
-                FactLine(l10n.factPlatform, self.platform.displayName),
-                FactLine(
-                  l10n.factOwnerGroup,
-                  l10n.groupDevices(self.groupLength),
-                ),
-                FactLine(
-                  l10n.factSessions,
-                  l10n.sessionsOpen(self.openSessions),
-                ),
-                FactLine(
-                  l10n.factListening,
-                  port != null
-                      ? l10n.onPort(port)
-                      : controller.isPaired
-                      ? l10n.connectionNotReady
-                      : l10n.sessionsAutoConnectPending,
-                ),
-                FactLine(
-                  l10n.factAutomaticConnections,
-                  controller.isAutomaticConnectionsReady
-                      ? l10n.automaticConnectionsReady
-                      : l10n.automaticConnectionsUnavailable,
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => showRenameDialog(context, controller),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: Text(l10n.renameThisDevice),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.settingsWhereThingsGo),
         Card(
           child: Padding(
@@ -242,12 +239,9 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FactLine(
-                  l10n.factIdentity,
-                  profilePath ?? l10n.notStoredOnThisDevice,
-                ),
+                _IdentityPathField(path: profilePath),
                 if (profilePath == null) HintText(l10n.noIdentityHint),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _IncomingFolderField(
                   controller: controller,
                   platformDefault: seams.defaultIncomingDirectory,
@@ -361,31 +355,39 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  SegmentedButton<UpdateCheckInterval>(
-                    segments: [
-                      for (final choice in [
-                        (UpdateCheckInterval.hourly, l10n.updateIntervalHourly),
-                        (
-                          UpdateCheckInterval.everySixHours,
-                          l10n.updateIntervalSixHours,
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<UpdateCheckInterval>(
+                      showSelectedIcon: false,
+                      segments: [
+                        for (final choice in [
+                          (
+                            UpdateCheckInterval.hourly,
+                            l10n.updateIntervalHourly,
+                          ),
+                          (
+                            UpdateCheckInterval.everySixHours,
+                            l10n.updateIntervalSixHours,
+                          ),
+                          (UpdateCheckInterval.daily, l10n.updateIntervalDaily),
+                          (
+                            UpdateCheckInterval.everyThreeDays,
+                            l10n.updateIntervalThreeDays,
+                          ),
+                        ])
+                          ButtonSegment<UpdateCheckInterval>(
+                            value: choice.$1,
+                            label: Text(choice.$2),
+                          ),
+                      ],
+                      selected: {controller.updateCheckInterval},
+                      onSelectionChanged: (selection) => unawaited(
+                        guarded(
+                          context,
+                          () => controller.setUpdateCheckInterval(
+                            selection.first,
+                          ),
                         ),
-                        (UpdateCheckInterval.daily, l10n.updateIntervalDaily),
-                        (
-                          UpdateCheckInterval.everyThreeDays,
-                          l10n.updateIntervalThreeDays,
-                        ),
-                      ])
-                        ButtonSegment<UpdateCheckInterval>(
-                          value: choice.$1,
-                          label: Text(choice.$2),
-                        ),
-                    ],
-                    selected: {controller.updateCheckInterval},
-                    onSelectionChanged: (selection) => unawaited(
-                      guarded(
-                        context,
-                        () =>
-                            controller.setUpdateCheckInterval(selection.first),
                       ),
                     ),
                   ),

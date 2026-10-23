@@ -131,6 +131,14 @@ class _TransferCard extends StatelessWidget {
                   label: Text(labelForState(view.state, l10n)),
                   visualDensity: VisualDensity.compact,
                 ),
+                if (view.state == TransferState.completed &&
+                    canRevealTransfer(view))
+                  IconButton(
+                    tooltip: l10n.openContainingFolder,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => unawaited(revealTransfer(context, view)),
+                    icon: const Icon(Icons.folder_open_outlined, size: 20),
+                  ),
               ],
             ),
             const SizedBox(height: 4),

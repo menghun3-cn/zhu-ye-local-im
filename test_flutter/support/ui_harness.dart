@@ -165,6 +165,9 @@ Future<UiDevice> startUiDevice(
   String? profilePath,
   ProfileStore? profileStore,
   String? defaultIncomingDirectory,
+  String? localHostname,
+  List<String> localAddresses = const [],
+  String? appDataDirectory,
   DevicePlatform platform = DevicePlatform.windows,
   MessageStore? messageStore,
   // The recording stand-in specifically, rather than any [HostShell]: this
@@ -221,6 +224,9 @@ Future<UiDevice> startUiDevice(
         clipboard: clipboard,
         platform: platform,
         defaultIncomingDirectory: defaultIncomingDirectory,
+        localHostname: localHostname,
+        localAddresses: localAddresses,
+        appDataDirectory: appDataDirectory,
         hostShell: host,
         controlsWindow: controlsWindow,
       ),
@@ -1237,9 +1243,11 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   /// with [failure] when there is nothing ready.
   ScriptedUpdateInstaller({
     this.supported = false,
+    this.restartsApplication = true,
     this.progress = const [],
     this.prepared,
     this.failure,
+    this.applyFailure,
     this.leftOver,
     this.hold,
   });
@@ -1247,6 +1255,11 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   /// Whether this stand-in says it can replace the build it is running in.
   @override
   final bool supported;
+
+  /// Whether applying the update ends and relaunches this process. Windows
+  /// does; Android opens the system package installer and returns.
+  @override
+  final bool restartsApplication;
 
   /// What is reported to the caller before the answer.
   final List<UpdateInstallProgress> progress;
@@ -1256,6 +1269,9 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
 
   /// What [prepare] fails with when it has nothing ready.
   final UpdateInstallFailure? failure;
+
+  /// What [apply] fails with, or null to succeed.
+  final UpdateInstallFailure? applyFailure;
 
   /// What [previousFailure] answers.
   final UpdateInstallFailure? leftOver;
@@ -1278,17 +1294,21 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   /// would silently answer for the next test in the file.
   static ScriptedUpdateInstaller replace({
     bool supported = false,
+    bool restartsApplication = true,
     List<UpdateInstallProgress> progress = const [],
     PreparedUpdate? prepared,
     UpdateInstallFailure? failure,
+    UpdateInstallFailure? applyFailure,
     UpdateInstallFailure? leftOver,
     Completer<UpdatePrepareResult>? hold,
   }) {
     final installer = ScriptedUpdateInstaller(
       supported: supported,
+      restartsApplication: restartsApplication,
       progress: progress,
       prepared: prepared,
       failure: failure,
+      applyFailure: applyFailure,
       leftOver: leftOver,
       hold: hold,
     );
@@ -1324,7 +1344,15 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
     applied.add(update);
     // What the real one reports before it ends the process: the last thing the
     // old build gets to say.
-    onProgress(const UpdateInstallProgress(UpdateInstallStage.handingOver));
+    final failure = applyFailure;
+    if (failure != null) throw UpdateInstallException(failure);
+    onProgress(
+      UpdateInstallProgress(
+        restartsApplication
+            ? UpdateInstallStage.handingOver
+            : UpdateInstallStage.installing,
+      ),
+    );
   }
 }
 
@@ -1407,6 +1435,21 @@ class ScriptedHostShell implements HostShell {
   /// twice" and "it was told once" are different bugs, and only a list can tell
   /// them apart.
   final List<bool> closeToTray = [];
+
+  final StreamController<bool> _windowActivity =
+      StreamController<bool>.broadcast();
+
+  /// Every unread-marker value the app has pushed, oldest first.
+  final List<bool> unreadRequests = [];
+
+  @override
+  Stream<bool> get windowActivity => _windowActivity.stream;
+
+  /// Reports the window becoming active or inactive, as the runner does.
+  void emitWindowActivity(bool active) => _windowActivity.add(active);
+
+  @override
+  Future<void> setUnread(bool value) async => unreadRequests.add(value);
 
   /// What the app last asked the close button to do, or null for never.
   bool? get closeToTrayNow => closeToTray.isEmpty ? null : closeToTray.last;

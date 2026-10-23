@@ -290,4 +290,6 @@ String describeUpdateInstallFailure(
   UpdateInstallFailure.checksum => l10n.updateFailureChecksum,
   UpdateInstallFailure.unpack => l10n.updateFailureUnpack,
   UpdateInstallFailure.handover => l10n.updateFailureHandover,
+  UpdateInstallFailure.permission => l10n.updateFailurePermission,
+  UpdateInstallFailure.installer => l10n.updateFailureInstaller,
 };

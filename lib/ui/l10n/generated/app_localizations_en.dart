@@ -222,6 +222,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing has been discovered yet. Devices running this app on the same network appear here; one Discovery cannot reach can still be dialled by address.';
 
   @override
+  String get localIpAddress => 'This device\'s IP';
+
+  @override
+  String get localIpUnavailable => 'This device\'s address is unavailable';
+
+  @override
   String get rename => 'Rename';
 
   @override
@@ -637,11 +643,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutUpdateHandingOver => 'Replacing this folder and restarting…';
 
   @override
+  String get aboutUpdateInstalling => 'Opening the system installer…';
+
+  @override
   String get aboutUpdateFailedTitle => 'The update was not completed';
 
   @override
   String get aboutUpdateInstallHint =>
       'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
+
+  @override
+  String get aboutUpdateInstallAndroid => 'Download and install';
+
+  @override
+  String get aboutUpdateInstallHintAndroid =>
+      'Press Download and install: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.';
 
   @override
   String get aboutUpdateConfirmTitle => 'Update and restart?';
@@ -655,8 +671,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutUpdateConfirmApply => 'Update and restart';
 
   @override
+  String get aboutUpdateConfirmTitleAndroid => 'Install the update?';
+
+  @override
+  String aboutUpdateConfirmBodyAndroid(String version) {
+    return 'Version $version has been downloaded and checked against the checksum the release published. Press Open installer: Android takes over the installation, and you can reopen this app when it finishes.';
+  }
+
+  @override
+  String get aboutUpdateConfirmApplyAndroid => 'Open installer';
+
+  @override
   String get aboutUpdateReady =>
       'The update package is ready. Press Download and update again to install it — no new download.';
+
+  @override
+  String get aboutUpdateReadyAndroid =>
+      'The APK is ready. Press Download and install again to open the system installer — no new download.';
+
+  @override
+  String get aboutHowToUpgradeAndroid =>
+      'To upgrade: press Download and install to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.';
 
   @override
   String get updateFailureUnsupported =>
@@ -689,6 +724,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateFailureHandover =>
       'A previous replacement did not finish. Download the new version by hand and unpack it over this folder.';
+
+  @override
+  String get updateFailurePermission =>
+      'This app is not yet allowed to install unknown apps. Allow it in Android Settings, then come back and press the button again.';
+
+  @override
+  String get updateFailureInstaller =>
+      'The system installer did not open. Try again, or open the download page and install the APK by hand.';
 
   @override
   String get railUpdate => 'Update';
@@ -746,6 +789,29 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get conversationListEmpty =>
       'No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.';
+
+  @override
+  String get searchConversations => 'Search conversation content';
+
+  @override
+  String get conversationSearchEmpty =>
+      'No conversation or message matches that search.';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String get clearConversation => 'Clear chat history';
+
+  @override
+  String get clearConversationConfirmTitle => 'Clear chat history?';
+
+  @override
+  String get clearConversationConfirmBody =>
+      'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.';
+
+  @override
+  String get clearConversationConfirmAction => 'Clear';
 
   @override
   String get conversationPickOne =>

@@ -69,11 +69,31 @@ final class FlutterSystemClipboard implements SystemClipboard {
 /// settings screen that cannot be drawn because a tray icon is unavailable.
 final class PlatformHostShell implements HostShell {
   /// Talks to the running host.
-  const PlatformHostShell();
+  PlatformHostShell() {
+    hostShellChannel.setMethodCallHandler(_handleHostCall);
+  }
+
+  final StreamController<bool> _activity = StreamController<bool>.broadcast();
+
+  Future<void> _handleHostCall(MethodCall call) async {
+    // The native side is the authority on whether its window currently has
+    // the user's attention. Dart only consumes the fact; it never guesses it
+    // from focus widgets, which is a different thing from the taskbar state.
+    if (call.method == 'windowActive' && call.arguments is bool) {
+      _activity.add(call.arguments as bool);
+    }
+  }
+
+  @override
+  Stream<bool> get windowActivity => _activity.stream;
 
   @override
   Future<void> setCloseToTray(bool value) =>
       _ask(hostShellChannel, arg: value, method: _setCloseToTrayMethod);
+
+  @override
+  Future<void> setUnread(bool value) =>
+      _ask(hostShellChannel, arg: value, method: _setUnreadMethod);
 
   @override
   Future<bool> autostartEnabled() async {
@@ -118,6 +138,9 @@ const String _autostartEnabledMethod = 'autostartEnabled';
 /// Makes starting with the system true or false. Takes a bool.
 const String _setAutostartMethod = 'setAutostart';
 
+/// Shows or clears the taskbar's unread marker. Takes a bool.
+const String _setUnreadMethod = 'setUnread';
+
 /// Everything the application needs from the platform it runs on.
 final class PlatformSeams {
   const PlatformSeams({
@@ -129,6 +152,9 @@ final class PlatformSeams {
     required this.clipboard,
     required this.platform,
     required this.defaultIncomingDirectory,
+    this.localHostname,
+    this.localAddresses = const [],
+    this.appDataDirectory,
     required this.hostShell,
     required this.controlsWindow,
   });
@@ -160,6 +186,15 @@ final class PlatformSeams {
 
   /// Where a Transfer lands when the user has not said otherwise.
   final String? defaultIncomingDirectory;
+
+  /// The operating system's name for this machine, or null when unavailable.
+  final String? localHostname;
+
+  /// The non-loopback IPv4 addresses this machine currently has.
+  final List<String> localAddresses;
+
+  /// The private directory Android handed this app, or null elsewhere.
+  final String? appDataDirectory;
 
   /// The window and startup facts this host will change for the app.
   ///
@@ -228,22 +263,28 @@ Future<PlatformSeams> openPlatformSeams({
   Map<String, String>? environment,
   MethodChannel pathsChannel = defaultPathsChannel,
   BeaconTransport? beacon,
+  String? localHostname,
+  List<String>? localAddresses,
+  String? appDataDirectory,
 }) async {
   final running = platform ?? currentPlatform();
-  final appDataDirectory = running == DevicePlatform.android
-      ? await _readAppDataDirectory(pathsChannel)
-      : null;
+  final dataDirectory =
+      appDataDirectory ??
+      (running == DevicePlatform.android
+          ? await _readAppDataDirectory(pathsChannel)
+          : null);
   final host = environment ?? Platform.environment;
   final path = profileFilePath(
     platform: running,
     environment: host,
-    appDataDirectory: appDataDirectory,
+    appDataDirectory: dataDirectory,
   );
   final conversationPath = messageFilePath(
     platform: running,
     environment: host,
-    appDataDirectory: appDataDirectory,
+    appDataDirectory: dataDirectory,
   );
+  final addresses = localAddresses ?? await _localAddresses();
   return PlatformSeams(
     // A Device with nowhere to write runs with its identity in memory: it
     // still pairs and transfers, and it has to be paired again after a
@@ -262,18 +303,54 @@ Future<PlatformSeams> openPlatformSeams({
     defaultIncomingDirectory: defaultIncomingDirectory(
       platform: running,
       environment: host,
-      appDataDirectory: appDataDirectory,
+      appDataDirectory: dataDirectory,
     ),
+    localHostname: localHostname ?? _localHostname(),
+    localAddresses: List<String>.unmodifiable(addresses),
+    appDataDirectory: dataDirectory,
     // Not branched on the platform. Every platform gets the same object, and
     // the one that has not implemented the channel answers "nothing happened"
     // — which is the truth, and is also what a platform with no window should
     // do with a question about a tray icon.
-    hostShell: const PlatformHostShell(),
+    hostShell: PlatformHostShell(),
     // The one platform whose runner implements the channel. Written as a
     // comparison rather than as a list so that adding a platform is a decision
     // somebody has to make here, next to the reason it is not in the list.
     controlsWindow: running == DevicePlatform.windows,
   );
+}
+
+/// The operating system's host name, or null when it has none to offer.
+String? _localHostname() {
+  try {
+    final name = Platform.localHostname.trim();
+    return name.isEmpty ? null : name;
+  } on Object {
+    return null;
+  }
+}
+
+/// Every non-loopback IPv4 address on this machine, sorted and distinct.
+///
+/// A machine can have several — Wi-Fi, Ethernet, a VPN adapter — and the
+/// Devices surface shows all of them rather than guessing which one a peer
+/// can reach. A failed enumeration is an empty list, not a startup failure:
+/// identity and transfer still work, and the card says the address is unknown.
+Future<List<String>> _localAddresses() async {
+  try {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+    final addresses = <String>{
+      for (final interface in interfaces)
+        for (final address in interface.addresses)
+          if (address.type == InternetAddressType.IPv4) address.address,
+    }.toList()..sort();
+    return addresses;
+  } on Object {
+    return const [];
+  }
 }
 
 /// The private directory this app may write to, when the platform has one and

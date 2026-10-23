@@ -106,6 +106,16 @@ final class ConversationReading {
     if (last != null && !keep.contains(last)) lastPeer = null;
   }
 
+  /// Forgets everything about [peer]'s conversation.
+  ///
+  /// Used when the user clears the conversation itself: a watermark with no
+  /// messages to compare against is not history, and leaving it behind would
+  /// make a new first message look as though it had already been read.
+  void forget(Fingerprint peer) {
+    _openedThrough.remove(peer.hex);
+    if (lastPeer == peer.hex) lastPeer = null;
+  }
+
   /// This state as JSON.
   ///
   /// Times are written in UTC, like a message's: an ISO-8601 string with an
