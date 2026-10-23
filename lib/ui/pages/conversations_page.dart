@@ -480,6 +480,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
                           selected?.peer.fingerprint.hex,
                       unread: controller.unreadCount(entry.peer.fingerprint),
                       controller: controller,
+                      onDelete: () => _confirmClearConversation(
+                        context,
+                        entry.peer.fingerprint,
+                      ),
                       onTap: () => _open(entry.peer.fingerprint),
                     );
                   },
@@ -497,7 +501,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
     final needle = query.toLowerCase();
     final answer = <_Conversation>[];
     for (final entry in conversations) {
-      final nameMatches = entry.peer.displayName.toLowerCase().contains(needle);
+      final nameMatches =
+          _titleFor(entry.peer).toLowerCase().contains(needle) ||
+          entry.peer.displayName.toLowerCase().contains(needle);
       TransferView? matched;
       for (final view in entry.history) {
         final text = view.text?.toLowerCase();
@@ -530,8 +536,47 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// the user was on another surface — which the shell's `IndexedStack` does
   /// every time the controller ticks — is not being read by anybody.
   void _open(Fingerprint peer) {
-    setState(() => _selected = peer.hex);
+    setState(() {
+      _selected = peer.hex;
+      // Picking a row is the user choosing where to type next. The existing
+      // auto-focus edge sends the caret to the new composer without making a
+      // second click necessary.
+      _focusComposer = true;
+    });
     unawaited(ControllerScope.of(context).markConversationOpened(peer));
+  }
+
+  /// Confirms, then removes every message exchanged with [peer].
+  ///
+  /// Reuses the same confirmation wording the conversation-menu clear action
+  /// uses, so the two surfaces agree about what "delete this conversation"
+  /// means. Clipboard entries stay put, exactly as `clearConversation` promises.
+  Future<void> _confirmClearConversation(
+    BuildContext context,
+    Fingerprint peer,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = ControllerScope.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.clearConversationConfirmTitle),
+        content: Text(l10n.clearConversationConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.clearConversationConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await controller.clearConversation(peer);
+    }
   }
 }
 
@@ -584,6 +629,7 @@ class _ConversationTile extends StatelessWidget {
     required this.unread,
     required this.controller,
     required this.onTap,
+    required this.onDelete,
   });
 
   final _Conversation entry;
@@ -602,6 +648,9 @@ class _ConversationTile extends StatelessWidget {
   final LocalTransferController controller;
 
   final VoidCallback onTap;
+
+  /// Right-tap on this row: confirms and then clears this peer's conversation.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -630,6 +679,7 @@ class _ConversationTile extends StatelessWidget {
     return ConversationRow(
       selected: selected,
       onTap: onTap,
+      onSecondaryTap: onDelete,
       // The name is handed down so a test can name one row and reach only it.
       // Without it a finder for "Connect" would match every row on the list,
       // and the harness that drives these surfaces has to be able to say *which*
@@ -658,7 +708,7 @@ class _ConversationTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    peer.displayName,
+                    _titleFor(peer),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: WeChat.fontSizeTitle,
@@ -851,6 +901,17 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
+/// The row's primary line.
+///
+/// The address is the fact that tells two machines apart on the local network.
+/// An alias can be duplicated, while a row has only one line for identity. A
+/// peer Discovery has not placed yet has no address, so its display name stays
+/// as the fallback rather than leaving the row without a title.
+String _titleFor(PeerView peer) {
+  final address = peer.address;
+  return address == null || address.isEmpty ? peer.displayName : address;
+}
+
 enum _PeerAction { connect }
 
 /// A row that answers the mouse the way the desktop client's list does.
@@ -870,6 +931,7 @@ class ConversationRow extends StatefulWidget {
     required this.peer,
     required this.selected,
     required this.onTap,
+    this.onSecondaryTap,
     required this.child,
   });
 
@@ -878,6 +940,9 @@ class ConversationRow extends StatefulWidget {
 
   final bool selected;
   final VoidCallback onTap;
+
+  /// Right-tap on the row: opens the delete-conversation confirmation.
+  final VoidCallback? onSecondaryTap;
   final Widget child;
 
   @override
@@ -902,6 +967,7 @@ class _ConversationRowState extends State<ConversationRow> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
+        onSecondaryTapUp: (_) => widget.onSecondaryTap?.call(),
         child: Container(
           color: colour,
           // The row sizes to its content — the avatar, or the two lines of

@@ -1194,22 +1194,35 @@ void main() {
       // the Devices surface first.
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the connected Device to appear in the list',
       );
-      // Named by its address as well as its name, which is what tells two
-      // Machines claiming the same name apart.
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+
+      // Titled by its address, which is what tells two Machines claiming the
+      // same name apart. The alias remains the row's finder key rather than
+      // its visible line.
       expect(
-        onPage(
-          windowA,
-          ConversationsPage,
-          find.textContaining(InternetAddress.loopbackIPv4.address),
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text(bobView.address!),
+          ),
         ),
-        findsWidgets,
+        findsOneWidget,
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text('Bob'),
+          ),
+        ),
+        findsNothing,
+        reason: 'the alias must not remain the row title',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -1241,11 +1254,7 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
 
@@ -1267,8 +1276,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // The pane is a conversation: a composer to type in, and the empty-state
       // line the shared body draws.
@@ -1285,6 +1293,21 @@ void main() {
       expect(
         boardOver(onConversation(windowA, find.text(l10n.conversationEmpty))),
         findsOneWidget,
+      );
+
+      // Picking a row is choosing where to type: the caret is already in the
+      // composer, with no second click spent on the box.
+      await pumpUntil(
+        tester,
+        () =>
+            tester
+                .widget<TextField>(
+                  onConversation(windowA, find.byType(TextField)),
+                )
+                .focusNode
+                ?.hasFocus ??
+            false,
+        description: 'the composer to focus after picking a conversation',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -1310,11 +1333,7 @@ void main() {
       // trip to the Devices surface first.
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the found Device to appear in the conversation list',
       );
       // And it is a conversation rather than a row waiting for a tap: the
@@ -1518,15 +1537,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // Typed into the composer and sent, the way a user does it.
       await tester.enterText(
@@ -1606,15 +1620,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // The emoji button sits beside the file button; opening it shows the
       // faces, and picking one puts it in the composer.
@@ -1692,15 +1701,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // v0.1.10 and v0.1.11 sent a face as a payload of its own, and a peer
       // running one of those still sends that. The kind stays on the wire and
@@ -1741,15 +1745,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       final composer = onConversation(windowA, find.byType(TextField));
       await tester.tap(composer);
