@@ -1178,6 +1178,151 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
+    testWidgets('long-pressing a conversation asks first and clears it', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await sendText(tester, alice, 'long-press me', to: bob.fingerprint);
+
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to appear in the conversation list',
+      );
+
+      // A long press is the mobile gesture that stands in for the desktop
+      // right-click: it must offer the same delete confirmation.
+      await tester.longPress(conversationRow(windowA, 'Bob'));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the deleting confirmation to open',
+      );
+      expect(find.text(l10n.clearConversationConfirmTitle), findsOneWidget);
+
+      await tapDialogButton(tester, l10n.cancel, window: windowA);
+      await pumpUntil(
+        tester,
+        () => !dialogIsOpen(windowA),
+        description: 'the cancellation to close',
+      );
+      expect(
+        conversationListed(windowA, 'Bob'),
+        isTrue,
+        reason: 'answering no keeps the row and the messages',
+      );
+
+      await tester.longPress(conversationRow(windowA, 'Bob'));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the deleting confirmation to open again',
+      );
+      await tapDialogButton(
+        tester,
+        l10n.clearConversationConfirmAction,
+        window: windowA,
+      );
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('long-press me'),
+        ).evaluate().isEmpty,
+        description: 'the confirmed clear to remove the message',
+      );
+      // The peer is still connected, so its row stays — only the history is
+      // gone. Deleting a conversation is not the same as forgetting a Device.
+      expect(
+        conversationListed(windowA, 'Bob'),
+        isTrue,
+        reason: 'a connected conversation keeps its row',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets(
+      'deleting an offline conversation removes its row until the peer returns',
+      (tester) async {
+        final hub = MemoryBeaconHub();
+        final bobStore = MemoryProfileStore();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(
+          tester,
+          hub.b,
+          'Bob',
+          profileStore: bobStore,
+        );
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+        await sendText(tester, alice, 'last words', to: bob.fingerprint);
+
+        await pumpWindow(tester, alice);
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Bob'),
+          description: 'Bob to appear in the conversation list',
+        );
+
+        // Bob goes away, and with it the Session and the Discovery sighting.
+        await tester.runAsync(bob.controller.close);
+        await pumpUntil(tester, () {
+          for (final peer in alice.controller.peers) {
+            if (peer.fingerprint == bob.fingerprint) {
+              return !peer.isConnected && !peer.isDiallable;
+            }
+          }
+          return false;
+        }, description: 'Bob to become unreachable');
+
+        await tester.longPress(conversationRow(windowA, 'Bob'));
+        await pumpUntil(
+          tester,
+          () => dialogIsOpen(windowA),
+          description: 'the deleting confirmation to open',
+        );
+        await tapDialogButton(
+          tester,
+          l10n.clearConversationConfirmAction,
+          window: windowA,
+        );
+        await pumpUntil(
+          tester,
+          () => !conversationListed(windowA, 'Bob'),
+          description: 'the offline conversation to leave the list',
+        );
+        expect(
+          onConversation(windowA, find.text('last words')).evaluate(),
+          isEmpty,
+          reason: 'deleting a conversation clears its history',
+        );
+
+        // Bob comes back on the network; Discovery places him again, and the
+        // row the user deleted returns with the Device it belongs to.
+        final bobAgain = await startUiDevice(
+          tester,
+          hub.b,
+          'Bob',
+          profileStore: bobStore,
+        );
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Bob'),
+          description: 'the rediscovered peer to return to the list',
+        );
+
+        await shutdown(tester, [alice, bobAgain]);
+      },
+    );
+
     testWidgets('a connected Device shows up without pressing anything', (
       tester,
     ) async {
@@ -1194,22 +1339,35 @@ void main() {
       // the Devices surface first.
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the connected Device to appear in the list',
       );
-      // Named by its address as well as its name, which is what tells two
-      // Machines claiming the same name apart.
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+
+      // Titled by its address, which is what tells two Machines claiming the
+      // same name apart. The alias remains the row's finder key rather than
+      // its visible line.
       expect(
-        onPage(
-          windowA,
-          ConversationsPage,
-          find.textContaining(InternetAddress.loopbackIPv4.address),
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text(bobView.address!),
+          ),
         ),
-        findsWidgets,
+        findsOneWidget,
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text('Bob'),
+          ),
+        ),
+        findsNothing,
+        reason: 'the alias must not remain the row title',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -1241,11 +1399,7 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
 
@@ -1267,8 +1421,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // The pane is a conversation: a composer to type in, and the empty-state
       // line the shared body draws.
@@ -1285,6 +1438,21 @@ void main() {
       expect(
         boardOver(onConversation(windowA, find.text(l10n.conversationEmpty))),
         findsOneWidget,
+      );
+
+      // Picking a row is choosing where to type: the caret is already in the
+      // composer, with no second click spent on the box.
+      await pumpUntil(
+        tester,
+        () =>
+            tester
+                .widget<TextField>(
+                  onConversation(windowA, find.byType(TextField)),
+                )
+                .focusNode
+                ?.hasFocus ??
+            false,
+        description: 'the composer to focus after picking a conversation',
       );
 
       await shutdown(tester, [alice, bob]);
@@ -1310,11 +1478,7 @@ void main() {
       // trip to the Devices surface first.
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the found Device to appear in the conversation list',
       );
       // And it is a conversation rather than a row waiting for a tap: the
@@ -1518,15 +1682,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // Typed into the composer and sent, the way a user does it.
       await tester.enterText(
@@ -1606,15 +1765,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // The emoji button sits beside the file button; opening it shows the
       // faces, and picking one puts it in the composer.
@@ -1692,15 +1846,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       // v0.1.10 and v0.1.11 sent a face as a payload of its own, and a peer
       // running one of those still sends that. The kind stays on the wire and
@@ -1741,15 +1890,10 @@ void main() {
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
-        () => onPage(
-          windowA,
-          ConversationsPage,
-          find.text('Bob'),
-        ).evaluate().isNotEmpty,
+        () => conversationListed(windowA, 'Bob'),
         description: 'the conversation to be listed',
       );
-      await tester.tap(onPage(windowA, ConversationsPage, find.text('Bob')));
-      await settleRoute(tester);
+      await openConversation(tester, windowA, name: 'Bob');
 
       final composer = onConversation(windowA, find.byType(TextField));
       await tester.tap(composer);
