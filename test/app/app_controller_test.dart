@@ -1452,6 +1452,46 @@ void main() {
       },
     );
 
+    test(
+      'simultaneous dials leave a Session that can still transfer',
+      () async {
+        final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
+        final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+        await pairDirectly(alice, bob);
+
+        await Future.wait([
+          alice.controller
+              .connectTo(
+                address: InternetAddress.loopbackIPv4.address,
+                port: bob.controller.listenPort,
+              )
+              .then<void>((_) {}, onError: (Object _) {}),
+          bob.controller
+              .connectTo(
+                address: InternetAddress.loopbackIPv4.address,
+                port: alice.controller.listenPort,
+              )
+              .then<void>((_) {}, onError: (Object _) {}),
+        ]);
+
+        await until(
+          () =>
+              alice.controller.sessions.isNotEmpty &&
+              bob.controller.sessions.isNotEmpty,
+          description:
+              'both Devices to keep a Session after simultaneous dials',
+        );
+        await alice.controller.sendText('after the dial race');
+        await until(
+          () =>
+              bob.controller.transfers.isNotEmpty &&
+              bob.controller.transfers.single.state.isSettled,
+          description: 'Bob to receive a text over the surviving Session',
+        );
+        expect(bob.controller.transfers.single.text, 'after the dial race');
+      },
+    );
+
     test('refuses an address to dial when there is none', () async {
       final solo = await startDevice(MemoryBeaconHub().a, 'Solo');
       await expectLater(
