@@ -79,6 +79,26 @@ void main() {
       registry.close();
     });
 
+    test('a peer announcing its Pairing port is a visible change', () {
+      final registry = PeerRegistry(localFingerprint: me.fingerprint);
+      final beforePort = testDevice('alice', listenPort: 51001);
+      final afterPort = testDevice(
+        'alice',
+        listenPort: 51001,
+        pairingPort: 52001,
+      );
+
+      registry.observe(device: beforePort, address: here);
+      expect(
+        registry.observe(device: afterPort, address: here),
+        isTrue,
+        reason: 'automatic connection needs the newly announced port',
+      );
+      expect(registry.peers.single.pairingPort, 52001);
+
+      registry.close();
+    });
+
     test('a peer that goes quiet is dropped once its sighting ages out', () {
       var now = DateTime(2026, 9, 29, 12);
       final registry = PeerRegistry(

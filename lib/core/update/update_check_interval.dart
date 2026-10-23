@@ -35,7 +35,7 @@ enum UpdateCheckInterval {
   ///
   /// Null rather than a throw, and the caller takes the default: this comes
   /// out of a file an older version wrote, and a value a *newer* version
-  /// invented is not damage. Same rule as [DeviceProfile.acceptsPairingRequests].
+  /// invented is not damage.
   static UpdateCheckInterval? fromWireName(String name) {
     for (final interval in values) {
       if (interval.wireName == name) return interval;

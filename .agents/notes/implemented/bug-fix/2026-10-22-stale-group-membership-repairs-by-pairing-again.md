@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-10-22-stale-group-membership-repairs-by-pairing-again.zh.md)
 
+> **Superseded** by
+> [Discovery connects automatically](2026-10-23-discovery-connects-automatically.md):
+> a discovered Device restores the missing secret automatically. Pair again is
+> no longer part of the interface or the recovery path.
+
 ## Problem
 
 Owner Group membership and the group secret are persisted together, but a peer

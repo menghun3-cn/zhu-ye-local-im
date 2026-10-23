@@ -215,14 +215,14 @@ class SettingsPage extends StatelessWidget {
                   port != null
                       ? l10n.onPort(port)
                       : controller.isPaired
-                      ? l10n.notAcceptingSessions
-                      : l10n.sessionsNeedPairing,
+                      ? l10n.connectionNotReady
+                      : l10n.sessionsAutoConnectPending,
                 ),
                 FactLine(
-                  l10n.factPairingRequests,
-                  controller.isAcceptingPairings
-                      ? l10n.pairingListening
-                      : l10n.pairingNotListening,
+                  l10n.factAutomaticConnections,
+                  controller.isAutomaticConnectionsReady
+                      ? l10n.automaticConnectionsReady
+                      : l10n.automaticConnectionsUnavailable,
                 ),
                 const SizedBox(height: 8),
                 TextButton.icon(

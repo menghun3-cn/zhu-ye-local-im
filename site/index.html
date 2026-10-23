@@ -167,12 +167,12 @@
               <path d="M13 17.5 11.4 19A3.9 3.9 0 0 1 5.9 13.5l1.6-1.6"/>
             </svg>
           </div>
-          <h3>配对一次，之后自动连上</h3>
-          <p>配对就是把两台设备放进同一个「设备组」。整件事只有两次点击。</p>
+          <h3>发现即自动连接</h3>
+          <p>附近运行本程序的设备被发现后，会自动校验身份、建立设备组关系并打开数据连接。</p>
           <ul>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>一边点「配对」，另一边点「接受」，当场完成</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>没有配对码 —— 不需要读一串数字给对方听</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>只做一次，重启后仍然有效</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>发现后直接建立连接，没有按钮、配对码或接受请求</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>连上即可发送文字、图片、文件和表情</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>设备组关系会记住，重启或短暂断网后自动恢复</li>
           </ul>
         </article>
 
@@ -306,7 +306,7 @@
       <div class="callout reveal">
         <strong>装完第一次运行，记得放行防火墙。</strong>
         Windows 会弹出询问，请勾上「专用网络」再点「允许访问」。当时点了取消，
-        或者机器上装了别的安全软件，就会出现「设备列表里看不到对方」或者点「配对」超时。
+        或者机器上装了别的安全软件，就会出现「设备列表里看不到对方」或者自动连接超时。
         要用的三个端口是 UDP 47654、TCP 47656、TCP 47655，全部只在本局域网内。
       </div>
 
@@ -331,8 +331,8 @@
 
         <dt>数据写在哪</dt>
         <dd>
-          设备身份与配对信息在 <code class="mono">%APPDATA%\LocalTransfer\profile.json</code>
-          —— 它含本机密钥，删掉等于恢复出厂、需要重新配对。
+          设备身份与设备组关系在 <code class="mono">%APPDATA%\LocalTransfer\profile.json</code>
+          —— 它含本机密钥，删掉等于恢复出厂；附近的设备会在重新发现后自动建立关系。
           收到的文件与图片默认落在
           <code class="mono">%USERPROFILE%\Downloads\LocalTransfer\</code>，可以在设置页改。
         </dd>

@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-09-30-pairing-requests-instead-of-a-window.zh.md)
 
+> **Superseded in part** by
+> [Discovery connects automatically](../bug-fix/2026-10-23-discovery-connects-automatically.md):
+> the permanent listener remains, but the controller admits requests
+> automatically. There is no prompt, request stream surface or answering switch.
+
 ## Problem
 
 [Pairing by clicking](2026-09-30-click-to-pair-no-more-typing.md) shipped with a

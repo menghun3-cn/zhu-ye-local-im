@@ -37,7 +37,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String failurePairing(String detail) {
-    return '配对失败：$detail';
+    return '自动连接失败：$detail';
   }
 
   @override
@@ -78,7 +78,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get refusalSeveralPeersConnected => '当前连接了多台设备，需要指明发给哪一台。';
 
   @override
-  String get refusalNotPaired => '本机还没有配对，不接受任何连接。';
+  String get refusalNotPaired => '本机还没有加入设备组，不接受任何连接。';
 
   @override
   String refusalNoFreeFileName(String name) {
@@ -261,10 +261,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get sessionsNeedPairing => '配对后接受连接';
+  String get sessionsAutoConnectPending => '正在自动建立连接';
 
   @override
-  String get notAcceptingSessions => '不接受连接';
+  String get connectionNotReady => '连接通道暂未就绪';
 
   @override
   String onPort(int port) {
@@ -272,30 +272,20 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get pairingCardPairedTitle => '再配对其他设备';
+  String get automaticConnectionsTitle => '自动连接';
 
   @override
-  String get pairingCardUnpairedTitle => '先配对，才能发送内容';
+  String get automaticConnectionsBody =>
+      '同一局域网内运行本程序的设备被发现后会自动建立连接。无需配对或接受请求，即可直接发送文字、图片、文件和表情。';
 
   @override
-  String get pairingCardPairedBody =>
-      '同一个设备组里的设备可以互相建立连接。配对就是把这台设备加进组里，也是共享剪贴板的前提。';
+  String get automaticConnectionsReady => '已就绪：发现设备后自动连接';
 
   @override
-  String get pairingCardUnpairedBody =>
-      '配对只做一次：在另一台设备上点本机旁边的「配对」，本机就会弹出请求；你点「接受」就完成了。之后互相发文件、发消息都不再需要任何操作。';
+  String get automaticConnectionsUnavailable => '本机当前无法接受自动连接；仍可主动连接其他设备。';
 
   @override
-  String get acceptPairingRequests => '应答配对请求';
-
-  @override
-  String get pairingListening => '正在应答其他设备的配对请求';
-
-  @override
-  String get pairingNotListening => '不再应答配对请求';
-
-  @override
-  String get factPairingRequests => '配对请求';
+  String get factAutomaticConnections => '自动连接';
 
   @override
   String get peerNameNotAnnounced => '对方还没广播名称';
@@ -336,22 +326,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSession => '建立连接';
 
   @override
-  String get pairWithThisDevice => '与这台设备配对';
-
-  @override
   String get nothingToDialYet => '暂时无法连接：还没有发现这台设备';
 
   @override
   String get nothingKnownAboutPeer => '不知道这台设备在哪里';
 
   @override
-  String get pair => '配对';
-
-  @override
-  String get repairPairing => '重新配对';
-
-  @override
   String get connect => '连接';
+
+  @override
+  String get connectingAutomatically => '正在自动连接';
+
+  @override
+  String get autoReconnectPending => '会自动重新连接';
+
+  @override
+  String get autoConnectingSoon => '正在等待对方可连接';
 
   @override
   String get transfersEmptyHint => '还没有传输过文件。文字内容在对话里，不在这里显示。';
@@ -445,7 +435,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clipboardPeersHint => '只有勾选的设备会收到本机复制的内容，本机也只会应用它们发来的内容。';
 
   @override
-  String get clipboardPeersEmpty => '还没有已配对的设备；先在对话列表里配对，再回来勾选要共享剪贴板的设备。';
+  String get clipboardPeersEmpty => '还没有已连接的设备；等附近设备自动出现后，再回来勾选要共享剪贴板的设备。';
 
   @override
   String get clipboardNoteBoth => '在本机复制的内容会发给组内设备，组内发来的内容会替换本机剪贴板。';
@@ -551,7 +541,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notStoredOnThisDevice => '未保存在本机';
 
   @override
-  String get noIdentityHint => '本机没有可保存身份的位置，因此身份只存在于内存中：功能可用，但每次重启后都需要重新配对。';
+  String get noIdentityHint =>
+      '本机没有可保存身份的位置，因此身份只存在于内存中：功能可用，但重启后需要重新发现其他设备并自动建立连接。';
 
   @override
   String get factReceivedFiles => '接收的文件';
@@ -677,35 +668,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get save => '保存';
 
   @override
-  String get pairingRequestTitle => '配对请求';
-
-  @override
-  String pairingRequestFrom(String alias) {
-    return '$alias 想与这台设备配对。';
-  }
-
-  @override
-  String get pairingRequestUnnamed => '一台还没报上名字的设备';
-
-  @override
-  String get pairingRequestClaimHint =>
-      '名字是对方自称的，本机无法核实。点「接受」就是把对方加入你的设备组，之后双方可以互相发送内容。';
-
-  @override
-  String get pairingCompleting => '正在完成配对…';
-
-  @override
-  String get acceptPairing => '接受';
-
-  @override
-  String connectToPeerTitle(String peer) {
-    return '连接到 $peer';
-  }
-
-  @override
-  String get reachingOtherDevice => '正在连接对方设备，等待对方点「接受」…';
-
-  @override
   String get manualAddressTitle => '按地址连接设备';
 
   @override
@@ -743,10 +705,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabConversation => '对话';
 
   @override
-  String get conversationListEmpty => '还没有对话。只要扫描到设备，它就会自动出现在这里，可以直接连接。';
+  String get conversationListEmpty => '还没有对话。附近运行本程序的设备被发现后，会自动建立连接并出现在这里。';
 
   @override
-  String get conversationPickOne => '从左边选一个对话，或者先连接一台设备。';
+  String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';
 
   @override
   String get conversationDisconnected => '离线';

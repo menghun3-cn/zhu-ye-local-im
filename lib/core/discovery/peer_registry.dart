@@ -109,6 +109,7 @@ final class PeerRegistry {
         (previous.address.address != address.address ||
             previous.device.alias != device.alias ||
             previous.device.listenPort != device.listenPort ||
+            previous.device.pairingPort != device.pairingPort ||
             previous.device.platform != device.platform);
     _peers[key] = DiscoveredPeer(
       device: device,

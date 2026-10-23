@@ -14,7 +14,7 @@
   "@failureUnreachable": {
     "placeholders": { "detail": { "type": "String" } }
   },
-  "failurePairing": "Pairing failed: {detail}",
+  "failurePairing": "Automatic connection failed: {detail}",
   "@failurePairing": {
     "placeholders": { "detail": { "type": "String" } }
   },
@@ -43,7 +43,7 @@
     "placeholders": { "peer": { "type": "String" } }
   },
   "refusalSeveralPeersConnected": "More than one Device is connected; name the one to send to.",
-  "refusalNotPaired": "This Device is not paired, so it accepts no Sessions.",
+  "refusalNotPaired": "This Device has not joined a group yet, so it accepts no Sessions.",
   "refusalNoFreeFileName": "No free name is left for \"{name}\" in that folder.",
   "@refusalNoFreeFileName": {
     "placeholders": { "name": { "type": "String" } }
@@ -147,21 +147,18 @@
   "@sessionsOpen": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "sessionsNeedPairing": "pair this Device to accept Sessions",
-  "notAcceptingSessions": "not accepting Sessions",
+  "sessionsAutoConnectPending": "establishing a connection automatically",
+  "connectionNotReady": "connection channel not ready",
   "onPort": "on port {port}",
   "@onPort": {
     "placeholders": { "port": { "type": "int" } }
   },
 
-  "pairingCardPairedTitle": "Pair another Device",
-  "pairingCardUnpairedTitle": "Pair this Device to send anything",
-  "pairingCardPairedBody": "Devices in one Owner Group can open Sessions with each other. Pairing adds one, and is also what lets a clipboard be shared.",
-  "pairingCardUnpairedBody": "Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.",
-  "acceptPairingRequests": "Answer pairing requests",
-  "pairingListening": "Answering requests from other Devices",
-  "pairingNotListening": "Not answering requests",
-  "factPairingRequests": "Pairing requests",
+  "automaticConnectionsTitle": "Automatic connections",
+  "automaticConnectionsBody": "Devices running this app on the same local network connect automatically when they are discovered. Send text, images, files and emoji directly; no pairing or request to accept.",
+  "automaticConnectionsReady": "Ready: discovered Devices connect automatically",
+  "automaticConnectionsUnavailable": "This Device cannot accept automatic connections right now, but it can still connect outwards.",
+  "factAutomaticConnections": "Automatic connections",
 
   "peerNameNotAnnounced": "name not announced yet",
   "sessionOpen": "Session open",
@@ -179,12 +176,12 @@
   "trustDevice": "Trust this Device",
   "stopTrustingDevice": "Stop trusting this Device",
   "openSession": "Open a Session",
-  "pairWithThisDevice": "Pair with this Device",
   "nothingToDialYet": "Nothing to dial yet: this Device has not been seen",
   "nothingKnownAboutPeer": "Nothing known about where this Device is",
-  "pair": "Pair",
-  "repairPairing": "Pair again",
   "connect": "Connect",
+  "connectingAutomatically": "Connecting automatically",
+  "autoReconnectPending": "will reconnect automatically",
+  "autoConnectingSoon": "waiting for the other Device to become reachable",
 
   "transfersEmptyHint": "No files have been transferred yet. Text messages live in their conversations, not here.",
   "transferTo": "To {peer}",
@@ -228,7 +225,7 @@
   "clipboardNeedsGroup": "Clipboard sync happens inside an Owner Group, and this Device is not in one yet.",
   "clipboardPeersHeader": "Devices that may share the clipboard",
   "clipboardPeersHint": "Only the devices ticked below receive what this Device copies, and only their entries are applied here.",
-  "clipboardPeersEmpty": "No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.",
+  "clipboardPeersEmpty": "No connected Devices yet; when one appears automatically, come back and tick it for clipboard sharing.",
   "clipboardNoteBoth": "Copies made here travel to the group, and copies from the group replace this clipboard.",
   "clipboardNoteApplyOnly": "This platform only lets an app read its clipboard while its window is on screen, so copies made here travel only while this window is focused. Copies from the group are applied at any time.",
   "clipboardNoteOriginateOnly": "Copies made here travel to the group. This platform cannot apply a copy that arrives.",
@@ -269,7 +266,7 @@
   "renameThisDevice": "Rename this Device",
   "factIdentity": "Identity",
   "notStoredOnThisDevice": "not stored on this Device",
-  "noIdentityHint": "This Device has nowhere to keep its identity, so it runs in memory: it works, and it has to be paired again after every restart.",
+  "noIdentityHint": "This Device has nowhere to keep its identity, so it runs in memory: it works, and after a restart it must discover other Devices and connect automatically again.",
   "factReceivedFiles": "Received files",
   "noDefaultFolder": "no default folder",
   "nothingWentWrong": "Nothing has gone wrong.",
@@ -319,20 +316,6 @@
   "cancel": "Cancel",
   "close": "Close",
   "save": "Save",
-  "pairingRequestTitle": "Pairing request",
-  "pairingRequestFrom": "{alias} wants to pair with this Device.",
-  "@pairingRequestFrom": {
-    "placeholders": { "alias": { "type": "String" } }
-  },
-  "pairingRequestUnnamed": "a Device with no name yet",
-  "pairingRequestClaimHint": "The name is the caller's own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.",
-  "pairingCompleting": "Finishing the Pairing…",
-  "acceptPairing": "Allow",
-  "connectToPeerTitle": "Connect to {peer}",
-  "@connectToPeerTitle": {
-    "placeholders": { "peer": { "type": "String" } }
-  },
-  "reachingOtherDevice": "Reaching the other Device, waiting for its user to allow it…",
   "manualAddressTitle": "Reach a Device by address",
   "fieldAddress": "Address",
   "addressHelper": "For a Device Discovery cannot find",
@@ -345,8 +328,8 @@
   "send": "Send",
   "removeAttachment": "Remove",
   "tabConversation": "Conversations",
-  "conversationListEmpty": "No conversations yet. A Device this one finds shows up here on its own, ready to connect.",
-  "conversationPickOne": "Pick a conversation on the left, or connect a Device first.",
+  "conversationListEmpty": "No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.",
+  "conversationPickOne": "Pick a conversation on the left, or wait for a nearby Device to connect automatically.",
   "conversationDisconnected": "Offline",
   "conversationUnread": "[{count}]",
   "@conversationUnread": {

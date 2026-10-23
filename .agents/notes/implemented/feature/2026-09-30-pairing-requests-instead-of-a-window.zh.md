@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-09-30-pairing-requests-instead-of-a-window.md) | 中文
 
+> **部分被取代**：
+> [发现设备后自动连接](../bug-fix/2026-10-23-discovery-connects-automatically.zh.md)
+> —— 常驻监听器仍保留，但控制器会自动准入请求。界面已没有请求弹窗、请求流入口
+> 或应答开关。
+
 ## Problem
 
 [点一下就配对](2026-09-30-click-to-pair-no-more-typing.zh.md) 上线时带着一步操作，而这一步是**对方**的用户既看不见、也做不了的：被配对的那台设备必须先点「接收连接」，让那个窗口一直开着，等待发起方点「配对」。监听器的寿命等于窗口的寿命，这带来三个问题。

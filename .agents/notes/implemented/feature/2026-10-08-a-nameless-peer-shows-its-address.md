@@ -2,6 +2,11 @@
 
 Status: implemented
 
+> **Superseded in part** by
+> [Discovery connects automatically](../bug-fix/2026-10-23-discovery-connects-automatically.md):
+> the address fallback in peer names remains, but the Pairing prompt that used
+> `callerAddress` and `pairingRequestUnnamed` no longer exists.
+
 ## Problem
 
 A Device that answers Discovery without announcing an Alias reaches the UI as a

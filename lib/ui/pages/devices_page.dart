@@ -6,7 +6,6 @@ import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../dialogs.dart';
-import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../wechat/theme.dart';
@@ -46,7 +45,7 @@ class DevicesPage extends StatelessWidget {
       children: [
         _SelfCard(controller: controller),
         const SizedBox(height: WeChat.cardGap),
-        _PairingCard(controller: controller),
+        _AutomaticConnectionCard(controller: controller),
         const SizedBox(height: WeChat.sectionGap),
         SectionHeader(
           title: l10n.tabDevices,
@@ -120,14 +119,14 @@ class _SelfCard extends StatelessWidget {
             FactLine(l10n.factSessions, l10n.sessionsOpen(self.openSessions)),
             FactLine(
               l10n.factListening,
-              // Discovery and pairing do not need a group secret; accepting
-              // Sessions does. Say which of those is missing rather than
-              // leaving an unpaired Device looking broken.
+              // Discovery and the trust exchange do not need a group secret;
+              // accepting Sessions does. Say which of those is missing rather
+              // than leaving an unpaired Device looking broken.
               port != null
                   ? l10n.onPort(port)
                   : controller.isPaired
-                  ? l10n.notAcceptingSessions
-                  : l10n.sessionsNeedPairing,
+                  ? l10n.connectionNotReady
+                  : l10n.sessionsAutoConnectPending,
             ),
           ],
         ),
@@ -136,16 +135,22 @@ class _SelfCard extends StatelessWidget {
   }
 }
 
-/// Pairing, whichever side of it this Device is on.
-class _PairingCard extends StatelessWidget {
-  const _PairingCard({required this.controller});
+/// How this Device accepts connections made through Discovery.
+///
+/// There is no switch: answering is part of being reachable. The card states
+/// the automatic flow and whether the listener actually started, because a
+/// port already held by another process is a degraded state rather than a
+/// preference the user chose.
+class _AutomaticConnectionCard extends StatelessWidget {
+  const _AutomaticConnectionCard({required this.controller});
 
   final LocalTransferController controller;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final paired = controller.isPaired;
+    final theme = Theme.of(context);
+    final listening = controller.isAutomaticConnectionsReady;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(WeChat.cardPadding),
@@ -154,44 +159,24 @@ class _PairingCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(paired ? Icons.link : Icons.link_off),
+                Icon(listening ? Icons.sync : Icons.sync_problem),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    paired
-                        ? l10n.pairingCardPairedTitle
-                        : l10n.pairingCardUnpairedTitle,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    l10n.automaticConnectionsTitle,
+                    style: theme.textTheme.titleSmall,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              paired
-                  ? l10n.pairingCardPairedBody
-                  : l10n.pairingCardUnpairedBody,
-            ),
+            Text(l10n.automaticConnectionsBody),
             const SizedBox(height: 12),
-            // A switch rather than a button: this Device answers requests for as
-            // long as it is on, so it is a standing state rather than a step the
-            // user takes. The subtitle reports the listener rather than the
-            // preference, because the two can disagree — a port already taken by
-            // a second copy of the app is the case — and the switch promising
-            // something that is not happening would be the lie.
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: controller.acceptsPairingRequests,
-              onChanged: (value) => guarded(
-                context,
-                () => controller.setAcceptsPairingRequests(value),
-              ),
-              title: Text(l10n.acceptPairingRequests),
-              subtitle: Text(
-                controller.isAcceptingPairings
-                    ? l10n.pairingListening
-                    : l10n.pairingNotListening,
-              ),
+            Text(
+              listening
+                  ? l10n.automaticConnectionsReady
+                  : l10n.automaticConnectionsUnavailable,
+              style: theme.textTheme.bodySmall,
             ),
           ],
         ),

@@ -119,10 +119,6 @@ final class KnownDevice {
 ///   on the user's behalf). Deliberately weaker than group membership, and
 ///   deliberately not a way to skip a prompt — see
 ///   `2026-09-30-pairing-requests-instead-of-a-window.md`;
-/// * `acceptsPairingRequests` — whether this Device answers Pairing requests at
-///   all. On by default, because a Device that cannot be paired *with* is a
-///   Device the user of the other one cannot add; off is what a user who does
-///   not want to be asked wants;
 /// * `clipboardPeers` — the peers the user has added to the clipboard-sharing
 ///   whitelist. Deliberately **empty by default**: group membership says a
 ///   Device may hold a Session, and says nothing about whether it may read
@@ -143,7 +139,7 @@ final class KnownDevice {
 ///
 /// Mutators mutate in place. A profile is the live state of a running
 /// Device, not a value object: an app layer holds one and lets the sessions,
-/// the pairing flow and the UI all read the same truth.
+/// automatic connection flow and the UI all read the same truth.
 final class DeviceProfile {
   DeviceProfile({
     required this.self,
@@ -154,7 +150,6 @@ final class DeviceProfile {
     Set<Fingerprint> clipboardPeers = const {},
     Map<String, KnownDevice> known = const {},
     List<String> recentEmojis = const [],
-    this.acceptsPairingRequests = true,
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
     this.updateCheckInterval = UpdateCheckInterval.hourly,
@@ -185,13 +180,6 @@ final class DeviceProfile {
 
   /// The Owner Group this Device belongs to. Always contains [self].
   OwnerGroup group;
-
-  /// Whether this Device answers Pairing requests at all.
-  ///
-  /// The one part of a Pairing a user can turn off. Turning it off stops this
-  /// Device listening on the Pairing port, so it can still pair with somebody
-  /// else — it just cannot be picked out of a list.
-  bool acceptsPairingRequests;
 
   /// Where the user wants received files to land, or null for the platform's
   /// own default.
@@ -320,7 +308,6 @@ final class DeviceProfile {
     'alias': alias,
     'platform': platform.wireName,
     'group': group.toJson(),
-    'acceptPairingRequests': acceptsPairingRequests,
     'favorites': [for (final favorite in favorites) favorite.hex],
     'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
@@ -335,7 +322,6 @@ final class DeviceProfile {
     final rawFavorites = json['favorites'];
     final rawClipboardPeers = json['clipboardPeers'];
     final rawKnown = json['known'];
-    final rawAccepts = json['acceptPairingRequests'];
     final rawRecentEmojis = json['recentEmojis'];
     final platform = DevicePlatform.fromWireName(_string(json, 'platform'));
     final self = Fingerprint(_string(json, 'self'));
@@ -385,10 +371,6 @@ final class DeviceProfile {
       clipboardPeers: clipboardPeers,
       known: known,
       recentEmojis: recentEmojis,
-      // A profile written before this key existed answers requests: the
-      // listener is the flow, and a Device that silently stopped being
-      // diallable after an upgrade would be a Device nobody can add.
-      acceptsPairingRequests: rawAccepts is bool ? rawAccepts : true,
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
       closeBehaviour: _closeBehaviour(json['closeBehaviour']),
       updateCheckInterval: _updateCheckInterval(json['updateCheckInterval']),
@@ -401,7 +383,6 @@ final class DeviceProfile {
       '${group.length} group, ${_favorites.length} favorites, '
       '${_clipboardPeers.length} clipboard peers, '
       '${_known.length} known, '
-      '${acceptsPairingRequests ? 'answering requests' : 'not answering'}, '
       'close ${closeBehaviour.wireName}, '
       'update ${updateCheckInterval.wireName})';
 
@@ -438,11 +419,11 @@ Map<String, Object?> _object(Object? value, String where) {
 
 /// Reads the close-button preference, falling back to the default.
 ///
-/// Tolerant in both directions, the same way `acceptPairingRequests` is: a
-/// profile written before this key existed has none, and a value a *newer*
-/// version invented is not damage to an older one. Both of those mean "the user
-/// has not said otherwise", which is exactly what the default is for — and a
-/// preference is not worth refusing to open a Device's identity file over.
+/// Tolerant in both directions: a profile written before this key existed has
+/// none, and a value a *newer* version invented is not damage to an older one.
+/// Both of those mean "the user has not said otherwise", which is exactly what
+/// the default is for — and a preference is not worth refusing to open a
+/// Device's identity file over.
 CloseBehaviour _closeBehaviour(Object? value) {
   if (value is! String) return CloseBehaviour.minimiseToTray;
   return CloseBehaviour.fromWireName(value) ?? CloseBehaviour.minimiseToTray;

@@ -28,8 +28,7 @@ enum CloseBehaviour {
   ///
   /// Null rather than a throw, and the caller takes the default: this comes out
   /// of a file an older version wrote, and a value a *newer* version invented is
-  /// not damage. Same rule as [DeviceProfile.acceptsPairingRequests] — an
-  /// upgrade must not turn a profile into an error.
+  /// not damage. An upgrade must not turn a profile into an error.
   static CloseBehaviour? fromWireName(String name) {
     for (final behaviour in values) {
       if (behaviour.wireName == name) return behaviour;

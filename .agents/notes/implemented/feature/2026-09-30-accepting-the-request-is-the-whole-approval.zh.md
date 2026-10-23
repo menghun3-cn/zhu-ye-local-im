@@ -4,6 +4,10 @@ Status: implemented
 
 [English](2026-09-30-accepting-the-request-is-the-whole-approval.md) | 中文
 
+> **已被取代**：
+> [发现设备后自动连接](../bug-fix/2026-10-23-discovery-connects-automatically.zh.md)
+> —— 现在没有可点击的接受请求按钮。自动发现会开始交换，接收端控制器自动准入。
+
 ## Problem
 
 配对已经不需要输码了，但仍然以一次比对收尾：两台设备各自画出握手派生的六位

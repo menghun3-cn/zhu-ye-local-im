@@ -31,9 +31,11 @@ The set of Devices that share an Owner. Clipboard Mirroring happens only
 within an Owner Group.
 _Avoid_: My Devices, Trusted Group, Family, Team, 我的设备
 
-**Pairing**:
-The one-time act of admitting a Device into an Owner Group.
-_Avoid_: Linking, Binding, Registration, Handshake, 配对
+**Automatic Pairing**:
+The internal trust exchange Discovery runs when it finds another Device. It
+admits both Devices into one Owner Group and the Session follows automatically;
+there is no code, button, prompt, or acceptance step.
+_Avoid_: Manual pairing, Pair request, Pair again, 手工配对
 
 **Favorite**:
 A Device the user has marked as trusted, so Transfers with it can skip

@@ -73,6 +73,7 @@ final class PeerView {
     required this.sessionPort,
     this.pairingPort,
     required this.isConnected,
+    this.isConnecting = false,
     required this.isInGroup,
     required this.isFavorite,
     required this.lastSeen,
@@ -96,14 +97,17 @@ final class PeerView {
   /// unpaired Device announces — so there is nothing to dial.
   final int? sessionPort;
 
-  /// The port the peer answers Pairing requests on, if it announced one.
+  /// The port the peer answers automatic Pairing attempts on, if announced.
   ///
-  /// Null is normal for an older peer or one that is not accepting Pairings;
-  /// the Pairing flow then keeps its well-known-port fallback.
+  /// Null is normal before the peer's listener starts; Discovery announces the
+  /// actual port when it is ready.
   final int? pairingPort;
 
   /// Whether a Session with this peer is open right now.
   final bool isConnected;
+
+  /// Whether this Device is establishing trust or opening a Session now.
+  final bool isConnecting;
 
   /// Whether this peer is in the Owner Group.
   final bool isInGroup;
@@ -496,7 +500,7 @@ enum AppRefusal {
   /// A send named no peer while several were connected.
   severalPeersConnected,
 
-  /// Something that needs the Session layer was asked for before pairing.
+  /// Something that needs the Session layer was asked for before group trust.
   notPaired,
 
   /// Every candidate name in the destination folder is taken.
