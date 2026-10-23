@@ -141,6 +141,48 @@ void main() {
       expect(session.hub.link.shortAuthenticationString, hasLength(6));
     });
 
+    test('simultaneous dials settle on the same Session', () async {
+      final (alice, bob) = await twoDevices();
+      addTearDown(alice.close);
+      addTearDown(bob.close);
+
+      await Future.wait([
+        alice.manager
+            .connect('127.0.0.1', bob.port)
+            .then<void>((_) {}, onError: (Object _) {}),
+        bob.manager
+            .connect('127.0.0.1', alice.port)
+            .then<void>((_) {}, onError: (Object _) {}),
+      ]);
+
+      await until(
+        () =>
+            alice.manager.session(bob.fingerprint) != null &&
+            bob.manager.session(alice.fingerprint) != null,
+        description: 'both Devices to keep one Session after the dial race',
+      );
+      final aliceSession = alice.manager.session(bob.fingerprint)!;
+      final bobSession = bob.manager.session(alice.fingerprint)!;
+      final aliceIsLower = alice.fingerprint.compareTo(bob.fingerprint) < 0;
+
+      expect(
+        aliceSession.role,
+        aliceIsLower ? LinkRole.initiator : LinkRole.responder,
+      );
+      expect(
+        bobSession.role,
+        aliceIsLower ? LinkRole.responder : LinkRole.initiator,
+      );
+      expect(aliceSession.isOpen, isTrue);
+      expect(bobSession.isOpen, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(alice.manager.session(bob.fingerprint), same(aliceSession));
+      expect(bob.manager.session(alice.fingerprint), same(bobSession));
+      expect(aliceSession.isOpen, isTrue);
+      expect(bobSession.isOpen, isTrue);
+    });
+
     test('both sides see the Session as an event', () async {
       final (alice, bob) = await twoDevices();
       addTearDown(alice.close);

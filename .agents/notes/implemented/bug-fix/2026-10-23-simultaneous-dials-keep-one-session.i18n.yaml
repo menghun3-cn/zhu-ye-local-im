@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-23-simultaneous-dials-keep-one-session.md
+#   git hash-object -- 2026-10-23-simultaneous-dials-keep-one-session.zh.md
+2026-10-23-simultaneous-dials-keep-one-session.md: b9f756f898788b821686d1c7447464756842ea06
+2026-10-23-simultaneous-dials-keep-one-session.zh.md: 382922515400182eb7d2cfcb5314a990818abbad

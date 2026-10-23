@@ -393,7 +393,10 @@ final class LinkManager {
         'expected ${expectedFingerprint.short()} but reached ${peer.short()}',
       );
     }
-    if (_sessions.containsKey(peer.hex)) {
+    final existing = _sessions[peer.hex];
+    final preferredRole = _preferredRoleFor(peer);
+    if (existing != null &&
+        (existing.role == preferredRole || role != preferredRole)) {
       await link.close();
       throw HandshakeException(
         'already holding a Session with ${peer.short()}',
@@ -423,9 +426,23 @@ final class LinkManager {
         onError: (Object error) => _forget(session, error),
       ),
     );
+    // When reciprocal dials cross, the non-preferred Session can be adopted
+    // briefly by both ends. Replace it with the same direction the peer
+    // chooses; `_forget` ignores the old Session because the map now names the
+    // replacement.
+    if (existing != null) unawaited(existing.close());
     _emit(SessionEstablished(session));
     return session;
   }
+
+  /// The one direction both ends keep when reciprocal dials cross.
+  ///
+  /// Fingerprint order is the same on both Devices, so each chooses the same
+  /// TCP connection instead of each keeping the one it initiated.
+  LinkRole _preferredRoleFor(Fingerprint peer) =>
+      _local.fingerprint.compareTo(peer) < 0
+      ? LinkRole.initiator
+      : LinkRole.responder;
 
   void _forget(ManagedSession session, Object? reason) {
     final peer = session.peer;
