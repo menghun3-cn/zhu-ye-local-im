@@ -72,7 +72,7 @@ void main() {
       // The rest of the surface is still there, so this is an absence and not a
       // page that failed to build.
       expect(
-        onPage(windowA, SettingsPage, find.text(l10n.settingsThisDevice)),
+        onPage(windowA, SettingsPage, find.text(l10n.settingsWhereThingsGo)),
         findsOneWidget,
       );
       expect(

@@ -1816,5 +1816,55 @@ void main() {
         expect(saved.saves.length, afterOpening);
       },
     );
+
+    test(
+      'clearing a chat removes messages and reading state, not clipboard',
+      () async {
+        final hub = MemoryBeaconHub();
+        final alice = await startDevice(hub.a, 'Alice');
+        final bob = await startDevice(hub.b, 'Bob');
+        await pairUp(alice, bob);
+        await connect(alice, bob);
+        shareClipboard(alice, bob);
+        alice.controller.setClipboardMode(ClipboardMode.mirror);
+        bob.controller.setClipboardMode(ClipboardMode.mirror);
+
+        final sent = await alice.controller.sendText('clear this');
+        await until(
+          () => sent.state.isSettled && bob.controller.transfers.isNotEmpty,
+          description: 'the text to land on Bob',
+        );
+        alice.clipboard.copy('keep this clipboard entry');
+        await until(
+          () => bob.clipboard.applied.contains('keep this clipboard entry'),
+          description: 'Bob to apply the clipboard entry',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        expect(bob.controller.totalUnread, 1);
+        await bob.controller.markConversationOpened(alice.fingerprint);
+        expect(bob.controller.lastConversation, alice.fingerprint);
+
+        await bob.controller.clearConversation(alice.fingerprint);
+
+        expect(
+          bob.controller.transfers.where(
+            (view) => view.kind != PayloadKind.clipboard,
+          ),
+          isEmpty,
+        );
+        expect(
+          bob.clipboard.applied,
+          contains('keep this clipboard entry'),
+          reason: 'the clipboard log is a separate surface',
+        );
+        expect(bob.controller.totalUnread, 0);
+        expect(
+          bob.controller.hasOpenedConversation(alice.fingerprint),
+          isFalse,
+        );
+        expect(bob.controller.lastConversation, isNull);
+      },
+    );
   });
 }

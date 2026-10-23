@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 import 'package:local_transfer/core/clipboard/clipboard_capability.dart';
+import 'package:local_transfer/core/identity/device_descriptor.dart';
 import 'package:local_transfer/core/identity/fingerprint.dart';
 import 'package:local_transfer/core/identity/owner_identity.dart';
 import 'package:local_transfer/core/profile/device_profile.dart';
@@ -260,5 +261,54 @@ void main() {
         expect(second.profile.alias, 'Desk');
       },
     );
+
+    test('a first identity takes the operating system host name', () async {
+      final local = await loadOrGenerateLocalProfile(
+        storeIn(sandbox),
+        platform: DevicePlatform.windows,
+        alias: '  Studio-PC  ',
+      );
+
+      expect(local.profile.alias, 'Studio-PC');
+    });
+
+    test('an old fallback name is replaced by the host name', () async {
+      final store = storeIn(sandbox);
+      final local = await _fresh();
+      local.profile.alias = DeviceDescriptor.fallbackAlias;
+      await saveLocalProfile(local, store);
+
+      final restored = await loadOrGenerateLocalProfile(
+        store,
+        platform: DevicePlatform.windows,
+        alias: 'Studio-PC',
+      );
+      final onDisk = await loadLocalProfile(store);
+
+      expect(restored.profile.alias, 'Studio-PC');
+      expect(
+        onDisk?.profile.alias,
+        'Studio-PC',
+        reason: 'the migration is persisted, not remade on every start',
+      );
+    });
+
+    test('a name the user chose survives a host name change', () async {
+      final store = storeIn(sandbox);
+      final local = await loadOrGenerateLocalProfile(
+        store,
+        platform: DevicePlatform.windows,
+        alias: 'The blue desk',
+      );
+
+      final restored = await loadOrGenerateLocalProfile(
+        store,
+        platform: DevicePlatform.windows,
+        alias: 'Studio-PC',
+      );
+
+      expect(restored.profile.alias, 'The blue desk');
+      expect(restored.identity.fingerprint, local.identity.fingerprint);
+    });
   });
 }

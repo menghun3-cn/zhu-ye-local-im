@@ -116,7 +116,9 @@ final class Release {
     final fragments = distinguishingFragments(commit.subject);
     if (fragments.isEmpty) return true;
     for (final bullet in bullets) {
-      if (fragments.any(bullet.contains)) return true;
+      // Fragments are lower-cased. An authored bullet may capitalise the same
+      // word, and that is the same mention.
+      if (fragments.any(bullet.toLowerCase().contains)) return true;
     }
     return false;
   }

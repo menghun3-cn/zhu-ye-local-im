@@ -5,6 +5,9 @@
          too — the debug manifest's copy exists for the Flutter tool, not for
          the application. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android hands the checked APK to the system installer. The system may
+         first send the user to the per-app "install unknown apps" setting. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="竹叶局域网传输"
         android:name="${applicationName}"
@@ -36,6 +39,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update_file_provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

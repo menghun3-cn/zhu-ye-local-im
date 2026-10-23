@@ -112,6 +112,9 @@ enum UpdatePayload {
 
   /// The installer an installed copy hands the job to.
   installer,
+
+  /// The APK an Android copy hands to the system package installer.
+  androidPackage,
 }
 
 /// What the release calls the file [payload] needs, tagged [tag].
@@ -126,6 +129,7 @@ String updateAssetName({required String tag, required UpdatePayload payload}) {
     UpdatePayload.portablePackage =>
       'LocalTransfer-$version-windows-x64-portable.zip',
     UpdatePayload.installer => 'LocalTransfer-$version-windows-x64-setup.exe',
+    UpdatePayload.androidPackage => 'LocalTransfer-$version-android.apk',
   };
 }
 
@@ -156,6 +160,9 @@ enum UpdateInstallStage {
 
   /// The new build has been started and is waiting to take over.
   handingOver,
+
+  /// Android is handing the checked APK to the system package installer.
+  installing,
 
   /// It did not work, and an [UpdateInstallFailure] says how.
   failed,
@@ -190,6 +197,12 @@ enum UpdateInstallFailure {
 
   /// A hand-over was started and never finished.
   handover,
+
+  /// Android has not been allowed to install apps from this one.
+  permission,
+
+  /// Android could not open the system package installer.
+  installer,
 }
 
 /// How far along a download is.
@@ -229,6 +242,11 @@ final class PreparedUpdate {
   /// The unpacked build an unpacked copy replaces itself from.
   const PreparedUpdate.portable({required this.package, required this.staged})
     : payload = UpdatePayload.portablePackage;
+
+  /// The checked APK an Android copy hands to the system installer.
+  const PreparedUpdate.android(this.package)
+    : payload = UpdatePayload.androidPackage,
+      staged = null;
 
   /// Which of the two shapes of copy this is for.
   final UpdatePayload payload;
@@ -274,6 +292,14 @@ abstract interface class UpdateInstaller {
   /// rather than show a button that always fails.
   bool get supported;
 
+  /// Whether applying an update ends this process and starts it again.
+  ///
+  /// Windows replaces the running build or hands the job to an installer that
+  /// relaunches it. Android opens the system package installer instead, which
+  /// may ask for permission and returns here after it has been opened. The
+  /// surface uses this to choose between "update and restart" and "install".
+  bool get restartsApplication;
+
   /// The last hand-over that did not finish, or null when the last one did.
   ///
   /// Consumed by the reading: the report a hand-over leaves says what to tell
@@ -309,11 +335,50 @@ abstract interface class UpdateInstaller {
   });
 }
 
+/// How the Android side answered a request to open its package installer.
+enum AndroidInstallOutcome {
+  /// The app must first be allowed to install unknown apps.
+  permission,
+
+  /// The system installer was opened.
+  started,
+}
+
+/// A failure applying an update that the page can show verbatim.
+///
+/// The platform side is allowed to throw; turning that into a closed failure
+/// belongs here, before the UI has to inspect an exception chain.
+final class UpdateInstallException implements Exception {
+  /// Reports [failure].
+  const UpdateInstallException(this.failure, [this.cause]);
+
+  /// What the user can act on.
+  final UpdateInstallFailure failure;
+
+  /// The underlying error, for diagnostics and tests.
+  final Object? cause;
+
+  @override
+  String toString() => 'UpdateInstallException($failure, $cause)';
+}
+
+/// Which platform's packaging [PlatformUpdateInstaller] should follow.
+///
+/// Separate from `DevicePlatform` so this file can be exercised by `dart test`
+/// without importing the Flutter-facing UI layer. [main.dart] maps the real
+/// platform onto it.
+enum UpdateInstallPlatform { windows, android, other }
+
 /// Replacing this build with the one a release names, on the platform that can.
 final class PlatformUpdateInstaller implements UpdateInstaller {
   /// Hands over, and ends the process, through [leave]. Fetches into
   /// [application], which a test points at a folder of its own.
-  const PlatformUpdateInstaller({this.leave = _leaveProcess, this.application});
+  const PlatformUpdateInstaller({
+    this.leave = _leaveProcess,
+    this.application,
+    this.platform,
+    this.androidInstall,
+  });
 
   /// What happens when a hand-over has started. A test replaces it; nothing in
   /// the application does.
@@ -326,15 +391,40 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
   /// real thing would be writing into the folder the suite itself runs from.
   final String? application;
 
+  /// What platform this instance follows. Null for the running one.
+  final UpdateInstallPlatform? platform;
+
+  /// Opens Android's package installer for the checked APK at a path.
+  ///
+  /// Supplied by `main.dart` through a Flutter method channel. Kept as a
+  /// function rather than imported here so this file stays runnable under
+  /// `dart test`, where no Flutter engine exists.
+  final Future<AndroidInstallOutcome> Function(String path)? androidInstall;
+
   /// The folder this build runs from, seam and all.
   String get _root => application ?? applicationDirectory().path;
 
+  UpdateInstallPlatform get _platform =>
+      platform ??
+      (Platform.isWindows
+          ? UpdateInstallPlatform.windows
+          : Platform.isAndroid
+          ? UpdateInstallPlatform.android
+          : UpdateInstallPlatform.other);
+
   @override
-  bool get supported => Platform.isWindows;
+  bool get supported =>
+      _platform == UpdateInstallPlatform.windows ||
+      _platform == UpdateInstallPlatform.android;
+
+  @override
+  bool get restartsApplication => _platform == UpdateInstallPlatform.windows;
 
   @override
   UpdateInstallFailure? previousFailure() =>
-      readHandoverReport(File(_within(_root, handoverReportName)));
+      _platform == UpdateInstallPlatform.windows
+      ? readHandoverReport(File(_within(_root, handoverReportName)))
+      : null;
 
   @override
   Future<UpdatePrepareResult> prepare(
@@ -343,6 +433,9 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
   }) async {
     if (!supported) {
       return const UpdatePrepareResult.failed(UpdateInstallFailure.unsupported);
+    }
+    if (_platform == UpdateInstallPlatform.android) {
+      return _prepareAndroid(check, onProgress: onProgress);
     }
     final installed = File(_within(_root, installedCopyMarker)).existsSync();
     final payload = installed
@@ -414,11 +507,77 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     );
   }
 
+  /// Fetches and checks the APK without unpacking it.
+  ///
+  /// The system package installer reads an APK in place. The private app data
+  /// directory is writable without storage permission, and the FileProvider in
+  /// the Android runner is the only thing granted access to it.
+  Future<UpdatePrepareResult> _prepareAndroid(
+    UpdateCheck check, {
+    required void Function(UpdateInstallProgress progress) onProgress,
+  }) async {
+    final asset = updateAssetFor(check, UpdatePayload.androidPackage);
+    if (asset == null) {
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.noAsset);
+    }
+    final expected = asset.sha256;
+    if (expected == null) {
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.noDigest);
+    }
+    if (!_isWritable(Directory(_root))) {
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.notWritable);
+    }
+    final Directory update;
+    try {
+      update = updateDirectory(_root);
+    } on Object {
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.notWritable);
+    }
+    final wanted = _fileName(asset.name);
+    final downloaded = File(_within(update.path, wanted));
+    _keepOnly(update, wanted);
+
+    onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
+    if (!await _matchesDigest(downloaded, expected)) {
+      try {
+        await _download(asset, downloaded, onProgress);
+      } on Object {
+        _discard(downloaded);
+        return const UpdatePrepareResult.failed(UpdateInstallFailure.download);
+      }
+    }
+
+    onProgress(const UpdateInstallProgress(UpdateInstallStage.verifying));
+    if (!await _matchesDigest(downloaded, expected)) {
+      _discard(downloaded);
+      return const UpdatePrepareResult.failed(UpdateInstallFailure.checksum);
+    }
+    return UpdatePrepareResult.ready(PreparedUpdate.android(downloaded.path));
+  }
+
   @override
   Future<void> apply(
     PreparedUpdate prepared, {
     required void Function(UpdateInstallProgress progress) onProgress,
   }) async {
+    if (prepared.payload == UpdatePayload.androidPackage) {
+      onProgress(const UpdateInstallProgress(UpdateInstallStage.installing));
+      final install = androidInstall;
+      if (install == null) {
+        throw const UpdateInstallException(UpdateInstallFailure.installer);
+      }
+      try {
+        final outcome = await install(prepared.package);
+        if (outcome == AndroidInstallOutcome.permission) {
+          throw const UpdateInstallException(UpdateInstallFailure.permission);
+        }
+      } on UpdateInstallException {
+        rethrow;
+      } on Object catch (error) {
+        throw UpdateInstallException(UpdateInstallFailure.installer, error);
+      }
+      return;
+    }
     if (prepared.payload == UpdatePayload.installer) {
       // Inno replaces the files and puts the application back — see the second
       // `[Run]` entry in `packaging/local_transfer.iss`, which runs under

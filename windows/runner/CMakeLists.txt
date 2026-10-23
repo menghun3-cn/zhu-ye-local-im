@@ -37,6 +37,8 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 # Shell_NotifyIcon, for the notification-area icon.
 target_link_libraries(${BINARY_NAME} PRIVATE "shell32.lib")
+# ITaskbarList3, for the unread overlay on the taskbar button.
+target_link_libraries(${BINARY_NAME} PRIVATE "ole32.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

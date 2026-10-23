@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'core/core.dart';
 import 'ui/app.dart';
+import 'ui/android_package_installer.dart';
 import 'ui/seams.dart';
 import 'ui/update_handoff.dart';
 import 'ui/update_install.dart';
@@ -35,10 +37,19 @@ Future<void> main(List<String> arguments) async {
   // housekeeping, and the first frame must not wait behind a folder holding
   // the previous build.
   unawaited(Future<void>(clearStaleUpdateStages));
-  unawaited(Future<void>(clearFetchedUpdate));
 
   try {
     final seams = await openPlatformSeams();
+    if (seams.platform == DevicePlatform.android) {
+      UpdateInstallResolution.installer = PlatformUpdateInstaller(
+        platform: UpdateInstallPlatform.android,
+        application: seams.appDataDirectory,
+        androidInstall: installAndroidPackage,
+      );
+    }
+    unawaited(
+      Future<void>(() => clearFetchedUpdate(root: seams.appDataDirectory)),
+    );
     runApp(LocalTransferApp(seams: seams));
   } on Object catch (error) {
     runApp(StartupFailureApp(message: '$error'));

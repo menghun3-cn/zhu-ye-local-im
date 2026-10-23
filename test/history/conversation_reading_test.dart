@@ -186,6 +186,18 @@ void main() {
 
       expect(reading.lastPeer, peer.hex);
     });
+
+    test('forget drops both the watermark and the last conversation', () {
+      final peer = _peer('Alice');
+      final reading = ConversationReading()
+        ..markOpened(peer, DateTime.utc(2026, 10, 10, 10))
+        ..lastPeer = peer.hex;
+
+      reading.forget(peer);
+
+      expect(reading.hasOpened(peer), isFalse);
+      expect(reading.lastPeer, isNull);
+    });
   });
 
   group('a malformed reading state', () {

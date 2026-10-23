@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../core/core.dart';
+import '../conversation_menu.dart';
 import '../controller_scope.dart';
 import '../conversation_view.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -69,22 +70,7 @@ class ConversationPage extends StatelessWidget {
             ),
           ],
         ),
-        actions: [
-          if (known != null)
-            PopupMenuButton<bool>(
-              onSelected: (value) => controller.setFavorite(peer, value: value),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: !known.isFavorite,
-                  child: Text(
-                    known.isFavorite
-                        ? l10n.stopTrustingDevice
-                        : l10n.trustDevice,
-                  ),
-                ),
-              ],
-            ),
-        ],
+        actions: [ConversationMenuButton(peer: peer)],
       ),
       body: ConversationView(
         peer: peer,
