@@ -380,10 +380,10 @@ void main() {
       );
 
       test('a value this build does not know decodes to the default', () {
-        // Tolerant rather than strict, like `acceptPairingRequests`: what is
-        // being read is a preference, and a preference is not worth refusing to
-        // open a Device's identity file over. A newer version writing a third
-        // behaviour must not make an older one unable to start.
+        // Tolerant rather than strict: what is being read is a preference, and
+        // a preference is not worth refusing to open a Device's identity file
+        // over. A newer version writing a third behaviour must not make an
+        // older one unable to start.
         final restored = DeviceProfile.fromJson({
           'self': _fp('a').hex,
           'alias': 'Desk',

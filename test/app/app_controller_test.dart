@@ -203,31 +203,59 @@ Future<TestDevice> startDevice(
   return device;
 }
 
-/// Runs the Pairing two people now do: [host] answers requests, [guest] picks it
-/// out of its list, and the host's user allows it.
+/// Waits for two Devices on one beacon hub to establish trust and connect.
 ///
-/// Both users confirm, as they would on two screens: allowing the request gets
-/// the two Devices talking, and the confirmation is what turns that into
-/// membership. The two halves are started before either is awaited — the dial
-/// does not resolve until the other side allows it, which is the whole point of
-/// the flow and would deadlock a sequential version.
+/// Discovery and the controller do the whole exchange. There is no request to
+/// answer or confirmation to issue at this layer; that is the behaviour this
+/// helper is meant to exercise.
 Future<void> pairUp(TestDevice host, TestDevice guest) async {
-  final request = host.controller.pairingRequests.first;
-  final joinFuture = guest.controller.pairWith(
-    host: InternetAddress.loopbackIPv4.address,
-    port: host.controller.pairingPort,
-  );
-  final hostAttempt = await (await request).admit();
-  final guestAttempt = await joinFuture;
-  expect(
-    hostAttempt.sas,
-    guestAttempt.sas,
-    reason: 'both Devices must derive the same digits to sign over',
-  );
-  await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
   await until(
-    () => host.controller.isServing && guest.controller.isServing,
-    description: 'both Devices to serve Sessions',
+    () => host.controller.isPaired && guest.controller.isPaired,
+    description: 'both Devices to connect automatically',
+    timeout: const Duration(seconds: 25),
+  );
+  await until(
+    () =>
+        host.controller.isServing &&
+        guest.controller.isServing &&
+        host.controller.sessions.isNotEmpty &&
+        guest.controller.sessions.isNotEmpty,
+    description: 'both Devices to serve Sessions and connect',
+  );
+  // A Pairing rebuilds the Session layer. Waiting only for the first Session
+  // that appears can catch the one belonging to the old layer just before it
+  // is replaced.
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  expect(
+    host.controller.sessions,
+    isNotEmpty,
+    reason: 'the automatically opened Session must stay open',
+  );
+  expect(guest.controller.sessions, isNotEmpty);
+}
+
+/// Establishes trust without Discovery, for a test that deliberately keeps the
+/// two Devices on separate beacon networks.
+///
+/// The receiving controller admits and confirms on its own. The initiating
+/// attempt is confirmed here so the helper has returned only when the group is
+/// written on both sides.
+Future<void> pairDirectly(TestDevice from, TestDevice to) async {
+  final port = to.controller.pairingPort;
+  expect(port, isNotNull, reason: 'the receiving Device answers Pairing');
+  final attempt = await from.controller.pairWith(
+    host: InternetAddress.loopbackIPv4.address,
+    port: port,
+  );
+  final outcome = await attempt.confirm();
+  expect(outcome.peer.fingerprint, to.fingerprint);
+  await until(
+    () =>
+        from.controller.isPaired &&
+        to.controller.isPaired &&
+        from.controller.isServing &&
+        to.controller.isServing,
+    description: 'both Devices to finish the direct Pairing and serve',
   );
 }
 
@@ -339,8 +367,8 @@ void main() {
     });
   });
 
-  group('pairing two Devices', () {
-    test('a typed code puts them in one group and starts them serving', () async {
+  group('automatically connecting two Devices', () {
+    test('discovery puts them in one group and starts them serving', () async {
       final hub = MemoryBeaconHub();
       final alice = await startDevice(hub.a, 'Alice');
       final bob = await startDevice(hub.b, 'Bob');
@@ -373,58 +401,27 @@ void main() {
       );
     });
 
-    test('a request the user refuses pairs nobody', () async {
+    test('both sides discovering together establish one group', () async {
       final hub = MemoryBeaconHub();
       final alice = await startDevice(hub.a, 'Alice');
       final bob = await startDevice(hub.b, 'Bob');
 
-      final request = alice.controller.pairingRequests.first;
-      final joinFuture = bob.controller.pairWith(
-        host: InternetAddress.loopbackIPv4.address,
-        port: alice.controller.pairingPort,
-      );
-      await (await request).refuse();
+      await pairUp(alice, bob);
 
-      // Which error depends on whether the refusal lands before or after the
-      // caller's first message: a closed link ends the read, and a send onto a
-      // link being torn down fails the handshake. Either way there is no
-      // attempt to confirm, which is what the test is about.
-      await expectLater(
-        joinFuture,
-        throwsA(anyOf(isA<PairingException>(), isA<HandshakeException>())),
+      expect(alice.controller.self.groupLength, 2);
+      expect(bob.controller.self.groupLength, 2);
+      expect(
+        alice.controller.self.groupLength,
+        bob.controller.self.groupLength,
+        reason: 'simultaneous discovery must not split the pair in two groups',
       );
-      expect(alice.controller.isPaired, isFalse);
-      expect(bob.controller.isPaired, isFalse);
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the automatically opened Session to come up',
+      );
     });
-
-    test(
-      'turning requests off takes the listener down, and on brings it back',
-      () async {
-        final hub = MemoryBeaconHub();
-        final alice = await startDevice(hub.a, 'Alice');
-
-        expect(alice.controller.acceptsPairingRequests, isTrue);
-        expect(alice.controller.isAcceptingPairings, isTrue);
-        expect(alice.controller.pairingPort, isNotNull);
-
-        await alice.controller.setAcceptsPairingRequests(false);
-
-        expect(alice.controller.acceptsPairingRequests, isFalse);
-        expect(
-          alice.controller.isAcceptingPairings,
-          isFalse,
-          reason:
-              'a Device that says it is not answering must not be listening',
-        );
-        expect(alice.controller.pairingPort, isNull);
-
-        await alice.controller.setAcceptsPairingRequests(true);
-
-        expect(alice.controller.acceptsPairingRequests, isTrue);
-        expect(alice.controller.isAcceptingPairings, isTrue);
-        expect(alice.controller.pairingPort, isNotNull);
-      },
-    );
 
     test('renaming keeps the group and changes what is announced', () async {
       final hub = MemoryBeaconHub();
@@ -531,8 +528,8 @@ void main() {
         expect(
           alice.controller.notices,
           contains(
-            'pairing port $blockedPort could not be bound; '
-            'answering on $fallbackPort instead',
+            'automatic connection port $blockedPort could not be bound; '
+            'listening on $fallbackPort instead',
           ),
         );
 
@@ -546,13 +543,7 @@ void main() {
           description: 'Bob to learn the Pairing fallback port from Discovery',
         );
 
-        final request = alice.controller.pairingRequests.first;
-        final joinFuture = bob.controller.pairWith(
-          host: InternetAddress.loopbackIPv4.address,
-        );
-        final hostAttempt = await (await request).admit();
-        final guestAttempt = await joinFuture;
-        await Future.wait([hostAttempt.confirm(), guestAttempt.confirm()]);
+        await pairUp(alice, bob);
 
         expect(alice.controller.isPaired, isTrue);
         expect(bob.controller.isPaired, isTrue);
@@ -589,6 +580,10 @@ void main() {
         reason: 'text is not a question, so nothing is offered',
       );
 
+      await until(
+        () => bob.controller.transfers.isNotEmpty,
+        description: 'Bob to record the text',
+      );
       final received = bob.controller.transfers.single;
       expect(received.kind, PayloadKind.text);
       expect(received.text, 'hello from Alice');
@@ -603,6 +598,20 @@ void main() {
       expect(received.peer, alice.fingerprint);
       expect(alice.controller.transfers.single.peer, bob.fingerprint);
       expect(sent.state, TransferState.completed);
+    });
+
+    test('an emoji travels as its own message kind', () async {
+      final sent = await alice.controller.sendEmoji('🙂');
+
+      await until(
+        () => sent.state.isSettled && bob.controller.transfers.isNotEmpty,
+        description: 'the emoji to settle on both Devices',
+      );
+      final received = bob.controller.transfers.single;
+      expect(received.kind, PayloadKind.emoji);
+      expect(received.text, '🙂');
+      expect(received.state, TransferState.completed);
+      expect(received.needsDecision, isFalse);
     });
 
     test('text arrives with nothing written to disk', () async {
@@ -855,8 +864,11 @@ void main() {
       // the controller answers it and no prompt is ever drawn.
       final sent = await alice.controller.sendText('goes straight through');
       await until(
-        () => sent.state.isSettled,
-        description: 'the text to settle',
+        () =>
+            sent.state.isSettled &&
+            bob.controller.transfers.isNotEmpty &&
+            bob.controller.transfers.single.state.isSettled,
+        description: 'the text to settle on both Devices',
       );
 
       expect(bob.offers, isEmpty, reason: 'there was nothing to ask');
@@ -1113,24 +1125,6 @@ void main() {
       expect(alice.controller.sessions, hasLength(1));
       expect(bob.controller.sessions, hasLength(1));
     });
-
-    test('a peer outside the group is not connected to', () async {
-      final hub = MemoryBeaconHub();
-      final alice = await startDevice(hub.a, 'Alice');
-      final bob = await startDevice(hub.b, 'Bob');
-      // Both are on the same beacon network, so each sees the other. Neither
-      // is in the other's Owner Group, so neither may dial: an unpaired Device
-      // needs its user's consent, and there is no secret to handshake with.
-      await until(
-        () => alice.controller.peers.any((peer) => peer.alias == 'Bob'),
-        description: 'Alice to see Bob',
-      );
-      // Alice's own connection is the point of asking whether she has one: a
-      // few discovery rounds have gone by at this point.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(alice.controller.sessions, isEmpty);
-      expect(bob.controller.sessions, isEmpty);
-    });
   });
 
   group('a Session that ends', () {
@@ -1203,26 +1197,6 @@ void main() {
         reason: 'the peer never moved, so this is the same peer again',
       );
     });
-
-    test(
-      'is not opened again for a peer that was never in the group',
-      () async {
-        final hub = MemoryBeaconHub();
-        final alice = await startDevice(hub.a, 'Alice');
-        final bob = await startDevice(hub.b, 'Bob');
-        // The two are on the same link and see each other, but they were never
-        // paired. A Session that ends must not become a way to talk to a Device
-        // the user never admitted — and neither may the sweep that keeps
-        // Sessions in step.
-        await until(
-          () => alice.controller.peers.any((peer) => peer.alias == 'Bob'),
-          description: 'Alice to see Bob',
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-        expect(alice.controller.sessions, isEmpty);
-        expect(bob.controller.sessions, isEmpty);
-      },
-    );
 
     test('is opened again after the peer went silent', () async {
       // The shape of a lost route rather than a closed socket: the
@@ -1435,7 +1409,7 @@ void main() {
         // which is the case a Manual Address exists for.
         final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
         final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
-        await pairUp(alice, bob);
+        await pairDirectly(alice, bob);
 
         expect(
           alice.controller.peers.any((peer) => peer.isDiallable),
@@ -1519,10 +1493,10 @@ void main() {
       // handshake is what has to refuse her.
       final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
       final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
-      await pairUp(alice, bob);
+      await pairDirectly(alice, bob);
       final carol = await startDevice(MemoryBeaconHub().a, 'Carol');
       final dave = await startDevice(MemoryBeaconHub().a, 'Dave');
-      await pairUp(carol, dave);
+      await pairDirectly(carol, dave);
 
       await expectLater(
         carol.controller.connectTo(

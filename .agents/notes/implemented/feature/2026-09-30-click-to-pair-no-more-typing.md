@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-09-30-click-to-pair-no-more-typing.zh.md)
 
+> **Superseded in part** by
+> [Discovery connects automatically](../bug-fix/2026-10-23-discovery-connects-automatically.md):
+> discovery now starts Pairing without a click or human admission. The open
+> Pairing secret negotiation and the initiator-owned Session dial remain current.
+
 ## Problem
 
 The first real use of the packaged app hit it immediately: the Join dialog asks

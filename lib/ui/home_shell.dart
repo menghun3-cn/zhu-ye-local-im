@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../core/core.dart';
 import 'controller_scope.dart';
-import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'nav_rail.dart';
 import 'pages/about_page.dart';
@@ -127,47 +124,6 @@ class _HomeShellState extends State<HomeShell> {
   /// between a successful download and the question: the entry is alive there
   /// so that a second press can find the question the first press opened.
   bool _updateLocked = false;
-
-  StreamSubscription<PairingRequest>? _requests;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Wired here rather than in the page that draws the pairing card: a request
-    // arrives whoever the user is looking at, and a prompt that only appeared on
-    // one of the surfaces would be a prompt that gets missed. The shell is the
-    // narrowest thing that is always alive.
-    _requests ??= ControllerScope.of(context).pairingRequests
-        .listen(_ask, onError: (Object _) {});
-  }
-
-  @override
-  void dispose() {
-    unawaited(_requests?.cancel());
-    super.dispose();
-  }
-
-  /// Puts one request to the user, and lets the answer travel back.
-  ///
-  /// Nothing else may happen first: the Device on the other end is blocked on
-  /// this dialog, so a request that arrives while there is no window to show it
-  /// in is refused rather than dropped — the alternative is a peer waiting for
-  /// a question nobody was ever asked.
-  Future<void> _ask(PairingRequest request) async {
-    if (!mounted) {
-      await request.refuse();
-      return;
-    }
-    // The controller travels with the question because the answer may have to
-    // open a Session: which side does that, when both sides asked at once, is
-    // decided from the two Fingerprints, and this is the side that knows one
-    // of them.
-    await showPairingRequestDialog(
-      context,
-      ControllerScope.of(context),
-      request,
-    );
-  }
 
   /// Brings the Conversations surface forward, with [peer]'s conversation open.
   ///

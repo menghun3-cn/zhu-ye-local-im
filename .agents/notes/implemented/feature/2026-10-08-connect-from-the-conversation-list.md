@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-10-08-connect-from-the-conversation-list.zh.md)
 
+> **Superseded in part** by
+> [Discovery connects automatically](../bug-fix/2026-10-23-discovery-connects-automatically.md):
+> found Devices remain in the conversation list, but trust and the first Session
+> are automatic. The list offers Connect only as a retry, never Pair.
+
 ## Problem
 
 Three things were wrong with the way a conversation begins, and they were the

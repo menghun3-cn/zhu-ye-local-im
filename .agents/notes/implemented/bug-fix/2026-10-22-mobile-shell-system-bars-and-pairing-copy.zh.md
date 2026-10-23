@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-10-22-mobile-shell-system-bars-and-pairing-copy.md) | 中文
 
+> **部分被取代**：
+> [发现设备后自动连接](2026-10-23-discovery-connects-automatically.zh.md)
+> —— `SafeArea` 的决定仍保留，但监听状态现在报告自动连接是否就绪，不再使用旧的
+> 配对边界文案。
+
 ## Problem
 
 主页外壳刻意没有 `AppBar`，但它的 `Scaffold.body` 绘制页面时没有顶部

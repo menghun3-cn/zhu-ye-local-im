@@ -149,7 +149,7 @@ abstract class AppLocalizations {
   /// No description provided for @failurePairing.
   ///
   /// In en, this message translates to:
-  /// **'Pairing failed: {detail}'**
+  /// **'Automatic connection failed: {detail}'**
   String failurePairing(String detail);
 
   /// No description provided for @failureCannotReach.
@@ -209,7 +209,7 @@ abstract class AppLocalizations {
   /// No description provided for @refusalNotPaired.
   ///
   /// In en, this message translates to:
-  /// **'This Device is not paired, so it accepts no Sessions.'**
+  /// **'This Device has not joined a group yet, so it accepts no Sessions.'**
   String get refusalNotPaired;
 
   /// No description provided for @refusalNoFreeFileName.
@@ -494,17 +494,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 open} other{{count} open}}'**
   String sessionsOpen(int count);
 
-  /// No description provided for @sessionsNeedPairing.
+  /// No description provided for @sessionsAutoConnectPending.
   ///
   /// In en, this message translates to:
-  /// **'pair this Device to accept Sessions'**
-  String get sessionsNeedPairing;
+  /// **'establishing a connection automatically'**
+  String get sessionsAutoConnectPending;
 
-  /// No description provided for @notAcceptingSessions.
+  /// No description provided for @connectionNotReady.
   ///
   /// In en, this message translates to:
-  /// **'not accepting Sessions'**
-  String get notAcceptingSessions;
+  /// **'connection channel not ready'**
+  String get connectionNotReady;
 
   /// No description provided for @onPort.
   ///
@@ -512,53 +512,35 @@ abstract class AppLocalizations {
   /// **'on port {port}'**
   String onPort(int port);
 
-  /// No description provided for @pairingCardPairedTitle.
+  /// No description provided for @automaticConnectionsTitle.
   ///
   /// In en, this message translates to:
-  /// **'Pair another Device'**
-  String get pairingCardPairedTitle;
+  /// **'Automatic connections'**
+  String get automaticConnectionsTitle;
 
-  /// No description provided for @pairingCardUnpairedTitle.
+  /// No description provided for @automaticConnectionsBody.
   ///
   /// In en, this message translates to:
-  /// **'Pair this Device to send anything'**
-  String get pairingCardUnpairedTitle;
+  /// **'Devices running this app on the same local network connect automatically when they are discovered. Send text, images, files and emoji directly; no pairing or request to accept.'**
+  String get automaticConnectionsBody;
 
-  /// No description provided for @pairingCardPairedBody.
+  /// No description provided for @automaticConnectionsReady.
   ///
   /// In en, this message translates to:
-  /// **'Devices in one Owner Group can open Sessions with each other. Pairing adds one, and is also what lets a clipboard be shared.'**
-  String get pairingCardPairedBody;
+  /// **'Ready: discovered Devices connect automatically'**
+  String get automaticConnectionsReady;
 
-  /// No description provided for @pairingCardUnpairedBody.
+  /// No description provided for @automaticConnectionsUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Pairing is a one-time step: on the other Device, tap Pair beside this one in its list, and this Device will ask you to allow it. Allowing it is the whole of it. After that, sending files and messages needs nothing further.'**
-  String get pairingCardUnpairedBody;
+  /// **'This Device cannot accept automatic connections right now, but it can still connect outwards.'**
+  String get automaticConnectionsUnavailable;
 
-  /// No description provided for @acceptPairingRequests.
+  /// No description provided for @factAutomaticConnections.
   ///
   /// In en, this message translates to:
-  /// **'Answer pairing requests'**
-  String get acceptPairingRequests;
-
-  /// No description provided for @pairingListening.
-  ///
-  /// In en, this message translates to:
-  /// **'Answering requests from other Devices'**
-  String get pairingListening;
-
-  /// No description provided for @pairingNotListening.
-  ///
-  /// In en, this message translates to:
-  /// **'Not answering requests'**
-  String get pairingNotListening;
-
-  /// No description provided for @factPairingRequests.
-  ///
-  /// In en, this message translates to:
-  /// **'Pairing requests'**
-  String get factPairingRequests;
+  /// **'Automatic connections'**
+  String get factAutomaticConnections;
 
   /// No description provided for @peerNameNotAnnounced.
   ///
@@ -632,12 +614,6 @@ abstract class AppLocalizations {
   /// **'Open a Session'**
   String get openSession;
 
-  /// No description provided for @pairWithThisDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Pair with this Device'**
-  String get pairWithThisDevice;
-
   /// No description provided for @nothingToDialYet.
   ///
   /// In en, this message translates to:
@@ -650,23 +626,29 @@ abstract class AppLocalizations {
   /// **'Nothing known about where this Device is'**
   String get nothingKnownAboutPeer;
 
-  /// No description provided for @pair.
-  ///
-  /// In en, this message translates to:
-  /// **'Pair'**
-  String get pair;
-
-  /// No description provided for @repairPairing.
-  ///
-  /// In en, this message translates to:
-  /// **'Pair again'**
-  String get repairPairing;
-
   /// No description provided for @connect.
   ///
   /// In en, this message translates to:
   /// **'Connect'**
   String get connect;
+
+  /// No description provided for @connectingAutomatically.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting automatically'**
+  String get connectingAutomatically;
+
+  /// No description provided for @autoReconnectPending.
+  ///
+  /// In en, this message translates to:
+  /// **'will reconnect automatically'**
+  String get autoReconnectPending;
+
+  /// No description provided for @autoConnectingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'waiting for the other Device to become reachable'**
+  String get autoConnectingSoon;
 
   /// No description provided for @transfersEmptyHint.
   ///
@@ -827,7 +809,7 @@ abstract class AppLocalizations {
   /// No description provided for @clipboardPeersEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No paired devices yet; pair one from the conversation list first, then come back to tick it for clipboard sharing.'**
+  /// **'No connected Devices yet; when one appears automatically, come back and tick it for clipboard sharing.'**
   String get clipboardPeersEmpty;
 
   /// No description provided for @clipboardNoteBoth.
@@ -1031,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @noIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'This Device has nowhere to keep its identity, so it runs in memory: it works, and it has to be paired again after every restart.'**
+  /// **'This Device has nowhere to keep its identity, so it runs in memory: it works, and after a restart it must discover other Devices and connect automatically again.'**
   String get noIdentityHint;
 
   /// No description provided for @factReceivedFiles.
@@ -1262,54 +1244,6 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get save;
 
-  /// No description provided for @pairingRequestTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Pairing request'**
-  String get pairingRequestTitle;
-
-  /// No description provided for @pairingRequestFrom.
-  ///
-  /// In en, this message translates to:
-  /// **'{alias} wants to pair with this Device.'**
-  String pairingRequestFrom(String alias);
-
-  /// No description provided for @pairingRequestUnnamed.
-  ///
-  /// In en, this message translates to:
-  /// **'a Device with no name yet'**
-  String get pairingRequestUnnamed;
-
-  /// No description provided for @pairingRequestClaimHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The name is the caller\'s own claim and nothing here can check it. Allowing it adds that Device to your Owner Group, and the two of you can then send each other things.'**
-  String get pairingRequestClaimHint;
-
-  /// No description provided for @pairingCompleting.
-  ///
-  /// In en, this message translates to:
-  /// **'Finishing the Pairing…'**
-  String get pairingCompleting;
-
-  /// No description provided for @acceptPairing.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow'**
-  String get acceptPairing;
-
-  /// No description provided for @connectToPeerTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect to {peer}'**
-  String connectToPeerTitle(String peer);
-
-  /// No description provided for @reachingOtherDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Reaching the other Device, waiting for its user to allow it…'**
-  String get reachingOtherDevice;
-
   /// No description provided for @manualAddressTitle.
   ///
   /// In en, this message translates to:
@@ -1385,13 +1319,13 @@ abstract class AppLocalizations {
   /// No description provided for @conversationListEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No conversations yet. A Device this one finds shows up here on its own, ready to connect.'**
+  /// **'No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.'**
   String get conversationListEmpty;
 
   /// No description provided for @conversationPickOne.
   ///
   /// In en, this message translates to:
-  /// **'Pick a conversation on the left, or connect a Device first.'**
+  /// **'Pick a conversation on the left, or wait for a nearby Device to connect automatically.'**
   String get conversationPickOne;
 
   /// No description provided for @conversationDisconnected.

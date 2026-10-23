@@ -126,7 +126,9 @@ String describePeerFacts(PeerView peer, AppLocalizations l10n) {
       l10n.onPort(peer.sessionPort!)
     else if (peer.address == null && !connected)
       l10n.neverSeen,
-    if (connected)
+    if (peer.isConnecting)
+      l10n.connectingAutomatically
+    else if (connected)
       l10n.sessionOpen
     else if (peer.address != null)
       l10n.lastSeen(describeLastSeen(peer.lastSeen, l10n)),

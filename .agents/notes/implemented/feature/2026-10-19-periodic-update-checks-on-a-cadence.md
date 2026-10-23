@@ -22,7 +22,7 @@ window was not looking — but it would never hear about it until a restart.
 persists in `DeviceProfile` as `updateCheckInterval`, with wire names
 `off / hourly / six-hours / daily / three-days`. A profile written before the
 key existed, or carrying a value this build does not know, decodes to the
-default — the same tolerant rule `acceptPairingRequests` uses.
+default — the same tolerant rule the profile applies to optional preferences.
 
 **Settings owns the choice.** A new 更新检查 section on the Settings surface
 shows a switch (periodic on/off) and, while on, a `SegmentedButton` of the four

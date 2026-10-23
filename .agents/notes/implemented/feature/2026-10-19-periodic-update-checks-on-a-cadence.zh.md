@@ -21,7 +21,7 @@ and one that never appeared in Settings was never agreed to exist.
 `lib/core`（纯 Dart，`test/` 可测），以 `updateCheckInterval` 持久化在
 `DeviceProfile` 中，wire 名固定为 `off / hourly / six-hours / daily /
 three-days`。该键出现前的旧 profile、或本版本不认识的取值，都按默认值解码——与
-`acceptPairingRequests` 的同一条宽容规则。
+profile 对可选偏好使用的同一条宽容规则。
 
 **设置页负责这个选择。** 设置页新增「更新检查」区：一个开关（后台定期检查开/关），
 打开时再给一个 `SegmentedButton` 列四种频率。改任一都会经控制器 `_persist()`

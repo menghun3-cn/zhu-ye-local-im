@@ -382,12 +382,12 @@ void main() {
   });
 
   group('What a Pairing request must never do', () {
-    test('a caller is given nothing until its request is allowed', () async {
+    test('a caller is given nothing until its request is admitted', () async {
       // The handshake an open Pairing runs on stands on a secret that is a
       // published constant, so *any* Device on the link can complete it. What
-      // such a caller must not be able to reach is the group secret, and the
-      // only thing standing between the two is that a person has to allow the
-      // request. This asserts the ordering that makes that true.
+      // such a caller must not be able to reach before admission is the group
+      // secret. The shipping controller admits discovered peers immediately,
+      // but the service must still hold that ordering for its caller.
       final host = await TestDevice.start('alice-laptop');
       final joiner = await TestDevice.start('bob-phone');
       addTearDown(host.close);
@@ -423,7 +423,7 @@ void main() {
       expect(error, isA<PairingException>());
       expect(
         (error! as PairingException).message,
-        contains('did not allow'),
+        contains('did not admit'),
         reason: 'a refusal is reported as a refusal',
       );
       expect(host.secret, isNull);

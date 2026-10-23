@@ -4,6 +4,10 @@ Status: implemented
 
 [English](2026-10-22-stale-group-membership-repairs-by-pairing-again.md) | 中文
 
+> **已被取代**：
+> [发现设备后自动连接](2026-10-23-discovery-connects-automatically.zh.md)
+> —— 发现的设备会自动恢复缺失密钥。界面和恢复路径都不再包含「重新配对」。
+
 ## Problem
 
 设备组成员关系和组密钥会一起持久化，但对端仍可能只保留了一次配对的其中一半。
