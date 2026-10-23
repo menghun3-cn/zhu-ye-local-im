@@ -1730,7 +1730,14 @@ final class LocalTransferController {
   }
 
   void _adopt(ManagedSession session) {
-    if (_wired.containsKey(session.peer.hex)) return;
+    final previous = _wired[session.peer.hex];
+    if (previous != null && identical(previous.session, session)) return;
+    if (previous != null) {
+      // A crossed dial can replace the Session after the controller adopted
+      // the losing direction. Move the transfer wiring to the survivor.
+      _wired.remove(session.peer.hex);
+      unawaited(previous.dispose());
+    }
     final engine = TransferEngine(
       channel: session.hub.transfers,
       onNotice: _notice,
