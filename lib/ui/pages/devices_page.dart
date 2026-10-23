@@ -18,11 +18,16 @@ class DevicesPage extends StatelessWidget {
   const DevicesPage({
     super.key,
     this.defaultIncomingDirectory,
+    this.localAddresses = const [],
     this.onConversationRequested,
   });
 
   /// Where a file received from a conversation lands by default.
   final String? defaultIncomingDirectory;
+
+  /// This machine's non-loopback IPv4 addresses, as the platform reported
+  /// them. Empty means the address could not be read.
+  final List<String> localAddresses;
 
   /// Called when the user asks for a conversation with [Fingerprint]'s Device.
   ///
@@ -43,7 +48,7 @@ class DevicesPage extends StatelessWidget {
     return ListView(
       padding: WeChat.pagePadding,
       children: [
-        _SelfCard(controller: controller),
+        _SelfCard(controller: controller, localAddresses: localAddresses),
         const SizedBox(height: WeChat.cardGap),
         _AutomaticConnectionCard(controller: controller),
         const SizedBox(height: WeChat.sectionGap),
@@ -71,9 +76,10 @@ class DevicesPage extends StatelessWidget {
 
 /// What this Device says about itself.
 class _SelfCard extends StatelessWidget {
-  const _SelfCard({required this.controller});
+  const _SelfCard({required this.controller, required this.localAddresses});
 
   final LocalTransferController controller;
+  final List<String> localAddresses;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +123,12 @@ class _SelfCard extends StatelessWidget {
             ),
             FactLine(l10n.factOwnerGroup, l10n.groupDevices(self.groupLength)),
             FactLine(l10n.factSessions, l10n.sessionsOpen(self.openSessions)),
+            FactLine(
+              l10n.localIpAddress,
+              localAddresses.isEmpty
+                  ? l10n.localIpUnavailable
+                  : localAddresses.join(' · '),
+            ),
             FactLine(
               l10n.factListening,
               // Discovery and the trust exchange do not need a group secret;

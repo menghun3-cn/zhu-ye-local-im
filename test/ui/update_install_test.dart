@@ -69,6 +69,12 @@ void main() {
             size: 10,
             digest: 'sha256:aa',
           ),
+          UpdateAsset(
+            name: 'LocalTransfer-9.9.9-android.apk',
+            url: 'https://example.test/android.apk',
+            size: 10,
+            digest: 'sha256:aa',
+          ),
         ],
   );
 
@@ -86,6 +92,10 @@ void main() {
       expect(
         updateAssetName(tag: '0.1.2', payload: UpdatePayload.installer),
         'LocalTransfer-0.1.2-windows-x64-setup.exe',
+      );
+      expect(
+        updateAssetName(tag: 'v0.1.2', payload: UpdatePayload.androidPackage),
+        'LocalTransfer-0.1.2-android.apk',
       );
     });
 
@@ -618,16 +628,120 @@ void main() {
   });
 
   group('PlatformUpdateInstaller', () {
-    test('replaces this build only where the packaging is known', () {
-      expect(const PlatformUpdateInstaller().supported, Platform.isWindows);
+    test('knows the packaging of both supported platforms', () {
+      expect(
+        const PlatformUpdateInstaller(platform: UpdateInstallPlatform.windows)
+            .supported,
+        isTrue,
+      );
+      expect(
+        const PlatformUpdateInstaller(platform: UpdateInstallPlatform.android)
+            .supported,
+        isTrue,
+      );
+      expect(
+        const PlatformUpdateInstaller(platform: UpdateInstallPlatform.other)
+            .supported,
+        isFalse,
+      );
     });
 
     test('does nothing at all on a platform that cannot', () async {
-      if (Platform.isWindows) return;
       final result = await PlatformUpdateInstaller(
         application: folder('lt_app_').path,
+        platform: UpdateInstallPlatform.other,
       ).prepare(releaseWith(), onProgress: (progress) {});
       expect(result.failure, UpdateInstallFailure.unsupported);
+    });
+
+    test('fetches an Android APK and hands it to the installer', () async {
+      final root = folder('lt_android_');
+      const body = 'checked APK bytes';
+      final update = updateDirectory(root.path);
+      final apk = File(
+        pathUnder(update.path, 'LocalTransfer-9.9.9-android.apk'),
+      )..writeAsStringSync(body);
+      final release = UpdateCheck(
+        UpdateOutcome.available,
+        version: 'v9.9.9',
+        assets: [
+          UpdateAsset(
+            name: 'LocalTransfer-9.9.9-android.apk',
+            url: 'https://example.test/android.apk',
+            size: body.length,
+            digest: 'sha256:${sha256.convert(utf8.encode(body))}',
+          ),
+        ],
+      );
+      final stages = <UpdateInstallStage>[];
+      String? handedToInstaller;
+      var left = false;
+      final installer = PlatformUpdateInstaller(
+        application: root.path,
+        platform: UpdateInstallPlatform.android,
+        leave: () => left = true,
+        androidInstall: (path) async {
+          handedToInstaller = path;
+          return AndroidInstallOutcome.started;
+        },
+      );
+
+      final result = await installer.prepare(
+        release,
+        onProgress: (progress) => stages.add(progress.stage),
+      );
+
+      expect(result.prepared?.payload, UpdatePayload.androidPackage);
+      expect(result.prepared?.package, apk.path);
+      expect(stages, [
+        UpdateInstallStage.downloading,
+        UpdateInstallStage.verifying,
+      ]);
+
+      await installer.apply(
+        result.prepared!,
+        onProgress: (progress) => stages.add(progress.stage),
+      );
+
+      expect(handedToInstaller, apk.path);
+      expect(stages.last, UpdateInstallStage.installing);
+      expect(
+        left,
+        isFalse,
+        reason: 'Android opens its installer and this process keeps running',
+      );
+    });
+
+    test('reports the two Android hand-off failures separately', () async {
+      const prepared = PreparedUpdate.android('/tmp/update.apk');
+      final permission = PlatformUpdateInstaller(
+        platform: UpdateInstallPlatform.android,
+        androidInstall: (_) async => AndroidInstallOutcome.permission,
+      );
+      final missing = const PlatformUpdateInstaller(
+        platform: UpdateInstallPlatform.android,
+      );
+
+      await expectLater(
+        permission.apply(prepared, onProgress: (_) {}),
+        throwsA(
+          isA<UpdateInstallException>().having(
+            (error) => error.failure,
+            'failure',
+            UpdateInstallFailure.permission,
+          ),
+        ),
+      );
+      await expectLater(
+        missing.apply(prepared, onProgress: (_) {}),
+        throwsA(
+          isA<UpdateInstallException>().having(
+            (error) => error.failure,
+            'failure',
+            UpdateInstallFailure.installer,
+          ),
+        ),
+      );
     });
   });
 
@@ -668,6 +782,10 @@ void main() {
           tag: 'v$appVersion',
           payload: UpdatePayload.portablePackage,
         ): 'the package that was just installed',
+        updateAssetName(
+          tag: 'v$appVersion',
+          payload: UpdatePayload.androidPackage,
+        ): 'the APK that was just installed',
       });
 
       clearFetchedUpdate(root: root.path);
@@ -677,6 +795,15 @@ void main() {
           pathUnder(
             root.path,
             'update/${updateAssetName(tag: 'v$appVersion', payload: UpdatePayload.portablePackage)}',
+          ),
+        ).existsSync(),
+        isFalse,
+      );
+      expect(
+        File(
+          pathUnder(
+            root.path,
+            'update/${updateAssetName(tag: 'v$appVersion', payload: UpdatePayload.androidPackage)}',
           ),
         ).existsSync(),
         isFalse,

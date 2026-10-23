@@ -87,6 +87,10 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
       store: seams.store,
       beaconTransport: seams.beacon,
       clipboard: seams.clipboard,
+      // A brand-new identity starts with the operating system's name for the
+      // machine. The profile layer migrates the old placeholder once, and
+      // never replaces a name the user chose.
+      alias: seams.localHostname,
       platform: seams.platform,
       // Where a Transfer the controller answers on its own lands when the
       // profile names no folder of its own. Passed in because only the platform

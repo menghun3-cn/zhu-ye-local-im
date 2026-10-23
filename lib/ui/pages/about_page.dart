@@ -188,6 +188,8 @@ class _AboutPageState extends State<AboutPage> {
   Future<void> _install({UpdateCheck? offered}) async {
     final answer = offered ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
+    final installer = UpdateInstallResolution.installer;
+    final restarts = installer.restartsApplication;
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
     setState(() => _answer = answer);
     var prepared = _prepared;
@@ -197,7 +199,7 @@ class _AboutPageState extends State<AboutPage> {
         _leftOver = null;
         _progress = const UpdateInstallProgress(UpdateInstallStage.downloading);
       });
-      final staged = await UpdateInstallResolution.installer.prepare(
+      final staged = await installer.prepare(
         answer,
         onProgress: (progress) {
           if (mounted) setState(() => _progress = progress);
@@ -226,7 +228,10 @@ class _AboutPageState extends State<AboutPage> {
     // place, so answering no costs nothing and changes nothing.
     final closing = await showDialog<bool>(
       context: context,
-      builder: (_) => _ConfirmUpdateDialog(version: answer.version ?? ''),
+      builder: (_) => _ConfirmUpdateDialog(
+        version: answer.version ?? '',
+        restartsApplication: restarts,
+      ),
     );
     if (!mounted) return;
     if (closing != true) {
@@ -237,15 +242,44 @@ class _AboutPageState extends State<AboutPage> {
     setState(() {
       // The question is past: what is left closes this program, so the buttons
       // that opened the question have nothing left to say.
-      _progress = const UpdateInstallProgress(UpdateInstallStage.handingOver);
+      _progress = UpdateInstallProgress(
+        restarts
+            ? UpdateInstallStage.handingOver
+            : UpdateInstallStage.installing,
+      );
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
-    await UpdateInstallResolution.installer.apply(
-      prepared,
-      onProgress: (progress) {
-        if (mounted) setState(() => _progress = progress);
-      },
-    );
+    try {
+      await installer.apply(
+        prepared,
+        onProgress: (progress) {
+          if (mounted) setState(() => _progress = progress);
+        },
+      );
+    } on UpdateInstallException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _failure = error.failure;
+        _progress = null;
+      });
+      _reportBusy(false);
+      return;
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _failure = UpdateInstallFailure.installer;
+        _progress = null;
+      });
+      _reportBusy(false);
+      return;
+    }
+    if (!mounted) return;
+    if (!restarts) {
+      // Android returns as soon as the system installer has been opened. The
+      // APK stays on disk so cancelling there and pressing again costs no new
+      // download.
+      setState(() => _progress = null);
+    }
     // A scripted installer returns without ending the process; the real one
     // never reaches here. Unlock only so a test that walks through the whole
     // flow does not leave the rail pinned behind it.
@@ -280,6 +314,8 @@ class _AboutPageState extends State<AboutPage> {
         return l10n.aboutUpdateStaging;
       case UpdateInstallStage.handingOver:
         return l10n.aboutUpdateHandingOver;
+      case UpdateInstallStage.installing:
+        return l10n.aboutUpdateInstalling;
       case UpdateInstallStage.idle:
       case UpdateInstallStage.failed:
         return null;
@@ -310,8 +346,22 @@ class _AboutPageState extends State<AboutPage> {
     final failure = _failure;
     final leftOver = _leftOver;
     final prepared = _prepared;
+    final installer = UpdateInstallResolution.installer;
+    final restarts = installer.restartsApplication;
     final canInstall =
         _canInstall && answer?.outcome == UpdateOutcome.available;
+    final installLabel = restarts
+        ? l10n.aboutUpdateInstall
+        : l10n.aboutUpdateInstallAndroid;
+    final installHint = restarts
+        ? l10n.aboutUpdateInstallHint
+        : l10n.aboutUpdateInstallHintAndroid;
+    final readyText = restarts
+        ? l10n.aboutUpdateReady
+        : l10n.aboutUpdateReadyAndroid;
+    final manualHint = _canInstall && !restarts
+        ? l10n.aboutHowToUpgradeAndroid
+        : l10n.aboutHowToUpgrade;
     final progressSentence = progress == null
         ? null
         : _progressSentence(progress, l10n);
@@ -376,7 +426,7 @@ class _AboutPageState extends State<AboutPage> {
                       FilledButton.icon(
                         onPressed: _busy ? null : () => unawaited(_install()),
                         icon: const Icon(Icons.download_outlined, size: 18),
-                        label: Text(l10n.aboutUpdateInstall),
+                        label: Text(installLabel),
                       ),
                     // Opens a page rather than doing something in this window,
                     // so it stays the quiet style: the filled button above is
@@ -469,7 +519,7 @@ class _AboutPageState extends State<AboutPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      l10n.aboutUpdateReady,
+                      readyText,
                       style: TextStyle(
                         fontSize: WeChat.fontSizePreview,
                         color: colors.brand,
@@ -491,11 +541,7 @@ class _AboutPageState extends State<AboutPage> {
                     ),
                   ),
                 const SizedBox(height: 8),
-                HintText(
-                  canInstall
-                      ? l10n.aboutUpdateInstallHint
-                      : l10n.aboutHowToUpgrade,
-                ),
+                HintText(canInstall ? installHint : manualHint),
               ],
             ),
           ),
@@ -513,18 +559,32 @@ class _AboutPageState extends State<AboutPage> {
 /// quiet option and also the safe one — the package stays in the update folder
 /// and the application carries on exactly as it was.
 class _ConfirmUpdateDialog extends StatelessWidget {
-  /// Asks about closing for [version].
-  const _ConfirmUpdateDialog({required this.version});
+  /// Asks about installing [version].
+  const _ConfirmUpdateDialog({
+    required this.version,
+    required this.restartsApplication,
+  });
 
   /// The version that has been fetched and checked.
   final String version;
+
+  /// Whether confirming closes this process and starts it again.
+  final bool restartsApplication;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text(l10n.aboutUpdateConfirmTitle),
-      content: Text(l10n.aboutUpdateConfirmBody(version)),
+      title: Text(
+        restartsApplication
+            ? l10n.aboutUpdateConfirmTitle
+            : l10n.aboutUpdateConfirmTitleAndroid,
+      ),
+      content: Text(
+        restartsApplication
+            ? l10n.aboutUpdateConfirmBody(version)
+            : l10n.aboutUpdateConfirmBodyAndroid(version),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
@@ -532,7 +592,11 @@ class _ConfirmUpdateDialog extends StatelessWidget {
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text(l10n.aboutUpdateConfirmApply),
+          child: Text(
+            restartsApplication
+                ? l10n.aboutUpdateConfirmApply
+                : l10n.aboutUpdateConfirmApplyAndroid,
+          ),
         ),
       ],
     );

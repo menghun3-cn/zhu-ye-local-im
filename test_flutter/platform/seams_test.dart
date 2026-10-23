@@ -240,6 +240,21 @@ void main() {
       expect(seams.clipboard, isA<FlutterSystemClipboard>());
     });
 
+    test('carry the host name, addresses and private directory', () async {
+      final seams = await openPlatformSeams(
+        platform: DevicePlatform.android,
+        environment: const {},
+        beacon: hub.a,
+        localHostname: 'Studio-PC',
+        localAddresses: const ['192.168.1.20', '10.0.0.5'],
+        appDataDirectory: androidFilesDir,
+      );
+
+      expect(seams.localHostname, 'Studio-PC');
+      expect(seams.localAddresses, ['192.168.1.20', '10.0.0.5']);
+      expect(seams.appDataDirectory, androidFilesDir);
+    });
+
     test('let a first launch mint an identity and keep it', () async {
       // The whole chain, on a directory that does not exist yet — which is
       // exactly the state of `%APPDATA%/LocalTransfer` on a machine that has

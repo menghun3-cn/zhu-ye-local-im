@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../core/core.dart';
+import '../conversation_menu.dart';
 import '../controller_scope.dart';
 import '../conversation_view.dart';
 import '../feedback.dart';
@@ -69,6 +70,8 @@ class ConversationsPage extends StatefulWidget {
 }
 
 class _ConversationsPageState extends State<ConversationsPage> {
+  final TextEditingController _search = TextEditingController();
+
   /// The peer being read, by Fingerprint hex. Null until one is picked.
   ///
   /// Held as a hex string rather than a [Fingerprint] so that a peer that
@@ -138,6 +141,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
     if (widget.focusRequest != oldWidget.focusRequest) {
       setState(() => _focusComposer = true);
     }
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   /// A conversation worth a row.
@@ -246,13 +255,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
     final wide = MediaQuery.sizeOf(context).width >= 720;
 
-    if (conversations.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: HintText(l10n.conversationListEmpty),
-      );
-    }
-
     // Narrow windows get the list and then the conversation, one at a time:
     // two panes at 400 logical pixels each would leave neither readable.
     if (!wide) {
@@ -264,6 +266,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
           _PaneHeader(
             title: current.peer.displayName,
             subtitle: _subtitleFor(current.peer, l10n),
+            peer: current.peer.fingerprint,
             onBack: () => setState(() {
               _selected = null;
               _untouched = false;
@@ -342,6 +345,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
                         // would reach anybody, and a pane that looked the same
                         // either way would be inviting a message into a void.
                         subtitle: _subtitleFor(current.peer, l10n),
+                        peer: current.peer.fingerprint,
                         offline: !current.peer.isConnected,
                       ),
                     ),
@@ -411,21 +415,111 @@ class _ConversationsPageState extends State<ConversationsPage> {
     required _Conversation? selected,
   }) {
     final controller = ControllerScope.of(context);
-    return ListView.builder(
-      itemCount: conversations.length,
-      itemBuilder: (context, index) {
-        final entry = conversations[index];
-        return _ConversationTile(
-          entry: entry,
-          l10n: l10n,
-          selected:
-              entry.peer.fingerprint.hex == selected?.peer.fingerprint.hex,
-          unread: controller.unreadCount(entry.peer.fingerprint),
-          controller: controller,
-          onTap: () => _open(entry.peer.fingerprint),
-        );
-      },
+    final query = _search.text.trim();
+    final visible = _searchConversations(conversations, query);
+    final colors = WeChatColors.of(context);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: TextField(
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: WeChat.fontSizeInput),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: colors.surfaceSunken,
+              hintText: l10n.searchConversations,
+              prefixIcon: const Icon(Icons.search, size: 19),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: l10n.clearSearch,
+                      onPressed: () {
+                        _search.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(WeChat.controlRadius),
+                borderSide: BorderSide(color: colors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(WeChat.controlRadius),
+                borderSide: BorderSide(color: colors.brandStrong),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: HintText(
+                    query.isEmpty
+                        ? l10n.conversationListEmpty
+                        : l10n.conversationSearchEmpty,
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final entry = visible[index];
+                    return _ConversationTile(
+                      entry: entry,
+                      l10n: l10n,
+                      selected:
+                          entry.peer.fingerprint.hex ==
+                          selected?.peer.fingerprint.hex,
+                      unread: controller.unreadCount(entry.peer.fingerprint),
+                      controller: controller,
+                      onTap: () => _open(entry.peer.fingerprint),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
+  }
+
+  List<_Conversation> _searchConversations(
+    List<_Conversation> conversations,
+    String query,
+  ) {
+    if (query.isEmpty) return conversations;
+    final needle = query.toLowerCase();
+    final answer = <_Conversation>[];
+    for (final entry in conversations) {
+      final nameMatches = entry.peer.displayName.toLowerCase().contains(needle);
+      TransferView? matched;
+      for (final view in entry.history) {
+        final text = view.text?.toLowerCase();
+        final named = view.names.any(
+          (name) => name.toLowerCase().contains(needle),
+        );
+        if ((text != null && text.contains(needle)) || named) {
+          matched = view;
+          break;
+        }
+      }
+      if (!nameMatches && matched == null) continue;
+      answer.add(
+        _Conversation(
+          peer: entry.peer,
+          history: entry.history,
+          waiting: entry.waiting,
+          preview: matched,
+        ),
+      );
+    }
+    return answer;
   }
 
   /// Opens [peer]'s conversation, and records that it has been read.
@@ -447,6 +541,7 @@ class _Conversation {
     required this.peer,
     required this.history,
     required this.waiting,
+    this.preview,
   });
 
   /// The Device on the other end.
@@ -457,6 +552,9 @@ class _Conversation {
 
   /// Whether something from this peer is waiting on an answer.
   final bool waiting;
+
+  /// The message a search matched, when the row is being drawn for a search.
+  final TransferView? preview;
 
   /// The last thing said, for the one-line summary a row shows.
   TransferView? get latest => history.isEmpty ? null : history.first;
@@ -509,7 +607,7 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
     final peer = entry.peer;
-    final latest = entry.latest;
+    final latest = entry.preview ?? entry.latest;
     final action = _actionFor(peer);
     // The top-right corner is the clock, where the desktop client puts it: the
     // time the last thing was said, or — for a conversation nobody has said
@@ -915,12 +1013,16 @@ class _PaneHeader extends StatelessWidget {
   const _PaneHeader({
     required this.title,
     this.subtitle,
+    this.peer,
     this.onBack,
     this.offline = false,
   });
 
   final String title;
   final String? subtitle;
+
+  /// The conversation this header belongs to, when there is a menu to offer.
+  final Fingerprint? peer;
 
   /// Shown as a leading back button on a narrow window, where the list and the
   /// conversation are the same screen.
@@ -990,6 +1092,12 @@ class _PaneHeader extends StatelessWidget {
                 ],
               ),
             ),
+            if (peer != null)
+              ConversationMenuButton(
+                peer: peer!,
+                color: colors.secondaryText,
+                iconSize: 20,
+              ),
           ],
         ),
       ),

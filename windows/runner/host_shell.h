@@ -2,6 +2,7 @@
 #define RUNNER_HOST_SHELL_H_
 
 #include <windows.h>
+#include <shobjidl.h>
 
 // The name of the method channel the Dart side reaches these behaviours
 // through. Kept next to them so the two spellings cannot drift apart. Narrow
@@ -40,6 +41,9 @@ class HostShell {
   // True when WM_CLOSE should hide the window rather than end the process.
   void set_close_to_tray(bool value);
 
+  // Shows or clears the taskbar overlay that says a conversation is unread.
+  void set_unread(bool value);
+
   // The per-user autostart entry. Nothing is cached on this side: the registry
   // is the only store, so an entry changed by hand reads back as it is.
   bool autostart_enabled() const;
@@ -58,6 +62,9 @@ class HostShell {
 
   void AddTrayIcon();
   void RemoveTrayIcon();
+  void EnsureTaskbar();
+  void ReleaseTaskbar();
+  void ApplyTaskbarOverlay();
 
   // Brings the window back and puts it in front of whatever the user is
   // currently looking at.
@@ -69,8 +76,12 @@ class HostShell {
 
   HWND window_ = nullptr;
   HICON tray_icon_ = nullptr;
+  HICON unread_icon_ = nullptr;
+  ITaskbarList3* taskbar_ = nullptr;
   bool close_to_tray_ = true;
   bool tray_icon_added_ = false;
+  bool unread_ = false;
+  bool com_initialized_ = false;
 };
 
 #endif  // RUNNER_HOST_SHELL_H_

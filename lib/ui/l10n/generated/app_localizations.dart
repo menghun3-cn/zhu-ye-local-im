@@ -440,6 +440,18 @@ abstract class AppLocalizations {
   /// **'Nothing has been discovered yet. Devices running this app on the same network appear here; one Discovery cannot reach can still be dialled by address.'**
   String get devicesEmptyHint;
 
+  /// No description provided for @localIpAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s IP'**
+  String get localIpAddress;
+
+  /// No description provided for @localIpUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s address is unavailable'**
+  String get localIpUnavailable;
+
   /// No description provided for @rename.
   ///
   /// In en, this message translates to:
@@ -1130,6 +1142,12 @@ abstract class AppLocalizations {
   /// **'Replacing this folder and restarting…'**
   String get aboutUpdateHandingOver;
 
+  /// No description provided for @aboutUpdateInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the system installer…'**
+  String get aboutUpdateInstalling;
+
   /// No description provided for @aboutUpdateFailedTitle.
   ///
   /// In en, this message translates to:
@@ -1141,6 +1159,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.'**
   String get aboutUpdateInstallHint;
+
+  /// No description provided for @aboutUpdateInstallAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and install'**
+  String get aboutUpdateInstallAndroid;
+
+  /// No description provided for @aboutUpdateInstallHintAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Download and install: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.'**
+  String get aboutUpdateInstallHintAndroid;
 
   /// No description provided for @aboutUpdateConfirmTitle.
   ///
@@ -1160,11 +1190,41 @@ abstract class AppLocalizations {
   /// **'Update and restart'**
   String get aboutUpdateConfirmApply;
 
+  /// No description provided for @aboutUpdateConfirmTitleAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the update?'**
+  String get aboutUpdateConfirmTitleAndroid;
+
+  /// No description provided for @aboutUpdateConfirmBodyAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Open installer: Android takes over the installation, and you can reopen this app when it finishes.'**
+  String aboutUpdateConfirmBodyAndroid(String version);
+
+  /// No description provided for @aboutUpdateConfirmApplyAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Open installer'**
+  String get aboutUpdateConfirmApplyAndroid;
+
   /// No description provided for @aboutUpdateReady.
   ///
   /// In en, this message translates to:
   /// **'The update package is ready. Press Download and update again to install it — no new download.'**
   String get aboutUpdateReady;
+
+  /// No description provided for @aboutUpdateReadyAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'The APK is ready. Press Download and install again to open the system installer — no new download.'**
+  String get aboutUpdateReadyAndroid;
+
+  /// No description provided for @aboutHowToUpgradeAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'To upgrade: press Download and install to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.'**
+  String get aboutHowToUpgradeAndroid;
 
   /// No description provided for @updateFailureUnsupported.
   ///
@@ -1213,6 +1273,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A previous replacement did not finish. Download the new version by hand and unpack it over this folder.'**
   String get updateFailureHandover;
+
+  /// No description provided for @updateFailurePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'This app is not yet allowed to install unknown apps. Allow it in Android Settings, then come back and press the button again.'**
+  String get updateFailurePermission;
+
+  /// No description provided for @updateFailureInstaller.
+  ///
+  /// In en, this message translates to:
+  /// **'The system installer did not open. Try again, or open the download page and install the APK by hand.'**
+  String get updateFailureInstaller;
 
   /// No description provided for @railUpdate.
   ///
@@ -1321,6 +1393,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.'**
   String get conversationListEmpty;
+
+  /// No description provided for @searchConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Search conversation content'**
+  String get searchConversations;
+
+  /// No description provided for @conversationSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversation or message matches that search.'**
+  String get conversationSearchEmpty;
+
+  /// No description provided for @clearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
+
+  /// No description provided for @clearConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear chat history'**
+  String get clearConversation;
+
+  /// No description provided for @clearConversationConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear chat history?'**
+  String get clearConversationConfirmTitle;
+
+  /// No description provided for @clearConversationConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.'**
+  String get clearConversationConfirmBody;
+
+  /// No description provided for @clearConversationConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearConversationConfirmAction;
 
   /// No description provided for @conversationPickOne.
   ///

@@ -453,6 +453,23 @@ final class LocalTransferController {
     }());
   }
 
+  /// How many unread messages every conversation holds together.
+  ///
+  /// The shell reads this to decide whether the taskbar icon needs a marker.
+  /// Clipboard entries are excluded for the same reason they are excluded from
+  /// every conversation: a mirrored clipboard is not something anybody reads.
+  int get totalUnread {
+    var total = 0;
+    final peers = <Fingerprint>{
+      for (final view in transfers)
+        if (view.kind != PayloadKind.clipboard) view.peer,
+    };
+    for (final peer in peers) {
+      total += unreadCount(peer);
+    }
+    return total;
+  }
+
   /// Whether this Device has ever opened [peer]'s conversation.
   ///
   /// What tells "everything here is new" from "nothing new since last time",
@@ -1108,6 +1125,33 @@ final class LocalTransferController {
     _transfers.removeWhere((tracked) => _handleOf(tracked) == handle);
     _history.removeWhere((record) => record.handle == handle);
     _pruneReading();
+    _notify();
+    await _persistHistory();
+  }
+
+  /// Removes every conversation message exchanged with [peer].
+  ///
+  /// Clipboard entries are not part of the conversation surface and stay put:
+  /// clearing a chat is about what was said, not about the separate clipboard
+  /// log. A Transfer that is still in flight is flagged rather than cancelled,
+  /// exactly as a single-message deletion is, so its eventual ending cannot
+  /// put the cleared history back on screen.
+  Future<void> clearConversation(Fingerprint peer) async {
+    for (final tracked in _transfers) {
+      if (tracked.peer == peer &&
+          tracked.transfer.kind != PayloadKind.clipboard) {
+        tracked.dismissed = true;
+      }
+    }
+    _transfers.removeWhere(
+      (tracked) =>
+          tracked.peer == peer &&
+          tracked.transfer.kind != PayloadKind.clipboard,
+    );
+    _history.removeWhere(
+      (record) => record.peer == peer && record.kind != PayloadKind.clipboard,
+    );
+    _reading.forget(peer);
     _notify();
     await _persistHistory();
   }

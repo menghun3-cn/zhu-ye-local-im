@@ -1,5 +1,6 @@
 #include "host_shell.h"
 
+#include <objbase.h>
 #include <shellapi.h>
 #include <string.h>
 
@@ -124,6 +125,88 @@ std::wstring ReadAutostartEntry() {
   return entry;
 }
 
+// A small red circle, drawn at the size Windows asks for taskbar overlays.
+//
+// The taskbar icon is not an asset: a second .ico would have to be carried by
+// every packaging path, while this shape is one GDI call and cannot go missing
+// from a build. The colour is WeChat's red, and the one-pixel margin keeps the
+// overlay from touching the icon edge behind it.
+HICON CreateUnreadIcon() {
+  int size = ::GetSystemMetrics(SM_CXSMICON);
+  if (size < 8) {
+    size = 16;
+  }
+
+  BITMAPV5HEADER header{};
+  header.bV5Size = sizeof(header);
+  header.bV5Width = size;
+  header.bV5Height = -size;
+  header.bV5Planes = 1;
+  header.bV5BitCount = 32;
+  header.bV5Compression = BI_BITFIELDS;
+  header.bV5RedMask = 0x00FF0000;
+  header.bV5GreenMask = 0x0000FF00;
+  header.bV5BlueMask = 0x000000FF;
+  header.bV5AlphaMask = 0xFF000000;
+
+  void* pixels = nullptr;
+  HDC screen = ::GetDC(nullptr);
+  HBITMAP colour = ::CreateDIBSection(
+      screen, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &pixels,
+      nullptr, 0);
+  if (screen != nullptr) {
+    ::ReleaseDC(nullptr, screen);
+  }
+  if (colour == nullptr || pixels == nullptr) {
+    if (colour != nullptr) {
+      ::DeleteObject(colour);
+    }
+    return nullptr;
+  }
+  ::memset(pixels, 0, static_cast<size_t>(size) * size * 4);
+
+  HDC memory = ::CreateCompatibleDC(nullptr);
+  HBRUSH brush = ::CreateSolidBrush(RGB(250, 81, 81));
+  if (memory != nullptr && brush != nullptr) {
+    HGDIOBJ old_bitmap = ::SelectObject(memory, colour);
+    HGDIOBJ old_brush = ::SelectObject(memory, brush);
+    HGDIOBJ old_pen = ::SelectObject(memory, ::GetStockObject(NULL_PEN));
+    ::Ellipse(memory, 1, 1, size - 1, size - 1);
+    ::GdiFlush();
+    ::SelectObject(memory, old_pen);
+    ::SelectObject(memory, old_brush);
+    ::SelectObject(memory, old_bitmap);
+  }
+  if (brush != nullptr) {
+    ::DeleteObject(brush);
+  }
+  if (memory != nullptr) {
+    ::DeleteDC(memory);
+  }
+
+  // GDI writes colour but leaves the alpha channel alone. The untouched circle
+  // stays transparent; every pixel the brush touched becomes fully opaque.
+  auto* bytes = static_cast<unsigned char*>(pixels);
+  for (int pixel = 0; pixel < size * size; ++pixel) {
+    unsigned char* rgba = bytes + pixel * 4;
+    if (rgba[0] != 0 || rgba[1] != 0 || rgba[2] != 0) {
+      rgba[3] = 255;
+    }
+  }
+
+  HBITMAP mask = ::CreateBitmap(size, size, 1, 1, nullptr);
+  ICONINFO info{};
+  info.fIcon = TRUE;
+  info.hbmMask = mask;
+  info.hbmColor = colour;
+  HICON icon = mask == nullptr ? nullptr : ::CreateIconIndirect(&info);
+  if (mask != nullptr) {
+    ::DeleteObject(mask);
+  }
+  ::DeleteObject(colour);
+  return icon;
+}
+
 }  // namespace
 
 HostShell::HostShell() {
@@ -146,6 +229,10 @@ HostShell::~HostShell() {
   if (tray_icon_ != nullptr) {
     ::DestroyIcon(tray_icon_);
     tray_icon_ = nullptr;
+  }
+  if (unread_icon_ != nullptr) {
+    ::DestroyIcon(unread_icon_);
+    unread_icon_ = nullptr;
   }
 }
 
@@ -201,15 +288,26 @@ bool HostShell::AcquireSingleInstance() {
 
 void HostShell::Attach(HWND window) {
   window_ = window;
+  EnsureTaskbar();
+  ApplyTaskbarOverlay();
 }
 
 void HostShell::Detach() {
+  if (taskbar_ != nullptr && window_ != nullptr) {
+    taskbar_->SetOverlayIcon(window_, nullptr, L"");
+  }
+  ReleaseTaskbar();
   RemoveTrayIcon();
   window_ = nullptr;
 }
 
 void HostShell::set_close_to_tray(bool value) {
   close_to_tray_ = value;
+}
+
+void HostShell::set_unread(bool value) {
+  unread_ = value;
+  ApplyTaskbarOverlay();
 }
 
 bool HostShell::autostart_enabled() const {
@@ -275,6 +373,61 @@ void HostShell::RemoveTrayIcon() {
   data.uID = kTrayIconId;
   ::Shell_NotifyIconW(NIM_DELETE, &data);
   tray_icon_added_ = false;
+}
+
+void HostShell::EnsureTaskbar() {
+  if (taskbar_ != nullptr) {
+    return;
+  }
+  const HRESULT initialized =
+      ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  if (SUCCEEDED(initialized)) {
+    com_initialized_ = true;
+  } else if (initialized != RPC_E_CHANGED_MODE) {
+    return;
+  }
+
+  ITaskbarList3* taskbar = nullptr;
+  const HRESULT created = ::CoCreateInstance(
+      CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbar));
+  if (SUCCEEDED(created) && taskbar != nullptr) {
+    if (SUCCEEDED(taskbar->HrInit())) {
+      taskbar_ = taskbar;
+      return;
+    }
+    taskbar->Release();
+  }
+  if (com_initialized_) {
+    ::CoUninitialize();
+    com_initialized_ = false;
+  }
+}
+
+void HostShell::ReleaseTaskbar() {
+  if (taskbar_ != nullptr) {
+    taskbar_->Release();
+    taskbar_ = nullptr;
+  }
+  if (com_initialized_) {
+    ::CoUninitialize();
+    com_initialized_ = false;
+  }
+}
+
+void HostShell::ApplyTaskbarOverlay() {
+  if (window_ == nullptr) {
+    return;
+  }
+  EnsureTaskbar();
+  if (taskbar_ == nullptr) {
+    return;
+  }
+  if (unread_ && unread_icon_ == nullptr) {
+    unread_icon_ = CreateUnreadIcon();
+  }
+  taskbar_->SetOverlayIcon(
+      window_, unread_ ? unread_icon_ : nullptr,
+      unread_ ? L"New messages" : L"");
 }
 
 void HostShell::Activate() {
@@ -366,6 +519,8 @@ bool HostShell::HandleMessage(HWND window, UINT message, WPARAM wparam,
     // is the one moment they have to be put back.
     tray_icon_added_ = false;
     AddTrayIcon();
+    ReleaseTaskbar();
+    ApplyTaskbarOverlay();
     return true;
   }
 

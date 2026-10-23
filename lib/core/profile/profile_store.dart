@@ -232,11 +232,29 @@ Future<LocalProfile> loadOrGenerateLocalProfile(
   String? alias,
 }) async {
   final stored = await loadLocalProfile(store);
-  if (stored != null) return stored;
+  if (stored != null) {
+    final hostname = alias == null
+        ? DeviceDescriptor.fallbackAlias
+        : DeviceDescriptor.sanitiseAlias(alias);
+    // An identity minted before host names were read still carries the
+    // placeholder. Migrate only that placeholder: a name the user typed is a
+    // decision, and a later operating-system rename must not overwrite it.
+    if (stored.profile.alias == DeviceDescriptor.fallbackAlias &&
+        hostname != DeviceDescriptor.fallbackAlias) {
+      stored.profile.alias = hostname;
+      await saveLocalProfile(stored, store);
+    }
+    return stored;
+  }
   final identity = await OwnerIdentity.generate();
+  final chosenAlias = alias == null
+      ? null
+      : DeviceDescriptor.sanitiseAlias(alias);
   final profile = DeviceProfile(
     self: identity.fingerprint,
-    alias: alias ?? DeviceDescriptor.fallbackAlias,
+    alias: chosenAlias == DeviceDescriptor.fallbackAlias
+        ? DeviceDescriptor.fallbackAlias
+        : chosenAlias ?? DeviceDescriptor.fallbackAlias,
     platform: platform,
   );
   final local = LocalProfile(identity: identity, profile: profile);

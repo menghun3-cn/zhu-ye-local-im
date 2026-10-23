@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../app/app.dart';
 import '../core/core.dart';
 import 'controller_scope.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -86,6 +89,19 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
+  /// The controller this shell is currently drawing.
+  LocalTransferController? _controller;
+
+  /// Unread counts change one message at a time, so the shell listens once and
+  /// asks the controller for the total rather than maintaining a second count.
+  StreamSubscription<void>? _changes;
+
+  /// Native window activation, used to clear the taskbar marker.
+  StreamSubscription<bool>? _windowActivity;
+
+  bool _windowActive = true;
+  bool _unreadShown = false;
+
   /// The conversation the user asked for from another surface, if any.
   ///
   /// The Devices surface cannot switch tabs itself — it does not know this
@@ -124,6 +140,45 @@ class _HomeShellState extends State<HomeShell> {
   /// between a successful download and the question: the entry is alive there
   /// so that a second press can find the question the first press opened.
   bool _updateLocked = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = ControllerScope.of(context);
+    _controller = controller;
+    _changes ??= controller.changes.listen((_) => _syncUnread());
+    _windowActivity ??= widget.seams.hostShell.windowActivity.listen(
+      _setWindowActive,
+    );
+    _syncUnread();
+  }
+
+  void _setWindowActive(bool active) {
+    _windowActive = active;
+    _syncUnread();
+  }
+
+  /// Mirrors "there is something unread in a window the user is not looking
+  /// at" onto the native taskbar icon.
+  ///
+  /// The native runner also clears the overlay as soon as it sees activation;
+  /// this call keeps the Dart-side state in step and clears it on hosts whose
+  /// activity stream emits the same fact.
+  void _syncUnread() {
+    final controller = _controller;
+    if (controller == null) return;
+    final wanted = !_windowActive && controller.totalUnread > 0;
+    if (wanted == _unreadShown) return;
+    _unreadShown = wanted;
+    unawaited(widget.seams.hostShell.setUnread(wanted));
+  }
+
+  @override
+  void dispose() {
+    unawaited(_changes?.cancel());
+    unawaited(_windowActivity?.cancel());
+    super.dispose();
+  }
 
   /// Brings the Conversations surface forward, with [peer]'s conversation open.
   ///
@@ -211,6 +266,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       DevicesPage(
         defaultIncomingDirectory: incoming,
+        localAddresses: widget.seams.localAddresses,
         onConversationRequested: _showConversation,
       ),
       TransfersPage(defaultIncomingDirectory: incoming),
@@ -328,15 +384,30 @@ class _HomeShellState extends State<HomeShell> {
         // compact back button on a narrow screen.
         bottom: false,
         child: wide
-            ? Row(
-                children: [
-                  rail,
-                  VerticalDivider(
-                    width: 1,
-                    color: WeChatColors.of(context).divider,
-                  ),
-                  Expanded(child: content),
-                ],
+            ? FocusTraversalGroup(
+                // Geometry used to put the rail first because its entries sat
+                // above everything in the page. A search field can now start
+                // at the top of the content column, so state the order rather
+                // than letting a pixel decide which control Tab reaches first.
+                policy: OrderedTraversalPolicy(),
+                child: Row(
+                  children: [
+                    FocusTraversalOrder(
+                      order: const NumericFocusOrder(1),
+                      child: rail,
+                    ),
+                    VerticalDivider(
+                      width: 1,
+                      color: WeChatColors.of(context).divider,
+                    ),
+                    Expanded(
+                      child: FocusTraversalOrder(
+                        order: const NumericFocusOrder(2),
+                        child: content,
+                      ),
+                    ),
+                  ],
+                ),
               )
             : content,
       ),

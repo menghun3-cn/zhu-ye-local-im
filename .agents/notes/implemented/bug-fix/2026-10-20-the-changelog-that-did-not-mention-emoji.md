@@ -76,6 +76,12 @@ must be accounted for by some bullet under that version's entry. The
 commit's own subject is the token the bullet has to mention — the check
 looks for a distinguishing fragment of it in the bullet text.
 
+Commit subjects may be English while the release note is Chinese. The
+fragment search therefore carries a small vocabulary for recurring feature
+names such as Device, discovery and automatic connection. It translates those
+names, not whole sentences: the release note still has to name the change,
+and the check does not depend on a translation service.
+
 `chore:`, `test:` and `ci:` commits are infrastructure and are excluded, which
 matches the classification rules in the `git-publish` skill itself.
 
@@ -182,6 +188,9 @@ process.
 - **The same class of omission is now caught for every future feature.** The
   periodic-update feature had the same gap in `v0.1.9` and is covered by
   the same check.
+- **English subjects and Chinese release notes can still match.** Recurring
+  feature names are carried across both languages, so a translated bullet is
+  not reported as missing its commit.
 - **Entries before `v0.1.8` are left as they were published.** The check
   does not ask for them to be rewritten, because a release note that is
   rewritten after the fact is a release note that no longer says what was

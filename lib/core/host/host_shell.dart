@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /// The small part of the running host this app asks to change.
 ///
 /// Three facts, all of them about the window the app is drawn in rather than
@@ -12,6 +14,19 @@
 /// method per feature: a facade like that makes every new capability a change
 /// to a type that everything already depends on.
 abstract interface class HostShell {
+  /// Whether the native window currently has the user's attention.
+  ///
+  /// The stream begins empty and emits on native activation changes. A host
+  /// with no window leaves it empty; the shell treats that as an active window
+  /// so it does not invent a notification state.
+  Stream<bool> get windowActivity;
+
+  /// Shows or clears the host's unread marker.
+  ///
+  /// Windows draws this as a red dot over the taskbar icon. A host without a
+  /// notification area accepts the call and does nothing.
+  Future<void> setUnread(bool value);
+
   /// Makes [value] true of the window's close button from now on.
   ///
   /// True means closing the window hides it and the app keeps running; false
