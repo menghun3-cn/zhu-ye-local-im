@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- .agents/notes/implemented/bug-fix/2026-10-20-the-changelog-that-did-not-mention-emoji.md
 #   git hash-object -- .agents/notes/implemented/bug-fix/2026-10-20-the-changelog-that-did-not-mention-emoji.zh.md
-2026-10-20-the-changelog-that-did-not-mention-emoji.md: 2301efd69d5816126cb7e242f842088fa4cc90cd
-2026-10-20-the-changelog-that-did-not-mention-emoji.zh.md: 219aaaf776db0751931384407bf4402f3c7b3cdd
+2026-10-20-the-changelog-that-did-not-mention-emoji.md: b4a024ea239871d8a01fcf654c5767636989171f
+2026-10-20-the-changelog-that-did-not-mention-emoji.zh.md: b98388e55592651cb4a8387516241b90de5f917d
