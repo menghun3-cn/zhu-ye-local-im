@@ -311,6 +311,56 @@ class AppLocalizationsZh extends AppLocalizations {
   String get trusted => '已信任';
 
   @override
+  String get presenceOnline => '在线';
+
+  @override
+  String get presenceConnecting => '连接中';
+
+  @override
+  String get presenceOffline => '离线';
+
+  @override
+  String presenceOfflineWithLastSeen(String when) {
+    return '离线 · $when';
+  }
+
+  @override
+  String presenceOnlineCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 台在线',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String presenceConnectingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 台连接中',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String presenceOfflineCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 台离线',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get presenceSummaryEmpty => '暂无设备';
+
+  @override
+  String get presenceOpenDevices => '查看设备';
+
+  @override
   String get menuSendFile => '发送文件';
 
   @override

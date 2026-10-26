@@ -20,7 +20,7 @@
   "probes": [
     "conversationListEmpty",
     "conversationPickOne",
-    "conversationDisconnected",
+    "presenceSummaryEmpty",
     "aboutUpdateNotes",
     "conversationEmpty",
     "automaticConnectionsBody",

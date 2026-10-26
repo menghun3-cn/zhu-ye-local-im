@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/nav_rail.dart';
+import 'package:local_transfer/ui/presence.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
 
 import '../support/ui_harness.dart';
@@ -425,6 +426,61 @@ void main() {
 
       await openTab(tester, l10n.tabConversation, window: windowA);
       expect(selectedSurface(tester, window: windowA), conversationsSurface);
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the rail summarises presence and opens Devices', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final summary = windowA.within(find.byType(ConnectionSummary));
+      expect(summary, findsOneWidget);
+      expect(
+        windowA.within(find.text(l10n.presenceOnlineCount(1))),
+        findsOneWidget,
+      );
+      expect(
+        windowA.within(find.text(l10n.presenceOfflineCount(0))),
+        findsOneWidget,
+      );
+
+      await tester.tap(summary);
+      await settleRoute(tester);
+      expect(selectedSurface(tester, window: windowA), devicesSurface);
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a narrow window puts presence above the bottom bar', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device, size: narrowWindow);
+
+      final summary = windowA.within(find.byType(ConnectionSummary));
+      final bar = windowA.within(find.byType(NavigationBar));
+      expect(summary, findsOneWidget);
+      expect(bar, findsOneWidget);
+      expect(
+        windowA.within(find.text(l10n.presenceSummaryEmpty)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getBottomLeft(summary).dy,
+        lessThanOrEqualTo(tester.getTopLeft(bar).dy),
+        reason: 'the summary belongs above the bar, not over the page',
+      );
+
+      await tester.tap(summary);
+      await settleRoute(tester);
+      expect(selectedSurface(tester, window: windowA), devicesSurface);
 
       await shutdown(tester, [device]);
     });
