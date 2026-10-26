@@ -2143,6 +2143,66 @@ void main() {
       },
     );
 
+    testWidgets(
+      'an open conversation clears a count without another tap on the row',
+      (tester) async {
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(tester, hub.b, 'Bob');
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+        await pumpWindow(tester, alice);
+
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Bob'),
+          description: 'Bob to be listed',
+        );
+        // Open the conversation first, so it is the one remembered; then step
+        // away and come back through the rail. The pane opens with it, without
+        // tapping its row, and that is where the arrivals below land.
+        await openConversation(tester, windowA, name: 'Bob');
+        await pumpUntil(
+          tester,
+          () => alice.controller.lastConversation == bob.fingerprint,
+          description: 'the conversation to be remembered',
+        );
+        await openTab(tester, l10n.tabDevices, window: windowA);
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await settleRoute(tester);
+
+        // Said from Bob's side while Alice is looking at the open
+        // conversation. Nothing about the selection changes, so the unread
+        // count can only know about it from the surface being visibly open and
+        // re-reading the current conversation — a tapped row is not involved.
+        await sendText(tester, bob, 'hello', to: alice.fingerprint);
+        await pumpUntil(
+          tester,
+          () =>
+              onConversation(windowA, find.text('hello')).evaluate().isNotEmpty,
+          description: 'the message to arrive in the open conversation',
+        );
+        expect(alice.controller.unreadCount(bob.fingerprint), 0);
+
+        // The row has no unread count either, so the preview reads as read —
+        // the "hello" line is what the row shows, not "[1] hello".
+        await pumpUntil(
+          tester,
+          () => find
+              .descendant(
+                of: conversationRow(windowA, 'Bob'),
+                matching: find.textContaining(l10n.conversationUnread(1)),
+              )
+              .evaluate()
+              .isEmpty,
+          description: 'the row to carry no unread count',
+        );
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
+
     testWidgets('the window comes back to the conversation last opened', (
       tester,
     ) async {

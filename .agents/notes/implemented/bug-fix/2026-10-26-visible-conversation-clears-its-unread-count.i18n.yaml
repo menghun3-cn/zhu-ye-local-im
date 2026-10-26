@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-26-visible-conversation-clears-its-unread-count.md
+#   git hash-object -- 2026-10-26-visible-conversation-clears-its-unread-count.zh.md
+2026-10-26-visible-conversation-clears-its-unread-count.md: 21ba83042ad35971546c52bc61626feb7de8f8e0
+2026-10-26-visible-conversation-clears-its-unread-count.zh.md: cf4f39871d1a4584008ffa8b85254e1b611f0824
