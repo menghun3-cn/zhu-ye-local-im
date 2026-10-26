@@ -1283,6 +1283,33 @@ void main() {
           return false;
         }, description: 'Bob to become unreachable');
 
+        // The row shows its state without opening it. The label is offline when
+        // the reconnect sweep has gone quiet, and connecting while a retry is
+        // still being scheduled — either word answers the row's own question.
+        final offlineOrConnecting = [
+          windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.textContaining(l10n.presenceOffline),
+                ),
+              )
+              .evaluate(),
+          windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.text(l10n.presenceConnecting),
+                ),
+              )
+              .evaluate(),
+        ];
+        expect(
+          offlineOrConnecting.any((found) => found.isNotEmpty),
+          isTrue,
+          reason: 'the row shows a state before it is opened',
+        );
+
         await tester.longPress(conversationRow(windowA, 'Bob'));
         await pumpUntil(
           tester,
@@ -1318,6 +1345,16 @@ void main() {
           () => conversationListed(windowA, 'Bob'),
           description: 'the rediscovered peer to return to the list',
         );
+        expect(
+          windowA.within(
+            find.descendant(
+              of: conversationRow(windowA, 'Bob'),
+              matching: find.text(l10n.presenceOnline),
+            ),
+          ),
+          findsOneWidget,
+          reason: 'the rediscovered Session reads online again',
+        );
 
         await shutdown(tester, [alice, bobAgain]);
       },
@@ -1341,6 +1378,16 @@ void main() {
         tester,
         () => conversationListed(windowA, 'Bob'),
         description: 'the connected Device to appear in the list',
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text(l10n.presenceOnline),
+          ),
+        ),
+        findsOneWidget,
+        reason: 'the row says the peer is online before it is opened',
       );
       final bobView = alice.controller.peers.firstWhere(
         (peer) => peer.fingerprint == bob.fingerprint,
@@ -1748,6 +1795,16 @@ void main() {
         findsNothing,
         reason: 'a text message carries no transfer status line',
       );
+      // And a sent text never flashes a transfer-in-progress card on the way
+      // to becoming the message: the bubble is drawn with its words and no
+      // progress bar. The settle is immediate because the body was already in
+      // the Offer, so a bar under it would only measure the few frames of the
+      // accept round trip the user sees as a flicker.
+      expect(
+        onConversation(windowA, find.byType(LinearProgressIndicator)),
+        findsNothing,
+        reason: 'a sent text has no in-flight progress to draw',
+      );
 
       await shutdown(tester, [alice, bob]);
     });
@@ -2091,6 +2148,66 @@ void main() {
         await openConversation(tester, windowA, name: 'Bob');
         await settleRoute(tester);
         expect(alice.controller.unreadCount(bob.fingerprint), 0);
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
+
+    testWidgets(
+      'an open conversation clears a count without another tap on the row',
+      (tester) async {
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(tester, hub.b, 'Bob');
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+        await pumpWindow(tester, alice);
+
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Bob'),
+          description: 'Bob to be listed',
+        );
+        // Open the conversation first, so it is the one remembered; then step
+        // away and come back through the rail. The pane opens with it, without
+        // tapping its row, and that is where the arrivals below land.
+        await openConversation(tester, windowA, name: 'Bob');
+        await pumpUntil(
+          tester,
+          () => alice.controller.lastConversation == bob.fingerprint,
+          description: 'the conversation to be remembered',
+        );
+        await openTab(tester, l10n.tabDevices, window: windowA);
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await settleRoute(tester);
+
+        // Said from Bob's side while Alice is looking at the open
+        // conversation. Nothing about the selection changes, so the unread
+        // count can only know about it from the surface being visibly open and
+        // re-reading the current conversation — a tapped row is not involved.
+        await sendText(tester, bob, 'hello', to: alice.fingerprint);
+        await pumpUntil(
+          tester,
+          () =>
+              onConversation(windowA, find.text('hello')).evaluate().isNotEmpty,
+          description: 'the message to arrive in the open conversation',
+        );
+        expect(alice.controller.unreadCount(bob.fingerprint), 0);
+
+        // The row has no unread count either, so the preview reads as read —
+        // the "hello" line is what the row shows, not "[1] hello".
+        await pumpUntil(
+          tester,
+          () => find
+              .descendant(
+                of: conversationRow(windowA, 'Bob'),
+                matching: find.textContaining(l10n.conversationUnread(1)),
+              )
+              .evaluate()
+              .isEmpty,
+          description: 'the row to carry no unread count',
+        );
 
         await shutdown(tester, [alice, bob]);
       },

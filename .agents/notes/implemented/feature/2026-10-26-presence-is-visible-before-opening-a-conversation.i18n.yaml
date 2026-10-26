@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-26-presence-is-visible-before-opening-a-conversation.md
+#   git hash-object -- 2026-10-26-presence-is-visible-before-opening-a-conversation.zh.md
+2026-10-26-presence-is-visible-before-opening-a-conversation.md: c952ec160c740d237b51fbe0c92e252138b8ff4c
+2026-10-26-presence-is-visible-before-opening-a-conversation.zh.md: ae1770075de55660d701d2a64e3f03f24132e437

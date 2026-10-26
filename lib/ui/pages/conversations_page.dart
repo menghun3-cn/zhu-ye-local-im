@@ -11,7 +11,7 @@ import '../conversation_view.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
-import '../wechat/bubble.dart';
+import '../presence.dart';
 import '../wechat/splitter.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -43,6 +43,7 @@ class ConversationsPage extends StatefulWidget {
     this.defaultIncomingDirectory,
     this.requestedPeer,
     this.focusRequest = 0,
+    this.isVisible = true,
   });
 
   /// Where a file received here lands when the user has not said otherwise.
@@ -64,6 +65,16 @@ class ConversationsPage extends StatefulWidget {
   /// second click on the box for every arrival. A counter rather than a bool
   /// so that arriving twice asks twice.
   final int focusRequest;
+
+  /// Whether this surface is the one the shell is showing.
+  ///
+  /// The page stays mounted in the shell's `IndexedStack` while another
+  /// surface is in front, so its `build` running is not the same thing as
+  /// somebody looking at it. Read marks are gated on this: a conversation
+  /// that receives a message while the user is elsewhere is still unread,
+  /// and the row keeps counting it; coming back to this surface is what
+  /// reads it.
+  final bool isVisible;
 
   @override
   State<ConversationsPage> createState() => _ConversationsPageState();
@@ -258,15 +269,22 @@ class _ConversationsPageState extends State<ConversationsPage> {
       });
     }
 
-    // Opening a conversation is what reads it, and arriving here already
-    // looking at one is an opening like any other — so the remembered
-    // conversation is marked read on the frame that shows it, exactly as a
-    // tapped one is. Deferred past the frame because this is `build`, and
-    // marking writes to the conversation file.
-    if (current != null && current.peer.fingerprint.hex == remembered) {
+    // Whatever conversation is on screen while this surface is the visible
+    // one has been read. That covers more than a tap on a row: opening from
+    // Devices arrives through [requestedPeer], arriving back through the rail
+    // leaves the previous selection in place, and a message that lands while
+    // the conversation is already open changes none of the selection state at
+    // all. In every one of those cases the user can see the message, so the
+    // count has to clear here rather than waiting for another tap on the row.
+    //
+    // Deferred past the frame because this is `build`, and marking writes to
+    // the conversation file. `isVisible` is re-read when the callback runs, so
+    // a switch away before it fires does not mark a conversation nobody is
+    // looking at.
+    if (current != null && widget.isVisible) {
       final peer = current.peer.fingerprint;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && widget.isVisible) {
           unawaited(controller.markConversationOpened(peer));
         }
       });
@@ -702,6 +720,10 @@ class _ConversationTile extends StatelessWidget {
     final peer = entry.peer;
     final latest = entry.preview ?? entry.latest;
     final action = _actionFor(peer);
+    final presenceLabel = labelForPeerPresence(peer, l10n);
+    final presenceColour = peer.presence == PeerPresence.online
+        ? colors.brandStrong
+        : colors.secondaryText;
     // The top-right corner is the clock, where the desktop client puts it: the
     // time the last thing was said, or — for a conversation nobody has said
     // anything in yet — when the Device was last heard from.
@@ -741,10 +763,11 @@ class _ConversationTile extends StatelessWidget {
             // The one Device drawn from something other than the first letter
             // of its name: a Device named by its address carries its last octet
             // in the circle, because `1` is what every address starts with.
-            Avatar(
+            PresenceAvatar(
               name: peer.displayName,
               seed: peer.fingerprint.hex,
               label: peer.avatarLabel,
+              presence: peer.presence,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -752,14 +775,42 @@ class _ConversationTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    _titleFor(peer),
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: WeChat.fontSizeTitle,
-                      color: colors.bubbleText,
-                      fontWeight: loud ? FontWeight.w600 : FontWeight.w400,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _titleFor(peer),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: WeChat.fontSizeTitle,
+                            color: colors.bubbleText,
+                            fontWeight: loud
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 96),
+                        child: Tooltip(
+                          message: presenceLabel,
+                          child: Text(
+                            presenceLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: WeChat.railLabelSize,
+                              color: presenceColour,
+                              fontWeight: peer.presence == PeerPresence.online
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -819,7 +870,13 @@ class _ConversationTile extends StatelessWidget {
   /// other surface in this application says about time, and a list that
   /// switched to `14:07` here would be the one place a user has to decode.
   String? _stampFor(PeerView peer, TransferView? latest) {
-    final when = latest?.at ?? peer.lastSeen;
+    // The presence line already carries last-seen for an offline peer. Keeping
+    // it out of the clock column leaves that column meaning one thing: when the
+    // last message moved. A connected peer with no history still gets the
+    // discovery time, because there is no presence line carrying it.
+    final when =
+        latest?.at ??
+        (peer.presence == PeerPresence.online ? peer.lastSeen : null);
     if (when == null) return null;
     return describeLastSeen(when, l10n);
   }

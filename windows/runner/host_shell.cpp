@@ -288,6 +288,13 @@ bool HostShell::AcquireSingleInstance() {
 
 void HostShell::Attach(HWND window) {
   window_ = window;
+  // The tray icon is the one door back to this window once it is hidden, and
+  // "hidden" can happen for the very first time at startup. Showing the icon
+  // now, while the window is still visible, is what gives a user something to
+  // exit or restore from immediately; waiting for the first WM_CLOSE would
+  // leave the taskbar as the only way back until the window happens to be
+  // closed.
+  AddTrayIcon();
   EnsureTaskbar();
   ApplyTaskbarOverlay();
 }

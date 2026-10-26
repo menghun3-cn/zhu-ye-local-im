@@ -33,9 +33,10 @@ Status: implemented
 
 导航轨画在 `lib/ui/nav_rail.dart` 里。
 
-`AppNavRail` 就是那一列：品牌标记、四个界面、一个 `Spacer`、两个工具，再加一个可选的
-`trailing` 挂在这两个之下。它收一份有序的 `destinations` 和一个 `pinnedCount`——**从末尾
-往前数**几个——这样 shell 那边的列表仍然只有一份，第七个界面也不会掉进错的那一段。
+`AppNavRail` 就是那一列：品牌标记、一个可选的 `status` 状态块、四个界面、一个
+`Spacer`、两个工具，再加一个可选的 `trailing` 挂在这两个之下。它收一份有序的
+`destinations` 和一个 `pinnedCount`——**从末尾往前数**几个——这样 shell 那边的列表仍然
+只有一份，第七个界面也不会掉进错的那一段。
 `NavRailDestination` 是它的项类型：一个图标、一个词、一个计数，而且没有选中态的另一枚
 图标，因为这一列在某一项变成当前项时并不换图标。`RailItem` 就是那一项本身，公开，按
 label 找得到。

@@ -158,7 +158,12 @@ class _TransferCard extends StatelessWidget {
               ].join(' · '),
               style: theme.textTheme.bodySmall,
             ),
-            if (!view.state.isSettled)
+            // A file is the one payload with bytes still moving across the
+            // wire. A text or a face carries its body inside the Offer, so the
+            // accept-then-complete round trips are not progress worth a bar —
+            // and on a send both settle inside the same frame as the answer,
+            // leaving a card that flashes a bar with nothing measured.
+            if (!view.state.isSettled && view.kind == PayloadKind.file)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: LinearProgressIndicator(value: view.fraction),
