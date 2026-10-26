@@ -277,6 +277,24 @@ abstract base class Transfer {
         _accepted
             .where((item) => !item.hasDigest)
             .fold(0, (sum, item) => sum + item.size);
+    // An inline payload is present before it is accepted: the Offer it arrived
+    // in was already authenticated, so there is no byte stream to move and no
+    // digest to verify. Settling straight away is what keeps a sent text from
+    // spending a frame looking like a file transfer on the sender's screen —
+    // a bubble that pops in saying "sending" with a progress bar, then turns
+    // into the message. A clipboard entry keeps the ordinary path: the mirror
+    // applies it on a separate schedule and does not render it as a message.
+    final inline = _accepted
+        .where((item) => !item.hasDigest)
+        .where((item) => kind != PayloadKind.clipboard);
+    if (_accepted.length == 1 &&
+        inline.isNotEmpty &&
+        inline.length == _accepted.length) {
+      finish(
+        TransferCompleted(digests: {for (final item in _accepted) item.id: ''}),
+      );
+      return;
+    }
     _state = TransferState.transferring;
     _emit();
   }

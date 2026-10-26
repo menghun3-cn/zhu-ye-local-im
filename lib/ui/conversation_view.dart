@@ -1523,6 +1523,13 @@ class MessageBubble extends StatelessWidget {
   /// an offer needs.
   Widget _contents(BuildContext context, AppLocalizations l10n) {
     final colors = WeChatColors.of(context);
+    // A bar belongs under a *file* — an item with bytes still moving across
+    // the wire. A text or a face has no bytes on the wire: its body was inside
+    // the Offer, so Accept counted it as present the moment the answer went
+    // out, and the few frames before its settle are not progress to show.
+    // Without this, a sent message flashes a "sending" card with a bar that
+    // then resolves into the message itself.
+    final showsProgress = _namesAFile && !view.state.isSettled;
     // A file in flight is the one bubble whose width is a decision rather than
     // a consequence. Left alone, the progress bar inside it would expand to
     // every pixel the conversation has left, and a bubble holding a short name
@@ -1537,7 +1544,7 @@ class MessageBubble extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _body(l10n, contentWidth, colors),
-        if (!view.state.isSettled)
+        if (showsProgress)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: SizedBox(
