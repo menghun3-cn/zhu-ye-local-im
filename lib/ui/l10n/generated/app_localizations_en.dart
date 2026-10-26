@@ -628,7 +628,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.';
 
   @override
-  String get aboutUpdateInstall => 'Download and update';
+  String get aboutUpdate => 'Update';
 
   @override
   String get aboutUpdateDownloading => 'Downloading';
@@ -650,14 +650,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
-
-  @override
-  String get aboutUpdateInstallAndroid => 'Download and install';
+      'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
 
   @override
   String get aboutUpdateInstallHintAndroid =>
-      'Press Download and install: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.';
+      'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.';
 
   @override
   String get aboutUpdateConfirmTitle => 'Update and restart?';
@@ -683,15 +680,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutUpdateReady =>
-      'The update package is ready. Press Download and update again to install it — no new download.';
+      'The update package is ready. Press Update again to install it — no new download.';
 
   @override
   String get aboutUpdateReadyAndroid =>
-      'The APK is ready. Press Download and install again to open the system installer — no new download.';
+      'The APK is ready. Press Update again to open the system installer — no new download.';
 
   @override
   String get aboutHowToUpgradeAndroid =>
-      'To upgrade: press Download and install to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.';
+      'To upgrade: press Update to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.';
 
   @override
   String get updateFailureUnsupported =>

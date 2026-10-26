@@ -1112,11 +1112,11 @@ abstract class AppLocalizations {
   /// **'To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device\'s identity and must not be touched.'**
   String get aboutHowToUpgrade;
 
-  /// No description provided for @aboutUpdateInstall.
+  /// No description provided for @aboutUpdate.
   ///
   /// In en, this message translates to:
-  /// **'Download and update'**
-  String get aboutUpdateInstall;
+  /// **'Update'**
+  String get aboutUpdate;
 
   /// No description provided for @aboutUpdateDownloading.
   ///
@@ -1157,19 +1157,13 @@ abstract class AppLocalizations {
   /// No description provided for @aboutUpdateInstallHint.
   ///
   /// In en, this message translates to:
-  /// **'Press Download and update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.'**
+  /// **'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.'**
   String get aboutUpdateInstallHint;
-
-  /// No description provided for @aboutUpdateInstallAndroid.
-  ///
-  /// In en, this message translates to:
-  /// **'Download and install'**
-  String get aboutUpdateInstallAndroid;
 
   /// No description provided for @aboutUpdateInstallHintAndroid.
   ///
   /// In en, this message translates to:
-  /// **'Press Download and install: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.'**
+  /// **'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.'**
   String get aboutUpdateInstallHintAndroid;
 
   /// No description provided for @aboutUpdateConfirmTitle.
@@ -1211,19 +1205,19 @@ abstract class AppLocalizations {
   /// No description provided for @aboutUpdateReady.
   ///
   /// In en, this message translates to:
-  /// **'The update package is ready. Press Download and update again to install it — no new download.'**
+  /// **'The update package is ready. Press Update again to install it — no new download.'**
   String get aboutUpdateReady;
 
   /// No description provided for @aboutUpdateReadyAndroid.
   ///
   /// In en, this message translates to:
-  /// **'The APK is ready. Press Download and install again to open the system installer — no new download.'**
+  /// **'The APK is ready. Press Update again to open the system installer — no new download.'**
   String get aboutUpdateReadyAndroid;
 
   /// No description provided for @aboutHowToUpgradeAndroid.
   ///
   /// In en, this message translates to:
-  /// **'To upgrade: press Download and install to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.'**
+  /// **'To upgrade: press Update to fetch and check the APK, then hand it to Android\'s installer. The download page is still there if you prefer to install it by hand.'**
   String get aboutHowToUpgradeAndroid;
 
   /// No description provided for @updateFailureUnsupported.
