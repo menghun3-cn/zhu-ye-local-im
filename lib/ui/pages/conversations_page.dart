@@ -43,6 +43,7 @@ class ConversationsPage extends StatefulWidget {
     this.defaultIncomingDirectory,
     this.requestedPeer,
     this.focusRequest = 0,
+    this.isVisible = true,
   });
 
   /// Where a file received here lands when the user has not said otherwise.
@@ -64,6 +65,16 @@ class ConversationsPage extends StatefulWidget {
   /// second click on the box for every arrival. A counter rather than a bool
   /// so that arriving twice asks twice.
   final int focusRequest;
+
+  /// Whether this surface is the one the shell is showing.
+  ///
+  /// The page stays mounted in the shell's `IndexedStack` while another
+  /// surface is in front, so its `build` running is not the same thing as
+  /// somebody looking at it. Read marks are gated on this: a conversation
+  /// that receives a message while the user is elsewhere is still unread,
+  /// and the row keeps counting it; coming back to this surface is what
+  /// reads it.
+  final bool isVisible;
 
   @override
   State<ConversationsPage> createState() => _ConversationsPageState();
@@ -258,15 +269,22 @@ class _ConversationsPageState extends State<ConversationsPage> {
       });
     }
 
-    // Opening a conversation is what reads it, and arriving here already
-    // looking at one is an opening like any other — so the remembered
-    // conversation is marked read on the frame that shows it, exactly as a
-    // tapped one is. Deferred past the frame because this is `build`, and
-    // marking writes to the conversation file.
-    if (current != null && current.peer.fingerprint.hex == remembered) {
+    // Whatever conversation is on screen while this surface is the visible
+    // one has been read. That covers more than a tap on a row: opening from
+    // Devices arrives through [requestedPeer], arriving back through the rail
+    // leaves the previous selection in place, and a message that lands while
+    // the conversation is already open changes none of the selection state at
+    // all. In every one of those cases the user can see the message, so the
+    // count has to clear here rather than waiting for another tap on the row.
+    //
+    // Deferred past the frame because this is `build`, and marking writes to
+    // the conversation file. `isVisible` is re-read when the callback runs, so
+    // a switch away before it fires does not mark a conversation nobody is
+    // looking at.
+    if (current != null && widget.isVisible) {
       final peer = current.peer.fingerprint;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && widget.isVisible) {
           unawaited(controller.markConversationOpened(peer));
         }
       });

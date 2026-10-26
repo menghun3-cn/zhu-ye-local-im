@@ -267,6 +267,7 @@ class _HomeShellState extends State<HomeShell> {
         defaultIncomingDirectory: incoming,
         requestedPeer: _requestedConversation,
         focusRequest: _conversationArrivals,
+        isVisible: _index == _conversationsSurface,
       ),
       DevicesPage(
         defaultIncomingDirectory: incoming,
