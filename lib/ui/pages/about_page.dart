@@ -186,6 +186,10 @@ class _AboutPageState extends State<AboutPage> {
   /// the async work itself, so whichever press opened them lands with the
   /// frame.
   Future<void> _install({UpdateCheck? offered}) async {
+    // The button is disabled as soon as the first progress state lands. Guard
+    // the method itself as well so two entry points in one frame cannot start
+    // two downloads before that disabled frame is drawn.
+    if (_busy) return;
     final answer = offered ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
     final installer = UpdateInstallResolution.installer;
@@ -350,9 +354,6 @@ class _AboutPageState extends State<AboutPage> {
     final restarts = installer.restartsApplication;
     final canInstall =
         _canInstall && answer?.outcome == UpdateOutcome.available;
-    final installLabel = restarts
-        ? l10n.aboutUpdateInstall
-        : l10n.aboutUpdateInstallAndroid;
     final installHint = restarts
         ? l10n.aboutUpdateInstallHint
         : l10n.aboutUpdateInstallHintAndroid;
@@ -394,40 +395,34 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: 8),
                 Text(l10n.aboutDescription),
                 const Divider(height: 24),
-                // A row that wraps, because the three buttons together are
-                // wider than a narrow window: on a squeezed card an overflow
-                // stripe is what a `Row` would draw, and a button nobody can
-                // reach is worse than one that moved to the next line.
+                // A row that wraps, because the primary action and the
+                // secondary link are wider than a narrow window: on a squeezed
+                // card an overflow stripe is what a `Row` would draw, and a
+                // button nobody can reach is worse than one on the next line.
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    // The one action on this card a user reaches for, so it
-                    // wears the filled style every other primary action in this
-                    // application wears — 检查更新 is a *button*, not a link,
-                    // and a flat green word was the odd one out beside the
-                    // Connect and Send buttons elsewhere.
+                    // One primary action changes role with the answer: ask for
+                    // an update, then install the one that was found. Keeping
+                    // both actions visible would make the user choose between
+                    // two steps the card already knows how to order.
                     FilledButton.icon(
                       onPressed: _asking || _busy
                           ? null
+                          : canInstall
+                          ? () => unawaited(_install())
                           : () => unawaited(_check()),
                       icon: const Icon(Icons.system_update_alt, size: 18),
                       label: Text(
                         _asking
                             ? l10n.aboutChecking
+                            : canInstall
+                            ? l10n.aboutUpdate
                             : l10n.aboutCheckForUpdates,
                       ),
                     ),
-                    // The one-click way, on a platform whose packaging this
-                    // build knows how to replace. Absent rather than disabled
-                    // elsewhere: an inert button explains nothing.
-                    if (canInstall)
-                      FilledButton.icon(
-                        onPressed: _busy ? null : () => unawaited(_install()),
-                        icon: const Icon(Icons.download_outlined, size: 18),
-                        label: Text(installLabel),
-                      ),
                     // Opens a page rather than doing something in this window,
                     // so it stays the quiet style: the filled button above is
                     // what a user should press.

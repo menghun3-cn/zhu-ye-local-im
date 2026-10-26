@@ -10,6 +10,10 @@ opposite of what that note decided, and the two are cross-linked for that reason
 Everything that note says about where the entry sits and why it is pinned is
 unchanged and still current.
 
+Partially superseded by [the About card's single update action](2026-10-26-one-update-action-on-the-about-card.md),
+which combines the card's check and install buttons into one control. The rail
+entry and the shared install flow described here are unchanged.
+
 ## Problem
 
 左侧菜单（`NavigationRail`）最下方有一个「更新」按钮：发现新版本时出现，鼠标悬停显示版本号。它是这个版本唯一
@@ -99,9 +103,10 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 
 ### Decision
 
-- About 页把更新过程当成**一个不可再进入的状态**：`_asking` 或 `_busy` 期间，检查更新、
-  下载并更新、打开下载页三个按钮全部置灰；失败后 `_busy` 清零，三个按钮恢复 —— 同一
-  个按钮就是重试。
+- About 页把更新过程当成**一个不可再进入的状态**：当前只有一个状态化主操作和
+  「打开下载页」，`_asking` 或 `_busy` 期间两者都置灰；失败后 `_busy` 清零并恢复。
+  主操作在「检查更新」与「更新」之间切换，见
+  [关于页只有一个更新操作](2026-10-26-one-update-action-on-the-about-card.md)。
 - 左侧菜单的「更新」按钮由 shell 用 `_updateLocked` 状态置灰：About 页通过新的
   `onUpdateBusyChanged` 回调把「进入更新」「退出更新」报给 shell，rail 的 `_UpdateEntry`
   在 `enabled: false` 时 `onPressed: null`。
@@ -136,7 +141,8 @@ notice 的职责是「启动时问一次」的答案；更新动作是从 About 
   增加 `enabled`，置灰时 `onPressed: null`（Material 的 disabled 样式就是置灰）。
 - `lib/l10n/app_zh.arb` / `app_en.arb`：确认框三句 + 安装说明改为「更新并重启」。
 - `test_flutter/ui/update_rail_test.dart`：新增「下载中 rail 入口置灰、失败后恢复」。
-- `test_flutter/ui/about_page_test.dart`：新增「下载中关于页三按钮全置灰、失败后恢复」。
+- `test_flutter/ui/about_page_test.dart`：新增「下载中关于页主操作与下载页置灰、
+  失败后恢复且不能重复下载」。
 
 ### 门禁
 

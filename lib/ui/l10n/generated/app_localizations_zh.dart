@@ -599,7 +599,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '升级方式：退出程序，下载新版压缩包，解压后覆盖本目录即可。程序只在这个文件夹和 %APPDATA%\\LocalTransfer（本机身份，不要动）里留东西。';
 
   @override
-  String get aboutUpdateInstall => '下载并更新';
+  String get aboutUpdate => '更新';
 
   @override
   String get aboutUpdateDownloading => '正在下载';
@@ -621,14 +621,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      '点「下载并更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「更新并重启」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
-
-  @override
-  String get aboutUpdateInstallAndroid => '下载并安装';
+      '点「更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「更新并重启」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
 
   @override
   String get aboutUpdateInstallHintAndroid =>
-      '点「下载并安装」：程序把 APK 下载到应用自己的目录，按发布方公布的校验值核一遍，然后问一句「安装更新」——确认后会打开系统安装器。第一次安装时，系统可能会先让你允许本应用安装未知应用。';
+      '点「更新」：程序把 APK 下载到应用自己的目录，按发布方公布的校验值核一遍，然后问一句「安装更新」——确认后会打开系统安装器。第一次安装时，系统可能会先让你允许本应用安装未知应用。';
 
   @override
   String get aboutUpdateConfirmTitle => '更新并重启？';
@@ -653,14 +650,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutUpdateConfirmApplyAndroid => '打开安装器';
 
   @override
-  String get aboutUpdateReady => '更新包已就绪。再点一次「下载并更新」即可安装，不用重新下载。';
+  String get aboutUpdateReady => '更新包已就绪。再点一次「更新」即可安装，不用重新下载。';
 
   @override
-  String get aboutUpdateReadyAndroid => '安装包已就绪。再点一次「下载并安装」即可打开系统安装器，不用重新下载。';
+  String get aboutUpdateReadyAndroid => '安装包已就绪。再点一次「更新」即可打开系统安装器，不用重新下载。';
 
   @override
   String get aboutHowToUpgradeAndroid =>
-      '升级方式：点「下载并安装」获取并校验 APK，再交给系统安装器；也可以打开下载页手动下载。';
+      '升级方式：点「更新」获取并校验 APK，再交给系统安装器；也可以打开下载页手动下载。';
 
   @override
   String get updateFailureUnsupported => '这个平台不能自己替换，请手动下载新版本。';
