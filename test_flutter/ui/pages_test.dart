@@ -1283,6 +1283,33 @@ void main() {
           return false;
         }, description: 'Bob to become unreachable');
 
+        // The row shows its state without opening it. The label is offline when
+        // the reconnect sweep has gone quiet, and connecting while a retry is
+        // still being scheduled — either word answers the row's own question.
+        final offlineOrConnecting = [
+          windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.textContaining(l10n.presenceOffline),
+                ),
+              )
+              .evaluate(),
+          windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.text(l10n.presenceConnecting),
+                ),
+              )
+              .evaluate(),
+        ];
+        expect(
+          offlineOrConnecting.any((found) => found.isNotEmpty),
+          isTrue,
+          reason: 'the row shows a state before it is opened',
+        );
+
         await tester.longPress(conversationRow(windowA, 'Bob'));
         await pumpUntil(
           tester,
@@ -1318,6 +1345,16 @@ void main() {
           () => conversationListed(windowA, 'Bob'),
           description: 'the rediscovered peer to return to the list',
         );
+        expect(
+          windowA.within(
+            find.descendant(
+              of: conversationRow(windowA, 'Bob'),
+              matching: find.text(l10n.presenceOnline),
+            ),
+          ),
+          findsOneWidget,
+          reason: 'the rediscovered Session reads online again',
+        );
 
         await shutdown(tester, [alice, bobAgain]);
       },
@@ -1341,6 +1378,16 @@ void main() {
         tester,
         () => conversationListed(windowA, 'Bob'),
         description: 'the connected Device to appear in the list',
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.text(l10n.presenceOnline),
+          ),
+        ),
+        findsOneWidget,
+        reason: 'the row says the peer is online before it is opened',
       );
       final bobView = alice.controller.peers.firstWhere(
         (peer) => peer.fingerprint == bob.fingerprint,

@@ -54,6 +54,8 @@ Material 3 会把有高度的表面往种子色那边调，而微信的表面是
 时间戳取 `latest?.at ?? peer.lastSeen`。新增的 `TransferView.at` 由 `app_controller` 在
 Tracking 一条 Transfer 的那一刻、从它自己的时钟上读一次传下来 —— 因为引擎里的 `Transfer`
 是协议对象、本身没有时间，而在渲染时读时钟会让同一条消息每次重建都印出不同的时间。
+离线行把最后出现时间放在名称旁，因此右侧时间列只显示消息时间，没有消息时留空。
+已连接但没有历史的行仍然回退到 `peer.lastSeen`。
 行与下一行之间还多了一条按 `conversationRowPadding` 内缩的分隔线，让线从**头像左缘**起笔：
 整行通栏的横线会把列表切成一块块，而参照物里它是一整片。
 

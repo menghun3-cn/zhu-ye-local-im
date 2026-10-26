@@ -56,14 +56,22 @@ void main() {
   });
 
   group('PeerView', () {
-    PeerView view({String? address, int? port, String? alias}) => PeerView(
-      fingerprint: Fingerprint.ofPublicKey(const [4, 5, 6]),
+    PeerView view({
+      String? address,
+      int? port,
+      String? alias,
+      bool connected = false,
+      bool connecting = false,
+      int keyByte = 4,
+    }) => PeerView(
+      fingerprint: Fingerprint.ofPublicKey([keyByte, 5, 6]),
       alias: alias,
       platform: DevicePlatform.windows,
       address: address,
       sessionPort: port,
       pairingPort: null,
-      isConnected: false,
+      isConnected: connected,
+      isConnecting: connecting,
       isInGroup: true,
       isFavorite: false,
       lastSeen: null,
@@ -126,6 +134,41 @@ void main() {
       expect(peer.address, isNull);
       expect(peer.displayName, peer.shortFingerprint);
       expect(peer.displayName, isNot(isEmpty));
+    });
+
+    test('a live Session wins over a dial still in progress', () {
+      expect(view(connected: true).presence, PeerPresence.online);
+      expect(
+        view(connected: true, connecting: true).presence,
+        PeerPresence.online,
+      );
+    });
+
+    test(
+      'a dial with no Session is connecting, and everything else offline',
+      () {
+        expect(view(connecting: true).presence, PeerPresence.connecting);
+        expect(view().presence, PeerPresence.offline);
+      },
+    );
+
+    test('counts every peer exactly once', () {
+      final counts = PresenceCounts.of([
+        view(keyByte: 1, connected: true),
+        view(keyByte: 2, connecting: true),
+        view(keyByte: 3),
+        view(keyByte: 7),
+      ]);
+
+      expect(counts.online, 1);
+      expect(counts.connecting, 1);
+      expect(counts.offline, 2);
+      expect(counts.total, 4);
+      expect(counts.isEmpty, isFalse);
+      expect(
+        const PresenceCounts(online: 0, connecting: 0, offline: 0).isEmpty,
+        isTrue,
+      );
     });
   });
 

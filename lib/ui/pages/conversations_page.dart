@@ -11,7 +11,7 @@ import '../conversation_view.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
-import '../wechat/bubble.dart';
+import '../presence.dart';
 import '../wechat/splitter.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -702,6 +702,10 @@ class _ConversationTile extends StatelessWidget {
     final peer = entry.peer;
     final latest = entry.preview ?? entry.latest;
     final action = _actionFor(peer);
+    final presenceLabel = labelForPeerPresence(peer, l10n);
+    final presenceColour = peer.presence == PeerPresence.online
+        ? colors.brandStrong
+        : colors.secondaryText;
     // The top-right corner is the clock, where the desktop client puts it: the
     // time the last thing was said, or — for a conversation nobody has said
     // anything in yet — when the Device was last heard from.
@@ -741,10 +745,11 @@ class _ConversationTile extends StatelessWidget {
             // The one Device drawn from something other than the first letter
             // of its name: a Device named by its address carries its last octet
             // in the circle, because `1` is what every address starts with.
-            Avatar(
+            PresenceAvatar(
               name: peer.displayName,
               seed: peer.fingerprint.hex,
               label: peer.avatarLabel,
+              presence: peer.presence,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -752,14 +757,42 @@ class _ConversationTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    _titleFor(peer),
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: WeChat.fontSizeTitle,
-                      color: colors.bubbleText,
-                      fontWeight: loud ? FontWeight.w600 : FontWeight.w400,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _titleFor(peer),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: WeChat.fontSizeTitle,
+                            color: colors.bubbleText,
+                            fontWeight: loud
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 96),
+                        child: Tooltip(
+                          message: presenceLabel,
+                          child: Text(
+                            presenceLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: WeChat.railLabelSize,
+                              color: presenceColour,
+                              fontWeight: peer.presence == PeerPresence.online
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -819,7 +852,13 @@ class _ConversationTile extends StatelessWidget {
   /// other surface in this application says about time, and a list that
   /// switched to `14:07` here would be the one place a user has to decode.
   String? _stampFor(PeerView peer, TransferView? latest) {
-    final when = latest?.at ?? peer.lastSeen;
+    // The presence line already carries last-seen for an offline peer. Keeping
+    // it out of the clock column leaves that column meaning one thing: when the
+    // last message moved. A connected peer with no history still gets the
+    // discovery time, because there is no presence line carrying it.
+    final when =
+        latest?.at ??
+        (peer.presence == PeerPresence.online ? peer.lastSeen : null);
     if (when == null) return null;
     return describeLastSeen(when, l10n);
   }

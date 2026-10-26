@@ -71,7 +71,10 @@ of a conversation row stacks the timestamp above the action-or-summary, and the
 timestamp is `latest?.at ?? peer.lastSeen`. `TransferView.at` is new and
 threaded from `app_controller`'s own clock at the moment a Transfer is tracked,
 because the engine's `Transfer` is a protocol object and has no time of its own,
-and a time read at render would print something different on every rebuild. The
+and a time read at render would print something different on every rebuild. An
+offline row carries last-seen beside the peer's name, so its clock column shows
+only a message time and is blank when there is no message. A connected row with
+no history still falls back to `peer.lastSeen`. The
 row is also parted from the next by a divider inset by
 `conversationRowPadding`, so the line starts at the avatar's left edge: a
 full-bleed rule chops a list into blocks, and the reference keeps it one sheet.

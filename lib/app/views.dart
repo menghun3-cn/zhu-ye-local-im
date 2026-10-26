@@ -3,6 +3,14 @@ import 'dart:math' as math;
 
 import '../core/core.dart';
 
+/// How reachable a peer is right now.
+///
+/// This is a reading of the live Session table, not of internet connectivity
+/// and not of whether the other machine is powered on. A peer that Discovery
+/// has just heard but that has no usable Session is [offline] unless it is
+/// visibly in the middle of establishing one.
+enum PeerPresence { online, connecting, offline }
+
 /// What this Device says about itself, for a header or a settings screen.
 final class SelfView {
   const SelfView({
@@ -121,6 +129,17 @@ final class PeerView {
   /// Whether there is both an address and a port to dial.
   bool get isDiallable => address != null && sessionPort != null;
 
+  /// How this peer reads at a glance.
+  ///
+  /// A live Session is the strongest fact, so it wins over a dial that happens
+  /// to still be in progress. Everything else that is not connecting has no
+  /// usable Session right now.
+  PeerPresence get presence {
+    if (isConnected) return PeerPresence.online;
+    if (isConnecting) return PeerPresence.connecting;
+    return PeerPresence.offline;
+  }
+
   /// What to show for this peer, in order of how much it tells a person.
   ///
   /// An Alias first, because it is what the peer chose to be called and it is
@@ -179,6 +198,51 @@ final class PeerView {
       alias != null &&
       alias!.isNotEmpty &&
       alias != DeviceDescriptor.fallbackAlias;
+}
+
+/// The peers known right now, counted by [PeerPresence].
+///
+/// The shell and the conversation list read the same `controller.peers` list,
+/// so counting here rather than in either widget keeps the summary and the rows
+/// from disagreeing about what "online" means.
+final class PresenceCounts {
+  const PresenceCounts({
+    required this.online,
+    required this.connecting,
+    required this.offline,
+  });
+
+  /// Counts [peers] by their current presence.
+  factory PresenceCounts.of(Iterable<PeerView> peers) {
+    var online = 0;
+    var connecting = 0;
+    var offline = 0;
+    for (final peer in peers) {
+      switch (peer.presence) {
+        case PeerPresence.online:
+          online++;
+        case PeerPresence.connecting:
+          connecting++;
+        case PeerPresence.offline:
+          offline++;
+      }
+    }
+    return PresenceCounts(
+      online: online,
+      connecting: connecting,
+      offline: offline,
+    );
+  }
+
+  final int online;
+  final int connecting;
+  final int offline;
+
+  /// Whether there is nothing to count.
+  bool get isEmpty => online == 0 && connecting == 0 && offline == 0;
+
+  /// Every peer represented by these counts.
+  int get total => online + connecting + offline;
 }
 
 /// One Transfer, as a UI renders it.

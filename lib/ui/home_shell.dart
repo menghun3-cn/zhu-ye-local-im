@@ -13,6 +13,7 @@ import 'pages/conversations_page.dart';
 import 'pages/devices_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/transfers_page.dart';
+import 'presence.dart';
 import 'seams.dart';
 import 'update_notice.dart';
 import 'wechat/theme.dart';
@@ -22,12 +23,14 @@ import 'wechat/theme.dart';
 /// It leads the list: talking to somebody is what the app is for, and the
 /// Devices surface is what you visit to set that up, so Devices sits second.
 ///
-/// Only this one index has a name: the shell builds the pages and the
-/// destinations from the same ordered list, so every index is already in the
-/// same order by construction, and the only place an index is *written* rather
-/// than derived is [_HomeShellState._showConversation]. A full set of names
-/// would be five constants kept in step with a list for no gain.
+/// The shell builds the pages and the destinations from the same ordered list,
+/// so every index is already in the same order by construction. Only the
+/// indices that machinery has to name get a constant; a full set would be five
+/// names kept in step with a list for no gain.
 const int _conversationsSurface = 0;
+
+/// Where the Devices surface sits, for the presence summary's press.
+const int _devicesSurface = 1;
 
 /// Where the About surface sits, named for the one thing outside the index list
 /// that has to know it.
@@ -257,6 +260,7 @@ class _HomeShellState extends State<HomeShell> {
     // chances to disagree.
     final incoming =
         controller.incomingDirectory ?? widget.seams.defaultIncomingDirectory;
+    final presence = PresenceCounts.of(controller.peers);
 
     final pages = <Widget>[
       ConversationsPage(
@@ -342,6 +346,11 @@ class _HomeShellState extends State<HomeShell> {
           ),
       ],
       pinnedCount: _toolSurfaces,
+      status: ConnectionSummary(
+        counts: presence,
+        compact: true,
+        onTap: () => _select(_devicesSurface),
+      ),
       trailing: trailing,
     );
 
@@ -413,16 +422,38 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: wide
           ? null
-          : NavigationBar(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              destinations: [
-                for (final surface in surfaces)
-                  NavigationDestination(
-                    icon: _badged(surface.icon, surface.badge),
-                    selectedIcon: _badged(surface.selectedIcon, surface.badge),
-                    label: surface.label,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The summary's hairline used to ride on its own decoration;
+                // now that it is a `TextButton`, the line is the border under
+                // the strip, drawn by the chrome so the two stay one decision.
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: WeChatColors.of(context).divider),
+                    ),
                   ),
+                  child: ConnectionSummary(
+                    counts: presence,
+                    onTap: () => _select(_devicesSurface),
+                  ),
+                ),
+                NavigationBar(
+                  selectedIndex: _index,
+                  onDestinationSelected: _select,
+                  destinations: [
+                    for (final surface in surfaces)
+                      NavigationDestination(
+                        icon: _badged(surface.icon, surface.badge),
+                        selectedIcon: _badged(
+                          surface.selectedIcon,
+                          surface.badge,
+                        ),
+                        label: surface.label,
+                      ),
+                  ],
+                ),
               ],
             ),
     );

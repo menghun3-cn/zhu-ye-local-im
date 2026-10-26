@@ -56,6 +56,7 @@ class AppNavRail extends StatelessWidget {
     required this.onDestinationSelected,
     required this.destinations,
     this.pinnedCount = 0,
+    this.status,
     this.trailing,
   });
 
@@ -77,6 +78,13 @@ class AppNavRail extends StatelessWidget {
   /// list. Counting from the end, rather than being handed a second list, keeps
   /// the shell's single ordered list single.
   final int pinnedCount;
+
+  /// A compact status block below the brand mark.
+  ///
+  /// It is not a destination: it reports the network's presence and hands the
+  /// press to the shell, which opens the Devices surface. Null keeps the rail
+  /// usable in a test or a caller that has nothing to report.
+  final Widget? status;
 
   /// An entry below even the pinned ones — today, the update entry.
   ///
@@ -115,6 +123,7 @@ class AppNavRail extends StatelessWidget {
             spacing: WeChat.railItemGap,
             children: [
               const _BrandMark(),
+              ?status,
               for (var index = 0; index < firstPinned; index++) _entry(index),
               // The space between the surfaces and the tools. It goes to the
               // gap rather than to the entries, which is what makes the tools

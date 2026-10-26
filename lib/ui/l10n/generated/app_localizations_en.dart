@@ -322,6 +322,59 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trusted => 'trusted';
 
   @override
+  String get presenceOnline => 'Online';
+
+  @override
+  String get presenceConnecting => 'Connecting';
+
+  @override
+  String get presenceOffline => 'Offline';
+
+  @override
+  String presenceOfflineWithLastSeen(String when) {
+    return 'Offline · $when';
+  }
+
+  @override
+  String presenceOnlineCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count online',
+      one: '1 online',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String presenceConnectingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count connecting',
+      one: '1 connecting',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String presenceOfflineCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count offline',
+      one: '1 offline',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get presenceSummaryEmpty => 'No devices yet';
+
+  @override
+  String get presenceOpenDevices => 'View devices';
+
+  @override
   String get menuSendFile => 'Send a file';
 
   @override

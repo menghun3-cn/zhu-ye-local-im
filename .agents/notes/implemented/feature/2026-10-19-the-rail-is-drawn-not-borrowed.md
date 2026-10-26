@@ -40,10 +40,11 @@ the wrong shape, size, or extent; nothing in a widget test sees the picture.
 
 Draw the rail in `lib/ui/nav_rail.dart`.
 
-`AppNavRail` is the column: the brand mark, the four surfaces, a `Spacer`, the
-two tools, and an optional `trailing` below them. It takes one ordered
-`destinations` list and `pinnedCount`, the number counted off the *end*, so the
-shell's list stays single and a seventh surface cannot land in the wrong run.
+`AppNavRail` is the column: the brand mark, an optional `status` block, the four
+surfaces, a `Spacer`, the two tools, and an optional `trailing` below them. It
+takes one ordered `destinations` list and `pinnedCount`, the number counted off
+the *end*, so the shell's list stays single and a seventh surface cannot land in
+the wrong run.
 `NavRailDestination` is its entry type — a glyph, a word and a count, and no
 filled variant, because the rail does not swap the glyph when an entry becomes
 current. `RailItem` is the entry itself, public and found by its label.
