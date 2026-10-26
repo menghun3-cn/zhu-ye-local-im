@@ -87,7 +87,7 @@ Name: "{userdesktop}\竹叶局域网传输"; Filename: "{app}\local_transfer.exe
 
 [Run]
 Filename: "{app}\local_transfer.exe"; Description: "立即运行竹叶局域网传输"; Flags: nowait postinstall skipifsilent
-; 应用内「下载并更新」跑的是静默安装：上面那条带 skipifsilent，会被跳掉，于是文件
+; 应用内「更新」跑的是静默安装：上面那条带 skipifsilent，会被跳掉，于是文件
 ; 换完了却没人把程序带回来。这一条专门补上那一刻，并且**只在应用自己要求时才跑**
 ; —— 判据是 `/update` 这个参数，它由 lib/ui/update_install.dart 在启动安装包时
 ; 一并递进来。这样一次脚本化的静默安装（`/SILENT`，没有那个参数）仍然只是安装，

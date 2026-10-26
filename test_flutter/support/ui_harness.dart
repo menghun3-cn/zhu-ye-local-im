@@ -1235,7 +1235,7 @@ class ScriptedUpdateChecker implements UpdateChecker {
 ///
 /// ```dart
 /// final installer = ScriptedUpdateInstaller.replace(supported: true);
-/// await press(tester, l10n.aboutUpdateInstall);
+/// await press(tester, l10n.aboutUpdate);
 /// expect(installer.askedFor.single.version, '9.9.9');
 /// ```
 class ScriptedUpdateInstaller implements UpdateInstaller {

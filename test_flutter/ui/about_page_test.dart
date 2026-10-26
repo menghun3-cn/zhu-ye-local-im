@@ -141,19 +141,28 @@ void main() {
 
     expect(checker.asked, 1);
     expect(find.text(l10n.aboutUpToDate), findsOneWidget);
+    expect(find.text(l10n.aboutCheckForUpdates), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 
-  testWidgets('the buttons that do something here are filled, one of them', (
+  testWidgets('the primary action changes from checking to updating', (
     tester,
   ) async {
     ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(supported: true);
     await show(tester);
 
-    // Checking is the ordinary action on this page, so it is drawn as the
-    // ordinary action — the filled pill the rest of the app uses. It used to be
-    // a `TextButton` with an icon, which is the shape for a *secondary* step,
-    // and a page whose only button looks secondary reads as a page with no
-    // action on it.
+    // Checking is the page's primary action until there is something else to
+    // do. It is drawn with the same filled style as every other primary action
+    // in the application.
     expect(
       find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
       findsOneWidget,
@@ -167,14 +176,14 @@ void main() {
 
     await press(tester, l10n.aboutCheckForUpdates);
 
-    // Installing is the same kind of thing — a step taken on this page — so it
-    // is filled too. Opening the download page is *not*: it leaves for a
-    // browser, and dressing it like the others would make three buttons of
-    // equal weight where the user has one decision to make.
+    // The same filled control becomes the next step. There is one primary
+    // decision on the card, not two actions competing for the same press.
+    expect(find.widgetWithText(FilledButton, l10n.aboutUpdate), findsOneWidget);
     expect(
-      find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
-      findsOneWidget,
+      find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+      findsNothing,
     );
+    // Opening the download page leaves this window, so it remains secondary.
     expect(
       find.widgetWithText(TextButton, l10n.aboutOpenDownload),
       findsOneWidget,
@@ -276,6 +285,16 @@ void main() {
 
     expect(find.text(l10n.aboutNoRelease), findsOneWidget);
     expect(find.text(l10n.aboutOpenDownload), findsNothing);
+    expect(find.text(l10n.aboutCheckForUpdates), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('says so when the question could not be asked', (tester) async {
@@ -286,6 +305,16 @@ void main() {
 
     expect(find.text(l10n.aboutUnreachable), findsOneWidget);
     expect(find.text(l10n.aboutNoRelease), findsNothing);
+    expect(find.text(l10n.aboutCheckForUpdates), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('always says how an upgrade is done by hand', (tester) async {
@@ -305,11 +334,12 @@ void main() {
 
     // Not before the question has been answered: there would be nothing to
     // install, and a download that has no version behind it is not an offer.
-    expect(find.text(l10n.aboutUpdateInstall), findsNothing);
+    expect(find.text(l10n.aboutUpdate), findsNothing);
 
     await press(tester, l10n.aboutCheckForUpdates);
 
-    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
+    expect(find.text(l10n.aboutCheckForUpdates), findsNothing);
     // The sentence that explains the button replaces the by-hand one, which is
     // still offered — by the button beside it rather than in words.
     expect(find.text(l10n.aboutUpdateInstallHint), findsOneWidget);
@@ -324,7 +354,8 @@ void main() {
 
     await press(tester, l10n.aboutCheckForUpdates);
 
-    expect(find.text(l10n.aboutUpdateInstall), findsNothing);
+    expect(find.text(l10n.aboutUpdate), findsNothing);
+    expect(find.text(l10n.aboutCheckForUpdates), findsOneWidget);
     expect(find.text(l10n.aboutHowToUpgrade), findsOneWidget);
     // The way that needs no help from the page is still there.
     expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
@@ -352,7 +383,7 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+    await pressAndDraw(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
 
     // The question is on screen and nothing has been handed over: the package
@@ -388,7 +419,7 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+    await pressAndDraw(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
     await tapUpdateAnswer(tester, l10n.cancel);
 
@@ -397,11 +428,11 @@ void main() {
     expect(installer.applied, isEmpty);
     expect(find.text(l10n.aboutUpdateReady), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
 
     // And it offers it without fetching anything again: the package is already
     // in the update folder.
-    await press(tester, l10n.aboutUpdateInstall);
+    await press(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
 
     expect(installer.askedFor, hasLength(1));
@@ -428,7 +459,7 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await press(tester, l10n.aboutUpdateInstall);
+    await press(tester, l10n.aboutUpdate);
 
     expect(find.textContaining(l10n.aboutUpdateDownloading), findsOneWidget);
     // Both halves of the pair come from the Transfers surface's own formatter,
@@ -443,14 +474,14 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets('the actions the update offers go quiet while a download runs', (
+  testWidgets('refuses a second update press while a download runs', (
     tester,
   ) async {
     ScriptedUpdateChecker.install(available);
     // A download that has not answered yet, so the assertions can stand beside
     // the middle of one.
     final running = Completer<UpdatePrepareResult>();
-    ScriptedUpdateInstaller.replace(
+    final installer = ScriptedUpdateInstaller.replace(
       supported: true,
       progress: const [UpdateInstallProgress(UpdateInstallStage.downloading)],
       hold: running,
@@ -458,28 +489,40 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await pressAndDraw(tester, l10n.aboutUpdateInstall);
+    // Call the same callback twice before the disabled frame is drawn. The
+    // entry guard inside `_install` must stop the second call even then.
+    final primary = tester
+        .widget<FilledButton>(
+          find.widgetWithText(FilledButton, l10n.aboutUpdate),
+        )
+        .onPressed!;
+    primary();
+    primary();
+    await tester.pump();
 
-    // All three ways to act on the update are inert for as long as the
-    // download is running: asking again would mix two answers, installing
-    // again would fetch the same package twice, and opening the page beside an
-    // in-flight fetch is the user leaving a thing they have asked to happen.
-    final check = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
-    );
-    final install = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
+    // The update stays named as the primary action, but it cannot start a
+    // second download while the first one is running. Opening the page is also
+    // inert so the user does not leave work they just asked for.
+    final update = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, l10n.aboutUpdate),
     );
     final open = tester.widget<TextButton>(
       find.widgetWithText(TextButton, l10n.aboutOpenDownload),
     );
-    expect(check.onPressed, isNull);
-    expect(install.onPressed, isNull);
+    expect(find.text(l10n.aboutCheckForUpdates), findsNothing);
+    expect(update.onPressed, isNull);
     expect(open.onPressed, isNull);
 
+    // A press against the disabled control cannot reach the installer again.
+    await tester.tap(
+      find.widgetWithText(FilledButton, l10n.aboutUpdate),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    expect(installer.askedFor, hasLength(1));
+
     // Let it fail: the failure sentence reports why, and the same buttons are
-    // the way to answer it. The check and the install are alive again, and so
-    // is the manual page.
+    // the way to answer it. The update and the manual page are alive again.
     running.complete(
       const UpdatePrepareResult.failed(UpdateInstallFailure.checksum),
     );
@@ -490,15 +533,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, l10n.aboutCheckForUpdates),
-          )
-          .onPressed,
-      isNotNull,
-    );
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, l10n.aboutUpdateInstall),
+            find.widgetWithText(FilledButton, l10n.aboutUpdate),
           )
           .onPressed,
       isNotNull,
@@ -524,13 +559,13 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await press(tester, l10n.aboutUpdateInstall);
+    await press(tester, l10n.aboutUpdate);
 
     expect(find.text(l10n.updateFailureChecksum), findsOneWidget);
     // Nothing is in flight any more, and the same button is how it is retried:
     // "try again" and "do it" are one action with one name.
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.text(l10n.aboutUpdateInstall), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
   });
 
   testWidgets('says when a replacement never finished', (tester) async {
@@ -558,10 +593,10 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    expect(find.text(l10n.aboutUpdateInstallAndroid), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
     expect(find.text(l10n.aboutUpdateInstallHintAndroid), findsOneWidget);
 
-    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pressAndDraw(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
 
     expect(find.text(l10n.aboutUpdateConfirmTitleAndroid), findsOneWidget);
@@ -578,7 +613,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text(l10n.aboutUpdateReadyAndroid), findsOneWidget);
     final installButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, l10n.aboutUpdateInstallAndroid),
+      find.widgetWithText(FilledButton, l10n.aboutUpdate),
     );
     expect(installButton.onPressed, isNotNull);
   });
@@ -593,7 +628,7 @@ void main() {
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
-    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pressAndDraw(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
     await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
 
@@ -602,7 +637,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, l10n.aboutUpdateInstallAndroid),
+            find.widgetWithText(FilledButton, l10n.aboutUpdate),
           )
           .onPressed,
       isNotNull,
@@ -621,7 +656,7 @@ void main() {
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
-    await pressAndDraw(tester, l10n.aboutUpdateInstallAndroid);
+    await pressAndDraw(tester, l10n.aboutUpdate);
     await pumpUntilAsked(tester);
     await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
 
