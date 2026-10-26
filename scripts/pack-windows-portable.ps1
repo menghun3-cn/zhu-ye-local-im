@@ -170,11 +170,6 @@ $requiredGlyphs = @{
     # 图标是这个功能**唯一**新用到的 codePoint（「复制文字」复用了上面那条）。
     # 0xe1bb = Icons.delete_outline
     '0xe1bb' = 'Icons.delete_outline'
-    # 2026-10-12 · 应用内一键更新：关于页多了一个「下载并更新」按钮，用的是
-    # Icons.download_outlined —— 它与「检查更新」那把 system_update_alt 不是
-    # 同一个字形，所以必须在这里点名。
-    # 0xeff2 = Icons.download_outlined
-    '0xeff2' = 'Icons.download_outlined'
     # 2026-10-20 · 会话支持发送表情：这类内容在会话与传输列表上画的是
     # emoji_emotions_outlined —— 它与其他任何一个字形都不是同一个 codePoint，
     # 所以必须在这里点名，否则它在界面上就是一个空胶囊。
