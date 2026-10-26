@@ -15,7 +15,7 @@ library;
 /// The build number is dropped because it is about how the file was made and
 /// not about what the user is running: two builds of the same source are the
 /// same version to everybody outside this repository.
-const String appVersion = '0.1.21';
+const String appVersion = '0.1.22';
 
 /// Whether [candidate] names a version newer than [current].
 ///
