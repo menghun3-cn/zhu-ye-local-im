@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-26-pack-glyph-list-must-match-source-icons.md
+#   git hash-object 2026-10-26-pack-glyph-list-must-match-source-icons.zh.md
+2026-10-26-pack-glyph-list-must-match-source-icons.md: 5d216153fe80faf092a120f1029790e4dfddff28
+2026-10-26-pack-glyph-list-must-match-source-icons.zh.md: 635b393a52e91497010e470724a16f71ea16b111
