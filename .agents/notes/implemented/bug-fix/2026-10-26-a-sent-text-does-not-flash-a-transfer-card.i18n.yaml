@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-26-a-sent-text-does-not-flash-a-transfer-card.md
+#   git hash-object -- 2026-10-26-a-sent-text-does-not-flash-a-transfer-card.zh.md
+2026-10-26-a-sent-text-does-not-flash-a-transfer-card.md: 381baf5fb1c62ae2d8ae5e551f4861e651f40b4f
+2026-10-26-a-sent-text-does-not-flash-a-transfer-card.zh.md: 5597ea8c0a185643299dc4530279ad60c066a479

@@ -379,17 +379,62 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
 
-      // Without a sink it is accepted, and completes on the sender's word
-      // because the body was already authenticated by the record layer.
+      // Without a sink it is accepted, and it settles *on the acceptance*
+      // rather than on the sender's later `complete`: the body was already
+      // authenticated by the record layer, so there is no byte stream whose
+      // end a received text would have to wait for — and a sender's own text
+      // would otherwise flash an in-flight transfer on the screen for the few
+      // frames the round trip takes.
       await transfer.accept(itemIds: const ['text']);
       expect(transfer.transferredBytes, 2);
-      channel.deliver(CompleteMessage(transferId: 't-3'));
-      expect(await transfer.outcome, isA<TransferCompleted>());
+      final outcome = await transfer.outcome;
+      expect(outcome, isA<TransferCompleted>());
+      expect(
+        (outcome as TransferCompleted).digests,
+        const {'text': ''},
+        reason:
+            'an inline item has no digest to confirm, so it reports an '
+            'empty one rather than waiting for the sender',
+      );
+      expect(transfer.state, TransferState.completed);
       expect(transfer.text, 'hi');
 
       await engine.close();
       await channel.close();
     });
+
+    test(
+      'a clipboard entry keeps the two round trips it was designed for',
+      () async {
+        final channel = FakeChannel();
+        final engine = channel.engineWith();
+        final arrived = Completer<IncomingTransfer>();
+        engine.incoming.listen(arrived.complete);
+        channel.deliver(
+          OfferMessage(
+            transferId: 't-clip',
+            kind: PayloadKind.clipboard,
+            items: [PayloadItem(id: 'clip', name: 'clip', size: 3)],
+            text: 'abc',
+          ),
+        );
+        final transfer = await arrived.future;
+
+        await transfer.accept(itemIds: const ['clip']);
+        expect(
+          transfer.state,
+          TransferState.transferring,
+          reason:
+              'clipboard mirroring is not a message: it keeps the ordinary '
+              'accept-then-complete flow rather than settling on acceptance',
+        );
+        channel.deliver(CompleteMessage(transferId: 't-clip'));
+        expect(await transfer.outcome, isA<TransferCompleted>());
+
+        await engine.close();
+        await channel.close();
+      },
+    );
 
     test(
       'refuses a sink that already holds more than the item declares',

@@ -1795,6 +1795,16 @@ void main() {
         findsNothing,
         reason: 'a text message carries no transfer status line',
       );
+      // And a sent text never flashes a transfer-in-progress card on the way
+      // to becoming the message: the bubble is drawn with its words and no
+      // progress bar. The settle is immediate because the body was already in
+      // the Offer, so a bar under it would only measure the few frames of the
+      // accept round trip the user sees as a flicker.
+      expect(
+        onConversation(windowA, find.byType(LinearProgressIndicator)),
+        findsNothing,
+        reason: 'a sent text has no in-flight progress to draw',
+      );
 
       await shutdown(tester, [alice, bob]);
     });
