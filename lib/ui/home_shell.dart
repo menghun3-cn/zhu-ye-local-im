@@ -120,7 +120,12 @@ class _HomeShellState extends State<HomeShell> {
   /// carries. A counter rather than a bool, so that asking twice asks twice:
   /// leaving the surface and coming back is a second arrival, not a repeat
   /// of the first.
-  int _conversationArrivals = 0;
+  ///
+  /// The application opens on the Conversations surface, so its first frame is
+  /// an arrival too. Counting it is what lets a remembered conversation open
+  /// ready to type in, rather than only after the user has visited another tab
+  /// and come back.
+  int _conversationArrivals = 1;
 
   /// How many times the rail's update entry has been pressed.
   ///
