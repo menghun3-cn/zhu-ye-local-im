@@ -12,6 +12,7 @@ import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
 import '../presence.dart';
+import '../wechat/bubble.dart';
 import '../wechat/splitter.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -763,11 +764,10 @@ class _ConversationTile extends StatelessWidget {
             // The one Device drawn from something other than the first letter
             // of its name: a Device named by its address carries its last octet
             // in the circle, because `1` is what every address starts with.
-            PresenceAvatar(
+            Avatar(
               name: peer.displayName,
               seed: peer.fingerprint.hex,
               label: peer.avatarLabel,
-              presence: peer.presence,
             ),
             const SizedBox(width: 10),
             Expanded(

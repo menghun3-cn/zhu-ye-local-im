@@ -608,36 +608,6 @@ abstract class AppLocalizations {
   /// **'Offline · {when}'**
   String presenceOfflineWithLastSeen(String when);
 
-  /// No description provided for @presenceOnlineCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 online} other{{count} online}}'**
-  String presenceOnlineCount(int count);
-
-  /// No description provided for @presenceConnectingCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 connecting} other{{count} connecting}}'**
-  String presenceConnectingCount(int count);
-
-  /// No description provided for @presenceOfflineCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 offline} other{{count} offline}}'**
-  String presenceOfflineCount(int count);
-
-  /// No description provided for @presenceSummaryEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No devices yet'**
-  String get presenceSummaryEmpty;
-
-  /// No description provided for @presenceOpenDevices.
-  ///
-  /// In en, this message translates to:
-  /// **'View devices'**
-  String get presenceOpenDevices;
-
   /// No description provided for @menuSendFile.
   ///
   /// In en, this message translates to:

@@ -100,12 +100,6 @@
   "presenceConnecting": "连接中",
   "presenceOffline": "离线",
   "presenceOfflineWithLastSeen": "离线 · {when}",
-  "presenceOnlineCount": "{count, plural, other{{count} 台在线}}",
-  "presenceConnectingCount": "{count, plural, other{{count} 台连接中}}",
-  "presenceOfflineCount": "{count, plural, other{{count} 台离线}}",
-  "presenceSummaryEmpty": "暂无设备",
-  "presenceOpenDevices": "查看设备",
-
   "menuSendFile": "发送文件",
   "menuSendEmoji": "发送表情",
   "emojiRecent": "最近使用",

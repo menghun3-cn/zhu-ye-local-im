@@ -178,21 +178,6 @@
   "@presenceOfflineWithLastSeen": {
     "placeholders": { "when": { "type": "String" } }
   },
-  "presenceOnlineCount": "{count, plural, =1{1 online} other{{count} online}}",
-  "@presenceOnlineCount": {
-    "placeholders": { "count": { "type": "int" } }
-  },
-  "presenceConnectingCount": "{count, plural, =1{1 connecting} other{{count} connecting}}",
-  "@presenceConnectingCount": {
-    "placeholders": { "count": { "type": "int" } }
-  },
-  "presenceOfflineCount": "{count, plural, =1{1 offline} other{{count} offline}}",
-  "@presenceOfflineCount": {
-    "placeholders": { "count": { "type": "int" } }
-  },
-  "presenceSummaryEmpty": "No devices yet",
-  "presenceOpenDevices": "View devices",
-
   "menuSendFile": "Send a file",
   "menuSendEmoji": "Send an emoji",
   "emojiRecent": "Recent",

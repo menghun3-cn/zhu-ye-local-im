@@ -14,22 +14,17 @@ Status: implemented
 
 ## Decision
 
+本笔记现在只负责决策中的会话行文字部分。头像圆点和应用级总览已由
+[在线指示离开应用外壳与头像](../simplification/2026-10-27-presence-indicators-leave-the-chrome-and-avatar.zh.md)
+移除；删除行为及其理由由那份笔记负责记录。
+
 `PeerView.presence` 读取实时 Session 表，给出
 `PeerPresence.online`、`PeerPresence.connecting` 或
 `PeerPresence.offline`。已经建立的 Session 优先于仍在进行的拨号；其余没有
 Session 的情况都是离线。仅仅被 Discovery 听见不算在线。
-`PresenceCounts.of(controller.peers)` 统计的正是会话列表所画的同一份列表，
-因此两个表面不会给出不同答案。
 
-每个会话行现在都在头像右下角带一个状态点，并在标题旁带一段短文字。在线是
-实心绿点加「在线」；连接中是空心绿点加「连接中」；离线是灰点加「离线」，
-已知最后出现时间时再附上时间。状态既用颜色也用文字表达，不依赖色觉。
-
-应用外壳常驻显示所有已知设备的总览。宽窗口把它放在导航轨品牌标下方，排成
-紧凑的两三行；窄窗口把它放在底部导航栏上方的一条窄带里。文案例如
-「1 台在线 · 2 台离线」，存在连接中设备时追加「1 台连接中」，没有可统计的
-设备时显示「暂无设备」。整条总览是一个按钮，点击进入设备页，那里有地址和
-完整的最后出现事实。
+每个会话行都在标题旁带一段短文字。在线是「在线」；连接中是「连接中」；
+离线是「离线」，已知最后出现时间时再附上时间。
 
 右侧时间列现在只表示最后一条消息是什么时候动的。离线行已经在名称旁携带
 最后出现时间，所以没有历史的行不再把同一事实打印两遍。已连接但没有历史的
@@ -37,6 +32,9 @@ Session 的情况都是离线。仅仅被 Discovery 听见不算在线。
 相对时间仍随控制器通知刷新，和设备页现有的刷新契约相同。
 
 ## Alternatives considered
+
+下面的头像圆点与外壳总览备选方案记录的是最初决策。当前选择见
+[移除笔记](../simplification/2026-10-27-presence-indicators-leave-the-chrome-and-avatar.zh.md)。
 
 **只在头像上放一个彩色点。** 否：点很省空间，但要求读者记住绿色和灰色分别
 代表什么。文字只多几个字符，却能在不打开任何东西的情况下把状态说清楚。
@@ -58,22 +56,15 @@ Session 的情况都是离线。仅仅被 Discovery 听见不算在线。
 
 ## Consequences
 
-- 用户不用打开会话就能判断每条对话现在能不能发送，应用外壳也始终带着在线、
-  连接中和离线总数。
-- 总览是通往设备页的导航捷径，不是第二个事实来源。它和会话行都读
-  `controller.peers` 与 `PeerView.presence`。
+- 用户不用打开会话就能判断每条对话现在能不能发送。
 - 离线且没有历史的会话行不再在右侧重复打印最后出现时间。会话行时间的笔记
   已同步记录这条更窄的规则。
-- 导航轨在品牌标下方多了一个可选的状态槽位。总览是一个跳过 Tab 遍历的
-  `TextButton`，键盘行走时仍然先落在第一个导航项上，和之前一样；更新入口仍在
-  脚部，窄窗口仍保留底部导航栏。
 - 这里的在线状态是局域网 Session 状态，不表示能否访问互联网，也不表示对方
   机器是否开机。
 
 ## Testing
 
-`test/app/views_test.dart` 固定 presence 的优先级和计数。
-`test_flutter/ui/presence_test.dart` 固定行内文字、三段式总览、点击目标，以及
-浅色与深色调色板。`test_flutter/ui/pages_test.dart` 断言在线和离线行在打开
-会话之前就带着状态文字。`test_flutter/ui/shell_test.dart` 断言宽窗口导航轨和
-窄窗口状态条都显示总览，状态条位于底栏上方，并且点击总览会打开设备页。
+`test/app/views_test.dart` 固定 presence 的优先级。
+`test_flutter/ui/presence_test.dart` 固定行内文字。
+`test_flutter/ui/pages_test.dart` 断言在线和离线行在打开会话之前就带着状态
+文字。

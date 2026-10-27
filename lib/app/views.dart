@@ -200,51 +200,6 @@ final class PeerView {
       alias != DeviceDescriptor.fallbackAlias;
 }
 
-/// The peers known right now, counted by [PeerPresence].
-///
-/// The shell and the conversation list read the same `controller.peers` list,
-/// so counting here rather than in either widget keeps the summary and the rows
-/// from disagreeing about what "online" means.
-final class PresenceCounts {
-  const PresenceCounts({
-    required this.online,
-    required this.connecting,
-    required this.offline,
-  });
-
-  /// Counts [peers] by their current presence.
-  factory PresenceCounts.of(Iterable<PeerView> peers) {
-    var online = 0;
-    var connecting = 0;
-    var offline = 0;
-    for (final peer in peers) {
-      switch (peer.presence) {
-        case PeerPresence.online:
-          online++;
-        case PeerPresence.connecting:
-          connecting++;
-        case PeerPresence.offline:
-          offline++;
-      }
-    }
-    return PresenceCounts(
-      online: online,
-      connecting: connecting,
-      offline: offline,
-    );
-  }
-
-  final int online;
-  final int connecting;
-  final int offline;
-
-  /// Whether there is nothing to count.
-  bool get isEmpty => online == 0 && connecting == 0 && offline == 0;
-
-  /// Every peer represented by these counts.
-  int get total => online + connecting + offline;
-}
-
 /// One Transfer, as a UI renders it.
 final class TransferView {
   const TransferView({
