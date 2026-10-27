@@ -1178,6 +1178,100 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
+    testWidgets('right-clicking a conversation offers Delete before asking', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await sendText(
+        tester,
+        alice,
+        'delete from the list',
+        to: bob.fingerprint,
+      );
+
+      await pumpWindow(tester, alice);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to appear in the conversation list',
+      );
+
+      await rightClick(tester, conversationRow(windowA, 'Bob'));
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.deleteConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation context menu to open',
+      );
+      expect(
+        dialogIsOpen(windowA),
+        isFalse,
+        reason: 'the context menu comes before the confirmation',
+      );
+
+      // The menu item is in the tree while the popup is still animating.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.deleteConversation)));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the deleting confirmation to open',
+      );
+      expect(find.text(l10n.deleteConversationConfirmTitle), findsOneWidget);
+
+      await tapDialogButton(tester, l10n.cancel, window: windowA);
+      await pumpUntil(
+        tester,
+        () => !dialogIsOpen(windowA),
+        description: 'the cancellation to close',
+      );
+      expect(
+        conversationListed(windowA, 'Bob'),
+        isTrue,
+        reason: 'answering no keeps the row and the messages',
+      );
+
+      await rightClick(tester, conversationRow(windowA, 'Bob'));
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.deleteConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation context menu to open again',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.deleteConversation)));
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the deleting confirmation to open again',
+      );
+      await tapDialogButton(tester, l10n.deleteConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('delete from the list'),
+        ).evaluate().isEmpty,
+        description: 'the confirmed delete to remove the message',
+      );
+      expect(
+        conversationListed(windowA, 'Bob'),
+        isTrue,
+        reason: 'a connected conversation keeps its row',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
     testWidgets('long-pressing a conversation asks first and clears it', (
       tester,
     ) async {
@@ -1197,14 +1291,24 @@ void main() {
       );
 
       // A long press is the mobile gesture that stands in for the desktop
-      // right-click: it must offer the same delete confirmation.
+      // right-click: it opens the same menu before asking for confirmation.
       await tester.longPress(conversationRow(windowA, 'Bob'));
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.deleteConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation context menu to open',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.deleteConversation)));
       await pumpUntil(
         tester,
         () => dialogIsOpen(windowA),
         description: 'the deleting confirmation to open',
       );
-      expect(find.text(l10n.clearConversationConfirmTitle), findsOneWidget);
+      expect(find.text(l10n.deleteConversationConfirmTitle), findsOneWidget);
 
       await tapDialogButton(tester, l10n.cancel, window: windowA);
       await pumpUntil(
@@ -1221,14 +1325,20 @@ void main() {
       await tester.longPress(conversationRow(windowA, 'Bob'));
       await pumpUntil(
         tester,
+        () => windowA
+            .within(find.text(l10n.deleteConversation))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the conversation context menu to open again',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(windowA.within(find.text(l10n.deleteConversation)));
+      await pumpUntil(
+        tester,
         () => dialogIsOpen(windowA),
         description: 'the deleting confirmation to open again',
       );
-      await tapDialogButton(
-        tester,
-        l10n.clearConversationConfirmAction,
-        window: windowA,
-      );
+      await tapDialogButton(tester, l10n.deleteConversation, window: windowA);
       await pumpUntil(
         tester,
         () => onConversation(
@@ -1313,14 +1423,20 @@ void main() {
         await tester.longPress(conversationRow(windowA, 'Bob'));
         await pumpUntil(
           tester,
+          () => windowA
+              .within(find.text(l10n.deleteConversation))
+              .evaluate()
+              .isNotEmpty,
+          description: 'the conversation context menu to open',
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(windowA.within(find.text(l10n.deleteConversation)));
+        await pumpUntil(
+          tester,
           () => dialogIsOpen(windowA),
           description: 'the deleting confirmation to open',
         );
-        await tapDialogButton(
-          tester,
-          l10n.clearConversationConfirmAction,
-          window: windowA,
-        );
+        await tapDialogButton(tester, l10n.deleteConversation, window: windowA);
         await pumpUntil(
           tester,
           () => !conversationListed(windowA, 'Bob'),

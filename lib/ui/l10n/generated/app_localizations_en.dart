@@ -825,6 +825,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearConversationConfirmAction => 'Clear';
 
   @override
+  String get deleteConversation => 'Delete';
+
+  @override
+  String get deleteConversationConfirmTitle => 'Delete conversation?';
+
+  @override
+  String get deleteConversationConfirmBody =>
+      'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.';
+
+  @override
   String get conversationPickOne =>
       'Pick a conversation on the left, or wait for a nearby Device to connect automatically.';
 

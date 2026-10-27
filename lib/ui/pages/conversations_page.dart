@@ -518,13 +518,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
                           selected?.peer.fingerprint.hex,
                       unread: controller.unreadCount(entry.peer.fingerprint),
                       controller: controller,
-                      onDelete: () => _confirmClearConversation(
+                      onContextMenu: (position) => _showConversationMenu(
                         context,
                         entry.peer.fingerprint,
-                      ),
-                      onLongPress: () => _confirmClearConversation(
-                        context,
-                        entry.peer.fingerprint,
+                        position,
                       ),
                       onTap: () => _open(entry.peer.fingerprint),
                     );
@@ -588,12 +585,44 @@ class _ConversationsPageState extends State<ConversationsPage> {
     unawaited(ControllerScope.of(context).markConversationOpened(peer));
   }
 
+  /// Opens the list's context menu where the pointer or long press started.
+  ///
+  /// The menu is one step before the destructive action, as it is in the
+  /// desktop client: a right-click opens what can be done to the row, and
+  /// choosing Delete is what raises the confirmation question.
+  Future<void> _showConversationMenu(
+    BuildContext context,
+    Fingerprint peer,
+    Offset position,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final overlay = Overlay.of(context).context.findRenderObject();
+    final size = overlay is RenderBox
+        ? overlay.size
+        : MediaQuery.sizeOf(context);
+    final chosen = await showMenu<_ConversationListAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        size.width - position.dx,
+        size.height - position.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: _ConversationListAction.delete,
+          child: Text(l10n.deleteConversation),
+        ),
+      ],
+    );
+    if (chosen != _ConversationListAction.delete || !context.mounted) return;
+    await _confirmDeleteConversation(context, peer);
+  }
+
   /// Confirms, then removes every message exchanged with [peer].
   ///
-  /// Reuses the same confirmation wording the conversation-menu clear action
-  /// uses, so the two surfaces agree about what "delete this conversation"
-  /// means. Clipboard entries stay put, exactly as `clearConversation` promises.
-  Future<void> _confirmClearConversation(
+  /// Clipboard entries stay put, exactly as `clearConversation` promises.
+  Future<void> _confirmDeleteConversation(
     BuildContext context,
     Fingerprint peer,
   ) async {
@@ -602,8 +631,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.clearConversationConfirmTitle),
-        content: Text(l10n.clearConversationConfirmBody),
+        title: Text(l10n.deleteConversationConfirmTitle),
+        content: Text(l10n.deleteConversationConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -611,7 +640,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.clearConversationConfirmAction),
+            child: Text(l10n.deleteConversation),
           ),
         ],
       ),
@@ -688,8 +717,7 @@ class _ConversationTile extends StatelessWidget {
     required this.unread,
     required this.controller,
     required this.onTap,
-    required this.onDelete,
-    required this.onLongPress,
+    required this.onContextMenu,
   });
 
   final _Conversation entry;
@@ -709,11 +737,8 @@ class _ConversationTile extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  /// Right-tap on this row: confirms and then clears this peer's conversation.
-  final VoidCallback? onDelete;
-
-  /// Long-press on this row (mobile): confirms and then clears this peer's conversation.
-  final VoidCallback? onLongPress;
+  /// Right-tap or long-press on this row: opens its actions at [position].
+  final ValueChanged<Offset> onContextMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -746,8 +771,7 @@ class _ConversationTile extends StatelessWidget {
     return ConversationRow(
       selected: selected,
       onTap: onTap,
-      onSecondaryTap: onDelete,
-      onLongPress: onLongPress,
+      onContextMenu: onContextMenu,
       // The name is handed down so a test can name one row and reach only it.
       // Without it a finder for "Connect" would match every row on the list,
       // and the harness that drives these surfaces has to be able to say *which*
@@ -1016,6 +1040,8 @@ String _titleFor(PeerView peer) {
 
 enum _PeerAction { connect }
 
+enum _ConversationListAction { delete }
+
 /// A row that answers the mouse the way the desktop client's list does.
 ///
 /// [ListTile] is not used here because its selected and hover colours come from
@@ -1033,9 +1059,8 @@ class ConversationRow extends StatefulWidget {
     required this.peer,
     required this.selected,
     required this.onTap,
-    this.onSecondaryTap,
+    this.onContextMenu,
     required this.child,
-    this.onLongPress,
   });
 
   /// What this row is called, for a finder to name it by.
@@ -1044,11 +1069,8 @@ class ConversationRow extends StatefulWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Right-tap on the row: opens the delete-conversation confirmation.
-  final VoidCallback? onSecondaryTap;
-
-  /// Long-press on the row (mobile): opens the delete-conversation confirmation.
-  final VoidCallback? onLongPress;
+  /// Right-tap or long-press on the row, at the pointer's global position.
+  final ValueChanged<Offset>? onContextMenu;
   final Widget child;
 
   @override
@@ -1073,8 +1095,10 @@ class _ConversationRowState extends State<ConversationRow> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        onSecondaryTapUp: (_) => widget.onSecondaryTap?.call(),
-        onLongPress: widget.onLongPress,
+        onSecondaryTapDown: (details) =>
+            widget.onContextMenu?.call(details.globalPosition),
+        onLongPressStart: (details) =>
+            widget.onContextMenu?.call(details.globalPosition),
         child: Container(
           color: colour,
           // The row sizes to its content — the avatar, or the two lines of
