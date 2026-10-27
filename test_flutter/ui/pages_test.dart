@@ -2539,6 +2539,76 @@ void main() {
 
       await shutdown(tester, [alice, bob]);
     });
+
+    testWidgets('the default conversation is ready to type in on startup', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == bob.fingerprint,
+        description: 'Bob to be the remembered conversation',
+      );
+
+      // Rebuild the window from nothing, as a new run would: the controller
+      // keeps the remembered conversation, but the shell and page start over.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpWindow(tester, alice);
+
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.byType(TextField),
+        ).evaluate().isNotEmpty,
+        description: 'the default conversation to open',
+      );
+
+      final selectedRows = tester
+          .widgetList<ConversationRow>(
+            onPage(
+              windowA,
+              ConversationsPage,
+              find.byWidgetPredicate(
+                (widget) => widget is ConversationRow && widget.selected,
+              ),
+            ),
+          )
+          .toList();
+      expect(
+        selectedRows,
+        hasLength(1),
+        reason: 'the remembered conversation is the default selection',
+      );
+      expect(selectedRows.single.peer, 'Bob');
+
+      await pumpUntil(
+        tester,
+        () =>
+            tester
+                .widget<TextField>(
+                  onConversation(windowA, find.byType(TextField)),
+                )
+                .focusNode
+                ?.hasFocus ??
+            false,
+        description: 'the default composer to focus on startup',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
   });
 
   group('pasting into the composer', () {
