@@ -1389,6 +1389,16 @@ void main() {
         findsOneWidget,
         reason: 'the row says the peer is online before it is opened',
       );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: conversationRow(windowA, 'Bob'),
+            matching: find.byType(Positioned),
+          ),
+        ),
+        findsNothing,
+        reason: 'the avatar carries no presence dot',
+      );
       final bobView = alice.controller.peers.firstWhere(
         (peer) => peer.fingerprint == bob.fingerprint,
       );

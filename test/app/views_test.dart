@@ -62,9 +62,8 @@ void main() {
       String? alias,
       bool connected = false,
       bool connecting = false,
-      int keyByte = 4,
     }) => PeerView(
-      fingerprint: Fingerprint.ofPublicKey([keyByte, 5, 6]),
+      fingerprint: Fingerprint.ofPublicKey(const [4, 5, 6]),
       alias: alias,
       platform: DevicePlatform.windows,
       address: address,
@@ -151,25 +150,6 @@ void main() {
         expect(view().presence, PeerPresence.offline);
       },
     );
-
-    test('counts every peer exactly once', () {
-      final counts = PresenceCounts.of([
-        view(keyByte: 1, connected: true),
-        view(keyByte: 2, connecting: true),
-        view(keyByte: 3),
-        view(keyByte: 7),
-      ]);
-
-      expect(counts.online, 1);
-      expect(counts.connecting, 1);
-      expect(counts.offline, 2);
-      expect(counts.total, 4);
-      expect(counts.isEmpty, isFalse);
-      expect(
-        const PresenceCounts(online: 0, connecting: 0, offline: 0).isEmpty,
-        isTrue,
-      );
-    });
   });
 
   group('the label a peer wears in its avatar', () {
