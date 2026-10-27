@@ -54,6 +54,23 @@ void main() {
       expect(release.mentions(commit), isTrue);
     });
 
+    test('matches a translated gesture and a translated address', () {
+      final longPress = Commit(
+        '0000000',
+        'feat: long-press deletes a conversation row on mobile',
+      );
+      final address = Commit(
+        '0000000',
+        'fix: conversation row titles with IP address and focuses composer on pick',
+      );
+
+      expect(Release('test', ['移动端长按对话行支持删除确认。']).mentions(longPress), isTrue);
+      expect(
+        Release('test', ['对话列表的行标题改为显示对端的 IP 地址。']).mentions(address),
+        isTrue,
+      );
+    });
+
     test('has a version for every tag', () {
       final changelog = File('CHANGELOG.md').readAsLinesSync();
       final releases = readReleases(changelog);
@@ -304,11 +321,13 @@ Set<String> distinguishingFragments(String subject) {
   // translated release note is not reported as missing its commit.
   const translated = <String, String>{
     'automatically': '自动',
+    'address': '地址',
     'connect': '连接',
     'discovered': '发现',
     'discovery': '发现',
     'device': '设备',
     'devices': '设备',
+    'long-press': '长按',
   };
 
   // Latin words of four letters or more. Short words are excluded because

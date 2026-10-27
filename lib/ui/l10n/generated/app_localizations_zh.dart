@@ -782,6 +782,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clearConversationConfirmAction => '清空';
 
   @override
+  String get deleteConversation => '删除';
+
+  @override
+  String get deleteConversationConfirmTitle => '删除对话？';
+
+  @override
+  String get deleteConversationConfirmBody =>
+      '这个对话里的文字、文件和图片记录都会从本机删除，无法撤销。剪贴板记录不受影响。';
+
+  @override
   String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';
 
   @override
