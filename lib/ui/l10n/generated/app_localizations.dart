@@ -1454,6 +1454,24 @@ abstract class AppLocalizations {
   /// **'Clear'**
   String get clearConversationConfirmAction;
 
+  /// No description provided for @deleteConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteConversation;
+
+  /// No description provided for @deleteConversationConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation?'**
+  String get deleteConversationConfirmTitle;
+
+  /// No description provided for @deleteConversationConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.'**
+  String get deleteConversationConfirmBody;
+
   /// No description provided for @conversationPickOne.
   ///
   /// In en, this message translates to:

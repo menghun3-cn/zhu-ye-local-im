@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-10-27-changelog-matcher-knows-gesture-and-address.md
+#   git hash-object -- 2026-10-27-changelog-matcher-knows-gesture-and-address.zh.md
+2026-10-27-changelog-matcher-knows-gesture-and-address.md: 4d89a9fc65abd223247cdb47d7f6eddb7e0c7e7d
+2026-10-27-changelog-matcher-knows-gesture-and-address.zh.md: d072286c145463714682177846e81fec2825f5cb
