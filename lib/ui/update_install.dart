@@ -90,6 +90,21 @@ const String stagedArgument = '--staged';
 /// The flag naming the folder a hand-over puts it in.
 const String targetArgument = '--target';
 
+/// What a partially fetched package is called while it fills up.
+///
+/// The suffix is a second, invisible marker that a file in the update folder
+/// is *in flight*: without it, a retry would hand a crashed attempt's
+/// half-written file to the digest check. That is safe for the digest's sake,
+/// but it costs the ability to resume from the bytes that already arrived.
+const String updatePartialSuffix = '.part';
+
+/// How many network steps one address of a download is allowed.
+///
+/// A step that fails is retried against the same address, resuming from the
+/// offset the previous one reached; only after all three does the next address
+/// get its own steps.
+const int _attemptsPerAddress = 3;
+
 /// How many times a rename waits for the build that is being replaced to go.
 const int _renameAttempts = 40;
 
@@ -465,8 +480,9 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     final downloaded = File(_within(update.path, wanted));
     // One package at a time. A folder holding last week's download beside this
     // one is a folder nobody can read, and a package that was superseded is
-    // superseded the moment a newer release was asked about.
-    _keepOnly(update, wanted);
+    // superseded the moment a newer release was asked about. The partial file
+    // is this same package's own in-flight name, so it is kept beside it.
+    _keepOnly(update, [wanted, '$wanted$updatePartialSuffix']);
 
     onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
     // The bytes may already be here: an attempt that was cancelled after the
@@ -535,7 +551,7 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     }
     final wanted = _fileName(asset.name);
     final downloaded = File(_within(update.path, wanted));
-    _keepOnly(update, wanted);
+    _keepOnly(update, [wanted, '$wanted$updatePartialSuffix']);
 
     onProgress(const UpdateInstallProgress(UpdateInstallStage.downloading));
     if (!await _matchesDigest(downloaded, expected)) {
@@ -950,8 +966,8 @@ bool _isWritable(Directory directory) {
   }
 }
 
-/// Deletes every file in [update] but the one called [keep].
-void _keepOnly(Directory update, String keep) {
+/// Deletes every file in [update] but the ones named [keep].
+void _keepOnly(Directory update, List<String> keep) {
   List<FileSystemEntity> entries;
   try {
     entries = update.listSync();
@@ -963,7 +979,7 @@ void _keepOnly(Directory update, String keep) {
     // somewhere else entirely, and anything else a folder might hold is
     // somebody else's.
     if (entry is! File) continue;
-    if (_fileName(entry.path) == keep) continue;
+    if (keep.contains(_fileName(entry.path))) continue;
     try {
       entry.deleteSync();
     } on Object {
@@ -976,6 +992,8 @@ void _keepOnly(Directory update, String keep) {
 void _discard(File file) {
   try {
     if (file.existsSync()) file.deleteSync();
+    final partial = File(_partialFileOf(file));
+    if (partial.existsSync()) partial.deleteSync();
   } on Object {
     // Nothing to be done about it: the sentence the user reads is about the
     // attempt, not about the litter.
@@ -1016,76 +1034,187 @@ List<String> downloadAddresses(UpdateAsset asset) {
   return addresses;
 }
 
+/// What one network step of a download ended with.
+final class _DownloadFailure {
+  const _DownloadFailure(this.attempt, this.position);
+
+  /// Which address attempt this was, starting from zero.
+  final int attempt;
+
+  /// How many bytes the failed step had already put down.
+  final int position;
+}
+
+/// The in-flight bytes an interrupted fetch leaves beside [destination].
+///
+/// Bytes are only ever *the package* once a step that received every one of
+/// them renames the file into place ([updatePartialSuffix] comes off then),
+/// so a leftover is safe to adopt — and expensive to throw away.
+final class _Recovered {
+  const _Recovered(this.destination);
+
+  /// The package the bytes are heading for, under the update folder.
+  final File destination;
+}
+
+/// The leftover a new step starts from, or null when there is none.
+///
+/// When [destination] is empty and a partial file sits beside it, that partial
+/// is the work of an earlier attempt: the current one adopts it for its first
+/// step, which is what turns byte-for-byte failure into a cheap resume instead
+/// of another whole download. A partial that coexists with a non-empty
+/// destination can only be stale — the package it was fetching is the one
+/// already named — so it is dropped.
+Future<_Recovered?> _recoverPartial(File destination) async {
+  final partial = File(_partialFileOf(destination));
+  if (!partial.existsSync() || _existingLength(destination) > 0) {
+    if (partial.existsSync() && _existingLength(destination) > 0) {
+      try {
+        partial.deleteSync();
+      } on Object {
+        // Best effort; the fetch below starts from zero regardless.
+      }
+    }
+    return null;
+  }
+  return _Recovered(destination);
+}
+
 /// Fetches [asset] to [destination], trying each of its addresses.
 ///
-/// Reports progress per attempt, from zero: a second attempt is a second
-/// download, and a bar that resumed where the failed one left off would be
-/// claiming bytes this one has not received. Throws when no address delivers
-/// the whole file, which is what the caller reports as "the download did not
-/// arrive" — an answer that has not changed, and one the user can act on by
-/// trying again.
+/// Every address is allowed up to [_attemptsPerAddress] network steps, and a
+/// step resumes the file where the previous one stopped instead of fetching
+/// the whole thing again: when a connection drops a few hundred kilobytes
+/// short of the end, the reconnect saves the part that already arrived.
+///
+/// Resuming is only possible while the server supports ranges; an answer that
+/// is a whole-file 200 switches the receiver back to a fresh download at the
+/// start. Nothing here decides whether the bytes are right — the digest check
+/// after the fetch is the only judge of that.
+///
+/// Throws when no address delivers the whole file, which is what the caller
+/// reports as "the download did not arrive" — an answer that has not changed,
+/// and one the user can act on by trying again.
 Future<void> _download(
   UpdateAsset asset,
   File destination,
   void Function(UpdateInstallProgress progress) onProgress,
 ) async {
-  Object? failure;
+  final failures = <_DownloadFailure>[];
   for (final address in downloadAddresses(asset)) {
     // A new client per attempt: a connection that failed during its CONNECT
     // leaves the pool of the one that held it in a state worth not reusing, and
     // the second host is a different one anyway.
-    final client = HttpClient()..connectionTimeout = _requestTimeout;
-    try {
-      final received = await _fetch(
-        client,
-        Uri.parse(address),
-        destination,
-        asset.size,
-        onProgress,
-      );
-      // Short of the bytes the release published is not a download that
-      // arrived, and finding that out here is what gives the next address a
-      // chance: an interception that answers with a page of its own returns
-      // 200 and the whole wrong file, which the checksum below would catch —
-      // but only after every address had been given up on.
-      if (asset.size > 0 && received != asset.size) {
-        throw HttpException(
-          '$received of ${asset.size} bytes',
-          uri: Uri.parse(address),
+    for (var attempt = 0; attempt < _attemptsPerAddress; attempt++) {
+      final client = HttpClient()..connectionTimeout = _requestTimeout;
+      try {
+        final recovered = await _recoverPartial(destination);
+        // The partial of an earlier attempt is the work this step resumes: it
+        // gets the range, and a step that reaches the end renames those very
+        // bytes into the package's own name.
+        // The partial file of whatever is being fetched: a recovered one from
+        // an earlier attempt, or the new one this step is about to open.
+        final resumeFrom = _existingLength(
+          File(_partialFileOf(recovered?.destination ?? destination)),
         );
+        final received = await _fetch(
+          client,
+          Uri.parse(address),
+          destination,
+          asset.size,
+          resumeFrom: resumeFrom,
+          onProgress: onProgress,
+        );
+        // Short of the bytes the release published is not a download that
+        // arrived, and finding that out here is what gives the next step a
+        // chance: an interception that answers with a page of its own returns
+        // 200 and the whole wrong file, which the checksum below would catch —
+        // but only after every address and step had been given up on.
+        if (asset.size > 0 && received != asset.size) {
+          throw HttpException(
+            '$received of ${asset.size} bytes',
+            uri: Uri.parse(address),
+          );
+        }
+        // The arrival is complete; the bytes were only ever the package's once
+        // they carry its name. A rename is atomic here, so a crash can leave
+        // the old package or the new one, never a file that looks whole.
+        await File(_partialFileOf(destination)).rename(destination.path);
+        return;
+      } on Object {
+        failures.add(
+          _DownloadFailure(
+            attempt,
+            _existingLength(File(_partialFileOf(destination))),
+          ),
+        );
+        // Re-running the same address after several of these would only be
+        // waiting on the same wall; the next address is what is new to try.
+        if (attempt + 1 >= _attemptsPerAddress) break;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      } finally {
+        client.close(force: true);
       }
-      return;
-    } on Object catch (error) {
-      failure = error;
-    } finally {
-      client.close(force: true);
     }
   }
-  throw failure ?? const HttpException('no address to download from');
+  throw StateError(
+    failures.isEmpty ? 'no address to download from' : failures.join('; '),
+  );
 }
 
-/// Reads [url] into [destination], answering how many bytes arrived.
+/// How many bytes [file] already holds, or zero when it cannot be read.
+int _existingLength(File file) {
+  try {
+    return file.lengthSync();
+  } on Object {
+    return 0;
+  }
+}
+
+/// Reads [url] into a partial file, answering how many bytes arrived.
+///
+/// [destined] is the package the bytes are heading for; nothing here writes
+/// that name. What is written is the bytes under [updatePartialSuffix] from
+/// [resumeFrom] on, and [destined] only appears again — with the whole file —
+/// when the caller renames the partial into place.
+///
+/// One step begins at [resumeFrom]: when the partial file already holds bytes,
+/// the request asks for them to be skipped ([HttpHeaders.rangeHeader]) and the
+/// sink resumes where they end. A server that does not understand ranges
+/// answers 200 with the whole file and the receiver falls back to a fresh
+/// download at the start — the same guard the partial file of a crashed
+/// attempt needs, since its bytes may end anywhere.
 Future<int> _fetch(
   HttpClient client,
   Uri url,
-  File destination,
-  int expectedBytes,
-  void Function(UpdateInstallProgress progress) onProgress,
-) async {
+  File destined,
+  int expectedBytes, {
+  required int resumeFrom,
+  required void Function(UpdateInstallProgress progress) onProgress,
+}) async {
   final request = await client.getUrl(url).timeout(_requestTimeout);
   request.headers.set(HttpHeaders.userAgentHeader, 'zhuye-local-transfer');
   // What turns the API's address from a description of a file into the file
   // itself. The download address ignores it, so one header serves both.
   request.headers.set(HttpHeaders.acceptHeader, 'application/octet-stream');
+  final resuming = resumeFrom > 0;
+  if (resuming) {
+    request.headers.set(HttpHeaders.rangeHeader, 'bytes=$resumeFrom-');
+  }
   final response = await request.close().timeout(_requestTimeout);
-  if (response.statusCode != HttpStatus.ok) {
+  final resumed = resuming && response.statusCode == HttpStatus.partialContent;
+  final whole = response.statusCode == HttpStatus.ok;
+  if (!resumed && !whole) {
     throw HttpException('HTTP ${response.statusCode}', uri: url);
   }
+  // A 200 to a ranged request means the server does not serve ranges: the
+  // bytes it sends start at zero, not at the offset the file already holds.
+  final writeFrom = resumed ? resumeFrom : 0;
   final total = response.contentLength > 0
       ? response.contentLength
       : expectedBytes;
-  final sink = destination.openWrite();
-  var received = 0;
+  final sink = File(_partialFileOf(destined)).openWrite(mode: FileMode.append);
+  var received = writeFrom;
   try {
     await for (final chunk in response.timeout(_idleTimeout)) {
       sink.add(chunk);
@@ -1103,6 +1232,12 @@ Future<int> _fetch(
   }
   return received;
 }
+
+/// The file that is filling up for [file], reached by [updatePartialSuffix].
+///
+/// One name, this platform's separator, so both the fetch and the takeover
+/// agree on where the bytes are.
+String _partialFileOf(File file) => '${file.path}$updatePartialSuffix';
 
 /// Unpacks [package] into [into], answering whether it worked.
 ///
