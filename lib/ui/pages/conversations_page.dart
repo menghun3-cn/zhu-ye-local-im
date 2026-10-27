@@ -139,6 +139,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
     super.initState();
     _selected = widget.requestedPeer?.hex;
     _untouched = widget.requestedPeer == null;
+    // The shell starts on this surface, so the first visible frame can already
+    // be an arrival with a remembered conversation in it. The shell counts
+    // that arrival; answer it here as well as in [didUpdateWidget], otherwise
+    // the default conversation would need a trip to another tab before its
+    // composer became ready to type in.
+    _focusComposer = widget.isVisible && widget.focusRequest > 0;
   }
 
   @override

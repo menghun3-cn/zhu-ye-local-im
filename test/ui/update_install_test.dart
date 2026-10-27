@@ -520,7 +520,10 @@ void main() {
           root: root,
         );
 
-        expect(asked, ['/api', '/download']);
+        // The refusal is answered by every allowed step of the first address,
+        // and only then does the second get its own steps: the first address
+        // takes all three failures before the address list moves on.
+        expect(asked, ['/api', '/api', '/api', '/download']);
         // The bytes arrived and were then thrown away for not being what the
         // release published — which is the proof that the *second* address was
         // the one that delivered them.
@@ -550,7 +553,9 @@ void main() {
         root: root,
       );
 
-      expect(asked, ['/api', '/download']);
+      // The first address's wrong-length steps precede the second address's,
+      // so the fallback is still exercised after every allowed step.
+      expect(asked, ['/api', '/api', '/api', '/download']);
       expect(result.failure, UpdateInstallFailure.checksum);
     });
 
@@ -572,8 +577,16 @@ void main() {
           root: root,
         );
 
-        // Both were tried, and the answer is the one the user can act on.
-        expect(asked, ['/api', '/download']);
+        // Both were tried — the first three times over its allowed steps — and
+        // the answer is the one the user can act on.
+        expect(asked, [
+          '/api',
+          '/api',
+          '/api',
+          '/download',
+          '/download',
+          '/download',
+        ]);
         expect(result.failure, UpdateInstallFailure.download);
       },
     );
