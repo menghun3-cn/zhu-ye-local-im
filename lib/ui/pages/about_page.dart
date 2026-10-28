@@ -245,12 +245,13 @@ class _AboutPageState extends State<AboutPage> {
     }
     setState(() {
       // The question is past: what is left closes this program, so the buttons
-      // that opened the question have nothing left to say.
-      _progress = UpdateInstallProgress(
-        restarts
-            ? UpdateInstallStage.handingOver
-            : UpdateInstallStage.installing,
-      );
+      // that opened the question have nothing left to say. Windows draws
+      // nothing during the hand-over either — the new window is what the user
+      // asked for, and the installer's own progress is silent too. Android
+      // still hands itself to the system installer, whose progress is real.
+      if (!restarts) {
+        _progress = const UpdateInstallProgress(UpdateInstallStage.installing);
+      }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
     try {
@@ -317,12 +318,11 @@ class _AboutPageState extends State<AboutPage> {
       case UpdateInstallStage.staging:
         return l10n.aboutUpdateStaging;
       case UpdateInstallStage.handingOver:
-        return l10n.aboutUpdateHandingOver;
-      case UpdateInstallStage.installing:
-        return l10n.aboutUpdateInstalling;
       case UpdateInstallStage.idle:
       case UpdateInstallStage.failed:
         return null;
+      case UpdateInstallStage.installing:
+        return l10n.aboutUpdateInstalling;
     }
   }
 

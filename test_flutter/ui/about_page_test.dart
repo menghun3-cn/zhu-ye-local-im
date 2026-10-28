@@ -399,10 +399,10 @@ void main() {
       installer.applied.single.package,
       'LocalTransfer-9.9.9-windows-x64-setup.exe',
     );
-    // The last thing the old build draws. The real installer ends the process
-    // rather than returning, so this is the state the user is left looking at.
-    expect(find.text(l10n.aboutUpdateHandingOver), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    // The question was the only announcement; after it the old build ends
+    // without drawing a progress bar or a hand-over sentence, because the
+    // real installer takes over and the new window is what the user sees.
+    expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
   testWidgets('changes nothing when the question is answered no', (

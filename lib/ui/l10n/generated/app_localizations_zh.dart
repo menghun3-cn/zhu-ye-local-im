@@ -625,9 +625,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutUpdateStaging => '正在解压…';
 
   @override
-  String get aboutUpdateHandingOver => '正在替换本目录并重启…';
-
-  @override
   String get aboutUpdateInstalling => '正在打开系统安装器…';
 
   @override

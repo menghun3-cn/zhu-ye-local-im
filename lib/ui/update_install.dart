@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 
@@ -27,8 +28,10 @@ import 'update_check.dart';
 ///
 /// What it is instead is the build that was just downloaded. It is unpacked
 /// into a folder of its own, started with [applyUpdateFlag] and the two paths
-/// it needs, and it waits — see [dropStagedTree] — for the old one to go. That
-/// it is *newer* than the process it replaces is the point rather than a
+/// it needs, and it waits — see [dropStagedTree] — for the old one to go. The
+/// step that finishes the update runs in that newer build, without a window of
+/// its own; the updated build is the window the user asked for. That it is
+/// *newer* than the process it replaces is the point rather than a
 /// coincidence: the code that finishes an update is the code that was written
 /// most recently, so a fix to this machinery reaches the machines that need it
 /// with the update that carries it.
@@ -339,11 +342,9 @@ abstract interface class UpdateInstaller {
   ///
   /// Does not return in the application: the files being replaced are open
   /// until the process holding them ends, so this one has to. What the user
-  /// sees after it is the window of the build that was just started — the
-  /// hand-over window, or the installer's own — and then the updated
-  /// application, reopened by that window or by the installer's second `[Run]`
-  /// entry. [onProgress] is called before the end, which is the last thing the
-  /// old build gets to say.
+  /// sees after it is the updated application, reopened by the build that was
+  /// just started or by the installer's second `[Run]` entry. [onProgress] is
+  /// called before the end, which is the last thing the old build gets to say.
   Future<void> apply(
     PreparedUpdate prepared, {
     required void Function(UpdateInstallProgress progress) onProgress,
@@ -596,14 +597,14 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
     }
     if (prepared.payload == UpdatePayload.installer) {
       // Inno replaces the files and puts the application back — see the second
-      // `[Run]` entry in `packaging/local_transfer.iss`, which runs under
-      // `/SILENT` only when `/update` is among the arguments, and that is what
-      // this spelling of it is for: a silent install somebody else started
-      // should install and nothing more. Whatever the installer does not do,
-      // this process must not: its files are open until it ends and it has
-      // seconds before the unpacker reaches them.
+      // `[Run]` entry in `packaging/local_transfer.iss`, which runs only when
+      // `/update` is among the arguments. `/VERYSILENT` is the whole point of
+      // an in-app update: the user has already said yes to the restart, so the
+      // installer must not show a window of its own either. Whatever the
+      // installer does not do, this process must not: its files are open until
+      // it ends and it has seconds before the unpacker reaches them.
       await Process.start(prepared.package, const [
-        '/SILENT',
+        '/VERYSILENT',
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
         '/update',
@@ -613,30 +614,33 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
       // every file of this build is open until this process ends, and that one
       // has nothing open in the folder it is about to fill. A portable payload
       // is only ever readied with a folder to run from, so there is nothing to
-      // do without one.
+      // do without one. The staged build is started detached and finishes the
+      // update in place; until this process goes, its files are still open.
       final staged = prepared.staged;
       if (staged == null) return;
-      await Process.start(_within(staged, _executableName), [
-        applyUpdateFlag,
-        stagedArgument,
-        staged,
-        targetArgument,
-        _root,
-      ], mode: ProcessStartMode.detached);
+      try {
+        await Process.start(_within(staged, _executableName), [
+          applyUpdateFlag,
+          stagedArgument,
+          staged,
+          targetArgument,
+          _root,
+        ], mode: ProcessStartMode.detached);
+      } on Object catch (error) {
+        // Where the old build can still say it: the next start reads this.
+        writeHandoverReport(File(_within(_root, handoverReportName)), error);
+      }
     }
     await _handOver(onProgress);
   }
 
   /// Says that a hand-over has started, and ends the process it was started
-  /// from.
+  /// from. Nothing is drawn in between — the updated build is the window the
+  /// user asked for, and a gap would read as a crash only to a user who had
+  /// not already answered the question that said the app was about to restart.
   Future<void> _handOver(
     void Function(UpdateInstallProgress progress) onProgress,
   ) async {
-    onProgress(const UpdateInstallProgress(UpdateInstallStage.handingOver));
-    // The sentence that says the application is restarting has to be on the
-    // screen before the screen goes away, and a frame is not painted in the
-    // same turn the state was set in.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
     leave();
   }
 }
@@ -907,6 +911,30 @@ final class UpdateHandoff {
     }
     dropStagedTree(staged: stagedDirectory, target: targetDirectory);
     return _within(targetDirectory.path, _executableName);
+  }
+
+  /// Finishes an update from a build that was started with [applyUpdateFlag].
+  ///
+  /// Replaces the folder on an isolate of its own (a whole application is
+  /// copied, and the caller's thread must not freeze while it is), starts the
+  /// updated build, and exits when it is on its way. A failure is written
+  /// where the application looks on its next start, because there is no window
+  /// of this build to report it. Answers the exit code the caller must leave
+  /// with: 0 when the updated build is on its way, non-zero otherwise.
+  Future<int> run() async {
+    try {
+      final executable = await Isolate.run(putInPlace);
+      // The new process must actually exist before this one goes away: exiting
+      // early can leave the update finished but nobody restarted.
+      await startDetached(executable);
+      return 0;
+    } on Object catch (error) {
+      writeHandoverReport(
+        File('$target${Platform.pathSeparator}$handoverReportName'),
+        error,
+      );
+      return 1;
+    }
   }
 }
 
