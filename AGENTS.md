@@ -234,6 +234,31 @@ Settings → Pages → Source 必须是 **GitHub Actions**（不是「从分支�
 - [docs/dart-dependency-baseline.md](docs/dart-dependency-baseline.md) — 依赖版本与维护状态
 - [docs/network-baseline.md](docs/network-baseline.md) — 开发机网络实测（仅环境事实，不是需求来源）
 
+## 7.1 安全红线（强制）
+
+本仓库在开发机上多次因为「清理临时文件」而差点毁掉整个工作区；2026-10-28 的一次误删直接
+删空了主工作区（含 `.git`），只能靠远程仓库重建。以下红线**覆盖本仓库内的一切 Shell
+命令，包括 AI 助手**：
+
+- **绝不执行跨 Shell 的删除/移动**：不要在 PowerShell 里调用 `cmd /c rd`、不要在 bash 里
+  调用其他 Shell 的文件命令。删除/移动必须用同一种 Shell 的内建/原生命令完成。
+- **绝不把「清理临时文件」作为目标**：临时文件（如意外生成的 `$null`）属于「忽略」，不
+  属于「主动清除」。除非用户明确要求清理，否则宁可留着也不删。
+- **删除/移动前必须先校验解析后的绝对路径**：目标路径必须通过字面量校验（例如
+  `Resolve-Path` 或 `[System.IO.Path]::GetFullPath`），且确认解析结果等于预期的绝对路径，
+  不等于仓库根目录或仓库内容。父目录路径禁止以通配/未展开变量结尾。
+- **`$null` 不是文件名**：PowerShell 的 `$null` 是空值，不能用来代表一个叫 `$null` 的
+  文件；把它放进 `cmd /c` 引号里会先展开成空，让删除命令落到仓库根目录。丢弃输出请用
+  `2>$null`（PowerShell）或 `2>/dev/null`（bash），不要混用。
+- **禁止在失败后继续「补删/重试」**：一次删除/移动失败（`Access is denied` 等）就是停止
+  信号。先向用户报告状态与下一步，未经确认不得重试或换工具再试。
+- **仓库内容优先用「移动」而不是「删除」**：需要挪动仓库目录时，先整体移动到新的安全
+  路径，确认后再处理旧位置；不删除仓库内任何文件。
+
+详细的机制、事故复盘与恢复方法见
+[.agents/notes/implemented/process/2026-10-28-deleting-files-needs-an-absolute-path.md](
+.agents/notes/implemented/process/2026-10-28-deleting-files-needs-an-absolute-path.md)。
+
 ## 8. 环境
 
 - Flutter 需为当前稳定版（本项目起始于 3.47.x / Dart 3.13.x）；开发机原有 3.29.2 必须先升级，原因见 [.agents/notes/](.agents/notes/) 中的升级决策笔记。
