@@ -654,9 +654,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutUpdateStaging => 'Unpacking…';
 
   @override
-  String get aboutUpdateHandingOver => 'Replacing this folder and restarting…';
-
-  @override
   String get aboutUpdateInstalling => 'Opening the system installer…';
 
   @override

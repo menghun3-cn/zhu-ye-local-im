@@ -1342,17 +1342,13 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
     required void Function(UpdateInstallProgress progress) onProgress,
   }) async {
     applied.add(update);
-    // What the real one reports before it ends the process: the last thing the
-    // old build gets to say.
+    // The real Windows hand-over is silent — the new window is what the user
+    // sees. Android still reports handing the APK to the system installer.
     final failure = applyFailure;
     if (failure != null) throw UpdateInstallException(failure);
-    onProgress(
-      UpdateInstallProgress(
-        restartsApplication
-            ? UpdateInstallStage.handingOver
-            : UpdateInstallStage.installing,
-      ),
-    );
+    if (!restartsApplication) {
+      onProgress(const UpdateInstallProgress(UpdateInstallStage.installing));
+    }
   }
 }
 

@@ -13,12 +13,8 @@
 // has been unpacked beside the one it replaces, and this copy was started to
 // finish putting it in place rather than to run. Spelled the same in
 // `lib/ui/update_install.dart`, which is where the two folders it is given are
-// read, and in `lib/ui/update_handoff.dart`, which is what it puts on screen.
-//
-// It changes two things here, both of them because the copy being replaced is
-// still running at the moment this one starts: this is not a second copy of the
-// application (see `HostShell::AcquireSingleInstance`), and it must not be
-// closed by a click in the middle of the copy it is making.
+// read. The copy that finishes the update runs with the flag and draws
+// nothing; the updated build it starts is the window the user asked for.
 constexpr char kApplyUpdateFlag[] = "--apply-update";
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -70,8 +66,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   // Not while an update is being finished: the copy that step makes is a whole
   // application, and a click that ended this process halfway through would
-  // leave the folder holding half of each build. The window that reports it
-  // offers its own way out once the copy has failed.
+  // leave the folder holding half of each build. The updated build is the
+  // window the user asked for, and the failure that update cannot draw is left
+  // in the report file.
   window.SetQuitOnClose(!applying_update);
 
   ::MSG msg;
