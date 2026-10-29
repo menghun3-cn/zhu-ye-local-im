@@ -21,13 +21,6 @@ class ClipboardPage extends StatefulWidget {
 }
 
 class _ClipboardPageState extends State<ClipboardPage> {
-  /// Entries that reached this Device's system clipboard since the page was
-  /// built, newest first.
-  ///
-  /// Held here rather than in the controller: the controller reports what it
-  /// applied, and only a screen cares about the last twenty of them. Bounded
-  /// because it is a history scroll-back, not a log.
-  final List<ClipboardEntry> _applied = [];
   StreamSubscription<ClipboardEntry>? _appliedWatch;
 
   @override
@@ -36,7 +29,9 @@ class _ClipboardPageState extends State<ClipboardPage> {
     // Read here rather than in initState: an inherited widget cannot be looked
     // up before the first didChangeDependencies, and this page outlives every
     // rebuild the scope above it does.
-    _appliedWatch ??= ControllerScope.of(context).applied.listen(_remember);
+    _appliedWatch ??= ControllerScope.of(context).applied.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -45,17 +40,11 @@ class _ClipboardPageState extends State<ClipboardPage> {
     super.dispose();
   }
 
-  void _remember(ClipboardEntry entry) {
-    setState(() {
-      _applied.insert(0, entry);
-      if (_applied.length > 20) _applied.removeLast();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final controller = ControllerScope.of(context);
+    final applied = controller.appliedEntries;
     final capability = controller.self.capability;
     final staged = controller.stagedEntries;
     // The whitelist is edited over the paired peers: a Device outside the
@@ -130,10 +119,10 @@ class _ClipboardPageState extends State<ClipboardPage> {
             _EntryCard(entry: entry, controller: controller),
         const SizedBox(height: WeChat.sectionGap),
         SectionHeader(title: l10n.clipboardAppliedHeader),
-        if (_applied.isEmpty)
+        if (applied.isEmpty)
           HintText(l10n.clipboardNothingApplied)
         else
-          for (final entry in _applied)
+          for (final entry in applied)
             _EntryCard(entry: entry, controller: null),
       ],
     );

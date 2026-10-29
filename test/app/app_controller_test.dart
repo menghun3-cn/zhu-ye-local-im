@@ -53,6 +53,9 @@ final class CountingMessageStore implements MessageStore {
     saves.add(json);
     await inner.save(json);
   }
+
+  @override
+  Future<void> remove() => inner.remove();
 }
 
 /// Sockets that can be made to swallow everything written to them.
@@ -1904,6 +1907,41 @@ void main() {
           isFalse,
         );
         expect(bob.controller.lastConversation, isNull);
+      },
+    );
+
+    test(
+      'deleteConversation forgets the Device and its whole history',
+      () async {
+        final (alice, bob) = await paired();
+        final sent = await alice.controller.sendText('goodbye');
+        await until(
+          () => sent.state.isSettled && bob.controller.transfers.isNotEmpty,
+          description: 'the text to land on Bob',
+        );
+        await remembered((messages) => messages.isNotEmpty);
+        await bob.controller.markConversationOpened(alice.fingerprint);
+        expect(bob.controller.lastConversation, alice.fingerprint);
+
+        await bob.controller.deleteConversation(alice.fingerprint);
+
+        expect(bob.controller.transfers, isEmpty);
+        expect(bob.controller.totalUnread, 0);
+        expect(bob.controller.lastConversation, isNull);
+        expect(
+          await loadMessages(kept),
+          isEmpty,
+          reason: 'the last conversation deletes the history file',
+        );
+        expect(
+          bob.controller.peers.any(
+            (peer) => peer.fingerprint == alice.fingerprint && peer.isInGroup,
+          ),
+          isFalse,
+          reason: 'the Device is no longer a group member',
+        );
+        expect(bob.controller.self.groupLength, 1);
+        expect(bob.controller.sessions, isEmpty);
       },
     );
   });

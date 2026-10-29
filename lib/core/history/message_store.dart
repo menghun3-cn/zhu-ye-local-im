@@ -56,6 +56,13 @@ abstract interface class MessageStore {
 
   /// Replaces the stored history.
   Future<void> save(Map<String, Object?> json);
+
+  /// Removes the stored history entirely, if there is one to remove.
+  ///
+  /// A Device that has no conversations left has no conversation file either:
+  /// "nothing to read back" is the honest answer to a restart, and an empty
+  /// JSON envelope left behind would only grow out of date.
+  Future<void> remove();
 }
 
 /// A [MessageStore] held in memory, for tests and for a Device that runs
@@ -73,6 +80,11 @@ final class MemoryMessageStore implements MessageStore {
     // Round-tripped through JSON so the caller's map cannot be mutated after
     // the fact into something the store no longer holds.
     _json = jsonDecode(jsonEncode(incoming)) as Map<String, Object?>;
+  }
+
+  @override
+  Future<void> remove() async {
+    _json = null;
   }
 }
 
@@ -147,6 +159,14 @@ final class FileMessageStore implements MessageStore {
       if (identical(_inFlight, settled)) _inFlight = null;
     });
     return started;
+  }
+
+  @override
+  Future<void> remove() async {
+    final target = File(path);
+    if (await target.exists()) await target.delete();
+    final temp = File(_tempPath);
+    if (await temp.exists()) await temp.delete();
   }
 
   /// The write itself, with no other save running beside it.

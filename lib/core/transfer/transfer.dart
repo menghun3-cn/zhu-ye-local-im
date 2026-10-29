@@ -312,6 +312,13 @@ abstract base class Transfer {
   /// it was carrying without knowing which direction each Transfer ran in.
   void onChannelError(Object error);
 
+  /// Abandons this Transfer and tells the peer why.
+  ///
+  /// Declared on the base so that a hard conversation deletion can stop every
+  /// Transfer it is carrying with one call, whichever direction the bytes ran
+  /// in. Subclasses send the wire message that settles the far side.
+  Future<void> cancel([RejectionReason reason = RejectionReason.declined]);
+
   /// Called once, when the Transfer ends, to release whatever it was holding.
   void onSettled() {}
 

@@ -147,6 +147,7 @@ final class IncomingTransfer extends Transfer {
   ///
   /// Bytes already written are left where they are: they are what makes the
   /// attempt resumable.
+  @override
   Future<void> cancel([
     RejectionReason reason = RejectionReason.declined,
   ]) async {

@@ -260,6 +260,13 @@ final class LocalTransferController {
   /// The clipboard entries this Device has staged but not applied.
   List<ClipboardEntry> get stagedEntries => _mirror.stagedEntries;
 
+  /// The clipboard entries this Device has applied, in application order.
+  ///
+  /// A hard conversation deletion clears a Device's applied entries from this
+  /// list, and the Clipboard surface draws from it so the history disappears
+  /// with the Device it belonged to.
+  List<ClipboardEntry> get appliedEntries => _mirror.appliedEntries;
+
   /// Clipboard entries that arrive while staging.
   Stream<ClipboardEntry> get staged => _mirror.staged;
 
@@ -941,6 +948,32 @@ final class LocalTransferController {
     return transfer;
   }
 
+  /// Sends [file] to a peer as an image message, recording that the bytes
+  /// live in a temporary file this application created.
+  ///
+  /// The paste path is the one file the app may take away again: deleting a
+  /// conversation must never touch a picture the user chose or received, and
+  /// the only way to tell the two apart later is to say so now. Absolutely
+  /// nothing else about the send differs from [sendImage].
+  Future<OutgoingTransfer> sendAppOwnedImage(
+    File file, {
+    Fingerprint? to,
+  }) async {
+    final target = _target(to);
+    final source = await FileByteSource.open(file);
+    final OutgoingTransfer transfer;
+    try {
+      transfer = await target.engine.sendImages([
+        OutgoingItem(name: fileNameOf(file.path), source: source),
+      ]);
+    } on Object {
+      await source.close();
+      rethrow;
+    }
+    _track(transfer, target.peer, localPath: file.path, appOwned: true);
+    return transfer;
+  }
+
   /// Sends [items] to a peer as one Transfer.
   Future<OutgoingTransfer> sendFiles(
     List<OutgoingItem> items, {
@@ -1154,6 +1187,93 @@ final class LocalTransferController {
     _reading.forget(peer);
     _notify();
     await _persistHistory();
+  }
+
+  /// Deletes the conversation with [peer] and forgets the Device entirely.
+  ///
+  /// The hard delete is a composite action: cancel every Transfer still in
+  /// flight, close the Session, drop the messages and reading state, remove
+  /// the peer from `known`/favorites/clipboard whitelist/Owner Group, clear
+  /// the clipboard Mirror's per-peer memory, and take away only the temporary
+  /// files this application itself created. Files the user picked or received
+  /// are deliberately kept, and so is the system clipboard's current content.
+  ///
+  /// No persistent ignore list is written: the peer may be automatically
+  /// re-discovered and re-paired at any moment, which starts a brand-new empty
+  /// conversation. This is one Device's local decision; the peer is told
+  /// nothing, and the Owner Group secret is left alone because other Devices
+  /// still hold it.
+  Future<void> deleteConversation(Fingerprint peer) async {
+    // Cancel first, so an ending that races back cannot resurrect anything.
+    for (final tracked in _transfers) {
+      if (tracked.peer == peer &&
+          tracked.transfer.kind != PayloadKind.clipboard) {
+        tracked.dismissed = true;
+        await tracked.transfer.cancel();
+      }
+    }
+    await _closeWired(peer);
+    _autoConnecting.remove(peer.hex);
+    _autoDue.remove(peer.hex);
+    _autoFailures.remove(peer.hex);
+    _autoPairing.remove(peer.hex);
+    _autoPairDue.remove(peer.hex);
+    _autoPairFailures.remove(peer.hex);
+
+    _transfers.removeWhere(
+      (tracked) =>
+          tracked.peer == peer &&
+          tracked.transfer.kind != PayloadKind.clipboard,
+    );
+    final appOwnedPaths = <String>{
+      for (final tracked in _transfers)
+        if (tracked.peer == peer &&
+            tracked.appOwned &&
+            tracked.localPath != null)
+          tracked.localPath!,
+      for (final record in _history)
+        if (record.peer == peer && record.appOwned && record.localPath != null)
+          record.localPath!,
+    };
+    _history.removeWhere(
+      (record) => record.peer == peer && record.kind != PayloadKind.clipboard,
+    );
+    _reading.forget(peer);
+
+    final local = _local;
+    if (local != null) {
+      local.profile.forgetDevice(peer);
+      await _persist();
+    }
+    _mirror.forgetPeer(peer);
+    _mirror.setGroup(local?.profile.group ?? _mirror.group);
+    _mirror.setAllowedPeers(local?.profile.clipboardPeers ?? const {});
+
+    await _persistHistory();
+    for (final path in appOwnedPaths) {
+      await _deleteAppOwnedFile(path);
+    }
+    _notify();
+  }
+
+  /// Closes the wired Session to [peer], if there is one.
+  Future<void> _closeWired(Fingerprint peer) async {
+    final wired = _wired.remove(peer.hex);
+    if (wired == null) return;
+    await wired.dispose();
+    await wired.session.close();
+  }
+
+  /// Deletes [path] when it is one of this application's temporary files.
+  Future<void> _deleteAppOwnedFile(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } on Object {
+      // Best effort: a temp file that will not delete is not worth failing a
+      // conversation deletion over, and it is named as the temporary thing it
+      // is.
+    }
   }
 
   /// Drops reading state for peers this Device no longer holds anything for.
@@ -1875,12 +1995,18 @@ final class LocalTransferController {
     unawaited(_persist());
   }
 
-  void _track(Transfer transfer, Fingerprint peer, {String? localPath}) {
+  void _track(
+    Transfer transfer,
+    Fingerprint peer, {
+    String? localPath,
+    bool appOwned = false,
+  }) {
     final tracked = _Tracked(
       transfer,
       peer,
       at: _clock(),
       localPath: localPath,
+      appOwned: appOwned,
     );
     _transfers.add(tracked);
     final progress = transfer.updates.listen((_) => _notify());
@@ -1953,6 +2079,7 @@ final class LocalTransferController {
       names: [for (final item in transfer.items) item.name],
       text: transfer.text,
       localPath: tracked.localPath,
+      appOwned: tracked.appOwned,
       // Text and an image the controller can file are never handed out as a
       // decision: it answers both on arrival, so an offer of one that still
       // reads as decidable is an answer in flight rather than a question on
@@ -2137,10 +2264,14 @@ final class LocalTransferController {
     final store = _messages;
     if (store == null) return;
     try {
-      await saveConversation(
-        StoredConversation(messages: _history, reading: _reading),
-        store,
-      );
+      if (_history.isEmpty && _reading.isEmpty) {
+        await store.remove();
+      } else {
+        await saveConversation(
+          StoredConversation(messages: _history, reading: _reading),
+          store,
+        );
+      }
     } on Object catch (error) {
       _notice('the conversation could not be saved: $error');
     }
@@ -2187,6 +2318,7 @@ final class LocalTransferController {
     names: record.names,
     text: record.text,
     localPath: record.localPath,
+    appOwned: record.appOwned,
     offer: null,
     send: null,
   );
@@ -2284,7 +2416,13 @@ final class _Landing {
 
 /// A Transfer and the Device it is with.
 final class _Tracked {
-  _Tracked(this.transfer, this.peer, {required this.at, this.localPath});
+  _Tracked(
+    this.transfer,
+    this.peer, {
+    required this.at,
+    this.localPath,
+    this.appOwned = false,
+  });
 
   final Transfer transfer;
   final Fingerprint peer;
@@ -2318,6 +2456,9 @@ final class _Tracked {
   /// Null for a text or clipboard Transfer, which has no file, and for a
   /// multi-item send, whose sources do not have to name a path.
   String? localPath;
+
+  /// Whether [localPath] names a temporary file this application created.
+  bool appOwned;
 
   /// Whether the user removed this message from the conversation.
   ///
