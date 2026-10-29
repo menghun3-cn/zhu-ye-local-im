@@ -1160,12 +1160,6 @@ abstract class AppLocalizations {
   /// **'Unpacking…'**
   String get aboutUpdateStaging;
 
-  /// No description provided for @aboutUpdateHandingOver.
-  ///
-  /// In en, this message translates to:
-  /// **'Replacing this folder and restarting…'**
-  String get aboutUpdateHandingOver;
-
   /// No description provided for @aboutUpdateInstalling.
   ///
   /// In en, this message translates to:

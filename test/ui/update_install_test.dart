@@ -306,6 +306,22 @@ void main() {
       );
     });
 
+    test('reports a failure where the next start looks', () async {
+      final target = folder('lt_target_');
+
+      final code = await UpdateHandoff(
+        staged: 'nowhere',
+        target: target.path,
+      ).run();
+
+      expect(code, isNot(0));
+      expect(
+        File(pathUnder(target.path, handoverReportName)).existsSync(),
+        isTrue,
+        reason: 'a silent hand-over writes its failure to the report file',
+      );
+    });
+
     test('startDetached waits for the process to start before returning', () async {
       // The hand-over window exits the moment startDetached answers. A
       // fire-and-forget start would let the old build vanish while nobody had

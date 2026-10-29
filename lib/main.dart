@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -6,7 +7,6 @@ import 'core/core.dart';
 import 'ui/app.dart';
 import 'ui/android_package_installer.dart';
 import 'ui/seams.dart';
-import 'ui/update_handoff.dart';
 import 'ui/update_install.dart';
 
 /// Starts the application.
@@ -17,10 +17,10 @@ import 'ui/update_install.dart';
 /// one that says why. Everything else the app does is a screen.
 ///
 /// A build started with [applyUpdateFlag] is not the application at all: see
-/// `update_install.dart` for why an update needs a second process, and
-/// `update_handoff.dart` for what that process puts on the screen. It opens no
+/// `update_install.dart` for why an update needs a second process. It opens no
 /// seams, binds no port and asks the platform for nothing — which is the point,
-/// because the build it is replacing still holds the discovery port.
+/// because the build it is replacing still holds the discovery port. It
+/// replaces the folder and starts the updated build, without drawing a window.
 Future<void> main(List<String> arguments) async {
   // The platform channels are asked for a directory before any widget exists,
   // so the binding has to be up first.
@@ -28,8 +28,7 @@ Future<void> main(List<String> arguments) async {
 
   final handoff = UpdateHandoff.parse(arguments);
   if (handoff != null) {
-    runApp(UpdateHandoffApp(handoff: handoff));
-    return;
+    exit(await handoff.run());
   }
 
   // What earlier hand-overs left in the temporary directory, and the package
