@@ -291,6 +291,12 @@ class _AboutPageState extends State<AboutPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(false));
   }
 
+  /// Whether an install or its download is in flight.
+  ///
+  /// This includes the time after download completes but before the user
+  /// answers the confirmation dialog, to prevent double-clicking the button.
+  bool get _installing => _progress != null || _prepared != null;
+
   /// What an update that is under way is doing, as a sentence.
   ///
   /// Null for the two stages that are not "under way" — nothing is in flight
@@ -409,7 +415,7 @@ class _AboutPageState extends State<AboutPage> {
                     // both actions visible would make the user choose between
                     // two steps the card already knows how to order.
                     FilledButton.icon(
-                      onPressed: _asking || _busy
+                      onPressed: _asking || _installing
                           ? null
                           : canInstall
                           ? () => unawaited(_install())
@@ -428,7 +434,7 @@ class _AboutPageState extends State<AboutPage> {
                     // what a user should press.
                     if (url != null)
                       TextButton.icon(
-                        onPressed: _asking || _busy
+                        onPressed: _asking || _installing
                             ? null
                             : () => unawaited(LinkResolution.opener.open(url)),
                         icon: const Icon(Icons.open_in_new, size: 18),
