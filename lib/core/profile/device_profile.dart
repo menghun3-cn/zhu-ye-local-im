@@ -265,6 +265,20 @@ final class DeviceProfile {
     _known[device.fingerprint.hex] = device;
   }
 
+  /// Forgets everything this Device knows about [fingerprint].
+  ///
+  /// The one place a hard deletion updates: the known-device record, the
+  /// favorite marker, the clipboard-sharing whitelist and the Owner Group
+  /// membership all describe the same peer, and a deletion that misses one of
+  /// them would leave a permission whose owner is no longer listed.
+  void forgetDevice(Fingerprint fingerprint) {
+    if (fingerprint == self) return;
+    _known.remove(fingerprint.hex);
+    _favorites.remove(fingerprint);
+    _clipboardPeers.remove(fingerprint);
+    group = group.without(fingerprint);
+  }
+
   /// What is known about [fingerprint], or null when the Device is unknown.
   KnownDevice? known(Fingerprint fingerprint) => _known[fingerprint.hex];
 

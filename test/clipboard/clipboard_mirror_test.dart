@@ -177,6 +177,47 @@ void main() {
       await fixture.close();
     });
 
+    test(
+      'forgetPeer drops staged, applied and per-origin state only for it',
+      () async {
+        final fixture = mirrorFor(
+          OwnerGroup(self: alice, members: [bob, carolDevice.fingerprint]),
+          mode: ClipboardMode.stage,
+        );
+        final bobChannel = FakeClipboardChannel();
+        final carolChannel = FakeClipboardChannel();
+        fixture.attach(bobDevice, bobChannel);
+        fixture.attach(carolDevice, carolChannel);
+        fixture.mirror.start();
+
+        final fromBob = testEntry(bobDevice, 'from bob', id: 'b1');
+        final fromCarol = testEntry(carolDevice, 'from carol', id: 'c1');
+        bobChannel.deliver(fromBob.toMessage());
+        carolChannel.deliver(fromCarol.toMessage());
+        await until(
+          () => fixture.mirror.stagedEntries.length == 2,
+          description: 'both at end to be staged',
+        );
+        await fixture.mirror.apply(fromCarol);
+        expect(fixture.mirror.appliedEntries, hasLength(1));
+        expect(
+          fixture.mirror.stagedEntries.single.origin,
+          bob,
+          reason: 'applying an entry takes it out of the staged list',
+        );
+
+        fixture.mirror.forgetPeer(bob);
+
+        expect(
+          fixture.mirror.appliedEntries.single.origin,
+          carolDevice.fingerprint,
+        );
+        expect(fixture.mirror.stagedEntries, isEmpty);
+        expect(fixture.mirror.appliedEntries, hasLength(1));
+        await fixture.close();
+      },
+    );
+
     test('refuses when this platform cannot write its clipboard', () async {
       final fixture = mirrorFor(
         aliceAndBob(),

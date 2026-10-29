@@ -190,6 +190,43 @@ void main() {
         );
         expect(profile.knownDevices, isEmpty);
       });
+
+      test('forgetDevice removes every trace of a peer and keeps others', () {
+        final self = _fp('a');
+        final doomed = _fp('b');
+        final kept = _fp('c');
+        final profile = DeviceProfile(
+          self: self,
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+          group: OwnerGroup(self: self, members: [doomed, kept]),
+          favorites: {doomed, kept},
+          clipboardPeers: {doomed, kept},
+          known: {
+            doomed.hex: KnownDevice(
+              fingerprint: doomed,
+              alias: 'Doomed',
+              platform: DevicePlatform.android,
+            ),
+            kept.hex: KnownDevice(
+              fingerprint: kept,
+              alias: 'Kept',
+              platform: DevicePlatform.windows,
+            ),
+          },
+        );
+
+        profile.forgetDevice(doomed);
+
+        expect(profile.known(doomed), isNull);
+        expect(profile.isFavorite(doomed), isFalse);
+        expect(profile.isClipboardPeer(doomed), isFalse);
+        expect(profile.group.contains(doomed), isFalse);
+        expect(profile.known(kept), isNotNull);
+        expect(profile.isFavorite(kept), isTrue);
+        expect(profile.isClipboardPeer(kept), isTrue);
+        expect(profile.group.contains(kept), isTrue);
+      });
     });
 
     group('the clipboard-sharing whitelist', () {

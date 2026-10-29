@@ -1461,15 +1461,21 @@ void main() {
           () => conversationListed(windowA, 'Bob'),
           description: 'the rediscovered peer to return to the list',
         );
-        expect(
-          windowA.within(
-            find.descendant(
-              of: conversationRow(windowA, 'Bob'),
-              matching: find.text(l10n.presenceOnline),
-            ),
-          ),
-          findsOneWidget,
-          reason: 'the rediscovered Session reads online again',
+        // A hard delete forgot Bob, so the Session with him has to be opened
+        // again before the row reads online; the row itself comes back as soon
+        // as Discovery hears him, which is a moment earlier.
+        await pumpUntil(
+          tester,
+          () => windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.text(l10n.presenceOnline),
+                ),
+              )
+              .evaluate()
+              .isNotEmpty,
+          description: 'the rediscovered Session to read online again',
         );
 
         await shutdown(tester, [alice, bobAgain]);

@@ -215,6 +215,7 @@ final class TransferView {
     required this.text,
     required this.offer,
     this.localPath,
+    this.appOwned = false,
     this.settledAt,
     this.send,
   });
@@ -292,6 +293,13 @@ final class TransferView {
   /// on the wire; and for a multi-item send, whose sources stream from
   /// somewhere that is not required to name a path.
   final String? localPath;
+
+  /// Whether this message's file is a temporary file this app created.
+  ///
+  /// Live transfers are told by the controller at the moment they are
+  /// tracked; a message read back from disk carries the flag its record was
+  /// written with. A UI that needs to dispose of a staged paste uses this.
+  final bool appOwned;
 
   /// The live send this Device is making, while it can still be abandoned.
   ///

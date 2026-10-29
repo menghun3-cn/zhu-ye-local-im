@@ -223,6 +223,7 @@ final class OutgoingTransfer extends Transfer {
   }
 
   /// Abandons the Transfer and tells the peer why.
+  @override
   Future<void> cancel([
     RejectionReason reason = RejectionReason.declined,
   ]) async {
