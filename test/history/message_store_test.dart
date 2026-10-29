@@ -59,6 +59,16 @@ void main() {
       expect(read.single.text, 'original');
       expect(identical(read.single, written), isFalse);
     });
+
+    test('remove drops the stored conversation entirely', () async {
+      final store = MemoryMessageStore();
+      await saveMessages([_message()], store);
+
+      await store.remove();
+
+      expect(await store.load(), isNull);
+      expect(await loadMessages(store), isEmpty);
+    });
   });
 
   group('what the user has read', () {
@@ -174,6 +184,18 @@ void main() {
       final read = await loadMessages(storeIn('messages.json'));
       expect(read.single.id, 'kept');
       expect(read.single.text, 'still here');
+    });
+
+    test('remove deletes the file, and its temp sibling with it', () async {
+      final store = storeIn('messages.json');
+      await saveMessages([_message()], store);
+      File('${store.path}.tmp').writeAsStringSync('leftover');
+
+      await store.remove();
+
+      expect(File(store.path).existsSync(), isFalse);
+      expect(File('${store.path}.tmp').existsSync(), isFalse);
+      expect(await loadMessages(store), isEmpty);
     });
 
     test(

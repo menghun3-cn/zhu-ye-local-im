@@ -56,6 +56,14 @@ final class ConversationReading {
   /// of this surface.
   String? lastPeer;
 
+  /// Whether nothing at all has been recorded.
+  ///
+  /// The empty state is the honest answer to a Device that has never opened a
+  /// conversation, and it is also what a deletion leaves behind: when both the
+  /// messages and this state are empty, there is no conversation file left to
+  /// keep.
+  bool get isEmpty => _openedThrough.isEmpty && lastPeer == null;
+
   /// When [peer]'s conversation was last open, or null if never.
   DateTime? openedThrough(Fingerprint peer) => _openedThrough[peer.hex];
 

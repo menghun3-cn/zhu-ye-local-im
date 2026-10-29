@@ -138,6 +138,7 @@ final class ClipboardMirror {
   final StreamController<ClipboardEntry> _appliedEntries =
       StreamController<ClipboardEntry>.broadcast();
   final List<ClipboardEntry> _staged = [];
+  final List<ClipboardEntry> _applied = [];
 
   /// Values this Device has applied, oldest first, to recognise our own echo.
   final Queue<String> _appliedTexts = Queue<String>();
@@ -176,6 +177,14 @@ final class ClipboardMirror {
   /// A list rather than only a stream because the user has to be able to see
   /// the entries that are waiting after a rebuild.
   List<ClipboardEntry> get stagedEntries => List.unmodifiable(_staged);
+
+  /// Entries this Device has applied, in application order.
+  ///
+  /// A list rather than only a stream for the same reason the staged list is
+  /// one: the Clipboard surface renders a history scroll-back that survives
+  /// rebuilds, and "what reached my clipboard" is a fact a screen holds for
+  /// as long as this Device runs.
+  List<ClipboardEntry> get appliedEntries => List.unmodifiable(_applied);
 
   /// Fires for each entry that arrives while staging.
   Stream<ClipboardEntry> get staged => _stagedEntries.stream;
@@ -288,7 +297,23 @@ final class ClipboardMirror {
     _staged.removeWhere((held) => held.entryId == entry.entryId);
     _rememberAppliedText(entry.text);
     await _clipboard.write(entry.text);
+    _applied.insert(0, entry);
+    if (_applied.length > _stagedMemory) _applied.removeLast();
     if (!_appliedEntries.isClosed) _appliedEntries.add(entry);
+  }
+
+  /// Forgets [fingerprint] and everything it ever brought.
+  ///
+  /// The whitelist entry, the staged entries, the applied list, the
+  /// echo/duplicate memory and the per-origin ordering state all belong to one
+  /// Device. A hard delete that leaves any of them could let one of that
+  /// Device's old entry ids be accepted again, or let a stale echo slip back
+  /// into the group.
+  void forgetPeer(Fingerprint fingerprint) {
+    _staged.removeWhere((held) => held.origin == fingerprint);
+    _applied.removeWhere((held) => held.origin == fingerprint);
+    _newestSeen.remove(fingerprint);
+    detachPeer(fingerprint);
   }
 
   /// Releases the watcher, every peer subscription, and both streams.

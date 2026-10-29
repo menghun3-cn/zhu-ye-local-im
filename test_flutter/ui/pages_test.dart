@@ -1461,15 +1461,21 @@ void main() {
           () => conversationListed(windowA, 'Bob'),
           description: 'the rediscovered peer to return to the list',
         );
-        expect(
-          windowA.within(
-            find.descendant(
-              of: conversationRow(windowA, 'Bob'),
-              matching: find.text(l10n.presenceOnline),
-            ),
-          ),
-          findsOneWidget,
-          reason: 'the rediscovered Session reads online again',
+        // A hard delete forgot Bob, so the Session with him has to be opened
+        // again before the row reads online; the row itself comes back as soon
+        // as Discovery hears him, which is a moment earlier.
+        await pumpUntil(
+          tester,
+          () => windowA
+              .within(
+                find.descendant(
+                  of: conversationRow(windowA, 'Bob'),
+                  matching: find.text(l10n.presenceOnline),
+                ),
+              )
+              .evaluate()
+              .isNotEmpty,
+          description: 'the rediscovered Session to read online again',
         );
 
         await shutdown(tester, [alice, bobAgain]);
@@ -1610,6 +1616,23 @@ void main() {
       // grey it inherited before the two fills traded places.
       expect(
         boardOver(onConversation(windowA, find.text(l10n.conversationEmpty))),
+        findsOneWidget,
+      );
+
+      // The header identifies the machine by address instead of by a name that
+      // two Devices on the same network can share. Its supporting line keeps
+      // the port without repeating the title.
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+      expect(
+        onConversation(windowA, find.text(bobView.address!)),
+        findsOneWidget,
+      );
+      expect(onConversation(windowA, find.text('Bob')), findsNothing);
+      expect(
+        onConversation(windowA, find.text(l10n.onPort(bobView.sessionPort!))),
         findsOneWidget,
       );
 
@@ -2434,16 +2457,36 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'a conversation to be open',
       );
-      // Carol's name is on the header, not Bob's: the window opens where the
-      // user left off rather than where they first were.
+      // Carol's endpoint is on the header, not Bob's: the window opens where
+      // the user left off rather than where they first were. Both test Devices
+      // use loopback, so their Session ports distinguish the two endpoints.
+      final carolView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == carol.fingerprint,
+      );
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(carolView.address, isNotNull, reason: 'Discovery placed it');
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+      expect(carolView.sessionPort, isNotNull);
+      expect(bobView.sessionPort, isNotNull);
       expect(
         windowA.within(
           find.descendant(
             of: find.byType(ConversationView),
-            matching: find.text('Carol'),
+            matching: find.text(l10n.onPort(carolView.sessionPort!)),
           ),
         ),
         findsWidgets,
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: find.byType(ConversationView),
+            matching: find.text(l10n.onPort(bobView.sessionPort!)),
+          ),
+        ),
+        findsNothing,
       );
 
       await shutdown(tester, [alice, bob, carol]);

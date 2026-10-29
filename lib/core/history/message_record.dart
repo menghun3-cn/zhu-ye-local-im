@@ -43,6 +43,7 @@ final class MessageRecord {
     required this.totalBytes,
     this.text,
     this.localPath,
+    this.appOwned = false,
     this.settledAt,
   });
 
@@ -79,6 +80,14 @@ final class MessageRecord {
   /// Where this message's bytes ended up on this machine, when they did.
   final String? localPath;
 
+  /// Whether [localPath] names a file this application itself created.
+  ///
+  /// True only for the temporary image a paste writes and a send then streams
+  /// from. A received file and a file the user picked are the user's own and
+  /// are never marked this way. The flag is what lets a deletion take the
+  /// temporary file away without ever guessing which paths are safe.
+  final bool appOwned;
+
   /// What names this message from now on, here and on disk.
   String get handle => messageHandle(peer, id);
 
@@ -99,6 +108,7 @@ final class MessageRecord {
     'bytes': totalBytes,
     if (text != null) 'text': text,
     if (localPath != null) 'path': localPath,
+    if (appOwned) 'appOwned': true,
   };
 
   /// Reads a message back, throwing [FormatException] on anything malformed.
@@ -129,6 +139,7 @@ final class MessageRecord {
       totalBytes: _int(json, 'bytes'),
       text: _optionalString(json, 'text'),
       localPath: _optionalString(json, 'path'),
+      appOwned: json['appOwned'] == true,
     );
   }
 

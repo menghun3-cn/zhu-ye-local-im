@@ -120,6 +120,26 @@ void main() {
   });
 
   group('how a conversation is drawn', () {
+    test('is titled by the address when the peer has been placed', () {
+      expect(
+        describePeerTitle(peer(alias: 'Bob', address: '10.0.0.7')),
+        '10.0.0.7',
+      );
+    });
+
+    test('falls back to the name when there is no address', () {
+      expect(describePeerTitle(peer(alias: 'Bob')), 'Bob');
+    });
+
+    test('does not repeat the title address in the supporting line', () {
+      final connection = describePeerConnection(
+        peer(address: '10.0.0.7', sessionPort: 47655, connected: true),
+        l10n,
+      );
+      expect(connection, l10n.onPort(47655));
+      expect(connection, isNot(contains('10.0.0.7')));
+    });
+
     test('does not wear the peer platform', () {
       // The row used to be drawn with the platform icon, which in a list of
       // conversations reads as "which app is this" — a question nobody is

@@ -17,6 +17,7 @@ MessageRecord _sample({
   int totalBytes = 5,
   String? text = 'hello',
   String? localPath,
+  bool appOwned = false,
 }) {
   final when = at ?? DateTime.utc(2026, 10, 10, 9, 30);
   return MessageRecord(
@@ -31,6 +32,7 @@ MessageRecord _sample({
     totalBytes: totalBytes,
     text: text,
     localPath: localPath,
+    appOwned: appOwned,
   );
 }
 
@@ -81,6 +83,23 @@ void main() {
       expect(read.text, isNull);
       expect(read.localPath, r'C:\Users\me\Downloads\report.pdf');
       expect(read.handle, record.handle);
+    });
+
+    test('an app-owned temporary file keeps its marker through the file', () {
+      final record = _sample(
+        kind: PayloadKind.image,
+        localPath: r'C:\Temp\pasted-123.png',
+        appOwned: true,
+      );
+
+      final read = _roundTrip(record);
+
+      expect(read.appOwned, isTrue);
+      expect(read.localPath, record.localPath);
+      expect(
+        _roundTrip(_sample(localPath: r'C:\Users\me\photo.png')).appOwned,
+        isFalse,
+      );
     });
 
     test('a text message keeps its body and names no file', () {

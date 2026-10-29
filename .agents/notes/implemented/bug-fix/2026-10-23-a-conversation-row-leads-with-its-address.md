@@ -25,6 +25,9 @@ instead of leaving the row blank. The row's test finder key remains the display
 name; that key identifies the row in the harness and is not a second visible
 title.
 
+The open conversation header follows the same address-first rule; see
+[The open conversation header shows its address](2026-10-29-the-open-conversation-header-shows-its-address.md).
+
 The list search accepts both the displayed address and the display name, so
 changing the title does not make an alias stop being searchable.
 

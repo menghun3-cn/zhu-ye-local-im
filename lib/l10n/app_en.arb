@@ -358,7 +358,7 @@
   "clearConversationConfirmAction": "Clear",
   "deleteConversation": "Delete",
   "deleteConversationConfirmTitle": "Delete conversation?",
-  "deleteConversationConfirmBody": "The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.",
+  "deleteConversationConfirmBody": "This forgets the Device and its pairing permissions, closes the connection and clears chat and clipboard history plus unsent drafts. Files you sent or received are kept, and the current system clipboard content stays. This cannot be undone.",
   "conversationPickOne": "Pick a conversation on the left, or wait for a nearby Device to connect automatically.",
   "conversationDisconnected": "Offline",
   "conversationUnread": "[{count}]",

@@ -112,14 +112,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// arrival a no-op.
   bool _focusComposer = false;
 
-  /// Peers the user has explicitly deleted from this list.
-  ///
-  /// Kept as a session-local set: deleting an offline conversation removes
-  /// the row, and the row comes back the moment Discovery hears the peer
-  /// again or a Session opens. An online or diallable peer stays listed with
-  /// its history cleared, because Discovery would place it back anyway.
-  final Set<String> _deletedPeers = {};
-
   /// How wide the conversation list is, in logical pixels.
   ///
   /// The width the user has dragged it to, or [WeChat.conversationListWidth]
@@ -195,17 +187,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
     // what was heard.
     final entries = <_Conversation>[];
     for (final peer in controller.peers) {
-      // A peer the user explicitly deleted stays out of the list only while
-      // it is genuinely gone. Discovery hearing it again is what brings the
-      // row back — an address and a Session port are the proof the Device is
-      // there, so a deleted row that is merely remembered is hidden, while
-      // one that has been re-found is shown.
-      if (_deletedPeers.contains(peer.fingerprint.hex) &&
-          !peer.isConnected &&
-          !peer.isDiallable) {
-        continue;
-      }
-
       final history = controller.transfers
           .where(
             (view) =>
@@ -308,8 +289,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
       return Column(
         children: [
           _PaneHeader(
-            title: current.peer.displayName,
-            subtitle: _subtitleFor(current.peer, l10n),
+            title: describePeerTitle(current.peer),
+            subtitle: describePeerConnection(current.peer, l10n),
             peer: current.peer.fingerprint,
             onBack: () => setState(() {
               _selected = null;
@@ -382,13 +363,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
                       defaultIncomingDirectory: widget.defaultIncomingDirectory,
                       autoFocusComposer: focusComposer,
                       header: _PaneHeader(
-                        title: current.peer.displayName,
-                        // The address, and — when the Session has gone — that
-                        // it has. A conversation outlives its Session, so this
-                        // is the only place that says whether typing here
-                        // would reach anybody, and a pane that looked the same
-                        // either way would be inviting a message into a void.
-                        subtitle: _subtitleFor(current.peer, l10n),
+                        title: describePeerTitle(current.peer),
+                        // The port, and — when the Session has gone — that it
+                        // has. A conversation outlives its Session, so this is
+                        // the only place that says whether typing here would
+                        // reach anybody.
+                        subtitle: describePeerConnection(current.peer, l10n),
                         peer: current.peer.fingerprint,
                         offline: !current.peer.isConnected,
                       ),
@@ -398,19 +378,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
         );
       },
     );
-  }
-
-  /// What the pane header says under the name.
-  ///
-  /// The address, always: it is the answer to "which machine is this". Then,
-  /// only when the Session has gone, that it has gone — because a conversation
-  /// outlives its Session, and a header that looked identical either way would
-  /// be inviting a message into a void.
-  String _subtitleFor(PeerView peer, AppLocalizations l10n) {
-    final address = describePeerAddress(peer, l10n);
-    if (peer.isConnected) return address;
-    return '$address · '
-        '${peer.isConnecting ? l10n.connectingAutomatically : l10n.conversationDisconnected}';
   }
 
   /// How wide the list is drawn, once every limit is applied.
@@ -625,9 +592,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
     await _confirmDeleteConversation(context, peer);
   }
 
-  /// Confirms, then removes every message exchanged with [peer].
+  /// Confirms, then hard-deletes the conversation with [peer].
   ///
-  /// Clipboard entries stay put, exactly as `clearConversation` promises.
+  /// This is the composite `deleteConversation`: it also forgets the Device,
+  /// closes the Session and takes away this app's own temporary files. Files
+  /// the user picked or received and the system clipboard's current content
+  /// stay put, exactly as the confirmation says.
   Future<void> _confirmDeleteConversation(
     BuildContext context,
     Fingerprint peer,
@@ -652,23 +622,14 @@ class _ConversationsPageState extends State<ConversationsPage> {
       ),
     );
     if (confirmed == true) {
-      await controller.clearConversation(peer);
-      // Deleting means clearing every message exchanged with the peer. An
-      // offline peer also drops out of the list, because keeping a row that
-      // only history justified would just show an empty conversation. A peer
-      // that is online is placed back by Discovery anyway, so its row stays
-      // and only its history is cleared; the session-local marker keeps an
-      // explicitly deleted peer out until Discovery hears it again.
-      var offline = true;
-      for (final view in controller.peers) {
-        if (view.fingerprint == peer &&
-            (view.isConnected || view.isDiallable)) {
-          offline = false;
-          break;
-        }
-      }
-      if (offline && mounted) {
-        setState(() => _deletedPeers.add(peer.hex));
+      await controller.deleteConversation(peer);
+      if (mounted) {
+        setState(() {
+          if (_selected == peer.hex) {
+            _selected = null;
+            _untouched = false;
+          }
+        });
       }
     }
   }
@@ -1040,8 +1001,7 @@ class _ConversationTile extends StatelessWidget {
 /// peer Discovery has not placed yet has no address, so its display name stays
 /// as the fallback rather than leaving the row without a title.
 String _titleFor(PeerView peer) {
-  final address = peer.address;
-  return address == null || address.isEmpty ? peer.displayName : address;
+  return describePeerTitle(peer);
 }
 
 enum _PeerAction { connect }

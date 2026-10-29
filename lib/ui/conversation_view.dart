@@ -113,6 +113,9 @@ class _ConversationViewState extends State<ConversationView> {
 
   @override
   void dispose() {
+    for (final attachment in _staged) {
+      if (attachment.appOwned) _deleteStagedFile(attachment.path);
+    }
     _message.dispose();
     _scroll.dispose();
     super.dispose();
@@ -154,7 +157,9 @@ class _ConversationViewState extends State<ConversationView> {
         for (final attachment in staged) {
           final file = File(attachment.path);
           await (attachment.isImage
-              ? controller.sendImage(file, to: widget.peer)
+              ? attachment.appOwned
+                    ? controller.sendAppOwnedImage(file, to: widget.peer)
+                    : controller.sendImage(file, to: widget.peer)
               : controller.sendFile(file, to: widget.peer));
         }
         _message.clear();
@@ -226,7 +231,17 @@ class _ConversationViewState extends State<ConversationView> {
     if (!mounted || bytes == null) return false;
     final image = await writePastedImage(bytes);
     if (!mounted || image == null) return false;
-    return _stagePaths([image.path]) > 0;
+    setState(
+      () => _staged.add(
+        StagedAttachment(
+          path: image.path,
+          name: fileNameOf(image.path),
+          isImage: true,
+          appOwned: true,
+        ),
+      ),
+    );
+    return true;
   }
 
   /// Puts each of [paths] in the composer, pictures as pictures.
@@ -236,14 +251,19 @@ class _ConversationViewState extends State<ConversationView> {
   /// with nothing behind it, and classifying it out is not the same as having
   /// taken it.
   int _stagePaths(List<String> paths) {
-    final staged = [
-      for (final entry in classifyPaths(paths))
+    // Pasting an image writes a temporary file this app owns; everything else
+    // a person chose or dropped is their own file and must never be removed.
+    final staged = <StagedAttachment>[];
+    for (final entry in classifyPaths(paths)) {
+      staged.add(
         StagedAttachment(
           path: entry.file.path,
           name: fileNameOf(entry.file.path),
           isImage: entry.isImage,
+          appOwned: false,
         ),
-    ];
+      );
+    }
     if (staged.isEmpty) return 0;
     setState(() => _staged.addAll(staged));
     return staged.length;
@@ -271,7 +291,20 @@ class _ConversationViewState extends State<ConversationView> {
   /// Takes the staged attachment at [index] back out of the composer.
   void _removeStaged(int index) {
     if (index < 0 || index >= _staged.length) return;
-    setState(() => _staged.removeAt(index));
+    final removed = _staged.removeAt(index);
+    if (removed.appOwned) _deleteStagedFile(removed.path);
+    setState(() {});
+  }
+
+  /// Deletes one temporary file this application created.
+  void _deleteStagedFile(String path) {
+    try {
+      final file = File(path);
+      if (file.existsSync()) file.deleteSync();
+    } on Object {
+      // Best effort; a temp file that will not delete is not worth turning an
+      // attachment removal into a failure.
+    }
   }
 
   /// The frame drawn over the history while a drag is in progress.
@@ -453,6 +486,7 @@ class StagedAttachment {
     required this.path,
     required this.name,
     required this.isImage,
+    this.appOwned = false,
   });
 
   /// Where the bytes are, as the engine will read them.
@@ -463,6 +497,14 @@ class StagedAttachment {
 
   /// Whether the far side will draw it as a picture.
   final bool isImage;
+
+  /// Whether this is a temporary file the application itself created.
+  ///
+  /// True only for a picture pasted out of the clipboard, which this app wrote
+  /// into the temporary directory. Such a file can be taken away again when it
+  /// is un-staged or the view goes away; a file a person picked or dropped is
+  /// theirs and is never marked this way.
+  final bool appOwned;
 }
 
 /// The box a message is typed in, and the two things that can be done with it.
