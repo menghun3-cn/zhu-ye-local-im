@@ -56,15 +56,15 @@ class ConversationPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              known?.displayName ?? peer.short(),
+              known == null ? peer.short() : describePeerTitle(known),
               overflow: TextOverflow.ellipsis,
             ),
-            // The address stays on screen for the whole conversation: it is
-            // the answer to "which machine am I actually talking to", and it
-            // is the piece of information a user needs when they walk over to
-            // the other one.
+            // The title carries the address. This line carries the Session
+            // detail, including whether typing here would reach anybody.
             Text(
-              known == null ? l10n.neverSeen : describePeerAddress(known, l10n),
+              known == null
+                  ? l10n.neverSeen
+                  : describePeerConnection(known, l10n),
               style: theme.textTheme.bodySmall,
               overflow: TextOverflow.ellipsis,
             ),

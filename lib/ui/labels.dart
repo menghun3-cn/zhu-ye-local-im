@@ -97,6 +97,38 @@ String describePeerAddress(PeerView peer, AppLocalizations l10n) {
   return '$address:$port';
 }
 
+/// The heading of a conversation with [peer].
+///
+/// The address is the fact that tells machines apart on the local network, so
+/// it leads whenever Discovery has placed the peer. The name remains the
+/// fallback for a Device that has never been seen, because there is then no
+/// address to show.
+String describePeerTitle(PeerView peer) {
+  final address = peer.address;
+  return address == null || address.isEmpty ? peer.displayName : address;
+}
+
+/// The supporting line under [describePeerTitle].
+///
+/// The title already carries the address, so this line carries the Session
+/// detail instead of repeating it: the listening port and, when there is no
+/// Session, whether the peer is being redialled or is offline.
+String describePeerConnection(PeerView peer, AppLocalizations l10n) {
+  final address = peer.address;
+  final placedAddress = address == null || address.isEmpty ? null : address;
+  final detail = switch ((placedAddress, peer.sessionPort, peer.isConnected)) {
+    (null, _, _) => l10n.neverSeen,
+    (_, final port?, _) => l10n.onPort(port),
+    (_, null, true) => l10n.sessionOpen,
+    (final address?, null, false) => l10n.peerNotAccepting(address),
+  };
+  if (peer.isConnected) return detail;
+  final state = peer.isConnecting
+      ? l10n.connectingAutomatically
+      : l10n.conversationDisconnected;
+  return '$detail · $state';
+}
+
 /// Everything known about a peer, as one line under its name.
 ///
 /// Assembled here rather than in the card that shows it: the list is a reading

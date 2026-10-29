@@ -1613,6 +1613,23 @@ void main() {
         findsOneWidget,
       );
 
+      // The header identifies the machine by address instead of by a name that
+      // two Devices on the same network can share. Its supporting line keeps
+      // the port without repeating the title.
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+      expect(
+        onConversation(windowA, find.text(bobView.address!)),
+        findsOneWidget,
+      );
+      expect(onConversation(windowA, find.text('Bob')), findsNothing);
+      expect(
+        onConversation(windowA, find.text(l10n.onPort(bobView.sessionPort!))),
+        findsOneWidget,
+      );
+
       // Picking a row is choosing where to type: the caret is already in the
       // composer, with no second click spent on the box.
       await pumpUntil(
@@ -2434,16 +2451,36 @@ void main() {
         ).evaluate().isNotEmpty,
         description: 'a conversation to be open',
       );
-      // Carol's name is on the header, not Bob's: the window opens where the
-      // user left off rather than where they first were.
+      // Carol's endpoint is on the header, not Bob's: the window opens where
+      // the user left off rather than where they first were. Both test Devices
+      // use loopback, so their Session ports distinguish the two endpoints.
+      final carolView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == carol.fingerprint,
+      );
+      final bobView = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(carolView.address, isNotNull, reason: 'Discovery placed it');
+      expect(bobView.address, isNotNull, reason: 'Discovery placed it');
+      expect(carolView.sessionPort, isNotNull);
+      expect(bobView.sessionPort, isNotNull);
       expect(
         windowA.within(
           find.descendant(
             of: find.byType(ConversationView),
-            matching: find.text('Carol'),
+            matching: find.text(l10n.onPort(carolView.sessionPort!)),
           ),
         ),
         findsWidgets,
+      );
+      expect(
+        windowA.within(
+          find.descendant(
+            of: find.byType(ConversationView),
+            matching: find.text(l10n.onPort(bobView.sessionPort!)),
+          ),
+        ),
+        findsNothing,
       );
 
       await shutdown(tester, [alice, bob, carol]);

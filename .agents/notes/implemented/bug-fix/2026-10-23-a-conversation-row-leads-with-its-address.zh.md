@@ -19,6 +19,9 @@ Status: implemented
 此时回退到 `displayName`，避免出现空标题。行的测试查找键仍保留显示名；这个键用于
 识别测试中的目标行，不是第二个可见标题。
 
+打开的对话头遵循同一套地址优先规则；见
+[打开的对话以地址作为标题](2026-10-29-the-open-conversation-header-shows-its-address.zh.md)。
+
 列表搜索同时接受当前显示的地址和显示名，因此换掉标题不会让别名变得不可搜索。
 
 选中一行时，页面在同一次状态变更里设置已有的输入框聚焦请求。`ConversationView`
