@@ -308,8 +308,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
       return Column(
         children: [
           _PaneHeader(
-            title: current.peer.displayName,
-            subtitle: _subtitleFor(current.peer, l10n),
+            title: describePeerTitle(current.peer),
+            subtitle: describePeerConnection(current.peer, l10n),
             peer: current.peer.fingerprint,
             onBack: () => setState(() {
               _selected = null;
@@ -382,13 +382,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
                       defaultIncomingDirectory: widget.defaultIncomingDirectory,
                       autoFocusComposer: focusComposer,
                       header: _PaneHeader(
-                        title: current.peer.displayName,
-                        // The address, and — when the Session has gone — that
-                        // it has. A conversation outlives its Session, so this
-                        // is the only place that says whether typing here
-                        // would reach anybody, and a pane that looked the same
-                        // either way would be inviting a message into a void.
-                        subtitle: _subtitleFor(current.peer, l10n),
+                        title: describePeerTitle(current.peer),
+                        // The port, and — when the Session has gone — that it
+                        // has. A conversation outlives its Session, so this is
+                        // the only place that says whether typing here would
+                        // reach anybody.
+                        subtitle: describePeerConnection(current.peer, l10n),
                         peer: current.peer.fingerprint,
                         offline: !current.peer.isConnected,
                       ),
@@ -398,19 +397,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
         );
       },
     );
-  }
-
-  /// What the pane header says under the name.
-  ///
-  /// The address, always: it is the answer to "which machine is this". Then,
-  /// only when the Session has gone, that it has gone — because a conversation
-  /// outlives its Session, and a header that looked identical either way would
-  /// be inviting a message into a void.
-  String _subtitleFor(PeerView peer, AppLocalizations l10n) {
-    final address = describePeerAddress(peer, l10n);
-    if (peer.isConnected) return address;
-    return '$address · '
-        '${peer.isConnecting ? l10n.connectingAutomatically : l10n.conversationDisconnected}';
   }
 
   /// How wide the list is drawn, once every limit is applied.
@@ -1040,8 +1026,7 @@ class _ConversationTile extends StatelessWidget {
 /// peer Discovery has not placed yet has no address, so its display name stays
 /// as the fallback rather than leaving the row without a title.
 String _titleFor(PeerView peer) {
-  final address = peer.address;
-  return address == null || address.isEmpty ? peer.displayName : address;
+  return describePeerTitle(peer);
 }
 
 enum _PeerAction { connect }

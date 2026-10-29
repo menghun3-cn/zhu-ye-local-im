@@ -87,9 +87,9 @@ user actually needs is the peer's, and that side already knows it.
 **Show both, like `alias (address)`.** More information, and rejected on
 surface area: `displayName` feeds list rows, headers, dialog titles and sort
 order, and every one of those already renders the address separately —
-`describePeerAddress` puts it in the subtitle, and the conversation header keeps
-it on screen for the life of the conversation. Composing it into the name would
-print it twice wherever it already appears.
+the conversation row and header lead with it, while the supporting line carries
+the port. Composing it into the name would print it twice wherever it already
+appears.
 
 **A distinct placeholder per peer, such as "Unnamed device 2".** It tells two
 nameless peers apart, which is the actual complaint, but the number is
@@ -104,8 +104,8 @@ Conversations list follows, since it sorts on `displayName`.
 
 The address is not stable in the way an Alias is. A peer that moves networks, or
 that is reached over a different interface, changes its display name. This is
-accepted: it reflects reality, the Fingerprint in the subtitle is what stays
-put, and a user who wants a stable name can rename the Device.
+accepted: it reflects reality, the Fingerprint on the Devices surface is what
+stays put, and a user who wants a stable name can rename the Device.
 
 `PairingRequest` gained a member, so any implementation of that interface must
 supply it. There is exactly one — `_Caller` — and the interface is internal to
