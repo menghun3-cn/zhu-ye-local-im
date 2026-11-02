@@ -200,7 +200,7 @@ class _MyPageState extends State<MyPage> {
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
-          icon: Icons.help_outline,
+          icon: Icons.announcement,
           title: l10n.myCardAbout,
           summary: _aboutSummary(widget.update, l10n),
           onTap: () => Navigator.of(context).push(

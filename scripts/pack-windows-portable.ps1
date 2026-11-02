@@ -155,12 +155,11 @@ $requiredGlyphs = @{
     '0xf090' = 'Icons.folder_open_outlined'
     '0xe16a' = 'Icons.close'
     # 2026-10-09 第四轮：「关于」页与它的导航项用到的字形。
-    # 0xe33d = Icons.info_outline（「关于」导航项未选中态）
-    # 0xe33c = Icons.info（「关于」导航项选中态）
+    # 0xe33d = Icons.info_outline（「关于」导航项未选中态）—— 已改为 help_outline
+    # 0xe33c = Icons.info（「关于」导航项选中态）—— 已改为 help_outline
     # 0xe637 = Icons.system_update_alt（「检查更新」按钮）
     # 0xe45c = Icons.open_in_new（「打开下载页」按钮）
-    '0xe33d' = 'Icons.info_outline'
-    '0xe33c' = 'Icons.info'
+    # 0xe8be = Icons.help_outline（「关于」卡片图标）—— 已改为 info（图标代码点问题待排查）
     '0xe637' = 'Icons.system_update_alt'
     '0xe45c' = 'Icons.open_in_new'
     # 2026-10-09 第六轮：右键菜单里「复制图片」那一条的图标。
