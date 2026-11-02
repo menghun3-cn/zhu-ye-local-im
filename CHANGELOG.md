@@ -21,6 +21,10 @@
 - 重构导航结构，使用卡片式 UI 提供更清晰的导航层次
 - 更新所有相关测试以适配新的导航结构
 
+### 修复
+
+- 修复 Windows 构建失败：将「关于」卡片图标从 info_outline 改为 help_outline（info_outline 不在 MaterialIcons-Regular.otf 字体中）
+
 ## [0.1.28] - 2026-10-29
 
 ### 修复
