@@ -16,10 +16,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupFailureTitle => '竹叶局域网传输无法启动';
 
   @override
-  String get tabDevices => '设备';
+  String get tabConversation => '对话';
 
   @override
   String get tabTransfers => '传输';
+
+  @override
+  String get tabMy => '我的';
+
+  @override
+  String get tabDevices => '设备';
 
   @override
   String get tabClipboard => '剪贴板';
@@ -751,9 +757,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get removeAttachment => '移除';
 
   @override
-  String get tabConversation => '对话';
-
-  @override
   String get conversationListEmpty => '还没有对话。附近运行本程序的设备被发现后，会自动建立连接并出现在这里。';
 
   @override
@@ -786,7 +789,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get deleteConversationConfirmBody =>
-      '这个对话里的文字、文件和图片记录都会从本机删除，无法撤销。剪贴板记录不受影响。';
+      '会忘记这台设备及其配对权限、关闭连接、清除聊天与剪贴板记录和未发送草稿。你收到或发送的文件不会删除，系统剪贴板当前内容保留。';
 
   @override
   String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';
@@ -848,4 +851,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get folderNotSaved => '未保存 —— 按回车，或点开别处，就会记下这个文件夹。';
+
+  @override
+  String get myPageTitle => '我的';
+
+  @override
+  String get myCardDevices => '设备';
+
+  @override
+  String myCardDevicesSummary(int count) {
+    return '已知设备：$count 台';
+  }
+
+  @override
+  String get myCardClipboard => '剪贴板';
+
+  @override
+  String get myCardClipboardSummary => '同步已开启';
+
+  @override
+  String get myCardClipboardSummaryDisabled => '同步已关闭';
+
+  @override
+  String get myCardSettings => '设置';
+
+  @override
+  String get myCardSettingsSummary => '接收文件夹已设置';
+
+  @override
+  String get myCardSettingsSummaryUnset => '接收文件夹未设置';
+
+  @override
+  String get myCardAbout => '关于';
+
+  @override
+  String myCardAboutSummary(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String myCardAboutSummaryUpdate(String version) {
+    return '版本 $version · 有新版本';
+  }
+
+  @override
+  String get myViewDetails => '查看详情';
 }

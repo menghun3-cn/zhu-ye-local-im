@@ -226,11 +226,11 @@ void main() {
     // One step further, and the ring is on the second entry; Enter is a press.
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
-    expect(focused(tester, l10n.tabDevices), isTrue);
+    expect(focused(tester, l10n.tabTransfers), isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await settleRoute(tester);
-    expect(selectedSurface(tester, window: windowA), devicesSurface);
+    expect(selectedSurface(tester, window: windowA), transfersSurface);
 
     await shutdown(tester, [device]);
   });

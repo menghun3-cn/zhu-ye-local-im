@@ -16,10 +16,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startupFailureTitle => 'Zhuye Local Transfer could not start';
 
   @override
-  String get tabDevices => 'Devices';
+  String get tabConversation => 'Conversations';
 
   @override
   String get tabTransfers => 'Transfers';
+
+  @override
+  String get tabMy => 'My';
+
+  @override
+  String get tabDevices => 'Devices';
 
   @override
   String get tabClipboard => 'Clipboard';
@@ -792,9 +798,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeAttachment => 'Remove';
 
   @override
-  String get tabConversation => 'Conversations';
-
-  @override
   String get conversationListEmpty =>
       'No conversations yet. A nearby Device running this app connects automatically and appears here when discovered.';
 
@@ -829,7 +832,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteConversationConfirmBody =>
-      'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.';
+      'This forgets the Device and its pairing permissions, closes the connection and clears chat and clipboard history plus unsent drafts. Files you sent or received are kept, and the current system clipboard content stays. This cannot be undone.';
 
   @override
   String get conversationPickOne =>
@@ -897,4 +900,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get folderNotSaved =>
       'Not saved — press Enter, or click away, to keep this folder.';
+
+  @override
+  String get myPageTitle => 'My';
+
+  @override
+  String get myCardDevices => 'Devices';
+
+  @override
+  String myCardDevicesSummary(int count) {
+    return 'Known devices: $count';
+  }
+
+  @override
+  String get myCardClipboard => 'Clipboard';
+
+  @override
+  String get myCardClipboardSummary => 'Sync enabled';
+
+  @override
+  String get myCardClipboardSummaryDisabled => 'Sync disabled';
+
+  @override
+  String get myCardSettings => 'Settings';
+
+  @override
+  String get myCardSettingsSummary => 'Receive folder configured';
+
+  @override
+  String get myCardSettingsSummaryUnset => 'Receive folder not set';
+
+  @override
+  String get myCardAbout => 'About';
+
+  @override
+  String myCardAboutSummary(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String myCardAboutSummaryUpdate(String version) {
+    return 'Version $version · Update available';
+  }
+
+  @override
+  String get myViewDetails => 'View details';
 }

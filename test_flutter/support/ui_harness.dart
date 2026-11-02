@@ -53,26 +53,15 @@ const Size tallWindow = Size(1000, 1600);
 const ValueKey<String> windowAKey = ValueKey('window-a');
 const ValueKey<String> windowBKey = ValueKey('window-b');
 
-/// The five surfaces, in the order the shell lists them.
+/// The three surfaces, in the order the shell lists them.
 ///
 /// Written out here rather than imported from the shell: the shell's own names
 /// are what the shell uses, and a test that read them would agree with any
 /// ordering the shell happened to pick. These numbers are the assertion — a
 /// tab that moved is a tab a user has to relearn.
 const int conversationsSurface = 0;
-const int devicesSurface = 1;
-const int transfersSurface = 2;
-const int clipboardSurface = 3;
-const int settingsSurface = 4;
-
-/// Where the About surface sits, and the sixth of the ordered list.
-///
-/// Named for the same reason the first five are: a test that pressed a tab and
-/// then asserted which surface came up would be reading the shell's own
-/// ordering back to itself. It earns its own name twice over, because the
-/// rail's update entry switches here rather than leaving the application — the
-/// test of that needs a number to press against.
-const int aboutSurface = 5;
+const int transfersSurface = 1;
+const int mySurface = 2;
 
 /// The strings the windows under test are showing.
 ///
@@ -292,6 +281,30 @@ Finder _buttonShowing(Finder scope, String label) => find.descendant(
     matching: find.bySubtype<ButtonStyleButton>(),
   ),
 );
+
+/// Opens the card titled [label] on the My page.
+///
+/// The My page shows four cards, each with a "View details" button. This helper
+/// taps that button to open the corresponding page as a route.
+Future<void> openMyCard(
+  WidgetTester tester,
+  String label, {
+  required TestWindow window,
+}) async {
+  // Find the view details button that is in the same card as the title
+  final button = window.within(
+    find.ancestor(
+      of: find.text(label),
+      matching: find.byType(Card),
+    ),
+  );
+  final detailsButton = find.descendant(
+    of: button,
+    matching: find.text(l10n.myViewDetails),
+  );
+  await tester.tap(detailsButton);
+  await settleRoute(tester);
+}
 
 /// The first window.
 TestWindow get windowA => TestWindow(find.byKey(windowAKey));

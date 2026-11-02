@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-10-30-a-my-page-consolidates-low-frequency-features.md
+#   git hash-object 2026-10-30-a-my-page-consolidates-low-frequency-features.zh.md
+2026-10-30-a-my-page-consolidates-low-frequency-features.md: fa5eb5c8630b68fe8da933e4864c9e7da39d9636
+2026-10-30-a-my-page-consolidates-low-frequency-features.zh.md: 4d475f4da8bc1d6453ead6ab6aa4c6ab976374cf

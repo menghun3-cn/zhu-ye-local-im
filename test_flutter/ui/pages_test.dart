@@ -44,7 +44,8 @@ void main() {
       // Conversations leads the shell now, so this surface is offstage until it
       // is asked for. Every other group already opens its tab; this one used to
       // be the surface a window started on and got away without saying so.
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
 
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.automaticConnectionsTitle)),
@@ -104,7 +105,8 @@ void main() {
         localAddresses: const ['192.168.1.24', '10.0.0.24'],
       );
       await pumpWindow(tester, device);
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
 
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.localIpAddress)),
@@ -124,7 +126,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
       await tapButton(tester, l10n.byAddress, window: windowA);
       await pumpUntil(
         tester,
@@ -189,7 +192,8 @@ void main() {
       // Trust is established by Discovery before either window exists.
       await pairDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
 
       expect(
         onPage(windowA, DevicesPage, find.text(l10n.automaticConnectionsTitle)),
@@ -217,6 +221,9 @@ void main() {
       // read without asking for anything, and there is no Connect here to ask
       // with. The conversation list is where that state shows, and the test
       // below covers it.
+      // Pop back to the shell, then open Conversations
+      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
+      await tester.pumpAndSettle();
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
@@ -238,7 +245,8 @@ void main() {
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
       await pumpWindow(tester, alice);
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
 
       await pumpUntil(
         tester,
@@ -315,7 +323,9 @@ void main() {
       expect(dialogIsOpen(windowA), isFalse);
       expect(dialogIsOpen(windowB), isFalse);
 
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      // Close Conversations before opening My
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
       expect(
         onPage(windowA, DevicesPage, find.byType(SwitchListTile)),
         findsNothing,
@@ -567,7 +577,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, l10n.tabClipboard, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardClipboard, window: windowA);
 
       final modes = [
         l10n.clipboardModeOff,
@@ -621,7 +632,8 @@ void main() {
       bob.controller.setClipboardPeer(alice.fingerprint, value: true);
       alice.controller.setClipboardMode(ClipboardMode.mirror);
       bob.controller.setClipboardMode(ClipboardMode.stage);
-      await openTab(tester, l10n.tabClipboard, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardClipboard, window: windowA);
 
       expect(
         onPage(windowA, ClipboardPage, find.text(l10n.clipboardNothingStaged)),
@@ -663,7 +675,8 @@ void main() {
       await pumpWindow(tester, bob);
       await pairDevices(tester, alice, bob);
       await connectDevices(tester, alice, bob);
-      await openTab(tester, l10n.tabClipboard, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardClipboard, window: windowA);
 
       // The list is what the fourth gate is edited from, so it has to be on the
       // surface rather than inferred from the group: being paired is not the
@@ -719,7 +732,8 @@ void main() {
       // what has gone wrong, which is nothing — is only built when the window
       // is tall enough to hold the cards above it.
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       // Identity belongs to the Devices surface. Repeating the name and
       // Fingerprint here only made two places that can disagree.
@@ -788,7 +802,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(
         tester
@@ -828,7 +843,8 @@ void main() {
       addTearDown(PickerResolution.reset);
       picker.willChooseDirectory(r'D:\shared\inbox');
 
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       // The field belongs to the page rather than to a dialog: the path can be
       // read and edited without opening anything first.
@@ -912,7 +928,8 @@ void main() {
       final picker = ScriptedPicker.install();
       addTearDown(PickerResolution.reset);
 
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
       await tester.tap(
         onPage(
           windowA,
@@ -949,7 +966,8 @@ void main() {
         controlsWindow: false,
       );
       await pumpWindow(tester, device, size: const Size(360, 800));
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.updateIntervalHourly)),
@@ -2327,7 +2345,11 @@ void main() {
           () => alice.controller.lastConversation == bob.fingerprint,
           description: 'the conversation to be remembered',
         );
-        await openTab(tester, l10n.tabDevices, window: windowA);
+        await openTab(tester, l10n.tabMy, window: windowA);
+        await openMyCard(tester, l10n.myCardDevices, window: windowA);
+        // Pop back to shell, then open Conversations
+        Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
+        await tester.pumpAndSettle();
         await openTab(tester, l10n.tabConversation, window: windowA);
         await settleRoute(tester);
 
@@ -2520,8 +2542,11 @@ void main() {
 
       // Somewhere else for a while — the whole point of the requirement is the
       // *return*, and a return from nowhere tests nothing.
-      await openTab(tester, l10n.tabSettings, window: windowA);
-
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
+      // Pop back to shell, then open Conversations
+      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
+      await tester.pumpAndSettle();
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
