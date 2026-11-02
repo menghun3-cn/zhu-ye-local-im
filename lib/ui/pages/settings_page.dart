@@ -411,7 +411,7 @@ class SettingsPage extends StatelessWidget {
                 for (final notice in notices.reversed.take(20))
                   ListTile(
                     dense: true,
-                    leading: const Icon(Icons.info_outline, size: 18),
+                    leading: const Icon(Icons.help_outline, size: 18),
                     title: Text(notice),
                   ),
               ],
