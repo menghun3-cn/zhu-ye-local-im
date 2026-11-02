@@ -202,7 +202,8 @@ void main() {
       // Discovery has already opened the Session, so there is nothing to dial
       // by hand before mirroring.
       for (final window in [windowA, windowB]) {
-        await openTab(tester, l10n.tabClipboard, window: window);
+        await openTab(tester, l10n.tabMy, window: window);
+        await openMyCard(tester, l10n.myCardClipboard, window: window);
         await tester.tap(
           onPage(window, ClipboardPage, find.text(l10n.clipboardModeMirror)),
         );
@@ -267,7 +268,8 @@ void main() {
       await pairDevices(tester, carol, dave);
 
       await pumpWindow(tester, carol);
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardDevices, window: windowA);
       await tapButton(tester, l10n.byAddress, window: windowA);
       await pumpUntil(
         tester,

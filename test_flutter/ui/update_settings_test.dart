@@ -27,7 +27,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.settingsUpdate)),
@@ -67,7 +68,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       // Off is the user opting out of the background question: the switch is
       // the whole choice, and the cadence segment row goes with it.
@@ -115,7 +117,8 @@ void main() {
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       await tester.tap(
         onPage(windowA, SettingsPage, find.text(l10n.updateIntervalThreeDays)),

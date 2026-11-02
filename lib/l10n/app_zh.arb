@@ -4,8 +4,10 @@
   "appTitle": "竹叶局域网传输",
   "startupFailureTitle": "竹叶局域网传输无法启动",
 
-  "tabDevices": "设备",
+  "tabConversation": "对话",
   "tabTransfers": "传输",
+  "tabMy": "我的",
+  "tabDevices": "设备",
   "tabClipboard": "剪贴板",
   "tabSettings": "设置",
   "tabAbout": "关于",
@@ -265,5 +267,19 @@
   "changeIncomingFolder": "更改…",
   "incomingFolderHint": "以后收到的文件默认保存在这里；每次接收时仍然可以另选一个文件夹。",
   "incomingFolderUnset": "每次接收时都会问你保存在哪里。",
-  "folderNotSaved": "未保存 —— 按回车，或点开别处，就会记下这个文件夹。"
+  "folderNotSaved": "未保存 —— 按回车，或点开别处，就会记下这个文件夹。",
+
+  "myPageTitle": "我的",
+  "myCardDevices": "设备",
+  "myCardDevicesSummary": "已知设备：{count} 台",
+  "myCardClipboard": "剪贴板",
+  "myCardClipboardSummary": "同步已开启",
+  "myCardClipboardSummaryDisabled": "同步已关闭",
+  "myCardSettings": "设置",
+  "myCardSettingsSummary": "接收文件夹已设置",
+  "myCardSettingsSummaryUnset": "接收文件夹未设置",
+  "myCardAbout": "关于",
+  "myCardAboutSummary": "版本 {version}",
+  "myCardAboutSummaryUpdate": "版本 {version} · 有新版本",
+  "myViewDetails": "查看详情"
 }

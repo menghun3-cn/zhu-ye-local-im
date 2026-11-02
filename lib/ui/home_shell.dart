@@ -7,11 +7,8 @@ import '../core/core.dart';
 import 'controller_scope.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'nav_rail.dart';
-import 'pages/about_page.dart';
-import 'pages/clipboard_page.dart';
 import 'pages/conversations_page.dart';
-import 'pages/devices_page.dart';
-import 'pages/settings_page.dart';
+import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
 import 'update_notice.dart';
@@ -19,8 +16,7 @@ import 'wechat/theme.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
 ///
-/// It leads the list: talking to somebody is what the app is for, and the
-/// Devices surface is what you visit to set that up, so Devices sits second.
+/// It leads the list: talking to somebody is what the app is for.
 ///
 /// The shell builds the pages and the destinations from the same ordered list,
 /// so every index is already in the same order by construction. Only the
@@ -28,40 +24,30 @@ import 'wechat/theme.dart';
 /// names kept in step with a list for no gain.
 const int _conversationsSurface = 0;
 
-/// Where the About surface sits, named for the one thing outside the index list
-/// that has to know it.
+/// Where the My surface sits, named for the one place that has to know it.
 ///
 /// The rail's update entry brings this surface forward: it has nowhere to *put*
 /// an update — no room for a download's progress, for the question before
-/// closing, or for the sentence an attempt ends in — and this card has all
-/// three. Writing the index once is what keeps the entry and the About
+/// closing, or for the sentence an attempt ends in — and the About card has all
+/// three. Writing the index once is what keeps the entry and the My
 /// destination agreeing; two spellings of it would be two chances for the entry
 /// to open a surface that is not the one it thinks it is.
 ///
 /// Named beside [_conversationsSurface] rather than beside it in a list: that
 /// one is the leading surface and reads first, this one is an exception and is
 /// only written by machinery.
-const int _aboutSurface = 5;
+const int _mySurface = 2;
 
-/// How many of the six entries hang at the foot of the rail.
+/// The three surfaces, and the way between them.
 ///
-/// The design splits them the way a desk is split: four places to be (会话 /
-/// 设备 / 传输 / 剪贴板), and then, past the space, the two things a user visits
-/// to change something (设置 / 关于) — `design-preview/conversation.html` puts a
-/// `.rail__spacer` between the two groups. Which entries those are follows from
-/// the list's own order, so the only number the code has to write down is how
-/// many come at the end.
-const int _toolSurfaces = 2;
-
-/// The six surfaces, and the way between them.
-///
-/// The About surface doubles as where an update is carried out. That is worth
-/// stating here rather than leaving it to the About page's own documentation,
-/// because it is a fact about the *shell's* indices: the rail's update entry
-/// switches to it rather than leaving the application, so pressing that entry
-/// moves the same selection a press on the About destination moves. The two are
-/// kept in step by [_aboutSurface] being written once, which is the whole of why
-/// the constant exists — see its own doc.
+/// The My surface aggregates the low-frequency pages (Devices, Clipboard,
+/// Settings, About) and is where an update is carried out from the rail's entry.
+/// That is worth stating here rather than leaving it to the About page's own
+/// documentation, because it is a fact about the *shell's* indices: the rail's
+/// update entry switches to it rather than leaving the application, so pressing
+/// that entry moves the same selection a press on the My destination moves.
+/// The two are kept in step by [_mySurface] being written once, which is the
+/// whole of why the constant exists — see its own doc.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
   const HomeShell({super.key, required this.seams, this.update});
@@ -130,10 +116,10 @@ class _HomeShellState extends State<HomeShell> {
   /// How many times the rail's update entry has been pressed.
   ///
   /// The entry is where a user presses "install the newer build", and the
-  /// About card is where an install is carried out — see [_aboutSurface]. A
-  /// counter rather than a call, because the shell cannot reach into a page
-  /// that is built in the `IndexedStack` below: what travels down is the
-  /// count, and the card answers the change.
+  /// About card (reachable from My) is where an install is carried out — see
+  /// [_mySurface]. A counter rather than a call, because the shell cannot
+  /// reach into a page that is built in the `IndexedStack` below: what travels
+  /// down is the count, and the card answers the change.
   int _installRequests = 0;
 
   /// Whether an install is under way and the entry must go quiet.
@@ -184,19 +170,6 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
-  /// Brings the Conversations surface forward, with [peer]'s conversation open.
-  ///
-  /// Handed to the Devices surface, which is where a user connects to a Device:
-  /// having done so, the thing they want is the conversation, and this is what
-  /// makes that one action instead of two.
-  void _showConversation(Fingerprint peer) {
-    setState(() {
-      _requestedConversation = peer;
-      _index = _conversationsSurface;
-      _conversationArrivals++;
-    });
-  }
-
   /// Brings surface [index] forward, counting it as an arrival when it is the
   /// Conversations one.
   ///
@@ -210,14 +183,14 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  /// Brings the About surface forward and asks it to install what was found.
+  /// Brings the My surface forward and asks it to install what was found.
   ///
   /// What the rail's update entry does when it is pressed. It used to leave the
   /// application for a browser, which made a user who had just been told a newer
   /// build exists go and fetch it by hand — the one thing an entry pinned to the
   /// rail should save them. It installs instead: the answer the entry was drawn
   /// from is *already here*, on the notice that found it, and the About card
-  /// carries the whole of what an install does.
+  /// (reachable from My) carries the whole of what an install does.
   ///
   /// The card is where the work happens rather than here, because the rail has
   /// nowhere to put any of it: [WeChat.railWidth] pixels hold neither a
@@ -228,7 +201,7 @@ class _HomeShellState extends State<HomeShell> {
   /// dropped rather than queued — two downloads of one package is one too many.
   void _installUpdate() {
     setState(() {
-      _index = _aboutSurface;
+      _index = _mySurface;
       _installRequests++;
     });
   }
@@ -269,23 +242,17 @@ class _HomeShellState extends State<HomeShell> {
         focusRequest: _conversationArrivals,
         isVisible: _index == _conversationsSurface,
       ),
-      DevicesPage(
-        defaultIncomingDirectory: incoming,
-        localAddresses: widget.seams.localAddresses,
-        onConversationRequested: _showConversation,
-      ),
       TransfersPage(defaultIncomingDirectory: incoming),
-      const ClipboardPage(),
-      SettingsPage(seams: widget.seams),
-      AboutPage(
-        offeredUpdate: widget.update?.answer,
+      MyPage(
+        seams: widget.seams,
+        update: widget.update,
         installRequest: _installRequests,
         onUpdateBusyChanged: _setUpdateLocked,
       ),
     ];
-    // The six surfaces, in the order both layouts show them. One list rather
+    // The three surfaces, in the order both layouts show them. One list rather
     // than one per layout: the rail and the bar are one decision about where to
-    // put the same six, and a list each would be two places to forget a seventh.
+    // put the same three, and a list each would be two places to forget a fourth.
     //
     // Both surfaces that can raise the question carry the count, because they
     // count one thing: a Transfer waiting on an answer. It is met first in the
@@ -298,30 +265,15 @@ class _HomeShellState extends State<HomeShell> {
         badge: waiting,
       ),
       _Surface(
-        icon: Icons.devices_outlined,
-        selectedIcon: Icons.devices,
-        label: l10n.tabDevices,
-      ),
-      _Surface(
         icon: Icons.swap_horiz_outlined,
         selectedIcon: Icons.swap_horiz,
         label: l10n.tabTransfers,
         badge: waiting,
       ),
       _Surface(
-        icon: Icons.content_paste_outlined,
-        selectedIcon: Icons.content_paste,
-        label: l10n.tabClipboard,
-      ),
-      _Surface(
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
-        label: l10n.tabSettings,
-      ),
-      _Surface(
-        icon: Icons.info_outline,
-        selectedIcon: Icons.info,
-        label: l10n.tabAbout,
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        label: l10n.tabMy,
       ),
     ];
 
@@ -346,7 +298,7 @@ class _HomeShellState extends State<HomeShell> {
             badge: surface.badge,
           ),
       ],
-      pinnedCount: _toolSurfaces,
+      pinnedCount: 0,
       trailing: trailing,
     );
 

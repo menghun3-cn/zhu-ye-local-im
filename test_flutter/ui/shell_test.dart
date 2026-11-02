@@ -352,7 +352,7 @@ void main() {
   });
 
   group('the shell', () {
-    testWidgets('a wide window offers the six surfaces and switches', (
+    testWidgets('a wide window offers the three surfaces and switches', (
       tester,
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
@@ -370,16 +370,8 @@ void main() {
       await openTab(tester, l10n.tabTransfers, window: windowA);
       expect(selectedSurface(tester, window: windowA), transfersSurface);
 
-      await openTab(tester, l10n.tabClipboard, window: windowA);
-      expect(selectedSurface(tester, window: windowA), clipboardSurface);
-
-      await openTab(tester, l10n.tabSettings, window: windowA);
-      expect(selectedSurface(tester, window: windowA), settingsSurface);
-
-      // Devices is second now, behind Conversations: talking to somebody is
-      // what the app is for, and this surface is where that is set up.
-      await openTab(tester, l10n.tabDevices, window: windowA);
-      expect(selectedSurface(tester, window: windowA), devicesSurface);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      expect(selectedSurface(tester, window: windowA), mySurface);
 
       await openTab(tester, l10n.tabConversation, window: windowA);
       expect(selectedSurface(tester, window: windowA), conversationsSurface);
@@ -387,7 +379,7 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('a narrow window offers the same six as a bottom bar', (
+    testWidgets('a narrow window offers the same three as a bottom bar', (
       tester,
     ) async {
       final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
@@ -402,15 +394,12 @@ void main() {
 
       final bar = windowA.within(find.byType(NavigationBar));
       final labels = [
-        // All six, Conversations first: a narrow window has no rail, so the
+        // All three, Conversations first: a narrow window has no rail, so the
         // bar is the only way to reach a surface and a missing entry is a
         // surface with no way in at all.
         l10n.tabConversation,
-        l10n.tabDevices,
         l10n.tabTransfers,
-        l10n.tabClipboard,
-        l10n.tabSettings,
-        l10n.tabAbout,
+        l10n.tabMy,
       ];
       for (final label in labels) {
         expect(
@@ -420,8 +409,8 @@ void main() {
         );
       }
 
-      await openTab(tester, l10n.tabSettings, window: windowA);
-      expect(selectedSurface(tester, window: windowA), settingsSurface);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      expect(selectedSurface(tester, window: windowA), mySurface);
 
       await openTab(tester, l10n.tabConversation, window: windowA);
       expect(selectedSurface(tester, window: windowA), conversationsSurface);

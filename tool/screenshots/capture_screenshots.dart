@@ -146,7 +146,8 @@ Future<void> _runCapture() async {
     );
     written.add(
       await _capture(tester, 'devices.png', () async {
-        await openTab(tester, l10n.tabDevices, window: windowA);
+        await openTab(tester, l10n.tabMy, window: windowA);
+        await openMyCard(tester, l10n.myCardDevices, window: windowA);
       }),
     );
     written.add(
@@ -156,12 +157,14 @@ Future<void> _runCapture() async {
     );
     written.add(
       await _capture(tester, 'clipboard.png', () async {
-        await openTab(tester, l10n.tabClipboard, window: windowA);
+        await openTab(tester, l10n.tabMy, window: windowA);
+        await openMyCard(tester, l10n.myCardClipboard, window: windowA);
       }),
     );
     written.add(
       await _capture(tester, 'settings.png', () async {
-        await openTab(tester, l10n.tabSettings, window: windowA);
+        await openTab(tester, l10n.tabMy, window: windowA);
+        await openMyCard(tester, l10n.myCardSettings, window: windowA);
       }),
     );
 

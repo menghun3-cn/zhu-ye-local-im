@@ -4,8 +4,10 @@
   "appTitle": "Zhuye Local Transfer",
   "startupFailureTitle": "Zhuye Local Transfer could not start",
 
-  "tabDevices": "Devices",
+  "tabConversation": "Conversations",
   "tabTransfers": "Transfers",
+  "tabMy": "My",
+  "tabDevices": "Devices",
   "tabClipboard": "Clipboard",
   "tabSettings": "Settings",
   "tabAbout": "About",
@@ -386,5 +388,28 @@
   "changeIncomingFolder": "Change…",
   "incomingFolderHint": "Received files are saved here by default. You can still pick another folder for each one.",
   "incomingFolderUnset": "You are asked where to save each file as it arrives.",
-  "folderNotSaved": "Not saved — press Enter, or click away, to keep this folder."
+  "folderNotSaved": "Not saved — press Enter, or click away, to keep this folder.",
+
+  "myPageTitle": "My",
+  "myCardDevices": "Devices",
+  "myCardDevicesSummary": "Known devices: {count}",
+  "@myCardDevicesSummary": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "myCardClipboard": "Clipboard",
+  "myCardClipboardSummary": "Sync enabled",
+  "myCardClipboardSummaryDisabled": "Sync disabled",
+  "myCardSettings": "Settings",
+  "myCardSettingsSummary": "Receive folder configured",
+  "myCardSettingsSummaryUnset": "Receive folder not set",
+  "myCardAbout": "About",
+  "myCardAboutSummary": "Version {version}",
+  "@myCardAboutSummary": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "myCardAboutSummaryUpdate": "Version {version} · Update available",
+  "@myCardAboutSummaryUpdate": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "myViewDetails": "View details"
 }

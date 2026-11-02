@@ -44,7 +44,8 @@ void main() {
         controlsWindow: false,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       // Android has no notification area and no close button to give a meaning
       // to, so both controls would be rows with nothing behind them. Absent
@@ -94,7 +95,8 @@ void main() {
         hostShell: host,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.settingsWindowAndStartup)),
@@ -138,7 +140,8 @@ void main() {
         hostShell: host,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       await tester.tap(
         onPage(windowA, SettingsPage, find.text(l10n.settingsCloseQuit)),
@@ -201,7 +204,8 @@ void main() {
         hostShell: host,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(device.controller.autostartEnabled, isTrue);
       expect(
@@ -234,7 +238,8 @@ void main() {
         hostShell: host,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       expect(host.autostart, isFalse);
       expect(
@@ -281,7 +286,8 @@ void main() {
         hostShell: host,
       );
       await pumpWindow(tester, device, size: tallWindow);
-      await openTab(tester, l10n.tabSettings, window: windowA);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
       await tester.tap(_startWithWindowsSwitch());
       await pumpUntil(

@@ -110,17 +110,29 @@ abstract class AppLocalizations {
   /// **'Zhuye Local Transfer could not start'**
   String get startupFailureTitle;
 
-  /// No description provided for @tabDevices.
+  /// No description provided for @tabConversation.
   ///
   /// In en, this message translates to:
-  /// **'Devices'**
-  String get tabDevices;
+  /// **'Conversations'**
+  String get tabConversation;
 
   /// No description provided for @tabTransfers.
   ///
   /// In en, this message translates to:
   /// **'Transfers'**
   String get tabTransfers;
+
+  /// No description provided for @tabMy.
+  ///
+  /// In en, this message translates to:
+  /// **'My'**
+  String get tabMy;
+
+  /// No description provided for @tabDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get tabDevices;
 
   /// No description provided for @tabClipboard.
   ///
@@ -1394,12 +1406,6 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get removeAttachment;
 
-  /// No description provided for @tabConversation.
-  ///
-  /// In en, this message translates to:
-  /// **'Conversations'**
-  String get tabConversation;
-
   /// No description provided for @conversationListEmpty.
   ///
   /// In en, this message translates to:
@@ -1463,7 +1469,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteConversationConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The text, files and images in this conversation will be deleted from this device. This cannot be undone. Clipboard history is not affected.'**
+  /// **'This forgets the Device and its pairing permissions, closes the connection and clears chat and clipboard history plus unsent drafts. Files you sent or received are kept, and the current system clipboard content stays. This cannot be undone.'**
   String get deleteConversationConfirmBody;
 
   /// No description provided for @conversationPickOne.
@@ -1573,6 +1579,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not saved — press Enter, or click away, to keep this folder.'**
   String get folderNotSaved;
+
+  /// No description provided for @myPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My'**
+  String get myPageTitle;
+
+  /// No description provided for @myCardDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get myCardDevices;
+
+  /// No description provided for @myCardDevicesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Known devices: {count}'**
+  String myCardDevicesSummary(int count);
+
+  /// No description provided for @myCardClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard'**
+  String get myCardClipboard;
+
+  /// No description provided for @myCardClipboardSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync enabled'**
+  String get myCardClipboardSummary;
+
+  /// No description provided for @myCardClipboardSummaryDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync disabled'**
+  String get myCardClipboardSummaryDisabled;
+
+  /// No description provided for @myCardSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get myCardSettings;
+
+  /// No description provided for @myCardSettingsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive folder configured'**
+  String get myCardSettingsSummary;
+
+  /// No description provided for @myCardSettingsSummaryUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive folder not set'**
+  String get myCardSettingsSummaryUnset;
+
+  /// No description provided for @myCardAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get myCardAbout;
+
+  /// No description provided for @myCardAboutSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String myCardAboutSummary(String version);
+
+  /// No description provided for @myCardAboutSummaryUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} · Update available'**
+  String myCardAboutSummaryUpdate(String version);
+
+  /// No description provided for @myViewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get myViewDetails;
 }
 
 class _AppLocalizationsDelegate
