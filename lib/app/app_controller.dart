@@ -2234,15 +2234,75 @@ final class LocalTransferController {
     if (store == null) return;
     try {
       final remembered = await loadConversation(store);
+      final fixed = await _fixImagePaths(remembered.messages);
       _history
         ..clear()
-        ..addAll(remembered.messages);
+        ..addAll(fixed);
       _reading = remembered.reading;
+      if (fixed.length != remembered.messages.length) {
+        await _persistHistory();
+      }
     } on Object catch (error) {
       _history.clear();
       _reading = ConversationReading();
       _notice('the conversation could not be read back: $error');
     }
+  }
+
+  /// Fixes image messages that have no localPath but the file still exists.
+  ///
+  /// This repairs historical messages from versions where the path was not
+  /// correctly saved, by checking if a file with the recorded name exists in
+  /// the incoming directory.
+  Future<List<MessageRecord>> _fixImagePaths(
+    List<MessageRecord> messages,
+  ) async {
+    final incoming = _local?.profile.incomingDirectory ??
+        _defaultIncomingDirectory;
+    if (incoming == null) return messages;
+
+    final directory = Directory(incoming);
+    if (!directory.existsSync()) return messages;
+
+    final fixed = <MessageRecord>[];
+    var fixCount = 0;
+
+    for (final record in messages) {
+      if (record.kind == PayloadKind.image &&
+          record.localPath == null &&
+          record.names.isNotEmpty) {
+        // Try to find the file by name in the incoming directory
+        final name = record.names.first;
+        final file = File('${directory.path}${Platform.pathSeparator}$name');
+        if (await file.exists()) {
+          fixed.add(
+            MessageRecord(
+              peer: record.peer,
+              id: record.id,
+              direction: record.direction,
+              kind: record.kind,
+              at: record.at,
+              state: record.state,
+              names: record.names,
+              totalBytes: record.totalBytes,
+              text: record.text,
+              localPath: file.path,
+              appOwned: record.appOwned,
+              settledAt: record.settledAt,
+            ),
+          );
+          fixCount++;
+          continue;
+        }
+      }
+      fixed.add(record);
+    }
+
+    if (fixCount > 0) {
+      _notice('fixed $fixCount image messages with missing paths');
+    }
+
+    return fixed;
   }
 
   /// Remembers a settled Transfer, and writes the conversation out.
