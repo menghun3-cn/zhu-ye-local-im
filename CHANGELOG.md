@@ -8,6 +8,8 @@
 
 ## [Unreleased]
 
+## [0.1.30] - 2026-11-03
+
 ### 修复
 
 - 修复图片接收失败时无法诊断的问题：在文件重命名失败时记录错误日志到通知区域，便于排查权限、跨驱动器等原因
@@ -31,7 +33,7 @@
 
 ### 修复
 
-- 修复 Windows 构建失败：将「关于」卡片和设置页面图标从 info_outline 改为 help_outline（info_outline 不在 MaterialIcons-Regular.otf 字体中）
+- 修复 Windows 构建失败：将「关于」卡片和设置页面图标从 info_outline 改为 announcement（info_outline 和 help_outline 不在 MaterialIcons-Regular.otf 字体中）
 
 ## [0.1.28] - 2026-10-29
 
