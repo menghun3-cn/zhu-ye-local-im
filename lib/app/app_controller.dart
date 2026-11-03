@@ -1121,6 +1121,13 @@ final class LocalTransferController {
         return;
       }
     }
+    // If we reach here, the transfer was not found in _transfers.
+    // This could happen if the transfer was already cleaned up or there's a
+    // mismatch in object identity.
+    _notice(
+      'could not record local path for transfer ${transfer.id}: '
+      'transfer not found in tracked list (size: ${_transfers.length})',
+    );
   }
 
   /// Refuses [transfer].
