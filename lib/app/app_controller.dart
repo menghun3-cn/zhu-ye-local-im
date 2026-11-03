@@ -1078,11 +1078,15 @@ final class LocalTransferController {
         final finalPath = incomingPathFor(landing.directory, landing.name);
         await landing.staged.rename(finalPath.path);
         first ??= finalPath.path;
-      } on Object {
+      } on Object catch (error) {
         // A file that could not be given its name cannot be kept under a name
         // nobody chose either, and leaving it behind would be the litter this
         // arrangement exists to remove. The Transfer has already ended, so all
         // that is left to do is not litter.
+        _notice(
+          'could not rename received file from ${landing.staged.path} '
+          'to its final name in ${landing.directory.path}: $error',
+        );
         await _discardStaged(landing.staged);
       }
     }

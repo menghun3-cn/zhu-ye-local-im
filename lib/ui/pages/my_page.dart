@@ -13,6 +13,63 @@ import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'settings_page.dart';
 
+/// Which sub-page is shown.
+enum _SubPage {
+  devices,
+  clipboard,
+  settings,
+  about,
+}
+
+/// The header shown above each sub-page, with a back button.
+class _SubPageHeader extends StatelessWidget {
+  const _SubPageHeader({
+    required this.title,
+    required this.onBack,
+  });
+
+  final String title;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
+      decoration: BoxDecoration(
+        color: colors.pageBackground,
+        border: Border(
+          bottom: BorderSide(
+            color: colors.divider,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: onBack,
+            tooltip: 'Back',
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: colors.bubbleText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// One card in the "My" page, representing a low-frequency surface.
 ///
 /// Each card shows the surface's icon, title, a short summary of the most
@@ -32,7 +89,6 @@ class _MyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     return Card(
       child: InkWell(
@@ -57,7 +113,6 @@ class _MyCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  TextButton(onPressed: onTap, child: Text(l10n.myViewDetails)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -119,6 +174,9 @@ class MyPage extends StatefulWidget {
 }
 
 class _MyPageState extends State<MyPage> {
+  /// Which sub-page is currently shown, or null for the card list.
+  _SubPage? _currentSubPage;
+
   /// Whether an update is in flight.
   ///
   /// Held here rather than in the notice the rail reads: the rail's entry is
@@ -138,6 +196,16 @@ class _MyPageState extends State<MyPage> {
     _reportBusy(busy);
   }
 
+  /// Opens a sub-page.
+  void _openSubPage(_SubPage page) {
+    setState(() => _currentSubPage = page);
+  }
+
+  /// Closes the current sub-page and returns to the card list.
+  void _closeSubPage() {
+    setState(() => _currentSubPage = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -145,6 +213,12 @@ class _MyPageState extends State<MyPage> {
     final incoming =
         controller.incomingDirectory ?? widget.seams.defaultIncomingDirectory;
 
+    // If a sub-page is open, show it with a back button
+    if (_currentSubPage != null) {
+      return _buildSubPage(context, l10n, controller, incoming);
+    }
+
+    // Otherwise show the card list
     return ListView(
       padding: WeChat.pagePadding,
       children: [
@@ -153,18 +227,7 @@ class _MyPageState extends State<MyPage> {
           icon: Icons.devices_outlined,
           title: l10n.myCardDevices,
           summary: l10n.myCardDevicesSummary(controller.peers.length),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(l10n.tabDevices)),
-                body: DevicesPage(
-                  defaultIncomingDirectory: incoming,
-                  localAddresses: widget.seams.localAddresses,
-                  onConversationRequested: (_) {},
-                ),
-              ),
-            ),
-          ),
+          onTap: () => _openSubPage(_SubPage.devices),
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
@@ -173,14 +236,7 @@ class _MyPageState extends State<MyPage> {
           summary: controller.clipboardMode == ClipboardMode.off
               ? l10n.myCardClipboardSummaryDisabled
               : l10n.myCardClipboardSummary,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(l10n.tabClipboard)),
-                body: const ClipboardPage(),
-              ),
-            ),
-          ),
+          onTap: () => _openSubPage(_SubPage.clipboard),
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
@@ -189,35 +245,80 @@ class _MyPageState extends State<MyPage> {
           summary: controller.incomingDirectory == null
               ? l10n.myCardSettingsSummaryUnset
               : l10n.myCardSettingsSummary,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(l10n.tabSettings)),
-                body: SettingsPage(seams: widget.seams),
-              ),
-            ),
-          ),
+          onTap: () => _openSubPage(_SubPage.settings),
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
           icon: Icons.announcement,
           title: l10n.myCardAbout,
           summary: _aboutSummary(widget.update, l10n),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(l10n.tabAbout)),
-                body: AboutPage(
-                  offeredUpdate: widget.update?.answer,
-                  installRequest: widget.installRequest,
-                  onUpdateBusyChanged: _setUpdateLocked,
-                ),
-              ),
-            ),
-          ),
+          onTap: () => _openSubPage(_SubPage.about),
         ),
       ],
     );
+  }
+
+  /// Builds the content for the currently selected sub-page.
+  Widget _buildSubPage(
+    BuildContext context,
+    AppLocalizations l10n,
+    LocalTransferController controller,
+    String? incoming,
+  ) {
+    final page = switch (_currentSubPage) {
+      _SubPage.devices => Column(
+          children: [
+            _SubPageHeader(
+              title: l10n.tabDevices,
+              onBack: _closeSubPage,
+            ),
+            Expanded(
+              child: DevicesPage(
+                defaultIncomingDirectory: incoming,
+                localAddresses: widget.seams.localAddresses,
+                onConversationRequested: (_) {},
+              ),
+            ),
+          ],
+        ),
+      _SubPage.clipboard => Column(
+          children: [
+            _SubPageHeader(
+              title: l10n.tabClipboard,
+              onBack: _closeSubPage,
+            ),
+            const Expanded(child: ClipboardPage()),
+          ],
+        ),
+      _SubPage.settings => Column(
+          children: [
+            _SubPageHeader(
+              title: l10n.tabSettings,
+              onBack: _closeSubPage,
+            ),
+            Expanded(
+              child: SettingsPage(seams: widget.seams),
+            ),
+          ],
+        ),
+      _SubPage.about => Column(
+          children: [
+            _SubPageHeader(
+              title: l10n.tabAbout,
+              onBack: _closeSubPage,
+            ),
+            Expanded(
+              child: AboutPage(
+                offeredUpdate: widget.update?.answer,
+                installRequest: widget.installRequest,
+                onUpdateBusyChanged: _setUpdateLocked,
+              ),
+            ),
+          ],
+        ),
+      _ => const SizedBox.shrink(),
+    };
+    return page;
   }
 
   String _aboutSummary(UpdateNotice? update, AppLocalizations l10n) {
