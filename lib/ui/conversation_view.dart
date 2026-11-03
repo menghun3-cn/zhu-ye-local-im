@@ -712,16 +712,32 @@ class _ConversationComposerState extends State<ConversationComposer> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // The text area, at the top of the board.
+                if (widget.attachments.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      WeChat.composerBoardPadding,
+                      WeChat.composerBoardPadding,
+                      WeChat.composerBoardPadding,
+                      0,
+                    ),
+                    child: _AttachmentTray(
+                      attachments: widget.attachments,
+                      onRemove: widget.onRemoveAttachment,
+                      removeTooltip: l10n.removeAttachment,
+                    ),
+                  ),
+                // The text area.
                 //
                 // It is the board's *content*, so it takes the board's padding —
                 // and the toolbar below it is a separate row rather than
                 // something sharing this row's baseline. WeChat's input area is
                 // two stacked things, not one line of controls.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     WeChat.composerBoardPadding,
-                    WeChat.composerBoardPadding,
+                    widget.attachments.isNotEmpty
+                        ? 8
+                        : WeChat.composerBoardPadding,
                     WeChat.composerBoardPadding,
                     0,
                   ),
@@ -733,20 +749,6 @@ class _ConversationComposerState extends State<ConversationComposer> {
                     onPaste: widget.onPaste,
                   ),
                 ),
-                if (widget.attachments.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      WeChat.composerBoardPadding,
-                      8,
-                      WeChat.composerBoardPadding,
-                      0,
-                    ),
-                    child: _AttachmentTray(
-                      attachments: widget.attachments,
-                      onRemove: widget.onRemoveAttachment,
-                      removeTooltip: l10n.removeAttachment,
-                    ),
-                  ),
                 // The toolbar row: the tools on the left, the send on the right.
                 //
                 // The send sits at the **bottom right** of the board, not beside
