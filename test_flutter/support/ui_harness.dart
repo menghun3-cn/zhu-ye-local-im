@@ -293,10 +293,7 @@ Future<void> openMyCard(
 }) async {
   // Find the view details button that is in the same card as the title
   final button = window.within(
-    find.ancestor(
-      of: find.text(label),
-      matching: find.byType(Card),
-    ),
+    find.ancestor(of: find.text(label), matching: find.byType(Card)),
   );
   final detailsButton = find.descendant(
     of: button,
