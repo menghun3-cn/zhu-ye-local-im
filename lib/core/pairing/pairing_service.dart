@@ -288,6 +288,7 @@ final class PairingService {
     this.handshakeTimeout = const Duration(seconds: 15),
     this.confirmationTimeout = const Duration(seconds: 240),
     this.requestTimeout = const Duration(minutes: 2),
+    this.dialTransport,
     this.onNotice,
   });
 
@@ -314,6 +315,12 @@ final class PairingService {
   /// until the process exits. The automatic controller normally answers in
   /// milliseconds, so this is a failure bound rather than a human-scale wait.
   final Duration requestTimeout;
+
+  /// Dials a peer for [join] and [joinOpen], for the seam a test replaces.
+  ///
+  /// Only a test replaces it, and only to make a dial fail the way a dial
+  /// fails while the peer's inbound port is unreachable.
+  final Future<ByteTransport> Function(String host, int port)? dialTransport;
 
   /// Where a failure that is not anybody's request is reported.
   ///
@@ -608,9 +615,11 @@ final class PairingService {
     required bool openPairing,
   }) async {
     if (_closed) throw StateError('this PairingService is closed');
-    final SocketByteTransport transport;
+    final ByteTransport transport;
     try {
-      transport = await SocketByteTransport.connect(host, port);
+      transport = dialTransport == null
+          ? await SocketByteTransport.connect(host, port)
+          : await dialTransport!(host, port);
     } on SocketException catch (error) {
       // Marked unreachable so a UI can say what to check. A dial that never
       // lands is a Device that is not running, on another network, or behind a

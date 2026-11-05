@@ -172,6 +172,7 @@ Future<TestDevice> startDevice(
   Duration keepAliveTimeout = defaultKeepAliveTimeout,
   ByteTransport Function(Socket socket)? wrapSocket,
   Future<Socket> Function(String host, int port)? dialSocket,
+  Future<ByteTransport> Function(String host, int port)? pairDialTransport,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -198,6 +199,7 @@ Future<TestDevice> startDevice(
     keepAliveTimeout: keepAliveTimeout,
     wrapSocket: wrapSocket,
     dialSocket: dialSocket,
+    pairingDialTransport: pairDialTransport,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -261,6 +263,39 @@ Future<void> pairDirectly(TestDevice from, TestDevice to) async {
     description: 'both Devices to finish the direct Pairing and serve',
   );
 }
+
+/// A profile already inside a group, for a test that needs a specific roster.
+LocalProfile presetProfile({
+  required OwnerIdentity identity,
+  required String alias,
+  required OwnerGroup group,
+  required Uint8List secret,
+  DevicePlatform platform = DevicePlatform.windows,
+}) => LocalProfile(
+  identity: identity,
+  profile: DeviceProfile(
+    self: identity.fingerprint,
+    alias: alias,
+    platform: platform,
+    group: group,
+  ),
+  groupSecret: secret,
+);
+
+/// Persists [local] where [startDevice] will find it.
+Future<ProfileStore> storeFor(LocalProfile local) async {
+  final store = MemoryProfileStore();
+  await saveLocalProfile(local, store);
+  return store;
+}
+
+/// A Session dial that fails the way an unreachable inbound port fails.
+Future<Socket> _blockedSessionDial(String host, int port) =>
+    Future<Socket>.error(SocketException('blocked'));
+
+/// A Pairing dial that fails the way an unreachable inbound port fails.
+Future<ByteTransport> _blockedPairDial(String host, int port) =>
+    Future<ByteTransport>.error(SocketException('blocked'));
 
 /// Opens a Session from [from] to [to], once Discovery has placed [to].
 ///
@@ -1127,6 +1162,68 @@ void main() {
       );
       expect(alice.controller.sessions, hasLength(1));
       expect(bob.controller.sessions, hasLength(1));
+    });
+
+    test('a member that missed a late joiner dials it anyway', () async {
+      final hub = MemoryBeaconHub();
+      var earlyId = await OwnerIdentity.generate();
+      var lateId = await OwnerIdentity.generate();
+      if (earlyId.fingerprint.compareTo(lateId.fingerprint) < 0) {
+        final swap = earlyId;
+        earlyId = lateId;
+        lateId = swap;
+      }
+      final secret = randomBytes(PairingSecret.keyBytes);
+
+      // Early joined the group before Late existed, so its roster does not
+      // name Late. Late joined through somebody else and does name Early.
+      final early = await startDevice(
+        hub.a,
+        'Early',
+        store: await storeFor(
+          presetProfile(
+            identity: earlyId,
+            alias: 'Early',
+            group: OwnerGroup(self: earlyId.fingerprint),
+            secret: secret,
+          ),
+        ),
+      );
+      final late = await startDevice(
+        hub.b,
+        'Late',
+        store: await storeFor(
+          presetProfile(
+            identity: lateId,
+            alias: 'Late',
+            platform: DevicePlatform.android,
+            group: OwnerGroup(
+              self: lateId.fingerprint,
+              members: [earlyId.fingerprint],
+            ),
+            secret: secret,
+          ),
+        ),
+        // Late cannot reach Early's inbound ports, the way a firewalled peer
+        // cannot; Early can still reach Late.
+        dialSocket: _blockedSessionDial,
+        pairDialTransport: _blockedPairDial,
+      );
+
+      await until(
+        () =>
+            early.controller.sessions.isNotEmpty &&
+            late.controller.sessions.isNotEmpty,
+        description: 'the secret-holding Device to dial the late joiner',
+        timeout: const Duration(seconds: 25),
+      );
+      expect(
+        early.controller.peers.any(
+          (peer) => peer.fingerprint == late.fingerprint && peer.isInGroup,
+        ),
+        isTrue,
+        reason: 'the Pairing Early opens is what teaches it Late exists',
+      );
     });
   });
 

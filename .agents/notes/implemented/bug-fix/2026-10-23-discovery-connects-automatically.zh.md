@@ -4,6 +4,10 @@ Status: implemented
 
 [English](2026-10-23-discovery-connects-automatically.md) | 中文
 
+> **部分被取代**：
+> [已持有组密钥的一端可以作为较大 Fingerprint 发起配对](2026-11-05-secret-holder-may-open-pairing.zh.md)
+> 仍保留全新配对的 Fingerprint 顺序，但已经持有组密钥的设备也可以拨号。
+
 ## Problem
 
 `v0.1.16` 的界面仍要求一个人发起配对，再由另一个人接受请求。这不是产品要求：
@@ -26,8 +30,10 @@ Status: implemented
 * 自动发现到设备组外的对端时，程序自动开始现有的开放配对交换。对端已在组内、
   但暂时没有广播会话监听端口时也走同一流程，因此还能恢复「名单仍在、组密钥丢失」
   的 profile。
-* 只有 Fingerprint 较小的一端发起自动配对。两端都能从已有事实算出同一顺序，
-  新设备不会同时生成两个互不相关的组密钥。
+* 全新配对仍只有 Fingerprint 较小的一端发起自动配对。已经持有组密钥的设备即使
+  Fingerprint 更大、且对端不在其名单内时，也可以发起，让较早成员能够到达入站
+  端口不可达的较晚加入者；见
+  [已持有组密钥的一端可以作为较大 Fingerprint 发起配对](2026-11-05-secret-holder-may-open-pairing.zh.md)。
 * 接收端控制器自动准入并确认每个有效的发现请求。`PairingRequest` 和
   `PairingAttempt` 仍保留为协议接缝；应用层不再把请求转交给界面。
 * 两个已有设备组通过开放配对相遇且组密钥冲突时，双方都选择 Fingerprint 较小
