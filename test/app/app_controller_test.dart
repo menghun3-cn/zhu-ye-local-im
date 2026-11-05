@@ -173,6 +173,7 @@ Future<TestDevice> startDevice(
   ByteTransport Function(Socket socket)? wrapSocket,
   Future<Socket> Function(String host, int port)? dialSocket,
   Future<ByteTransport> Function(String host, int port)? pairDialTransport,
+  Future<DiscoveredPeer?> Function(String host)? addressProbe,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -200,6 +201,7 @@ Future<TestDevice> startDevice(
     wrapSocket: wrapSocket,
     dialSocket: dialSocket,
     pairingDialTransport: pairDialTransport,
+    addressProbe: addressProbe,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -263,6 +265,35 @@ Future<void> pairDirectly(TestDevice from, TestDevice to) async {
     description: 'both Devices to finish the direct Pairing and serve',
   );
 }
+
+/// A port nothing is listening on right now, for a Device that must serve a
+/// known Session port after Pairing rather than an ephemeral one.
+Future<int> freePort() async {
+  final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+  final port = socket.port;
+  await socket.close();
+  return port;
+}
+
+/// The beacon answer a unicast probe would have heard from [device].
+DiscoveredPeer discoveredFor(
+  TestDevice device, {
+  int? sessionPort,
+  int? pairingPort,
+}) => DiscoveredPeer(
+  device: DeviceDescriptor(
+    fingerprint: device.fingerprint,
+    alias: device.controller.self.alias,
+    platform: device.controller.self.platform,
+    capability: ClipboardCapability.forPlatform(
+      device.controller.self.platform,
+    ),
+    listenPort: sessionPort,
+    pairingPort: pairingPort,
+  ),
+  address: InternetAddress.loopbackIPv4,
+  lastSeen: DateTime.now(),
+);
 
 /// A profile already inside a group, for a test that needs a specific roster.
 LocalProfile presetProfile({
@@ -1648,6 +1679,103 @@ void main() {
       expect(carol.controller.sessions, isEmpty);
       expect(bob.controller.sessions, isEmpty);
     });
+
+    test(
+      'connectByAddress refuses a non-IP and an unanswered address',
+      () async {
+        final solo = await startDevice(MemoryBeaconHub().a, 'Solo');
+        await expectLater(
+          solo.controller.connectByAddress(address: 'not-an-ip'),
+          throwsA(isA<AppStateException>()),
+        );
+
+        final alice = await startDevice(
+          MemoryBeaconHub().a,
+          'Alice',
+          addressProbe: (_) async => null,
+        );
+        await expectLater(
+          alice.controller.connectByAddress(
+            address: InternetAddress.loopbackIPv4.address,
+          ),
+          throwsA(isA<AppStateException>()),
+        );
+      },
+    );
+
+    test('connectByAddress dials a group member the probe found', () async {
+      late TestDevice bob;
+      final alice = await startDevice(
+        MemoryBeaconHub().a,
+        'Alice',
+        addressProbe: (_) async => discoveredFor(
+          bob,
+          sessionPort: bob.controller.listenPort,
+          pairingPort: bob.controller.pairingPort,
+        ),
+      );
+      bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+      await pairDirectly(alice, bob);
+
+      await alice.controller.connectByAddress(
+        address: InternetAddress.loopbackIPv4.address,
+      );
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up on both Devices',
+      );
+      expect(
+        alice.controller.peers
+            .firstWhere((peer) => peer.isConnected)
+            .fingerprint,
+        bob.fingerprint,
+      );
+    });
+
+    test(
+      'connectByAddress pairs a Device the probe found outside the group',
+      () async {
+        late TestDevice bob;
+        final sessionPort = await freePort();
+        final alice = await startDevice(
+          MemoryBeaconHub().a,
+          'Alice',
+          addressProbe: (_) async => discoveredFor(
+            bob,
+            sessionPort: sessionPort,
+            pairingPort: bob.controller.pairingPort,
+          ),
+        );
+        bob = await startDevice(
+          MemoryBeaconHub().a,
+          'Bob',
+          sessionListenPort: sessionPort,
+        );
+
+        await alice.controller.connectByAddress(
+          address: InternetAddress.loopbackIPv4.address,
+        );
+        await until(
+          () =>
+              alice.controller.isPaired &&
+              bob.controller.isPaired &&
+              alice.controller.sessions.isNotEmpty &&
+              bob.controller.sessions.isNotEmpty,
+          description: 'Pairing and the Session to finish over the typed IP',
+        );
+
+        await alice.controller.sendText('over a typed IP');
+        await until(
+          () =>
+              bob.controller.transfers.isNotEmpty &&
+              bob.controller.transfers.single.state.isSettled,
+          description: 'Bob to receive the text',
+        );
+        expect(bob.controller.transfers.single.text, 'over a typed IP');
+      },
+    );
   });
 
   group('the conversation outlives the process', () {

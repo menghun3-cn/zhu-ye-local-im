@@ -166,6 +166,7 @@ Future<UiDevice> startUiDevice(
   // record is not what this harness is for.
   ScriptedHostShell? hostShell,
   bool controlsWindow = true,
+  Future<DiscoveredPeer?> Function(String host)? addressProbe,
 }) async {
   late final UiDevice device;
   await tester.runAsync(() async {
@@ -194,6 +195,7 @@ Future<UiDevice> startUiDevice(
       defaultIncomingDirectory: defaultIncomingDirectory,
       messageStore: conversation,
       hostShell: host,
+      addressProbe: addressProbe,
     );
     await controller.start();
     device = UiDevice(

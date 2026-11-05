@@ -287,6 +287,8 @@ String describeRefusal(
     AppRefusal.severalPeersConnected => l10n.refusalSeveralPeersConnected,
     AppRefusal.notPaired => l10n.refusalNotPaired,
     AppRefusal.noFreeFileName => l10n.refusalNoFreeFileName(subject),
+    AppRefusal.invalidAddress => l10n.refusalInvalidAddress,
+    AppRefusal.deviceNotReachable => l10n.refusalDeviceNotReachable(subject),
   };
 }
 

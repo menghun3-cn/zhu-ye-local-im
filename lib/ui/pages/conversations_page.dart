@@ -8,6 +8,7 @@ import '../../core/core.dart';
 import '../conversation_menu.dart';
 import '../controller_scope.dart';
 import '../conversation_view.dart';
+import '../dialogs.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
@@ -444,9 +445,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
               fillColor: colors.surfaceSunken,
               hintText: l10n.searchConversations,
               prefixIcon: const Icon(Icons.search, size: 19),
-              suffixIcon: query.isEmpty
-                  ? null
-                  : IconButton(
+              suffixIconConstraints: const BoxConstraints(maxWidth: 96),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (query.isNotEmpty)
+                    IconButton(
                       tooltip: l10n.clearSearch,
                       onPressed: () {
                         _search.clear();
@@ -454,6 +458,14 @@ class _ConversationsPageState extends State<ConversationsPage> {
                       },
                       icon: const Icon(Icons.close, size: 18),
                     ),
+                  IconButton(
+                    tooltip: l10n.connectByAddress,
+                    onPressed: () =>
+                        showConnectByAddressDialog(context, controller),
+                    icon: const Icon(Icons.add, size: 20),
+                  ),
+                ],
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 10,
@@ -781,26 +793,6 @@ class _ConversationTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 96),
-                        child: Tooltip(
-                          message: presenceLabel,
-                          child: Text(
-                            presenceLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.end,
-                            style: TextStyle(
-                              fontSize: WeChat.railLabelSize,
-                              color: presenceColour,
-                              fontWeight: peer.presence == PeerPresence.online
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -829,7 +821,24 @@ class _ConversationTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (stamp != null)
+                  Tooltip(
+                    message: presenceLabel,
+                    child: Text(
+                      presenceLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: WeChat.railLabelSize,
+                        color: presenceColour,
+                        fontWeight: peer.presence == PeerPresence.online
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  if (stamp != null) ...[
+                    const SizedBox(height: 2),
                     Text(
                       stamp,
                       overflow: TextOverflow.ellipsis,
@@ -838,10 +847,8 @@ class _ConversationTile extends StatelessWidget {
                         color: colors.secondaryText,
                       ),
                     ),
-                  if (lower != null) ...[
-                    if (stamp != null) const SizedBox(height: 2),
-                    lower,
                   ],
+                  if (lower != null) ...[const SizedBox(height: 2), lower],
                 ],
               ),
             ),

@@ -17,9 +17,9 @@ control rather than as a Device identity.
 ## Decision
 
 `PeerView.presence` and `labelForPeerPresence` remain the source of presence
-in the conversation list. A row still prints 在线, 连接中, or 离线 beside its
-title, including last-seen time when an offline peer has one. The avatar is
-now a plain `Avatar`; it carries no lower-right mark.
+in the conversation list. A row still prints 在线, 连接中, or 离线 in its
+trailing column, including last-seen time when an offline peer has one. The
+avatar is now a plain `Avatar`; it carries no lower-right mark.
 
 The application chrome no longer draws `ConnectionSummary` under the rail's
 brand mark or above the narrow window's bottom navigation bar.

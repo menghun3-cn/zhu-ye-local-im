@@ -1096,6 +1096,49 @@ void main() {
       await shutdown(tester, [alice, bob]);
     });
 
+    testWidgets('the search field connects by IP and validates the address', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+
+      final add = onPage(
+        windowA,
+        ConversationsPage,
+        find.byTooltip(l10n.connectByAddress),
+      );
+      expect(
+        add,
+        findsOneWidget,
+        reason: 'the search field offers the + action',
+      );
+      await tester.tap(add);
+      await pumpUntil(
+        tester,
+        () => dialogIsOpen(windowA),
+        description: 'the connect-by-IP dialog to open',
+      );
+
+      await fillField(
+        tester,
+        l10n.fieldIpAddress,
+        'not-an-ip',
+        window: windowA,
+      );
+      await tapDialogButton(tester, l10n.connect, window: windowA);
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.refusalInvalidAddress))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the invalid-address refusal to show',
+      );
+
+      await shutdown(tester, [device]);
+    });
+
     testWidgets('clearing the open chat asks first and leaves it empty', (
       tester,
     ) async {

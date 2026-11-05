@@ -15,7 +15,7 @@ Status: implemented
 ## Decision
 
 `PeerView.presence` 与 `labelForPeerPresence` 仍然是会话列表里在线状态的来源。
-会话行继续在标题旁显示「在线」「连接中」或「离线」，离线设备有最后出现时间时
+会话行继续在行尾列显示「在线」「连接中」或「离线」，离线设备有最后出现时间时
 也继续显示。头像现在是普通的 `Avatar`，右下角不再带状态标记。
 
 应用外壳不再在导航轨品牌标下方或窄窗口底栏上方绘制 `ConnectionSummary`。

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -122,6 +123,32 @@ final class DiscoveryService {
   void probe() {
     if (!_running) return;
     transport.broadcast(_probeBytes);
+  }
+
+  /// Asks one address who is there, and waits for its announce.
+  ///
+  /// Discovery normally broadcasts the probe; a user who typed an address has
+  /// already answered "where", so the probe is unicast and the answer is the
+  /// first announce that arrives from that address. The announce is recorded
+  /// like any other sighting, so the peer joins [currentPeers] whether or not
+  /// this call is still waiting.
+  Future<DiscoveredPeer?> probeHost(
+    InternetAddress address, {
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
+    if (!_running) return null;
+    for (final peer in _registry.peers) {
+      if (peer.address.address == address.address) return peer;
+    }
+    transport.send(_probeBytes, address: address, port: discoveryPort);
+    final deadline = DateTime.now().add(timeout);
+    while (true) {
+      for (final peer in _registry.peers) {
+        if (peer.address.address == address.address) return peer;
+      }
+      if (!DateTime.now().isBefore(deadline)) return null;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
   }
 
   /// Stops announcing and listening, leaving the peer list as it stands.

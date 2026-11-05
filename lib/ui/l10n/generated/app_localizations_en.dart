@@ -95,6 +95,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get refusalInvalidAddress => 'Enter an IP address.';
+
+  @override
+  String refusalDeviceNotReachable(String address) {
+    return 'No Device answered at $address.';
+  }
+
+  @override
   String get kindText => 'Text';
 
   @override
@@ -780,6 +788,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get manualAddressNote =>
       'Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.';
+
+  @override
+  String get connectByAddress => 'Connect by IP';
+
+  @override
+  String get connectByAddressTitle => 'Connect by IP';
+
+  @override
+  String get fieldIpAddress => 'IP address';
+
+  @override
+  String get connectByAddressNote =>
+      'The address is probed first. A Device already in this group connects directly; any other Device is paired automatically before the Session opens.';
 
   @override
   String get openConversation => 'Open conversation';

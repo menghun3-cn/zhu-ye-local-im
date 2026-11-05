@@ -230,6 +230,18 @@ abstract class AppLocalizations {
   /// **'No free name is left for \"{name}\" in that folder.'**
   String refusalNoFreeFileName(String name);
 
+  /// No description provided for @refusalInvalidAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an IP address.'**
+  String get refusalInvalidAddress;
+
+  /// No description provided for @refusalDeviceNotReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'No Device answered at {address}.'**
+  String refusalDeviceNotReachable(String address);
+
   /// No description provided for @kindText.
   ///
   /// In en, this message translates to:
@@ -1375,6 +1387,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.'**
   String get manualAddressNote;
+
+  /// No description provided for @connectByAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect by IP'**
+  String get connectByAddress;
+
+  /// No description provided for @connectByAddressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect by IP'**
+  String get connectByAddressTitle;
+
+  /// No description provided for @fieldIpAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'IP address'**
+  String get fieldIpAddress;
+
+  /// No description provided for @connectByAddressNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The address is probed first. A Device already in this group connects directly; any other Device is paired automatically before the Session opens.'**
+  String get connectByAddressNote;
 
   /// No description provided for @openConversation.
   ///
