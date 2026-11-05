@@ -92,6 +92,7 @@ final class LocalTransferController {
     this.keepAliveTimeout = defaultKeepAliveTimeout,
     this.wrapSocket,
     this.dialSocket,
+    this.pairingDialTransport,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -180,6 +181,13 @@ final class LocalTransferController {
   /// Only a test replaces it, and only to make a dial fail the way a dial
   /// fails while the network is down.
   final Future<Socket> Function(String host, int port)? dialSocket;
+
+  /// Dials a Pairing port, for the seam the same reason [dialSocket] exists.
+  ///
+  /// Only a test replaces it, and only to make an automatic Pairing dial fail
+  /// the way a peer whose inbound ports are unreachable fails.
+  final Future<ByteTransport> Function(String host, int port)?
+  pairingDialTransport;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -601,6 +609,7 @@ final class LocalTransferController {
     final pairing = PairingService(
       local: local,
       store: _store,
+      dialTransport: pairingDialTransport,
       onNotice: _notice,
     );
     _pairing = pairing;
@@ -1605,13 +1614,25 @@ final class LocalTransferController {
 
   /// Starts the one discovery handshake for a pair, when this side owns it.
   ///
-  /// Both Devices see the other and both run this method. Only the smaller
-  /// Fingerprint dials, so a fresh pair cannot create two random group secrets
-  /// at once. The other side accepts the request automatically.
+  /// Both Devices see the other and both run this method. The smaller
+  /// Fingerprint always dials, so a fresh pair cannot create two random group
+  /// secrets at once. A Device that already holds a group secret may also dial
+  /// when it is the larger Fingerprint, but only for a peer outside its roster:
+  /// open Pairing merges two different secrets deterministically, and the
+  /// roster it adopts is how an earlier member learns a later joiner when that
+  /// joiner's inbound ports are unreachable. A peer already in the roster is
+  /// left to the Session sweep and the smaller-Fingerprint rule, so the
+  /// post-Pairing window cannot turn into a second handshake. The other side
+  /// accepts the request automatically.
   bool _maybePairAutomatically(DiscoveredPeer peer) {
     final local = _local;
     if (local == null || _closed || _pairing == null) return false;
-    if (local.profile.self.compareTo(peer.fingerprint) >= 0) return false;
+    final secretHolderMayDial =
+        local.hasGroupSecret && !local.profile.group.contains(peer.fingerprint);
+    if (local.profile.self.compareTo(peer.fingerprint) >= 0 &&
+        !secretHolderMayDial) {
+      return false;
+    }
     if (peer.pairingPort == null) return false;
     if (!_autoPairing.add(peer.fingerprint.hex)) return false;
     final due = _autoPairDue[peer.fingerprint.hex];
@@ -2257,8 +2278,8 @@ final class LocalTransferController {
   Future<List<MessageRecord>> _fixImagePaths(
     List<MessageRecord> messages,
   ) async {
-    final incoming = _local?.profile.incomingDirectory ??
-        _defaultIncomingDirectory;
+    final incoming =
+        _local?.profile.incomingDirectory ?? _defaultIncomingDirectory;
     if (incoming == null) return messages;
 
     final directory = Directory(incoming);
