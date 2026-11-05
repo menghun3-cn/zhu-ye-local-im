@@ -9,13 +9,17 @@ import 'beacon.dart';
 import 'beacon_transport.dart';
 import 'peer_registry.dart';
 
-/// Finds the other Devices on the local link, and keeps finding them.
+/// Finds the other Devices on the local link — and on the private networks
+/// that link is joined to — and keeps finding them.
 ///
 /// The policy is small on purpose: announce on a schedule so others find this
 /// Device, probe once at start so this Device finds others without waiting out
 /// an announce period, answer a probe directly so the prober does not have to,
-/// and drop a peer that stops announcing. Everything else — the socket, the
-/// clock, the peer table — is behind a seam.
+/// and drop a peer that stops announcing. Broadcast stops at the routing
+/// boundary, so a second, unicast probe goes to every address a provider names
+/// — remembered peers, a tailnet directory — for the Devices broadcast cannot
+/// reach. Everything else — the socket, the clock, the peer table — is behind
+/// a seam.
 final class DiscoveryService {
   DiscoveryService({
     required this.transport,
@@ -24,6 +28,9 @@ final class DiscoveryService {
     this.announceInterval = const Duration(seconds: 3),
     this.sweepInterval = const Duration(seconds: 1),
     Duration peerTtl = const Duration(seconds: 10),
+    this.unicastTargets,
+    this.unicastProbeInterval = const Duration(seconds: 5),
+    this.maxUnicastTargets = 64,
     DateTime Function()? clock,
     Random? random,
   }) : _nonce = nonce ?? randomNonce(random),
@@ -56,12 +63,33 @@ final class DiscoveryService {
   /// How often peers that stopped announcing are dropped.
   final Duration sweepInterval;
 
+  /// The addresses worth probing directly, because broadcast cannot reach
+  /// them: remembered peers, tailnet members, anything a provider can name.
+  ///
+  /// Called once per [unicastProbeInterval]; the probe it returns is sent
+  /// to each address unicast, and an answer is recorded exactly like a
+  /// broadcast one — the peer's own announce names where it can be reached.
+  /// Null disables unicast probing entirely.
+  final Future<List<InternetAddress>> Function()? unicastTargets;
+
+  /// How often the unicast targets are probed.
+  ///
+  /// Deliberately shorter than the peer TTL: a peer heard only through these
+  /// probes would expire between rounds if the interval were longer, and the
+  /// datagrams are small enough that a five-second cadence costs nothing.
+  final Duration unicastProbeInterval;
+
+  /// The most unicast targets probed per round, so a very large directory
+  /// cannot turn discovery into a flood.
+  final int maxUnicastTargets;
+
   final String _nonce;
   final PeerRegistry _registry;
 
   StreamSubscription<BeaconDatagram>? _subscription;
   Timer? _announceTimer;
   Timer? _sweepTimer;
+  Timer? _unicastTimer;
   bool _running = false;
 
   /// The beacon bytes, re-encoded when the descriptor behind them changes.
@@ -111,6 +139,13 @@ final class DiscoveryService {
     probe();
     _announceTimer = Timer.periodic(announceInterval, (_) => announce());
     _sweepTimer = Timer.periodic(sweepInterval, (_) => _registry.expire());
+    if (unicastTargets != null) {
+      unawaited(_probeUnicastTargets());
+      _unicastTimer = Timer.periodic(
+        unicastProbeInterval,
+        (_) => unawaited(_probeUnicastTargets()),
+      );
+    }
   }
 
   /// Tells the link this Device is here, now.
@@ -138,13 +173,13 @@ final class DiscoveryService {
   }) async {
     if (!_running) return null;
     for (final peer in _registry.peers) {
-      if (peer.address.address == address.address) return peer;
+      if (_heardAt(peer, address)) return peer;
     }
     transport.send(_probeBytes, address: address, port: discoveryPort);
     final deadline = DateTime.now().add(timeout);
     while (true) {
       for (final peer in _registry.peers) {
-        if (peer.address.address == address.address) return peer;
+        if (_heardAt(peer, address)) return peer;
       }
       if (!DateTime.now().isBefore(deadline)) return null;
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -157,8 +192,10 @@ final class DiscoveryService {
     _running = false;
     _announceTimer?.cancel();
     _sweepTimer?.cancel();
+    _unicastTimer?.cancel();
     _announceTimer = null;
     _sweepTimer = null;
+    _unicastTimer = null;
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -168,6 +205,36 @@ final class DiscoveryService {
     await stop();
     await _registry.close();
   }
+
+  /// Sends the probe to every unicast target the provider names, once.
+  ///
+  /// A provider that fails is not a discovery failure: the broadcast path
+  /// carries on regardless, and the next round asks again. Targets are
+  /// deduplicated and capped so a large directory cannot turn one round
+  /// into a flood.
+  Future<void> _probeUnicastTargets() async {
+    final provider = unicastTargets;
+    if (!_running || provider == null) return;
+    final List<InternetAddress> targets;
+    try {
+      targets = await provider();
+    } on Object {
+      return;
+    }
+    final seen = <String>{};
+    var sent = 0;
+    for (final target in targets) {
+      if (sent >= maxUnicastTargets) break;
+      if (!seen.add(target.address)) continue;
+      transport.send(_probeBytes, address: target, port: discoveryPort);
+      sent++;
+    }
+  }
+
+  /// Whether [peer] has ever been heard at [address].
+  static bool _heardAt(DiscoveredPeer peer, InternetAddress address) => peer
+      .addresses
+      .any((sighting) => sighting.address.address == address.address);
 
   void _onDatagram(BeaconDatagram datagram) {
     final beacon = datagram.beacon;
