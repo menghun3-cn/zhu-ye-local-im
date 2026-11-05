@@ -190,7 +190,7 @@ void main() {
 
     await tester.tap(updateEntry(windowA));
     await settleRoute(tester);
-    // The rail entry navigates to My and increments installRequest
+    // The rail entry navigates to My and hands the install to the session
     expect(selectedSurface(tester, window: windowA), mySurface);
     // Now open the About card from My - the install has already started
     await openMyCard(tester, l10n.myCardAbout, window: windowA);

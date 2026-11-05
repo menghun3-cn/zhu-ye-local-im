@@ -11,7 +11,9 @@ import 'pages/conversations_page.dart';
 import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
+import 'update_check.dart';
 import 'update_notice.dart';
+import 'update_session.dart';
 import 'wechat/theme.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
@@ -113,23 +115,38 @@ class _HomeShellState extends State<HomeShell> {
   /// and come back.
   int _conversationArrivals = 1;
 
-  /// How many times the rail's update entry has been pressed.
+  /// The update this shell is carrying out, if any.
   ///
-  /// The entry is where a user presses "install the newer build", and the
-  /// About card (reachable from My) is where an install is carried out — see
-  /// [_mySurface]. A counter rather than a call, because the shell cannot
-  /// reach into a page that is built in the `IndexedStack` below: what travels
-  /// down is the count, and the card answers the change.
-  int _installRequests = 0;
+  /// Owned here rather than by the About card because the card is not always
+  /// built — My builds it only while its sub-page is open — and a download
+  /// that died with the page would be a download the user has to start over.
+  /// The shell is the one widget that outlives every surface, which is what
+  /// lets a fetch finish in the background and a finished package survive a
+  /// restart — see `update_session.dart`.
+  final UpdateInstallSession _installSession = UpdateInstallSession();
+
+  /// Whether the session reports work in flight, for the rail's lock.
+  bool _sessionBusy = false;
+
+  /// The notice currently being listened to for restore lookups.
+  UpdateNotice? _watchedUpdate;
 
   /// Whether an install is under way and the entry must go quiet.
   ///
   /// The shell cannot see into the About card, so the card reports the phases
-  /// that must pin the entry: a check while a download is in flight, all the
-  /// way through to the closing hand-over. The one moment it stays false is
-  /// between a successful download and the question: the entry is alive there
-  /// so that a second press can find the question the first press opened.
+  /// that must pin the entry: the update *check* the card runs on its own
+  /// button. The install's own phases are heard from [_installSession]
+  /// directly — a download or the closing hand-over locks the entry all the
+  /// way through, while the moment between a successful download and the
+  /// question stays unlocked so that a second press can find the question the
+  /// first press opened.
   bool _updateLocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _installSession.addListener(_syncSessionBusy);
+  }
 
   @override
   void didChangeDependencies() {
@@ -140,7 +157,38 @@ class _HomeShellState extends State<HomeShell> {
     _windowActivity ??= widget.seams.hostShell.windowActivity.listen(
       _setWindowActive,
     );
+    _watchUpdate(widget.update);
     _syncUnread();
+  }
+
+  /// Hears the session's busy edge for the rail's lock.
+  void _syncSessionBusy() {
+    final busy = _installSession.busy;
+    if (busy == _sessionBusy) return;
+    setState(() => _sessionBusy = busy);
+  }
+
+  /// Follows [update] for the answer a restore is looked up from.
+  ///
+  /// The notice is the app's one answer to "is there a newer build", asked
+  /// once as the application comes up and again on the interval the profile
+  /// names. Whenever it lands on a version, the session is asked whether a
+  /// download for it already finished on an earlier run — the package the
+  /// update folder keeps is what makes a restart cheap.
+  void _watchUpdate(UpdateNotice? update) {
+    if (identical(update, _watchedUpdate)) return;
+    _watchedUpdate?.removeListener(_restoreFetched);
+    _watchedUpdate = update;
+    update?.addListener(_restoreFetched);
+    _restoreFetched();
+  }
+
+  /// Asks the session to look for a finished download once the notice has an
+  /// answer worth restoring for.
+  void _restoreFetched() {
+    final answer = widget.update?.answer;
+    if (answer?.outcome != UpdateOutcome.available) return;
+    unawaited(_installSession.restore(answer!));
   }
 
   void _setWindowActive(bool active) {
@@ -164,9 +212,20 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   @override
+  void didUpdateWidget(HomeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.update, oldWidget.update)) {
+      _watchUpdate(widget.update);
+    }
+  }
+
+  @override
   void dispose() {
     unawaited(_changes?.cancel());
     unawaited(_windowActivity?.cancel());
+    _watchedUpdate?.removeListener(_restoreFetched);
+    _installSession.removeListener(_syncSessionBusy);
+    _installSession.dispose();
     super.dispose();
   }
 
@@ -183,27 +242,23 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  /// Brings the My surface forward and asks it to install what was found.
+  /// Brings the My surface forward and asks for the newer build to be
+  /// installed.
   ///
   /// What the rail's update entry does when it is pressed. It used to leave the
   /// application for a browser, which made a user who had just been told a newer
   /// build exists go and fetch it by hand — the one thing an entry pinned to the
   /// rail should save them. It installs instead: the answer the entry was drawn
-  /// from is *already here*, on the notice that found it, and the About card
-  /// (reachable from My) carries the whole of what an install does.
-  ///
-  /// The card is where the work happens rather than here, because the rail has
-  /// nowhere to put any of it: [WeChat.railWidth] pixels hold neither a
-  /// download's progress, nor the question an update asks before it closes this
-  /// program, nor the sentence an attempt ends in. So the shell switches to the
-  /// one surface that has all three and passes the count down; the card answers
-  /// the change, and a press that arrives while one is already under way is
-  /// dropped rather than queued — two downloads of one package is one too many.
+  /// from is *already here*, on the notice that found it, and the session is
+  /// where the download lives — so the fetch starts on the press rather than
+  /// waiting for the About card to be opened, and it keeps running if the user
+  /// looks at something else meanwhile. The card has the room for the
+  /// progress, the question before closing and the failure sentence, which is
+  /// why the shell still brings its surface forward.
   void _installUpdate() {
-    setState(() {
-      _index = _mySurface;
-      _installRequests++;
-    });
+    final answer = widget.update?.answer;
+    if (answer != null) unawaited(_installSession.install(answer));
+    setState(() => _index = _mySurface);
   }
 
   /// Reports that the update a press started has reached [busy].
@@ -246,7 +301,7 @@ class _HomeShellState extends State<HomeShell> {
       MyPage(
         seams: widget.seams,
         update: widget.update,
-        installRequest: _installRequests,
+        installSession: _installSession,
         onUpdateBusyChanged: _setUpdateLocked,
       ),
     ];
@@ -321,7 +376,7 @@ class _HomeShellState extends State<HomeShell> {
                     : _UpdateEntry(
                         version: version,
                         onInstall: _installUpdate,
-                        enabled: !_updateLocked,
+                        enabled: !_updateLocked && !_sessionBusy,
                       ),
               );
             },
