@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/nav_rail.dart';
@@ -163,11 +166,15 @@ void main() {
     expect(find.byType(ScriptedLinkOpener), findsNothing);
 
     // It hands the job to the My surface, which has the About card that has room
-    // for a download's progress and the question before closing.
+    // for a download's progress and the question before closing — and the card
+    // is already open, because the press was the request that opened it.
     expect(selectedSurface(tester, window: windowA), mySurface);
-    // Now open the About card from My - the install should have already started
-    await openMyCard(tester, l10n.myCardAbout, window: windowA);
-    await tester.pumpAndSettle();
+    expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
+    await pumpUntil(
+      tester,
+      () => installer.askedFor.isNotEmpty,
+      description: 'the rail press to reach the installer',
+    );
     expect(installer.askedFor.single.version, '0.1.7');
     await shutdown(tester, [device]);
   });
@@ -190,12 +197,10 @@ void main() {
 
     await tester.tap(updateEntry(windowA));
     await settleRoute(tester);
-    // The rail entry navigates to My and increments installRequest
+    // The rail entry navigates to My and opens the About card it hands the
+    // install to, so the question is already the one on screen.
     expect(selectedSurface(tester, window: windowA), mySurface);
-    // Now open the About card from My - the install has already started
-    await openMyCard(tester, l10n.myCardAbout, window: windowA);
-    await tester.pumpAndSettle();
-    // The dialog should already be showing the confirmation
+    expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
     await pumpUntil(
       tester,
       () => dialogIsOpen(windowA),
@@ -220,10 +225,52 @@ void main() {
 
   testWidgets('goes quiet while the install is in flight, and after a '
       'failure the same press is the retry', (tester) async {
-    // This test is temporarily skipped due to the My page architecture change.
-    // The core behavior (download disables entry, failure re-enables it) is
-    // still tested in about_page_test.dart.
-  }, skip: true);
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    final hold = Completer<UpdatePrepareResult>();
+    ScriptedUpdateInstaller.replace(
+      supported: true,
+      progress: const [
+        UpdateInstallProgress(
+          UpdateInstallStage.downloading,
+          received: 25,
+          total: 100,
+        ),
+      ],
+      hold: hold,
+    );
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
+
+    await tester.tap(updateEntry(windowA));
+    await settleRoute(tester);
+    await pumpUntil(
+      tester,
+      () => inRail(find.text(l10n.railUpdateRunning)).evaluate().isNotEmpty,
+      description: 'the rail entry to say the update is running',
+    );
+
+    // The rail has room for the state and one number, not the byte counts the
+    // About card is showing underneath it.
+    expect(inRail(find.text(l10n.railUpdatePercent(25))), findsOneWidget);
+    expect(inRail(find.text(l10n.railUpdate)), findsNothing);
+    final entry = updateEntry(windowA);
+    expect(entry, findsOneWidget);
+    expect(tester.widget<TextButton>(entry).onPressed, isNull);
+
+    hold.complete(
+      const UpdatePrepareResult.failed(UpdateInstallFailure.download),
+    );
+    await pumpUntil(
+      tester,
+      () => inRail(find.text(l10n.railUpdate)).evaluate().isNotEmpty,
+      description: 'the rail entry to come back as the retry',
+    );
+    expect(
+      tester.widget<TextButton>(updateEntry(windowA)).onPressed,
+      isNotNull,
+    );
+
+    await shutdown(tester, [device]);
+  });
 
   testWidgets('says so on the card when the install cannot happen', (
     tester,
@@ -240,11 +287,10 @@ void main() {
 
     await tester.tap(updateEntry(windowA));
     await settleRoute(tester);
-    // Verify we're on the My surface
+    // The press opens the About card itself, so the failure is already the
+    // thing on screen rather than something behind another tap.
     expect(selectedSurface(tester, window: windowA), mySurface);
-    // Open the About card from My to see the failure
-    await openMyCard(tester, l10n.myCardAbout, window: windowA);
-    await tester.pumpAndSettle();
+    expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
     await pumpUntil(
       tester,
       () => onPage(

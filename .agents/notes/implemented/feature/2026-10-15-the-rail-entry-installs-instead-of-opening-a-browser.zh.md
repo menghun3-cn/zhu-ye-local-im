@@ -39,22 +39,25 @@ Status: implemented
 
 **把 rail 上的更新按钮接到已有的安装流程上，安装过程放在 About 页面上。**
 
-shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index = _aboutSurface` 并自增；About 页
-通过 `didUpdateWidget` 观察计数的变化，用 `offeredUpdate`（应用启动时那次检查的答案）启动 `_install()`。
+shell 里保留 `_installRequests` 计数器；rail 按钮按下时 `_index = _mySurface` 并自增。`MyPage`
+有两条应答路径：About 卡片已经打开时，由它的 `didUpdateWidget` 用 `offeredUpdate`（应用启动时
+那次检查的答案）启动 `_install()`；卡片还没构建过时，`installOnOpen` 先打开 About 子页，再在
+同一个 `_install()` 里启动。后一条路见
+[左侧「更新」入口显示它正在做的事](../bug-fix/2026-11-05-the-rail-update-entry-shows-its-work.zh.md)。
 
-为什么把活儿放到 About 页而不是 rail 上自己做：rail 只有 72px 宽，放不下载进度条、放不下「关闭并更新？」
-这个确认框、也放不下失败时那句话。这三样 About 页全都有，而且就是同一个 `_install()`
-—— 第二次实现一遍是不可能的，两个实现之间必然漂移。
+为什么把活儿放到 About 页而不是 rail 上自己做：rail 只有 84px 宽，放不下载进度条、放不下
+「更新并重启？」这个确认框、也放不下失败时那句话。这三样 About 页全都有，而且就是同一个
+`_install()` —— 第二次实现一遍是不可能的，两个实现之间必然漂移。
 
-为什么 rail 按下去要切到 About 页：装的时候用户需要看见进度。不切过去的话，用户点在 rail 上、然后看到
-什么都没有发生（当前停在对话页或设备页），只会再点一次。
+为什么 rail 按下去要切表面：装的时候用户需要看见进度。不切过去的话，用户点在 rail 上、
+然后看到什么都没有发生（当前停在对话页或传输页），只会再点一次。
 
 `_UpdateEntry` 的 `url` 参数被删除，改成 `onInstall: VoidCallback` 回调：widget 在 rail 深处，
 没有道理让它知道 shell 的 `_index`。按钮的职责止于「用户说想装」，去哪是 shell 的决定。
 
 ## Alternatives considered
 
-**在 rail 上放一个进度指示器** —— 72px 只够放一个圆环，放不下百分比、放不下「正在校验」、
+**在 rail 上放一个进度指示器** —— 84px 只够放一个紧凑状态加一个百分比，放不下「正在校验」、
 放不下失败原因。失败时用户还得自己去 About 页看是什么原因，那不如一开始就在能说清楚的地方做。
 
 **弹一个对话框放进度** —— shell 需要自己管一个 dialog 的开与关，而且确认框（「关闭并更新？」）本来
@@ -64,7 +67,7 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 程序，一个不打招呼就消失的程序是不可接受的。而确认框在 About 页里，所以必然要经过它。
 
 **保留「打开下载页」作为备选按钮** —— About 页右侧的「打开下载页面」按钮一直在，哪里需要手动下载
-都还能去。rail 上 72px 放不下两个按钮。
+都还能去。rail 上 84px 放不下两个按钮。
 
 ### 顺手带上的第三条需求
 
@@ -107,9 +110,9 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 - 状态同步放在 `addPostFrameCallback` 里而不是 `_install()` 开头：rail 点击经由
   `didUpdateWidget` 到达 About 页，而那一次仍在 build 阶段，直接 `setState` 父级
   HomeShell 会触发 `setState() called during build`。
-- 下载完成后（`_prepared != null`）到确认框打开之间 `_busy` 为空，shell 不置灰：
-  这是为了让用户在确认框打开时再点 rail 的「更新」能命中正在等着的同一个确认框，
-  而不是静默丢弃。确认框确认后到进程结束前再次置灰。
+- busy 上报覆盖整个安装，包括确认框打开期间：`_install` 开始时 postframe 报
+  `true`，准备好安装包时并不撤回，所以 rail 在模态问题后面保持置灰；失败、取消
+  或交接返回时才报 `false`。
 - 文案：确认框标题/正文/按钮从「关闭并更新」改为「更新并重启」；按钮下方那段说明里
   的指引也同步改名。
 
@@ -122,9 +125,9 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 notice 的职责是「启动时问一次」的答案；更新动作是从 About 页发起的，通知本身并不感知下载。
 让 notice 兼任会把它变成一个四处都是的全局状态。
 
-**确认框打开期间也置灰** —— 会丢掉一次「再点一次 rail 入口打开同一个确认框」的机会；
-用户双击 rail 按钮时第二次点击不应成了空气。置灰的窗口期是「真正有工作在跑」的窗口期，
-不是「等待用户回答」的窗口期。
+**确认框打开期间让 rail 保持可点** —— 否：确认框是模态的，rail 本来也点不到；
+而安装仍由卡片持有，置灰才是诚实的状态。真正不能点的窗口期是「有工作在跑或问题
+在等答案」的整个窗口期。
 
 ### Consequences
 

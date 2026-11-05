@@ -5,6 +5,7 @@ import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
+import '../update_install.dart';
 import '../update_notice.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -128,6 +129,7 @@ class MyPage extends StatefulWidget {
     this.update,
     this.installRequest = 0,
     this.onUpdateBusyChanged,
+    this.onUpdateProgressChanged,
   });
 
   /// The platform facts a page needs but the controller does not carry.
@@ -153,6 +155,12 @@ class MyPage extends StatefulWidget {
   /// the closing hand-over is in flight a second press must not be possible.
   final ValueChanged<bool>? onUpdateBusyChanged;
 
+  /// What the shell's rail entry should draw while an update is in flight.
+  ///
+  /// Forwarded unchanged from the About card: the rail owns no update work of
+  /// its own, so it can only ever be a projection of what that card reports.
+  final ValueChanged<UpdateInstallProgress?>? onUpdateProgressChanged;
+
   @override
   State<MyPage> createState() => _MyPageState();
 }
@@ -163,21 +171,55 @@ class _MyPageState extends State<MyPage> {
 
   /// Whether an update is in flight.
   ///
-  /// Held here rather than in the notice the rail reads: the rail's entry is
-  /// about *asking*, and an update is something a person pressed a button on
-  /// the About card to start. This page passes the state to the About card.
+  /// Relayed rather than owned here: the About card is where the work happens,
+  /// and this page passes the state up to the rail that asked for it.
   bool _updateLocked = false;
+
+  /// Whether the About card now open was opened *for* an install request.
+  ///
+  /// The card only reads this once, when it is first built; it is cleared after
+  /// that first frame, so a later visit to the same card does not start the
+  /// download again.
+  bool _installOnOpen = false;
 
   /// Tells the rail whether an update is in flight, when there is a rail.
   void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
+
+  /// Tells the rail what the update is doing, when there is a rail.
+  void _reportProgress(UpdateInstallProgress? progress) =>
+      widget.onUpdateProgressChanged?.call(progress);
 
   /// Reports that the update a press started has reached [busy].
   ///
   /// This is called by the About card, which is where the actual work happens.
   void _setUpdateLocked(bool busy) {
+    if (busy) _installOnOpen = false;
     if (_updateLocked == busy) return;
     setState(() => _updateLocked = busy);
     _reportBusy(busy);
+  }
+
+  @override
+  void didUpdateWidget(MyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.installRequest == oldWidget.installRequest) return;
+    if (_currentSubPage == _SubPage.about) {
+      // The card is already there and sees the counter itself; telling it to
+      // install on open as well would be the same press counted twice.
+      _installOnOpen = false;
+      return;
+    }
+    _installOnOpen = true;
+    _currentSubPage = _SubPage.about;
+    // The flag is only for the card's first frame. Clearing it here rather than
+    // waiting for the install to report busy means a request that turns out not
+    // to start — no installable answer reached the card — cannot linger and
+    // start a later visit by itself.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _installOnOpen) {
+        setState(() => _installOnOpen = false);
+      }
+    });
   }
 
   /// Opens a sub-page.
@@ -281,7 +323,9 @@ class _MyPageState extends State<MyPage> {
             child: AboutPage(
               offeredUpdate: widget.update?.answer,
               installRequest: widget.installRequest,
+              installOnOpen: _installOnOpen,
               onUpdateBusyChanged: _setUpdateLocked,
+              onUpdateProgressChanged: _reportProgress,
             ),
           ),
         ],

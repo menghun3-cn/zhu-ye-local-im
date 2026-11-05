@@ -719,6 +719,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get railUpdate => '更新';
 
   @override
+  String get railUpdateRunning => '更新中';
+
+  @override
+  String railUpdatePercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get aliasHelper => '其他设备上显示的名称';
 
   @override

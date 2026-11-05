@@ -41,7 +41,9 @@ class AboutPage extends StatefulWidget {
     super.key,
     this.offeredUpdate,
     this.installRequest = 0,
+    this.installOnOpen = false,
     this.onUpdateBusyChanged,
+    this.onUpdateProgressChanged,
   });
 
   /// What the application's own update check found, when it was asked at all.
@@ -66,12 +68,27 @@ class AboutPage extends StatefulWidget {
   /// installs and a rebuild in between is not one.
   final int installRequest;
 
+  /// Whether this page's first frame should start the install it was opened for.
+  ///
+  /// The rail's entry can arrive before this card has ever been built. A
+  /// counter cannot be "seen" by a widget that did not exist for the previous
+  /// value, so the page that opens the card for that press says so once here;
+  /// every later press still travels as [installRequest].
+  final bool installOnOpen;
+
   /// What the shell's rail entry should hear about the phases of an update.
   ///
-  /// The rail has no room for a download's progress, so the one thing it needs
+  /// The rail has no room for the download's detail, so the one thing it needs
   /// from the card is whether its own entry may be pressed: while a download or
   /// the closing hand-over is in flight a second press must not be possible.
   final ValueChanged<bool>? onUpdateBusyChanged;
+
+  /// What the shell's rail entry should draw while an update is in flight.
+  ///
+  /// Null when nothing is being installed; a stage while it is. The rail turns
+  /// the download's byte counts into the one percentage it has room for, and
+  /// every other stage into the same "updating" state.
+  final ValueChanged<UpdateInstallProgress?>? onUpdateProgressChanged;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -113,14 +130,53 @@ class _AboutPageState extends State<AboutPage> {
   /// fetching it again would cost twenty megabytes for nothing.
   PreparedUpdate? _prepared;
 
+  /// Whether the question before closing is on screen.
+  ///
+  /// Separate from [_prepared]: a ready package is not work in flight once the
+  /// question has been answered, but while the question is open a second press
+  /// must not open a second one.
+  bool _confirmingUpdate = false;
+
+  /// The newest progress the rail has not been told about yet.
+  ///
+  /// Reports are coalesced to the end of the frame: an install can be started
+  /// from `didUpdateWidget`, where asking the parent to rebuild immediately
+  /// would be a `setState` during build, and a download reports once per
+  /// received chunk — more often than the rail's one percentage can change.
+  UpdateInstallProgress? _progressToReport;
+  bool _hasProgressToReport = false;
+  bool _progressReportScheduled = false;
+
   @override
   void initState() {
     super.initState();
     _leftOver = UpdateInstallResolution.installer.previousFailure();
+    if (widget.installOnOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_install(offered: widget.offeredUpdate));
+      });
+    }
   }
 
   /// Tells the rail whether an update is in flight, when there is a rail.
   void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
+
+  /// Tells the rail what the update is doing, at most once a frame.
+  void _reportProgress(UpdateInstallProgress? progress) {
+    if (widget.onUpdateProgressChanged == null) return;
+    _progressToReport = progress;
+    _hasProgressToReport = true;
+    if (_progressReportScheduled) return;
+    _progressReportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _progressReportScheduled = false;
+      if (!mounted || !_hasProgressToReport) return;
+      final latest = _progressToReport;
+      _progressToReport = null;
+      _hasProgressToReport = false;
+      widget.onUpdateProgressChanged?.call(latest);
+    });
+  }
 
   @override
   void didUpdateWidget(AboutPage oldWidget) {
@@ -189,7 +245,7 @@ class _AboutPageState extends State<AboutPage> {
     // The button is disabled as soon as the first progress state lands. Guard
     // the method itself as well so two entry points in one frame cannot start
     // two downloads before that disabled frame is drawn.
-    if (_busy) return;
+    if (_busy || _confirmingUpdate) return;
     final answer = offered ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) return;
     final installer = UpdateInstallResolution.installer;
@@ -203,10 +259,16 @@ class _AboutPageState extends State<AboutPage> {
         _leftOver = null;
         _progress = const UpdateInstallProgress(UpdateInstallStage.downloading);
       });
+      _reportProgress(
+        const UpdateInstallProgress(UpdateInstallStage.downloading),
+      );
       final staged = await installer.prepare(
         answer,
         onProgress: (progress) {
-          if (mounted) setState(() => _progress = progress);
+          if (mounted) {
+            setState(() => _progress = progress);
+            _reportProgress(progress);
+          }
         },
       );
       if (!mounted) return;
@@ -216,6 +278,7 @@ class _AboutPageState extends State<AboutPage> {
           _failure = staged.failure;
           _progress = null;
         });
+        _reportProgress(null);
         _reportBusy(false);
         return;
       }
@@ -226,10 +289,12 @@ class _AboutPageState extends State<AboutPage> {
         // happening.
         _progress = null;
       });
+      _reportProgress(null);
     }
     // The question. Everything the update still has to do ends this process,
     // and the user is the one who has to say so — the package is already in
     // place, so answering no costs nothing and changes nothing.
+    setState(() => _confirmingUpdate = true);
     final closing = await showDialog<bool>(
       context: context,
       builder: (_) => _ConfirmUpdateDialog(
@@ -238,27 +303,35 @@ class _AboutPageState extends State<AboutPage> {
       ),
     );
     if (!mounted) return;
+    setState(() {
+      _confirmingUpdate = false;
+      if (closing != true) _progress = null;
+    });
     if (closing != true) {
-      setState(() => _progress = null);
+      _reportProgress(null);
       _reportBusy(false);
       return;
     }
+    const handingOver = UpdateInstallProgress(UpdateInstallStage.handingOver);
+    const installing = UpdateInstallProgress(UpdateInstallStage.installing);
     setState(() {
       // The question is past: what is left closes this program, so the buttons
       // that opened the question have nothing left to say. Windows draws
       // nothing during the hand-over either — the new window is what the user
       // asked for, and the installer's own progress is silent too. Android
       // still hands itself to the system installer, whose progress is real.
-      if (!restarts) {
-        _progress = const UpdateInstallProgress(UpdateInstallStage.installing);
-      }
+      if (!restarts) _progress = installing;
     });
+    _reportProgress(restarts ? handingOver : installing);
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
     try {
       await installer.apply(
         prepared,
         onProgress: (progress) {
-          if (mounted) setState(() => _progress = progress);
+          if (mounted) {
+            setState(() => _progress = progress);
+            _reportProgress(progress);
+          }
         },
       );
     } on UpdateInstallException catch (error) {
@@ -267,6 +340,7 @@ class _AboutPageState extends State<AboutPage> {
         _failure = error.failure;
         _progress = null;
       });
+      _reportProgress(null);
       _reportBusy(false);
       return;
     } on Object {
@@ -275,6 +349,7 @@ class _AboutPageState extends State<AboutPage> {
         _failure = UpdateInstallFailure.installer;
         _progress = null;
       });
+      _reportProgress(null);
       _reportBusy(false);
       return;
     }
@@ -285,6 +360,7 @@ class _AboutPageState extends State<AboutPage> {
       // download.
       setState(() => _progress = null);
     }
+    _reportProgress(null);
     // A scripted installer returns without ending the process; the real one
     // never reaches here. Unlock only so a test that walks through the whole
     // flow does not leave the rail pinned behind it.
@@ -293,9 +369,11 @@ class _AboutPageState extends State<AboutPage> {
 
   /// Whether an install or its download is in flight.
   ///
-  /// This includes the time after download completes but before the user
-  /// answers the confirmation dialog, to prevent double-clicking the button.
-  bool get _installing => _progress != null || _prepared != null;
+  /// This includes the time the confirmation question is open, to prevent
+  /// double-clicking the button. A package that is ready but no longer being
+  /// asked about is not in flight: answering no leaves it in place, and the
+  /// same button is the way to ask about it again.
+  bool get _installing => _progress != null || _confirmingUpdate;
 
   /// What an update that is under way is doing, as a sentence.
   ///

@@ -11,6 +11,7 @@ import 'pages/conversations_page.dart';
 import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
+import 'update_install.dart';
 import 'update_notice.dart';
 import 'wechat/theme.dart';
 
@@ -125,11 +126,19 @@ class _HomeShellState extends State<HomeShell> {
   /// Whether an install is under way and the entry must go quiet.
   ///
   /// The shell cannot see into the About card, so the card reports the phases
-  /// that must pin the entry: a check while a download is in flight, all the
-  /// way through to the closing hand-over. The one moment it stays false is
-  /// between a successful download and the question: the entry is alive there
-  /// so that a second press can find the question the first press opened.
+  /// that must pin the entry: from the press until the attempt ends — failure,
+  /// cancellation, or the closing hand-over — a second press must not be able
+  /// to queue a second download. The question before closing sits inside that
+  /// window: it is modal, so the entry could not be pressed anyway, and a
+  /// disabled entry is the honest state for an install the card still owns.
   bool _updateLocked = false;
+
+  /// What the update in flight is doing, when the card has said.
+  ///
+  /// Null means the entry is not mid-update and draws its plain label. A
+  /// download's byte counts become the one percentage the rail has room for;
+  /// every other stage is the same "updating" state.
+  UpdateInstallProgress? _updateProgress;
 
   @override
   void didChangeDependencies() {
@@ -219,6 +228,15 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _updateLocked = busy);
   }
 
+  /// Reports what the update in flight is doing, for the entry's label.
+  ///
+  /// The card reports at most once a frame, so this is a projection rather
+  /// than a second source of truth: the rail draws the newest stage it was
+  /// told about and owns none of the work itself.
+  void _setUpdateProgress(UpdateInstallProgress? progress) {
+    setState(() => _updateProgress = progress);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -248,6 +266,7 @@ class _HomeShellState extends State<HomeShell> {
         update: widget.update,
         installRequest: _installRequests,
         onUpdateBusyChanged: _setUpdateLocked,
+        onUpdateProgressChanged: _setUpdateProgress,
       ),
     ];
     // The three surfaces, in the order both layouts show them. One list rather
@@ -322,6 +341,7 @@ class _HomeShellState extends State<HomeShell> {
                         version: version,
                         onInstall: _installUpdate,
                         enabled: !_updateLocked,
+                        progress: _updateProgress,
                       ),
               );
             },
@@ -386,10 +406,11 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// The rail's update entry: one word on the rail, the version on the hover.
+/// The rail's update entry: one state on the rail, the version on the hover.
 ///
-/// The rail has room for one word, so the version number — which is the whole
-/// reason the entry exists rather than a coloured dot — rides on the hover.
+/// The rail has room for one word — plus one percentage while a download's byte
+/// counts are known — so the version number, which is the whole reason the
+/// entry exists rather than a coloured dot, rides on the hover.
 /// That the version is the payload and not the label is why the tooltip is
 /// [AppLocalizations.aboutUpdateAvailable] rather than a sentence invented
 /// here: the About card already says exactly this fact, in exactly this shape,
@@ -405,6 +426,7 @@ class _UpdateEntry extends StatelessWidget {
     required this.version,
     required this.onInstall,
     required this.enabled,
+    this.progress,
   });
 
   /// The newer version, named on the hover.
@@ -422,10 +444,22 @@ class _UpdateEntry extends StatelessWidget {
   /// so a second press cannot queue a second download.
   final bool enabled;
 
+  /// What the update in flight is doing, or null when none is.
+  ///
+  /// The rail has room for one word and one number, so a download's byte
+  /// counts become a percentage and every other stage is the same updating
+  /// state.
+  final UpdateInstallProgress? progress;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
+    final updating = !enabled || progress != null;
+    final fraction = progress?.stage == UpdateInstallStage.downloading
+        ? progress?.fraction
+        : null;
+    final percent = fraction == null ? null : (fraction * 100).round();
     return Padding(
       // Room to breathe under the last destination: without it the entry sits
       // flush against the bottom edge of the window and reads as a tab that has
@@ -467,9 +501,14 @@ class _UpdateEntry extends StatelessWidget {
               const Icon(Icons.system_update_alt),
               const SizedBox(height: 2),
               Text(
-                l10n.railUpdate,
+                updating ? l10n.railUpdateRunning : l10n.railUpdate,
                 style: const TextStyle(fontSize: WeChat.fontSizeMeta),
               ),
+              if (percent != null)
+                Text(
+                  l10n.railUpdatePercent(percent),
+                  style: const TextStyle(fontSize: WeChat.fontSizeMeta),
+                ),
             ],
           ),
         ),
