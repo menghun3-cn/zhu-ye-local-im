@@ -93,6 +93,7 @@ final class LocalTransferController {
     this.wrapSocket,
     this.dialSocket,
     this.pairingDialTransport,
+    this.addressProbe,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -188,6 +189,14 @@ final class LocalTransferController {
   /// the way a peer whose inbound ports are unreachable fails.
   final Future<ByteTransport> Function(String host, int port)?
   pairingDialTransport;
+
+  /// Resolves the Device answering at an address a user typed.
+  ///
+  /// Only a test replaces it: production asks [DiscoveryService.probeHost],
+  /// which needs a live beacon transport a test link cannot always model —
+  /// especially one where two Devices are deliberately not on the same
+  /// broadcast domain.
+  final Future<DiscoveredPeer?> Function(String host)? addressProbe;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -888,6 +897,62 @@ final class LocalTransferController {
       throw AppStateException(AppRefusal.portNotAPort, '$target');
     }
     return manager.connect(host, target);
+  }
+
+  /// Connects to the Device at [address], pairing first when needed.
+  ///
+  /// This is the Conversations manual-IP path: the user typed where to look,
+  /// so the first step is a unicast Discovery probe rather than a blind dial.
+  /// The probe is still unauthenticated — it only learns which Fingerprint and
+  /// ports the Device claims — and the trust decision stays where it always
+  /// was: a Device already in the Owner Group is pinned by Fingerprint for the
+  /// Session dial, and a Device outside it has to complete the same
+  /// cryptographic Pairing as one found by broadcast.
+  ///
+  /// Throws [AppStateException] for a blank or non-IP [address], and when no
+  /// Device answers the probe; throws [HandshakeException] when the dial or
+  /// Pairing fails.
+  Future<ManagedSession> connectByAddress({required String address}) async {
+    final host = address.trim();
+    final ip = InternetAddress.tryParse(host);
+    if (host.isEmpty || ip == null) {
+      throw const AppStateException(AppRefusal.invalidAddress);
+    }
+    final peer = _peerAtAddress(host) ?? await _probeAddress(host);
+    if (peer == null) {
+      throw AppStateException(AppRefusal.deviceNotReachable, host);
+    }
+    _rememberDiscovered(peer);
+    final existing = _wired[peer.fingerprint.hex]?.session;
+    if (existing != null) return existing;
+
+    final local = _local;
+    final canSession =
+        local != null &&
+        local.hasGroupSecret &&
+        local.profile.group.contains(peer.fingerprint) &&
+        peer.sessionPort != null;
+    if (canSession) {
+      if (_manager == null) await _syncLayersInTurn();
+      return _requireManager().connect(
+        host,
+        peer.sessionPort!,
+        expectedFingerprint: peer.fingerprint,
+      );
+    }
+    if (peer.pairingPort == null) {
+      throw AppStateException(AppRefusal.deviceNotReachable, host);
+    }
+
+    final attempt = await pairWith(host: host, port: peer.pairingPort);
+    if (attempt.peer.fingerprint != peer.fingerprint) {
+      await attempt.cancel();
+      throw const PairingException(
+        'the Device that answered the probe is not the one that paired',
+      );
+    }
+    await _confirmPairing(attempt);
+    return connectAfterPairing(attempt.peer.fingerprint);
   }
 
   /// Sends [text] to a peer as a Transfer.
@@ -2189,6 +2254,33 @@ final class LocalTransferController {
       if (discovered.address.address == host) return discovered.pairingPort;
     }
     return null;
+  }
+
+  DiscoveredPeer? _peerAtAddress(String host) {
+    for (final discovered in _discovered) {
+      if (discovered.address.address == host) return discovered;
+    }
+    return null;
+  }
+
+  Future<DiscoveredPeer?> _probeAddress(String host) {
+    final probe = addressProbe;
+    if (probe != null) return probe(host);
+    final discovery = _discovery;
+    final ip = InternetAddress.tryParse(host);
+    if (discovery == null || ip == null) return Future.value(null);
+    return discovery.probeHost(ip);
+  }
+
+  /// Records a peer a unicast probe found, so the row and the post-Pairing
+  /// dial see the same address Discovery would have reported.
+  void _rememberDiscovered(DiscoveredPeer peer) {
+    final known = _discovered.any(
+      (candidate) => candidate.fingerprint == peer.fingerprint,
+    );
+    if (known) return;
+    _discovered = [..._discovered, peer];
+    _notify();
   }
 
   String _keyOf(LocalProfile local) =>

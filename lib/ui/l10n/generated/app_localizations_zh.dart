@@ -92,6 +92,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get refusalInvalidAddress => '请输入 IP 地址。';
+
+  @override
+  String refusalDeviceNotReachable(String address) {
+    return '在 $address 没有设备应答。';
+  }
+
+  @override
   String get kindText => '文本';
 
   @override
@@ -740,6 +748,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get manualAddressNote =>
       '事先并不知道这台设备的任何信息，因此要靠连接握手来证明它属于同一个设备组；属于其他设备组的会被拒绝。';
+
+  @override
+  String get connectByAddress => '按 IP 连接';
+
+  @override
+  String get connectByAddressTitle => '按 IP 连接';
+
+  @override
+  String get fieldIpAddress => 'IP 地址';
+
+  @override
+  String get connectByAddressNote =>
+      '会先向这个地址探测。已经在本设备组里的设备会直接连接；其他设备会先自动配对，再建立会话。';
 
   @override
   String get openConversation => '打开会话';

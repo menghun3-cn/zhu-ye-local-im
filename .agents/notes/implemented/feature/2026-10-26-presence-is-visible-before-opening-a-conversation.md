@@ -26,12 +26,12 @@ that note owns the removal and its rationale.
 A live Session wins over a dial that is still in progress; everything else
 without a Session is offline. Discovery alone does not make a peer online.
 
-Every conversation row carries a short label beside its title. Online is
+Every conversation row carries a short label in its trailing column. Online is
 "在线"; connecting is "连接中"; offline is "离线", with the last-seen time
 appended when one is known.
 
 The right-hand clock column now means only when the last message moved. An
-offline row already carries last-seen beside its name, so a row with no
+offline row already carries last-seen in the trailing column, so a row with no
 history leaves the clock blank rather than printing the same fact twice. A
 connected row with no history still uses `peer.lastSeen`, because nothing else
 on that row carries it. No periodic timer was added; relative times refresh

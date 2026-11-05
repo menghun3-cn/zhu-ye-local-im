@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:local_transfer/core/core.dart';
 import 'package:test/test.dart';
 
@@ -18,6 +21,50 @@ DiscoveryService _service(
   sweepInterval: sweep,
   peerTtl: ttl,
 );
+
+/// A transport that records the unicast probe and answers it on demand.
+final class _ProbeTransport implements BeaconTransport {
+  final StreamController<BeaconDatagram> _received =
+      StreamController<BeaconDatagram>();
+
+  List<int>? sent;
+  InternetAddress? sentTo;
+  int? sentPort;
+
+  @override
+  Stream<BeaconDatagram> get received => _received.stream;
+
+  @override
+  void send(
+    List<int> datagram, {
+    required InternetAddress address,
+    required int port,
+  }) {
+    sent = datagram;
+    sentTo = address;
+    sentPort = port;
+  }
+
+  void answer(DeviceDescriptor device, InternetAddress from) {
+    _received.add(
+      BeaconDatagram(
+        beacon: Beacon(
+          kind: BeaconKind.announce,
+          device: device,
+          nonce: '0123456789abcdef',
+        ),
+        address: from,
+        port: 41000,
+      ),
+    );
+  }
+
+  @override
+  void broadcast(List<int> datagram) {}
+
+  @override
+  Future<void> close() => _received.close();
+}
 
 void main() {
   group('DiscoveryService over a link', () {
@@ -213,6 +260,36 @@ void main() {
         await beta.close();
       },
     );
+
+    test('a unicast probe is answered by the Device at that address', () async {
+      final transport = _ProbeTransport();
+      final alpha = DiscoveryService(
+        transport: transport,
+        local: testDevice('alpha', listenPort: 51001),
+        announceInterval: const Duration(seconds: 30),
+        sweepInterval: const Duration(seconds: 30),
+      );
+      alpha.start();
+
+      final target = InternetAddress('192.0.2.10');
+      final answer = alpha.probeHost(
+        target,
+        timeout: const Duration(seconds: 2),
+      );
+      await until(
+        () => transport.sentPort == discoveryPort,
+        description: 'the unicast probe to be sent',
+      );
+      expect(transport.sentTo?.address, target.address);
+
+      transport.answer(testDevice('beta', listenPort: 51002), target);
+      final peer = await answer;
+      expect(peer?.device.alias, 'beta');
+      expect(peer?.address.address, target.address);
+      expect(peer?.sessionPort, 51002);
+
+      await alpha.close();
+    });
 
     test('start and stop are idempotent', () async {
       final hub = MemoryBeaconHub();

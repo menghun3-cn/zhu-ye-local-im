@@ -532,6 +532,12 @@ enum AppRefusal {
 
   /// Every candidate name in the destination folder is taken.
   noFreeFileName,
+
+  /// An address was given that is not an IP address.
+  invalidAddress,
+
+  /// No Device answered the unicast probe at the address given.
+  deviceNotReachable,
 }
 
 /// Raised when the app layer is asked for something its current state does not
