@@ -286,22 +286,19 @@ Finder _buttonShowing(Finder scope, String label) => find.descendant(
 
 /// Opens the card titled [label] on the My page.
 ///
-/// The My page shows four cards, each with a "View details" button. This helper
-/// taps that button to open the corresponding page as a route.
+/// The My page shows four cards, and the whole card is the button: tapping it
+/// swaps the card list for that surface's sub-page. The tap lands on the card
+/// itself rather than on a label inside it, so it keeps working however the
+/// card is dressed.
 Future<void> openMyCard(
   WidgetTester tester,
   String label, {
   required TestWindow window,
 }) async {
-  // Find the view details button that is in the same card as the title
-  final button = window.within(
+  final card = window.within(
     find.ancestor(of: find.text(label), matching: find.byType(Card)),
   );
-  final detailsButton = find.descendant(
-    of: button,
-    matching: find.text(l10n.myViewDetails),
-  );
-  await tester.tap(detailsButton);
+  await tester.tap(card);
   await settleRoute(tester);
 }
 

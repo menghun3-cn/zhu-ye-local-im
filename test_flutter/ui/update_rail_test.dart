@@ -142,6 +142,43 @@ void main() {
     await shutdown(tester, [device]);
   });
 
+  testWidgets('the About card shows the known update without asking again', (
+    tester,
+  ) async {
+    // The card's summary can say 「有新版本」; the page behind it used to answer
+    // that with 「检查更新」 — the same question asked a second time. It now
+    // shows the answer the startup check already produced.
+    final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+    ScriptedUpdateInstaller.replace(supported: true);
+    await pumpWindow(tester, device, update: await noticeSaying(newerBuild));
+
+    await openTab(tester, l10n.tabMy, window: windowA);
+    expect(
+      find.text(l10n.myCardAboutSummaryUpdate('0.1.7')),
+      findsOneWidget,
+      reason: 'the card summary names the newer version',
+    );
+
+    await openMyCard(tester, l10n.myCardAbout, window: windowA);
+    await tester.pumpAndSettle();
+
+    expect(
+      onPage(windowA, AboutPage, find.text(l10n.aboutUpdateAvailable('0.1.7'))),
+      findsOneWidget,
+    );
+    expect(
+      onPage(windowA, AboutPage, find.text(l10n.aboutUpdate)),
+      findsOneWidget,
+      reason: 'the known answer offers the install, not another question',
+    );
+    expect(
+      onPage(windowA, AboutPage, find.text(l10n.aboutCheckForUpdates)),
+      findsNothing,
+    );
+
+    await shutdown(tester, [device]);
+  });
+
   testWidgets('installs what it names when pressed, on the About surface', (
     tester,
   ) async {

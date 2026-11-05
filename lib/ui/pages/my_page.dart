@@ -5,6 +5,7 @@ import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
+import '../update_check.dart';
 import '../update_notice.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -161,6 +162,24 @@ class _MyPageState extends State<MyPage> {
   /// Which sub-page is currently shown, or null for the card list.
   _SubPage? _currentSubPage;
 
+  /// The install request the About card has not acknowledged yet, or null.
+  ///
+  /// The shell counts rail presses; this page is the one thing alive between
+  /// them and the card — the card itself only exists while its sub-page is
+  /// open, so a press that arrives with the card list showing would otherwise
+  /// meet nothing and be lost. Held here until [AboutPage.onInstallRequestHandled]
+  /// reports the card has the job, including the case where the card is only
+  /// opened afterwards: a nonzero value handed down is by definition a request
+  /// still waiting to be answered.
+  int? _pendingInstallRequest;
+
+  @override
+  void didUpdateWidget(MyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.installRequest == oldWidget.installRequest) return;
+    _pendingInstallRequest = widget.installRequest;
+  }
+
   /// Whether an update is in flight.
   ///
   /// Held here rather than in the notice the rail reads: the rail's entry is
@@ -232,15 +251,27 @@ class _MyPageState extends State<MyPage> {
           onTap: () => _openSubPage(_SubPage.settings),
         ),
         const SizedBox(height: WeChat.sectionGap),
-        _MyCard(
-          icon: Icons.announcement,
-          title: l10n.myCardAbout,
-          summary: _aboutSummary(widget.update, l10n),
-          onTap: () => _openSubPage(_SubPage.about),
-        ),
+        // The About card is the one whose summary can change without anything
+        // on this page happening: the notice answers once as the application
+        // comes up, and again on the interval the profile names. Listening here
+        // is what keeps 「有新版本」 from waiting for an unrelated rebuild.
+        widget.update == null
+            ? _aboutCard(null, l10n)
+            : ListenableBuilder(
+                listenable: widget.update!,
+                builder: (context, _) => _aboutCard(widget.update, l10n),
+              ),
       ],
     );
   }
+
+  /// The About card, summarising [update] — the notice, or null for none.
+  Widget _aboutCard(UpdateNotice? update, AppLocalizations l10n) => _MyCard(
+    icon: Icons.announcement,
+    title: l10n.myCardAbout,
+    summary: _aboutSummary(update, l10n),
+    onTap: () => _openSubPage(_SubPage.about),
+  );
 
   /// Builds the content for the currently selected sub-page.
   Widget _buildSubPage(
@@ -277,19 +308,46 @@ class _MyPageState extends State<MyPage> {
       _SubPage.about => Column(
         children: [
           _SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
-          Expanded(
-            child: AboutPage(
-              offeredUpdate: widget.update?.answer,
-              installRequest: widget.installRequest,
-              onUpdateBusyChanged: _setUpdateLocked,
-            ),
-          ),
+          Expanded(child: _aboutPage()),
         ],
       ),
       _ => const SizedBox.shrink(),
     };
     return page;
   }
+
+  /// The About card, rebuilt when the notice's answer changes.
+  ///
+  /// The page mirrors [UpdateNotice.answer] — see `AboutPage.offeredUpdate` —
+  /// so it has to be handed each new answer as it lands, not only the one that
+  /// happened to be there when the sub-page opened. Without the listener a
+  /// check that finishes while the page is open would leave the card showing
+  /// 「检查更新」 over an answer the rail is already acting on.
+  Widget _aboutPage() {
+    final update = widget.update;
+    if (update == null) return _aboutPageWith(null);
+    return ListenableBuilder(
+      listenable: update,
+      builder: (context, _) => _aboutPageWith(update.answer),
+    );
+  }
+
+  /// The About page itself, showing [offered] as the application's answer.
+  ///
+  /// [installRequest] is nonzero only while a rail press is still waiting for
+  /// the card to answer it — see [_pendingInstallRequest] — so a card mounted
+  /// for the first time can tell a request that is still owed from one that
+  /// was already carried out by a card that has since gone away.
+  Widget _aboutPageWith(UpdateCheck? offered) => AboutPage(
+    offeredUpdate: offered,
+    installRequest: _pendingInstallRequest ?? 0,
+    onInstallRequestHandled: (request) {
+      if (_pendingInstallRequest == request) {
+        setState(() => _pendingInstallRequest = null);
+      }
+    },
+    onUpdateBusyChanged: _setUpdateLocked,
+  );
 
   String _aboutSummary(UpdateNotice? update, AppLocalizations l10n) {
     if (update == null) return l10n.myCardAboutSummary(appVersion);

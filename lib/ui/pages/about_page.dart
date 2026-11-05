@@ -27,6 +27,12 @@ import '../widgets.dart';
 /// deliberate request per run into one per visit, and a visit is not something a
 /// person thinks of as reaching outwards.
 ///
+/// Showing the answer that check already produced is not asking, so the card
+/// mirrors [AboutPage.offeredUpdate] until it has an answer of its own: the
+/// My card's summary can say 「有新版本」 while the page behind it still says
+/// 「检查更新」, and a user who follows that card to find out what the new
+/// version is should not have to ask the same question a second time.
+///
 /// The page also offers to install what the question turns up — see
 /// `update_install.dart` for what that does to the folder this build runs from,
 /// and note that the offer is left out entirely on a platform that cannot:
@@ -41,6 +47,7 @@ class AboutPage extends StatefulWidget {
     super.key,
     this.offeredUpdate,
     this.installRequest = 0,
+    this.onInstallRequestHandled,
     this.onUpdateBusyChanged,
   });
 
@@ -48,10 +55,10 @@ class AboutPage extends StatefulWidget {
   ///
   /// Handed down by the shell from the notice it already holds — see
   /// `UpdateNotice`, which is asked once as the application comes up — so that
+  /// the card can show the same answer the My card's summary does, and so that
   /// the rail's update entry can start an install on a card that has not been
-  /// opened and asked first. It is *not* shown for that reason alone: the
-  /// answer is adopted only when a request arrives, which is what keeps this
-  /// card saying nothing until somebody asks it something.
+  /// opened and asked first. Showing it asks nothing: the question was already
+  /// asked, once, by the application.
   final UpdateCheck? offeredUpdate;
 
   /// How many times the user has asked for the newer build to be installed.
@@ -64,7 +71,24 @@ class AboutPage extends StatefulWidget {
   ///
   /// A counter rather than a pending flag, so that two presses are two
   /// installs and a rebuild in between is not one.
+  ///
+  /// What arrives here is not the shell's raw count but the *pending* one the
+  /// My page hands down: nonzero only while a press is still owed an answer,
+  /// and back to zero once [onInstallRequestHandled] has been called. That is
+  /// what lets a card mounted after the press — the sub-page was not open when
+  /// it arrived — tell the request apart from one a previous card already
+  /// carried out.
   final int installRequest;
+
+  /// Told which [installRequest] this card has taken, once it has seen it.
+  ///
+  /// Called for every request the card answers — including one it drops
+  /// because an install or a check is already under way — so the page above
+  /// can stop offering it. Reported after the frame rather than inside
+  /// `didUpdateWidget`, for the same reason [_reportBusy] is: the press
+  /// arrives during a build, and marking the parent dirty from inside it is
+  /// not allowed.
+  final ValueChanged<int>? onInstallRequestHandled;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
@@ -78,8 +102,19 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  /// The last answer, or null while none has been asked for.
+  /// The answer on screen, or null while none has been adopted or asked for.
   UpdateCheck? _answer;
+
+  /// Whether [_answer] is still the notice's answer being mirrored rather than
+  /// one this page asked for itself.
+  ///
+  /// While it is, a newer answer the notice brings — the hourly re-check, say —
+  /// replaces what is on screen, so the version this card offers to install is
+  /// the version the rail's entry would install. The page's own check or an
+  /// install ends the mirroring: after that its answer is the fresher fact, and
+  /// a notice answer arriving later must not rewrite what a download is
+  /// already running against.
+  bool _mirroring = false;
 
   /// Whether a question is out. The button is inert while it is, because a
   /// second press would only ask the same thing again.
@@ -117,6 +152,55 @@ class _AboutPageState extends State<AboutPage> {
   void initState() {
     super.initState();
     _leftOver = UpdateInstallResolution.installer.previousFailure();
+    _adoptOffered();
+    // A request that arrived while this card was not on screen is still owed:
+    // the page above only hands down a count that is waiting to be answered,
+    // so a nonzero one here is a press this card has never seen. Answered on
+    // the next frame rather than here, because both the acknowledgement and
+    // the install it starts mark widgets that are mid-build.
+    if (widget.installRequest > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onInstallRequestHandled?.call(widget.installRequest);
+        unawaited(_install(offered: widget.offeredUpdate ?? _answer));
+      });
+    }
+  }
+
+  /// Puts the application's own answer on screen while the page has none of
+  /// its own, or mirrors a newer one while it is still mirroring.
+  ///
+  /// Called from `initState` and `didUpdateWidget`, which cover the two ways
+  /// [AboutPage.offeredUpdate] can change: the page being built after the
+  /// notice already answered, and the notice answering — or answering again —
+  /// while the page is open. It assigns rather than calling `setState`: both
+  /// call sites run inside a build, and the build that follows reads the new
+  /// answer directly.
+  ///
+  /// Nothing is asked here — the notice's checker already asked, once, as the
+  /// application came up. What is adopted is its *answer*, which is the same
+  /// question this card's button would put to the same checker.
+  void _adoptOffered() {
+    // A question out or a download in flight owns the screen until it lands:
+    // rewriting the answer under it would describe a version the work in
+    // progress is not carrying out.
+    if (_asking || _progress != null) return;
+    final offered = widget.offeredUpdate;
+    if (offered == null) return;
+    if (_answer != null && (!_mirroring || identical(offered, _answer))) {
+      return;
+    }
+    final previous = _answer;
+    _answer = offered;
+    _mirroring = true;
+    // A different version makes a fetched package the wrong one — litter with
+    // a download in it, the same invalidation `_check` makes. The same version
+    // named again keeps it: the hourly re-check hands a new [UpdateCheck] for
+    // the same release, and throwing away twenty megabytes for that would make
+    // "answer no, then yes later" pay for the fetch twice.
+    if (_prepared != null && offered.version != previous?.version) {
+      _prepared = null;
+    }
   }
 
   /// Tells the rail whether an update is in flight, when there is a rail.
@@ -125,11 +209,21 @@ class _AboutPageState extends State<AboutPage> {
   @override
   void didUpdateWidget(AboutPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _adoptOffered();
     // The rail's entry was pressed. The answer it was drawn from is adopted
     // first: the card may never have been asked, and an install needs a
-    // version to fetch.
+    // version to fetch. Only an *increase* is a press: the page above returns
+    // the count to zero once the request is acknowledged, and that drop is the
+    // acknowledgement landing, not a second press.
     final installRequest = widget.installRequest;
-    if (installRequest == oldWidget.installRequest) return;
+    if (installRequest <= oldWidget.installRequest) return;
+    // Seen is answered, whatever becomes of it: a press dropped below because
+    // a download is already running must not stay pending for the next card
+    // to find.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onInstallRequestHandled?.call(installRequest);
+    });
     // While a download is in flight or the page is asking GitHub, a second
     // press is only the same request again, so it is dropped rather than
     // queued twice. Once the package is ready, `_busy` is null again and a
@@ -155,6 +249,9 @@ class _AboutPageState extends State<AboutPage> {
     if (!mounted) return;
     setState(() {
       _answer = answer;
+      // This page asked, so its answer is now the fresher fact and the notice
+      // stops being mirrored.
+      _mirroring = false;
       _asking = false;
       // A fresh question invalidates anything a previous one readied: the
       // version it named may not be the one on offer now, and a package for a

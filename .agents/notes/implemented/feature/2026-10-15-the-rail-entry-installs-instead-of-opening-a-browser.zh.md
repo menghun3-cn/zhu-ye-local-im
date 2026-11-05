@@ -143,6 +143,16 @@ notice 的职责是「启动时问一次」的答案；更新动作是从 About 
 - `flutter analyze`：无问题
 - `dart test`：574 通过
 
+## 后续：「我的」页合并后按压可能丢失，改为待确认计数（2026-11-05）
+
+「我的」页把四个低频页面收进子页面之后，About 卡片只在其子页面打开期间存在，
+rail 按压到达时若卡片列表正在显示，`didUpdateWidget` 无从观察计数变化，请求被
+静默丢弃。现在 `MyPage` 把未确认的按压记为 `_pendingInstallRequest`，只在
+未被 `AboutPage.onInstallRequestHandled` 回执期间以非零 `installRequest` 传给
+卡片；卡片在 `initState`（按压后才打开的情形）或 `didUpdateWidget`（卡片已开着的
+情形）应答，计数归零即回执落地。细节见
+[关于卡片展示应用已知的答案](../bug-fix/2026-11-05-the-about-card-shows-the-answer-the-app-already-has.zh.md)。
+
 ## Consequences
 
 - `lib/ui/home_shell.dart`：rail 更新按钮改为安装；新增 `_installUpdate()`；About 页接两个新参数；

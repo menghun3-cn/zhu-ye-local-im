@@ -36,7 +36,12 @@ void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
   /// Shows the page in the theme and language the app uses.
-  Future<void> show(WidgetTester tester) async {
+  ///
+  /// [offeredUpdate] is the application's own answer, handed down the way the
+  /// My page hands it: pumping the page again with a different one is how a
+  /// test says the notice answered — or answered again — while the page was
+  /// open.
+  Future<void> show(WidgetTester tester, {UpdateCheck? offeredUpdate}) async {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -44,7 +49,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: appLocales,
         theme: WeChat.theme(WeChatColors.light),
-        home: const Scaffold(body: AboutPage()),
+        home: Scaffold(body: AboutPage(offeredUpdate: offeredUpdate)),
       ),
     );
     await tester.pumpAndSettle();
@@ -129,6 +134,62 @@ void main() {
     // Nothing has been asked, so nothing is claimed either way.
     expect(find.text(l10n.aboutUpToDate), findsNothing);
     expect(find.text(l10n.aboutUnreachable), findsNothing);
+  });
+
+  testWidgets('shows the answer the application already has, without asking '
+      'again', (tester) async {
+    // The My card's summary can say there is a newer version; the page behind
+    // it must not answer 「检查更新」 to a question the startup check already
+    // answered. Showing that answer asks nothing.
+    final checker = ScriptedUpdateChecker.install(available);
+    ScriptedUpdateInstaller.replace(supported: true);
+    await show(tester, offeredUpdate: available);
+
+    expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
+    expect(find.text(l10n.aboutCheckForUpdates), findsNothing);
+    expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
+    expect(
+      checker.asked,
+      0,
+      reason: 'showing a known answer must not reach outside the network',
+    );
+  });
+
+  testWidgets('adopts an answer that arrives after the page opened', (
+    tester,
+  ) async {
+    // The startup check was still out when the page opened, so the card had
+    // nothing to show. When the answer lands the card shows it rather than
+    // still offering to ask the same question.
+    final checker = ScriptedUpdateChecker.install(
+      const UpdateCheck(UpdateOutcome.upToDate),
+    );
+    ScriptedUpdateInstaller.replace(supported: true);
+    await show(tester);
+    expect(find.text(l10n.aboutCheckForUpdates), findsOneWidget);
+
+    await show(tester, offeredUpdate: available);
+
+    expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsOneWidget);
+    expect(find.text(l10n.aboutUpdate), findsOneWidget);
+    expect(checker.asked, 0);
+  });
+
+  testWidgets('keeps the answer it asked for when the notice offers another', (
+    tester,
+  ) async {
+    // Once this page has asked, its answer is the fresher fact: a notice answer
+    // arriving afterwards must not rewrite what is on screen.
+    ScriptedUpdateChecker.install(const UpdateCheck(UpdateOutcome.upToDate));
+    await show(tester);
+    await press(tester, l10n.aboutCheckForUpdates);
+    expect(find.text(l10n.aboutUpToDate), findsOneWidget);
+
+    await show(tester, offeredUpdate: available);
+
+    expect(find.text(l10n.aboutUpToDate), findsOneWidget);
+    expect(find.text(l10n.aboutUpdateAvailable('9.9.9')), findsNothing);
   });
 
   testWidgets('asks only when the button is pressed', (tester) async {
