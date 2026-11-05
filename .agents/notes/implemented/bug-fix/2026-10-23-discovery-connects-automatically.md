@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-10-23-discovery-connects-automatically.zh.md)
 
+> **Superseded in part** by
+> [A secret holder may open Pairing as the larger Fingerprint](2026-11-05-secret-holder-may-open-pairing.md):
+> Fingerprint ordering still chooses the initiator for a fresh pair, but a
+> Device that already holds a group secret may also dial.
+
 ## Problem
 
 The `v0.1.16` interface still required a person to start Pairing and another
@@ -33,9 +38,12 @@ text, images, files and emoji as soon as the automatic exchange finishes.
   exchange automatically. A peer already in the group but temporarily
   advertising no Session listener does the same, which also restores a profile
   that retained its roster but lost its group secret.
-* Only the Device with the smaller Fingerprint initiates automatic Pairing.
-  Both sides can compute that ordering from facts they already hold, so a fresh
-  pair never creates two unrelated group secrets at once.
+* A fresh pair still has only the Device with the smaller Fingerprint initiate
+  automatic Pairing. A Device that already holds a group secret may initiate
+  even when it is the larger Fingerprint for a peer outside its roster, which
+  lets an earlier member reach a
+  later joiner whose inbound ports are unreachable; see
+  [A secret holder may open Pairing as the larger Fingerprint](2026-11-05-secret-holder-may-open-pairing.md).
 * The receiving controller admits and confirms every valid discovery request.
   `PairingRequest` and `PairingAttempt` remain the protocol seams; the
   application layer no longer forwards requests to a screen.

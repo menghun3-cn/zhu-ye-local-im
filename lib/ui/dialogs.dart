@@ -35,6 +35,15 @@ Future<void> showManualAddressDialog(
   builder: (_) => _ManualAddressDialog(controller: controller),
 );
 
+/// Asks for the IP address of a Device to connect to, pairing if needed.
+Future<void> showConnectByAddressDialog(
+  BuildContext context,
+  LocalTransferController controller,
+) => showDialog<void>(
+  context: context,
+  builder: (_) => _ConnectByAddressDialog(controller: controller),
+);
+
 /// Asks for the path of a file to send to [name], the Device at [to].
 ///
 /// An address rather than a [PeerView] because a conversation is opened with a
@@ -269,6 +278,88 @@ class _ManualAddressDialogState extends State<_ManualAddressDialog> {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(l10n.manualAddressNote),
+          ),
+          _ErrorLine(_failure),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : () => unawaited(_connect()),
+          child: Text(l10n.connect),
+        ),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------- connect by IP
+
+class _ConnectByAddressDialog extends StatefulWidget {
+  const _ConnectByAddressDialog({required this.controller});
+
+  final LocalTransferController controller;
+
+  @override
+  State<_ConnectByAddressDialog> createState() =>
+      _ConnectByAddressDialogState();
+}
+
+class _ConnectByAddressDialogState extends State<_ConnectByAddressDialog> {
+  final TextEditingController _address = TextEditingController();
+  Object? _failure;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _address.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    setState(() {
+      _busy = true;
+      _failure = null;
+    });
+    try {
+      await widget.controller.connectByAddress(address: _address.text);
+      if (mounted) Navigator.of(context).pop();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _failure = error;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.connectByAddressTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _address,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: l10n.fieldIpAddress,
+              helperText: l10n.addressHelper,
+            ),
+            keyboardType: TextInputType.url,
+            onSubmitted: (_) {
+              if (!_busy) unawaited(_connect());
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(l10n.connectByAddressNote),
           ),
           _ErrorLine(_failure),
         ],

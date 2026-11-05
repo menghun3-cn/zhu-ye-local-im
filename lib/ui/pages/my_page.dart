@@ -14,19 +14,11 @@ import 'devices_page.dart';
 import 'settings_page.dart';
 
 /// Which sub-page is shown.
-enum _SubPage {
-  devices,
-  clipboard,
-  settings,
-  about,
-}
+enum _SubPage { devices, clipboard, settings, about }
 
 /// The header shown above each sub-page, with a back button.
 class _SubPageHeader extends StatelessWidget {
-  const _SubPageHeader({
-    required this.title,
-    required this.onBack,
-  });
+  const _SubPageHeader({required this.title, required this.onBack});
 
   final String title;
   final VoidCallback onBack;
@@ -35,18 +27,10 @@ class _SubPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: colors.pageBackground,
-        border: Border(
-          bottom: BorderSide(
-            color: colors.divider,
-            width: 1,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
       ),
       child: Row(
         children: [
@@ -267,55 +251,41 @@ class _MyPageState extends State<MyPage> {
   ) {
     final page = switch (_currentSubPage) {
       _SubPage.devices => Column(
-          children: [
-            _SubPageHeader(
-              title: l10n.tabDevices,
-              onBack: _closeSubPage,
+        children: [
+          _SubPageHeader(title: l10n.tabDevices, onBack: _closeSubPage),
+          Expanded(
+            child: DevicesPage(
+              defaultIncomingDirectory: incoming,
+              localAddresses: widget.seams.localAddresses,
+              onConversationRequested: (_) {},
             ),
-            Expanded(
-              child: DevicesPage(
-                defaultIncomingDirectory: incoming,
-                localAddresses: widget.seams.localAddresses,
-                onConversationRequested: (_) {},
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
       _SubPage.clipboard => Column(
-          children: [
-            _SubPageHeader(
-              title: l10n.tabClipboard,
-              onBack: _closeSubPage,
-            ),
-            const Expanded(child: ClipboardPage()),
-          ],
-        ),
+        children: [
+          _SubPageHeader(title: l10n.tabClipboard, onBack: _closeSubPage),
+          const Expanded(child: ClipboardPage()),
+        ],
+      ),
       _SubPage.settings => Column(
-          children: [
-            _SubPageHeader(
-              title: l10n.tabSettings,
-              onBack: _closeSubPage,
-            ),
-            Expanded(
-              child: SettingsPage(seams: widget.seams),
-            ),
-          ],
-        ),
+        children: [
+          _SubPageHeader(title: l10n.tabSettings, onBack: _closeSubPage),
+          Expanded(child: SettingsPage(seams: widget.seams)),
+        ],
+      ),
       _SubPage.about => Column(
-          children: [
-            _SubPageHeader(
-              title: l10n.tabAbout,
-              onBack: _closeSubPage,
+        children: [
+          _SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
+          Expanded(
+            child: AboutPage(
+              offeredUpdate: widget.update?.answer,
+              installRequest: widget.installRequest,
+              onUpdateBusyChanged: _setUpdateLocked,
             ),
-            Expanded(
-              child: AboutPage(
-                offeredUpdate: widget.update?.answer,
-                installRequest: widget.installRequest,
-                onUpdateBusyChanged: _setUpdateLocked,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
       _ => const SizedBox.shrink(),
     };
     return page;

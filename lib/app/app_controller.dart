@@ -92,6 +92,8 @@ final class LocalTransferController {
     this.keepAliveTimeout = defaultKeepAliveTimeout,
     this.wrapSocket,
     this.dialSocket,
+    this.pairingDialTransport,
+    this.addressProbe,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -180,6 +182,21 @@ final class LocalTransferController {
   /// Only a test replaces it, and only to make a dial fail the way a dial
   /// fails while the network is down.
   final Future<Socket> Function(String host, int port)? dialSocket;
+
+  /// Dials a Pairing port, for the seam the same reason [dialSocket] exists.
+  ///
+  /// Only a test replaces it, and only to make an automatic Pairing dial fail
+  /// the way a peer whose inbound ports are unreachable fails.
+  final Future<ByteTransport> Function(String host, int port)?
+  pairingDialTransport;
+
+  /// Resolves the Device answering at an address a user typed.
+  ///
+  /// Only a test replaces it: production asks [DiscoveryService.probeHost],
+  /// which needs a live beacon transport a test link cannot always model —
+  /// especially one where two Devices are deliberately not on the same
+  /// broadcast domain.
+  final Future<DiscoveredPeer?> Function(String host)? addressProbe;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -601,6 +618,7 @@ final class LocalTransferController {
     final pairing = PairingService(
       local: local,
       store: _store,
+      dialTransport: pairingDialTransport,
       onNotice: _notice,
     );
     _pairing = pairing;
@@ -879,6 +897,62 @@ final class LocalTransferController {
       throw AppStateException(AppRefusal.portNotAPort, '$target');
     }
     return manager.connect(host, target);
+  }
+
+  /// Connects to the Device at [address], pairing first when needed.
+  ///
+  /// This is the Conversations manual-IP path: the user typed where to look,
+  /// so the first step is a unicast Discovery probe rather than a blind dial.
+  /// The probe is still unauthenticated — it only learns which Fingerprint and
+  /// ports the Device claims — and the trust decision stays where it always
+  /// was: a Device already in the Owner Group is pinned by Fingerprint for the
+  /// Session dial, and a Device outside it has to complete the same
+  /// cryptographic Pairing as one found by broadcast.
+  ///
+  /// Throws [AppStateException] for a blank or non-IP [address], and when no
+  /// Device answers the probe; throws [HandshakeException] when the dial or
+  /// Pairing fails.
+  Future<ManagedSession> connectByAddress({required String address}) async {
+    final host = address.trim();
+    final ip = InternetAddress.tryParse(host);
+    if (host.isEmpty || ip == null) {
+      throw const AppStateException(AppRefusal.invalidAddress);
+    }
+    final peer = _peerAtAddress(host) ?? await _probeAddress(host);
+    if (peer == null) {
+      throw AppStateException(AppRefusal.deviceNotReachable, host);
+    }
+    _rememberDiscovered(peer);
+    final existing = _wired[peer.fingerprint.hex]?.session;
+    if (existing != null) return existing;
+
+    final local = _local;
+    final canSession =
+        local != null &&
+        local.hasGroupSecret &&
+        local.profile.group.contains(peer.fingerprint) &&
+        peer.sessionPort != null;
+    if (canSession) {
+      if (_manager == null) await _syncLayersInTurn();
+      return _requireManager().connect(
+        host,
+        peer.sessionPort!,
+        expectedFingerprint: peer.fingerprint,
+      );
+    }
+    if (peer.pairingPort == null) {
+      throw AppStateException(AppRefusal.deviceNotReachable, host);
+    }
+
+    final attempt = await pairWith(host: host, port: peer.pairingPort);
+    if (attempt.peer.fingerprint != peer.fingerprint) {
+      await attempt.cancel();
+      throw const PairingException(
+        'the Device that answered the probe is not the one that paired',
+      );
+    }
+    await _confirmPairing(attempt);
+    return connectAfterPairing(attempt.peer.fingerprint);
   }
 
   /// Sends [text] to a peer as a Transfer.
@@ -1605,13 +1679,25 @@ final class LocalTransferController {
 
   /// Starts the one discovery handshake for a pair, when this side owns it.
   ///
-  /// Both Devices see the other and both run this method. Only the smaller
-  /// Fingerprint dials, so a fresh pair cannot create two random group secrets
-  /// at once. The other side accepts the request automatically.
+  /// Both Devices see the other and both run this method. The smaller
+  /// Fingerprint always dials, so a fresh pair cannot create two random group
+  /// secrets at once. A Device that already holds a group secret may also dial
+  /// when it is the larger Fingerprint, but only for a peer outside its roster:
+  /// open Pairing merges two different secrets deterministically, and the
+  /// roster it adopts is how an earlier member learns a later joiner when that
+  /// joiner's inbound ports are unreachable. A peer already in the roster is
+  /// left to the Session sweep and the smaller-Fingerprint rule, so the
+  /// post-Pairing window cannot turn into a second handshake. The other side
+  /// accepts the request automatically.
   bool _maybePairAutomatically(DiscoveredPeer peer) {
     final local = _local;
     if (local == null || _closed || _pairing == null) return false;
-    if (local.profile.self.compareTo(peer.fingerprint) >= 0) return false;
+    final secretHolderMayDial =
+        local.hasGroupSecret && !local.profile.group.contains(peer.fingerprint);
+    if (local.profile.self.compareTo(peer.fingerprint) >= 0 &&
+        !secretHolderMayDial) {
+      return false;
+    }
     if (peer.pairingPort == null) return false;
     if (!_autoPairing.add(peer.fingerprint.hex)) return false;
     final due = _autoPairDue[peer.fingerprint.hex];
@@ -2170,6 +2256,33 @@ final class LocalTransferController {
     return null;
   }
 
+  DiscoveredPeer? _peerAtAddress(String host) {
+    for (final discovered in _discovered) {
+      if (discovered.address.address == host) return discovered;
+    }
+    return null;
+  }
+
+  Future<DiscoveredPeer?> _probeAddress(String host) {
+    final probe = addressProbe;
+    if (probe != null) return probe(host);
+    final discovery = _discovery;
+    final ip = InternetAddress.tryParse(host);
+    if (discovery == null || ip == null) return Future.value(null);
+    return discovery.probeHost(ip);
+  }
+
+  /// Records a peer a unicast probe found, so the row and the post-Pairing
+  /// dial see the same address Discovery would have reported.
+  void _rememberDiscovered(DiscoveredPeer peer) {
+    final known = _discovered.any(
+      (candidate) => candidate.fingerprint == peer.fingerprint,
+    );
+    if (known) return;
+    _discovered = [..._discovered, peer];
+    _notify();
+  }
+
   String _keyOf(LocalProfile local) =>
       '${local.profile.alias}\u0000${local.profile.self.hex}';
 
@@ -2257,8 +2370,8 @@ final class LocalTransferController {
   Future<List<MessageRecord>> _fixImagePaths(
     List<MessageRecord> messages,
   ) async {
-    final incoming = _local?.profile.incomingDirectory ??
-        _defaultIncomingDirectory;
+    final incoming =
+        _local?.profile.incomingDirectory ?? _defaultIncomingDirectory;
     if (incoming == null) return messages;
 
     final directory = Directory(incoming);

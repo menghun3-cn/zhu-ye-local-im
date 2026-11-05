@@ -50,6 +50,11 @@
   "@refusalNoFreeFileName": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "refusalInvalidAddress": "Enter an IP address.",
+  "refusalDeviceNotReachable": "No Device answered at {address}.",
+  "@refusalDeviceNotReachable": {
+    "placeholders": { "address": { "type": "String" } }
+  },
 
   "kindText": "Text",
   "kindFiles": "Files",
@@ -344,6 +349,10 @@
   "fieldPort": "Port",
   "portIsANumber": "A port is a number.",
   "manualAddressNote": "Nothing is known about this Device beforehand, so the Session is what proves it belongs in your Owner Group. A Device in a different group is refused.",
+  "connectByAddress": "Connect by IP",
+  "connectByAddressTitle": "Connect by IP",
+  "fieldIpAddress": "IP address",
+  "connectByAddressNote": "The address is probed first. A Device already in this group connects directly; any other Device is paired automatically before the Session opens.",
   "openConversation": "Open conversation",
   "conversationEmpty": "Nothing has been sent or received here yet. Text and images arrive straight away; a file waits for the other Device to accept it.",
   "messageHint": "Type a message",
