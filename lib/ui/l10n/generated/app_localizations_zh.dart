@@ -894,6 +894,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get myCardClipboardSummaryDisabled => '同步已关闭';
 
   @override
+  String get myCardScreenshot => '截图';
+
+  @override
+  String get myCardScreenshotSummaryEnabled => '已开启 · 全局快捷键可用';
+
+  @override
+  String get myCardScreenshotSummaryDisabled => '已关闭';
+
+  @override
   String get myCardSettings => '设置';
 
   @override

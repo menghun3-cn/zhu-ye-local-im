@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "zh",
 
   "appTitle": "竹叶局域网传输",
@@ -281,6 +281,9 @@
   "myCardClipboard": "剪贴板",
   "myCardClipboardSummary": "同步已开启",
   "myCardClipboardSummaryDisabled": "同步已关闭",
+  "myCardScreenshot": "截图",
+  "myCardScreenshotSummaryEnabled": "已开启 · 全局快捷键可用",
+  "myCardScreenshotSummaryDisabled": "已关闭",
   "myCardSettings": "设置",
   "myCardSettingsSummary": "接收文件夹已设置",
   "myCardSettingsSummaryUnset": "接收文件夹未设置",

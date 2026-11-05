@@ -56,6 +56,42 @@ String? messageFilePath({
   return directory == null ? null : '$directory/messages.json';
 }
 
+/// Where this Device keeps its screenshot history, or null when it has
+/// nowhere durable to write.
+///
+/// A subdirectory of the data directory rather than the data directory
+/// itself: the history is PNGs the user can accumulate, and the profile
+/// directory is meant to stay a handful of small JSON files. The same
+/// null-means-nowhere rule as [profileFilePath] applies — a Device with no
+/// durable directory keeps its screenshots for as long as the process does.
+String? screenshotLibraryDirectory({
+  required DevicePlatform platform,
+  required Map<String, String> environment,
+  String? appDataDirectory,
+}) {
+  final directory = _dataDirectory(
+    platform: platform,
+    environment: environment,
+    appDataDirectory: appDataDirectory,
+  );
+  return directory == null ? null : '$directory/screenshots';
+}
+
+/// Where this Device keeps its pinned images, for the same reasons and with
+/// the same null rule as [screenshotLibraryDirectory].
+String? pinDirectory({
+  required DevicePlatform platform,
+  required Map<String, String> environment,
+  String? appDataDirectory,
+}) {
+  final directory = _dataDirectory(
+    platform: platform,
+    environment: environment,
+    appDataDirectory: appDataDirectory,
+  );
+  return directory == null ? null : '$directory/pins';
+}
+
 /// Where a Transfer with no destination chosen yet should land, or null when
 /// the host has no such place.
 ///

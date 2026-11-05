@@ -74,6 +74,8 @@ final class PlatformHostShell implements HostShell {
   }
 
   final StreamController<bool> _activity = StreamController<bool>.broadcast();
+  final StreamController<void> _screenshotHistory =
+      StreamController<void>.broadcast();
 
   Future<void> _handleHostCall(MethodCall call) async {
     // The native side is the authority on whether its window currently has
@@ -81,11 +83,20 @@ final class PlatformHostShell implements HostShell {
     // from focus widgets, which is a different thing from the taskbar state.
     if (call.method == 'windowActive' && call.arguments is bool) {
       _activity.add(call.arguments as bool);
+    } else if (call.method == 'screenshotHistory') {
+      _screenshotHistory.add(null);
     }
   }
 
   @override
   Stream<bool> get windowActivity => _activity.stream;
+
+  @override
+  Stream<void> get screenshotHistoryRequests => _screenshotHistory.stream;
+
+  @override
+  Future<void> setScreenshotEnabled(bool value) =>
+      _ask(hostShellChannel, arg: value, method: _setScreenshotEnabledMethod);
 
   @override
   Future<void> setCloseToTray(bool value) =>
@@ -141,6 +152,9 @@ const String _setAutostartMethod = 'setAutostart';
 /// Shows or clears the taskbar's unread marker. Takes a bool.
 const String _setUnreadMethod = 'setUnread';
 
+/// Whether the tray menu offers the screenshot history. Takes a bool.
+const String _setScreenshotEnabledMethod = 'setScreenshotEnabled';
+
 /// Everything the application needs from the platform it runs on.
 final class PlatformSeams {
   const PlatformSeams({
@@ -157,6 +171,8 @@ final class PlatformSeams {
     this.appDataDirectory,
     required this.hostShell,
     required this.controlsWindow,
+    this.screenshotLibraryPath,
+    this.pinPath,
   });
 
   /// Where this Device's identity is kept, or an in-memory stand-in.
@@ -215,6 +231,13 @@ final class PlatformSeams {
   /// platform whose runner implements the channel answers yes; see
   /// `windows/runner/host_shell.cpp`.
   final bool controlsWindow;
+
+  /// Where the screenshot history's PNGs and index live, or null when this
+  /// Device has nowhere durable to write — the same rule as [profilePath].
+  final String? screenshotLibraryPath;
+
+  /// Where the pinned images' PNGs and index live.
+  final String? pinPath;
 }
 
 /// The platform this binary is running on.
@@ -317,6 +340,20 @@ Future<PlatformSeams> openPlatformSeams({
     // comparison rather than as a list so that adding a platform is a decision
     // somebody has to make here, next to the reason it is not in the list.
     controlsWindow: running == DevicePlatform.windows,
+    // Screenshot state is per-installation files, resolved from the same
+    // directory as the profile: a Device with nowhere to write keeps its
+    // screenshots for as long as the process does, exactly as it keeps its
+    // identity.
+    screenshotLibraryPath: screenshotLibraryDirectory(
+      platform: running,
+      environment: host,
+      appDataDirectory: dataDirectory,
+    ),
+    pinPath: pinDirectory(
+      platform: running,
+      environment: host,
+      appDataDirectory: dataDirectory,
+    ),
   );
 }
 

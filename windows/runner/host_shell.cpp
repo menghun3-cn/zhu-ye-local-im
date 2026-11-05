@@ -45,6 +45,7 @@ constexpr UINT kTrayCallbackMessage = WM_APP + 1;
 
 // Notification-area menu commands.
 constexpr UINT kCommandShowWindow = 1;
+constexpr UINT kCommandScreenshotHistory = 3;
 constexpr UINT kCommandExit = 2;
 
 // "zhuye LAN transfer" -- the notification-area tooltip.
@@ -55,6 +56,9 @@ constexpr const wchar_t kShowWindowText[] =
     L"\u663e\u793a\u4e3b\u7a97\u53e3";
 // "exit"
 constexpr const wchar_t kExitText[] = L"\u9000\u51fa";
+// "screenshot history"
+constexpr const wchar_t kScreenshotHistoryText[] =
+    L"\u622a\u56fe\u5386\u53f2";
 
 // How long to keep looking for the already-running instance's window before
 // giving up on raising it. Long enough to cover a second launch that lands
@@ -462,6 +466,10 @@ void HostShell::ShowTrayMenu() {
     return;
   }
   ::AppendMenuW(menu, MF_STRING, kCommandShowWindow, kShowWindowText);
+  if (screenshot_enabled_) {
+    ::AppendMenuW(menu, MF_STRING, kCommandScreenshotHistory,
+                  kScreenshotHistoryText);
+  }
   ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   ::AppendMenuW(menu, MF_STRING, kCommandExit, kExitText);
 
@@ -480,12 +488,26 @@ void HostShell::ShowTrayMenu() {
     case kCommandShowWindow:
       Activate();
       break;
+    case kCommandScreenshotHistory:
+      if (screenshot_history_handler_) {
+        screenshot_history_handler_();
+      }
+      break;
     case kCommandExit:
       QuitFromTray();
       break;
     default:
       break;
   }
+}
+
+void HostShell::set_screenshot_history_handler(
+    std::function<void()> handler) {
+  screenshot_history_handler_ = std::move(handler);
+}
+
+void HostShell::set_screenshot_enabled(bool value) {
+  screenshot_enabled_ = value;
 }
 
 void HostShell::HandleTrayMouse(LPARAM lparam) {

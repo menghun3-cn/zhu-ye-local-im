@@ -1652,6 +1652,24 @@ abstract class AppLocalizations {
   /// **'Sync disabled'**
   String get myCardClipboardSummaryDisabled;
 
+  /// No description provided for @myCardScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot'**
+  String get myCardScreenshot;
+
+  /// No description provided for @myCardScreenshotSummaryEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'On · global hotkey active'**
+  String get myCardScreenshotSummaryEnabled;
+
+  /// No description provided for @myCardScreenshotSummaryDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get myCardScreenshotSummaryDisabled;
+
   /// No description provided for @myCardSettings.
   ///
   /// In en, this message translates to:

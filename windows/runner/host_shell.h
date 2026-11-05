@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <shobjidl.h>
 
+#include <functional>
+
 // The name of the method channel the Dart side reaches these behaviours
 // through. Kept next to them so the two spellings cannot drift apart. Narrow
 // rather than wide: a channel name is a Dart string, and the C++ wrapper takes
@@ -54,6 +56,15 @@ class HostShell {
   // safety, exactly when there is an icon to bring it back with.
   bool HandleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 
+  // The "open screenshot history" tray command, wired by the window so the
+  // menu can reach Dart. Called on the UI thread from ShowTrayMenu.
+  void set_screenshot_history_handler(std::function<void()> handler);
+
+  // Whether the tray menu lists the screenshot history at all. Pushed from
+  // Dart whenever the feature's switch changes; the menu is built on each
+  // right-click, so the flag only has to be current at that moment.
+  void set_screenshot_enabled(bool value);
+
  private:
   // Both are registered once per session. Either can be zero if registration
   // failed, which callers have to tolerate.
@@ -81,6 +92,8 @@ class HostShell {
   bool close_to_tray_ = true;
   bool tray_icon_added_ = false;
   bool unread_ = false;
+  bool screenshot_enabled_ = false;
+  std::function<void()> screenshot_history_handler_;
   bool com_initialized_ = false;
 };
 

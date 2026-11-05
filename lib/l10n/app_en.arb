@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
 
   "appTitle": "Zhuye Local Transfer",
@@ -408,6 +408,9 @@
   "myCardClipboard": "Clipboard",
   "myCardClipboardSummary": "Sync enabled",
   "myCardClipboardSummaryDisabled": "Sync disabled",
+  "myCardScreenshot": "Screenshot",
+  "myCardScreenshotSummaryEnabled": "On · global hotkey active",
+  "myCardScreenshotSummaryDisabled": "Off",
   "myCardSettings": "Settings",
   "myCardSettingsSummary": "Receive folder configured",
   "myCardSettingsSummaryUnset": "Receive folder not set",
