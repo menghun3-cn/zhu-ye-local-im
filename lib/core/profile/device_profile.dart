@@ -5,6 +5,7 @@ import '../host/close_behaviour.dart';
 import '../identity/device_descriptor.dart';
 import '../identity/fingerprint.dart';
 import '../identity/owner_group.dart';
+import '../screenshot/capture_action.dart';
 import '../update/update_check_interval.dart';
 
 /// A Device this one has dealt with before, remembered so it can be reached
@@ -153,10 +154,12 @@ final class DeviceProfile {
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
     this.updateCheckInterval = UpdateCheckInterval.hourly,
-    this.screenshotEnabled = false,
+    this.screenshotEnabled = true,
     this.screenshotHotkey = defaultScreenshotHotkey,
+    Map<CaptureAction, String>? captureKeys,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
+       captureKeys = {...defaultCaptureKeys, ...?captureKeys},
        _favorites = {...favorites}
          ..removeWhere((favourite) => favourite == self),
        _clipboardPeers = {...clipboardPeers}
@@ -210,12 +213,14 @@ final class DeviceProfile {
 
   /// Whether the screenshot feature is switched on.
   ///
-  /// Off by default: capturing the screen is the most invasive thing this
-  /// app can do, and a global hotkey that fires it must be something the
-  /// user asked for rather than something they discover. Turning it off
-  /// stops new captures and unregisters the hotkey; pins and history that
-  /// already exist stay — they are the user's pictures, not the feature's
-  /// state.
+  /// On for a new Device: the hotkey only answers when the user presses it,
+  /// and the capture it opens is one Esc away from nothing — the cost of a
+  /// forgotten feature is lower than the cost of a feature nobody finds.
+  /// A profile written before this default flipped keeps its stored value,
+  /// so an install that was never asked is not changed retroactively.
+  /// Turning it off stops new captures and unregisters the hotkey; pins and
+  /// history that already exist stay — they are the user's pictures, not
+  /// the feature's state.
   bool screenshotEnabled;
 
   /// The accelerator that summons the capture overlay, as
@@ -227,6 +232,44 @@ final class DeviceProfile {
   /// string here. [defaultScreenshotHotkey] is what an untouched profile
   /// resolves to.
   String screenshotHotkey;
+
+  /// The key bindings inside the capture overlay, one per [CaptureAction].
+  ///
+  /// Unlike [screenshotHotkey] these are matched by the overlay window
+  /// itself, while it has the keyboard to itself — so a bare `q` is a legal
+  /// binding here where the global hotkey would refuse it. Values are the
+  /// normalized `modifier+key` strings [isCaptureHotkey] accepts; an action
+  /// absent from the map resolves to [defaultCaptureKey].
+  Map<CaptureAction, String> captureKeys;
+
+  /// The binding currently in effect for [action] — the stored one, or the
+  /// default when the map has none.
+  String captureKey(CaptureAction action) =>
+      captureKeys[action] ?? defaultCaptureKey(action);
+
+  /// Sets the binding for [action] and answers nothing.
+  ///
+  /// [accelerator] must satisfy [isCaptureHotkey] and must not collide with
+  /// another action's binding — two actions on one key would make the
+  /// overlay's key handling a coin flip, so the second claim is refused
+  /// here, where the user can still see why, rather than in the overlay,
+  /// where it would look like a dead key.
+  void setCaptureKey(CaptureAction action, String accelerator) {
+    final normalized = normalizeCaptureHotkey(accelerator);
+    if (normalized == null) {
+      throw ArgumentError.value(accelerator, 'accelerator');
+    }
+    for (final other in CaptureAction.values) {
+      if (other != action && captureKey(other) == normalized) {
+        throw ArgumentError.value(
+          accelerator,
+          'accelerator',
+          'already bound to ${other.wireName}',
+        );
+      }
+    }
+    captureKeys[action] = normalized;
+  }
 
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
@@ -351,6 +394,10 @@ final class DeviceProfile {
     'updateCheckInterval': updateCheckInterval.wireName,
     'screenshotEnabled': screenshotEnabled,
     'screenshotHotkey': screenshotHotkey,
+    'captureKeys': {
+      for (final action in CaptureAction.values)
+        action.wireName: captureKey(action),
+    },
     'known': [for (final device in knownDevices) device.toJson()],
     'recentEmojis': recentEmojis,
   };
@@ -416,6 +463,7 @@ final class DeviceProfile {
           ? json['screenshotEnabled'] as bool
           : false,
       screenshotHotkey: _screenshotHotkey(json['screenshotHotkey']),
+      captureKeys: _captureKeys(json['captureKeys']),
     );
   }
 
@@ -491,6 +539,39 @@ UpdateCheckInterval _updateCheckInterval(Object? value) {
 String _screenshotHotkey(Object? value) {
   if (value is! String) return defaultScreenshotHotkey;
   return isScreenshotHotkey(value) ? value : defaultScreenshotHotkey;
+}
+
+/// Reads the capture-overlay bindings, tolerant per action.
+///
+/// Each action resolves independently: a missing key, a malformed binding
+/// or one this build's grammar refuses all mean "the user has not said
+/// otherwise" for *that* action, which is its default — a profile written
+/// by a newer version that knows more keys still opens. Actions are
+/// visited in enum order so a binding that collides with an already-claimed
+/// one loses to the earlier action. Should a hand-edited file claim every
+/// default too, the action parks on an `f13`–`f24` key — obscure, valid,
+/// and guaranteed free, because only five other actions can claim keys.
+Map<CaptureAction, String> _captureKeys(Object? value) {
+  final keys = <CaptureAction, String>{};
+  final claimed = <String>{};
+  for (final action in CaptureAction.values) {
+    final raw = value is Map ? value[action.wireName] : null;
+    var binding = raw is String ? normalizeCaptureHotkey(raw) : null;
+    binding ??= defaultCaptureKey(action);
+    if (claimed.contains(binding)) binding = defaultCaptureKey(action);
+    if (claimed.contains(binding)) {
+      for (var n = 13; n <= 24; n++) {
+        final spare = 'f$n';
+        if (!claimed.contains(spare)) {
+          binding = spare;
+          break;
+        }
+      }
+    }
+    keys[action] = binding!;
+    claimed.add(binding);
+  }
+  return keys;
 }
 
 /// The accelerator a fresh profile starts with.

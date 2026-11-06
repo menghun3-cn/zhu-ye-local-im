@@ -8,18 +8,19 @@ Status: implemented
 
 文件与剪贴板传输应用的用户经常需要截取屏幕上的内容——一个错误对话框、一张图表、一条想贴到别处的消息。Snipaste 是参照行为：全局快捷键唤出全屏暗色遮罩，拖动框选区域（或选窗口、或全屏），图片进入剪贴板，可以钉在其他窗口之上或添加标注。此前应用里完全没有这些能力；剪贴板只有文本、文件和已配对设备间的镜像条目。
 
-需求刻意按 Snipaste 的形状提出，而不是「加一个截图按钮」：钉图窗口要跨重启持久存在、要有悬浮历史、要有标注编辑器、要有可自定义的全局快捷键，并且全部由一个**默认关闭**的开关把守——因为能截屏的全局快捷键是这个应用能做的最具侵入性的事。
+需求刻意按 Snipaste 的形状提出，而不是「加一个截图按钮」：钉图窗口要跨重启持久存在、要有悬浮历史、要有标注编辑器、要有可自定义的全局快捷键，并且全部由一个开关把守。开关最初**默认关闭**——因为能截屏的全局快捷键是这个应用能做的最具侵入性的事——并于 2026-11-06 翻转为「新设备默认开启」；该变更以及遮罩自身的按键绑定见 [2026-11-06-screenshot-on-by-default-and-overlay-keys](2026-11-06-screenshot-on-by-default-and-overlay-keys.zh.md)，本笔记早于它们。
 
 ## Decision
 
 该功能仅限 Windows，由四个部分组成，每个部分在 `desktop_multi_window` 的独立 Flutter 引擎中运行：
 
-* **截图遮罩**——一个覆盖虚拟屏幕（`GetSystemMetrics(SM_*VIRTUALSCREEN)`）的窗口，始终置顶。区域拖框、窗口模式（`EnumWindows` + `WindowFromPoint` + `PrintWindow`，能截取被遮挡的窗口）和全屏模式，可在工具栏中切换。完成时把 PNG 以 `CF_DIB` 写入剪贴板——由 Win32 手写，因为 Flutter 的 `Clipboard` 只带文本——并追加进历史。
+* **截图遮罩**——一个覆盖虚拟屏幕（`GetSystemMetrics(SM_*VIRTUALSCREEN)`）的窗口，始终置顶。区域拖框、窗口模式（`EnumWindows` + `WindowFromPoint` + `PrintWindow`，能截取被遮挡的窗口）和全屏模式，可在工具栏或后加的可配置遮罩内按键中切换。完成时把 PNG 以 `CF_DIB` 写入剪贴板——由 Win32 手写，因为 Flutter 的 `Clipboard` 只带文本——并追加进历史。
 * **历史**——`ScreenshotLibrary`（索引 JSON + 每条目一个 PNG，上限 20 条），在悬浮网格窗口中展示，可从遮罩、「我的 → 截图」卡片和既有原生 `HostShell` 新增的托盘菜单项进入。
 * **钉图**——`PinStore` 保存 `PinRecord`（位置、尺寸、置顶、鼠标穿透），启动时恢复为无边框置顶窗口。鼠标穿透是 `WS_EX_TRANSPARENT | WS_EX_LAYERED` 加上固定不透明 alpha，通过唯一窗口标题 → `EnumWindows` 查找来设置——因为所有钉图引擎共享同一进程 id，而 `desktop_multi_window` 的 windowId 是 UUID 而非 HWND。
 * **标注编辑器**——箭头、矩形、自由画笔、文字和序号标记叠加在图片上；点「完成」时把笔画经 `ui.PictureRecorder` 重放并把 PNG 原地重写，因此历史条目或钉图仍是同一个文件。
 
-开关和快捷键存在 `DeviceProfile`（`screenshotEnabled`、`screenshotHotkey`，默认 `ctrl+shift+a`——刻意避开 QQ 和微信已在全局占用的 `Ctrl+Alt` 系组合）。主引擎里的 `ScreenshotService` 通过 `hotkey_manager` 对齐注册，并把开关状态经既有宿主通道推给托盘菜单；关闭即注销快捷键、隐藏入口，但钉图和历史保留——它们是用户的图片。
+开关和快捷键存在 `DeviceProfile`（`screenshotEnabled`、`screenshotHotkey`，默认 `ctrl+shift+a`——刻意避开 QQ 和微信已在全局占用的 `Ctrl+Alt` 系组合）。主引擎里的 `ScreenshotService` 通过 `hotkey_manager` 对齐注册，并把开关状态经既有宿主通道推给托盘菜单；关闭即注销快捷键、隐藏入口，但钉图和历史保留——它们是用户的图片。遮罩自身的按键绑定以
+`captureKeys` 同存；该新增见 2026-11-06 的笔记。
 
 UIA 控件边界吸附明确延后：没有插件提供该能力，v1 只做常规参考线选择。
 

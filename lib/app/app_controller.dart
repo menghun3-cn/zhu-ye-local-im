@@ -862,6 +862,52 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// The key bindings inside the capture overlay, by [CaptureAction].
+  ///
+  /// Read from the profile like the summon hotkey: what the settings page
+  /// edits is what the next capture honours, because the overlay receives
+  /// the bindings through its launch arguments rather than a live link.
+  Map<CaptureAction, String> get screenshotCaptureKeys =>
+      _local?.profile.captureKeys ?? defaultCaptureKeys;
+
+  /// The same bindings in wire form — action name to accelerator — which is
+  /// what [ScreenshotWindowArgs] carries into the capture window.
+  Map<String, String> get screenshotCaptureKeyWire => {
+    for (final action in CaptureAction.values)
+      action.wireName:
+          _local?.profile.captureKey(action) ?? defaultCaptureKey(action),
+  };
+
+  /// Sets one overlay binding, and persists it.
+  ///
+  /// [accelerator] must satisfy [isCaptureHotkey] and must not collide with
+  /// another action's binding or with [screenshotHotkey] — a key that is
+  /// both the summon chord and an in-overlay action would re-open the
+  /// overlay on every press. The profile enforces the action collisions;
+  /// the hotkey check lives here because only the controller sees both.
+  Future<void> setScreenshotCaptureKey(
+    CaptureAction action,
+    String accelerator,
+  ) async {
+    final local = _requireLocal();
+    final normalized = normalizeCaptureHotkey(accelerator);
+    if (normalized == null) {
+      throw ArgumentError.value(accelerator, 'accelerator');
+    }
+    final hotkey = normalizeCaptureHotkey(screenshotHotkey);
+    if (normalized == hotkey) {
+      throw ArgumentError.value(
+        accelerator,
+        'accelerator',
+        'equals the global hotkey',
+      );
+    }
+    if (local.profile.captureKey(action) == normalized) return;
+    local.profile.setCaptureKey(action, accelerator);
+    await _persist();
+    _notify();
+  }
+
   /// Whether this app starts with the system.
   bool get autostartEnabled => _autostart;
 

@@ -37,6 +37,7 @@ export 'protocol/frame.dart';
 export 'protocol/messages.dart';
 export 'security/hkdf.dart';
 export 'security/secure_link.dart';
+export 'screenshot/capture_action.dart';
 export 'screenshot/pin_record.dart';
 export 'screenshot/pin_store.dart';
 export 'screenshot/screenshot_entry.dart';

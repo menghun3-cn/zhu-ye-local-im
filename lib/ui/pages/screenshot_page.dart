@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -5,10 +7,12 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 import '../../app/app_controller.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
+import '../screenshot/capture_key_names.dart';
 import '../screenshot/screenshot_service.dart';
 
-/// The "截图" sub-page under 我的: the feature's on/off switch and the
-/// global hotkey that summons the capture overlay.
+/// The "截图" sub-page under 我的: the feature's on/off switch, the global
+/// hotkey that summons the capture overlay, and every key binding that
+/// works inside it.
 ///
 /// The switch is the only gate — pins and history already on disk are the
 /// user's pictures and stay either way, and turning the feature back on
@@ -49,7 +53,35 @@ class ScreenshotPage extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
                 const SizedBox(height: 12),
-                _HotkeyEditor(controller: controller),
+                _HotkeyEditor(
+                  accelerator: controller.screenshotHotkey,
+                  onChanged: controller.setScreenshotHotkey,
+                  onReset: () =>
+                      controller.setScreenshotHotkey(defaultScreenshotHotkey),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '截图内快捷键',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '截图遮罩打开时生效；可以只按一个键，不必带修饰键',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                const SizedBox(height: 12),
+                for (final action in CaptureAction.values)
+                  _OverlayKeyRow(action: action, controller: controller),
               ],
             ),
           ),
@@ -68,16 +100,91 @@ class ScreenshotPage extends StatelessWidget {
   }
 }
 
+/// One overlay binding: what the action does, the recorder for its key,
+/// and a way back to the default.
+class _OverlayKeyRow extends StatelessWidget {
+  const _OverlayKeyRow({required this.action, required this.controller});
+
+  final CaptureAction action;
+  final LocalTransferController controller;
+
+  String get _label => switch (action) {
+    CaptureAction.region => '框选区域',
+    CaptureAction.window => '窗口截图',
+    CaptureAction.full => '全屏截图',
+    CaptureAction.copy => '完成（复制）',
+    CaptureAction.pin => '钉图',
+    CaptureAction.cancel => '取消',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(_label, style: const TextStyle(fontSize: 14)),
+          ),
+          Expanded(
+            child: _HotkeyEditor(
+              accelerator:
+                  controller.screenshotCaptureKeys[action] ??
+                  defaultCaptureKey(action),
+              accepts: isCaptureHotkey,
+              onChanged: (accelerator) =>
+                  unawaited(_apply(context, accelerator)),
+              onReset: () =>
+                  unawaited(_apply(context, defaultCaptureKey(action))),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Applies a recorded binding, telling the user when the profile refuses
+  /// it — a collision or the summon chord is only visible as a rejected
+  /// future, so it has to be caught here to become a sentence.
+  Future<void> _apply(BuildContext context, String accelerator) async {
+    try {
+      await controller.setScreenshotCaptureKey(action, accelerator);
+    } on ArgumentError {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('该快捷键不可用或已被占用')));
+      }
+    }
+  }
+}
+
 /// The hotkey recorder row: shows the current accelerator and records a new
 /// one on the next key press.
 ///
 /// Recording uses hotkey_manager's own recorder, which listens to hardware
 /// keys; the result is translated back into the profile's `ctrl+shift+a`
-/// string form, which is also what [isScreenshotHotkey] validates.
+/// string form, which is also what the validators check.
 class _HotkeyEditor extends StatelessWidget {
-  const _HotkeyEditor({required this.controller});
+  const _HotkeyEditor({
+    required this.accelerator,
+    required this.onChanged,
+    this.accepts = isScreenshotHotkey,
+    this.onReset,
+  });
 
-  final LocalTransferController controller;
+  /// The binding currently in effect, in `modifier+key` form.
+  final String accelerator;
+
+  /// Called with the normalized binding the recorder produced.
+  final FutureOr<void> Function(String accelerator) onChanged;
+
+  /// The grammar this row accepts — the global hotkey demands a modifier,
+  /// the in-overlay bindings do not.
+  final bool Function(String accelerator) accepts;
+
+  /// Returns the binding to its default, when the row offers that.
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -85,30 +192,25 @@ class _HotkeyEditor extends StatelessWidget {
       children: [
         Expanded(
           child: HotKeyRecorder(
-            initalHotKey: _toHotKey(controller.screenshotHotkey),
+            initalHotKey: _toHotKey(accelerator),
             onHotKeyRecorded: (hotKey) {
-              final accelerator = _acceleratorOf(hotKey);
-              if (accelerator != null) {
-                controller.setScreenshotHotkey(accelerator);
+              final recorded = _acceleratorOf(hotKey);
+              if (recorded != null && accepts(recorded)) {
+                onChanged(normalizeCaptureHotkey(recorded)!);
               }
             },
           ),
         ),
-        TextButton(
-          onPressed: () =>
-              controller.setScreenshotHotkey(defaultScreenshotHotkey),
-          child: const Text('恢复默认'),
-        ),
+        if (onReset != null)
+          TextButton(onPressed: onReset, child: const Text('恢复默认')),
       ],
     );
   }
 
   HotKey? _toHotKey(String accelerator) {
-    final parts = accelerator.split('+');
-    if (parts.length < 2) return null;
     final modifiers = <HotKeyModifier>[];
     LogicalKeyboardKey? key;
-    for (final part in parts) {
+    for (final part in accelerator.split('+')) {
       switch (part) {
         case 'ctrl':
           modifiers.add(HotKeyModifier.control);
@@ -119,47 +221,15 @@ class _HotkeyEditor extends StatelessWidget {
         case 'win':
           modifiers.add(HotKeyModifier.meta);
         default:
-          key = _keyOf(part);
+          // A second non-modifier part means the string is not a binding
+          // this recorder can show; the validators refuse it anyway.
+          if (key != null) return null;
+          key = captureKeyOf(part);
       }
     }
     if (key == null) return null;
     return HotKey(key: key, modifiers: modifiers);
   }
-
-  LogicalKeyboardKey? _keyOf(String part) {
-    if (part.length == 1) {
-      final code = part.codeUnitAt(0);
-      if (code >= 0x61 && code <= 0x7a) {
-        return LogicalKeyboardKey(LogicalKeyboardKey.keyA.keyId + code - 0x61);
-      }
-      if (code >= 0x30 && code <= 0x39) {
-        return LogicalKeyboardKey(
-          LogicalKeyboardKey.digit0.keyId + code - 0x30,
-        );
-      }
-    }
-    if (part.startsWith('f')) {
-      final n = int.tryParse(part.substring(1));
-      if (n != null && n >= 1 && n <= 24) return _functionKey(n);
-    }
-    return null;
-  }
-
-  LogicalKeyboardKey _functionKey(int n) => switch (n) {
-    1 => LogicalKeyboardKey.f1,
-    2 => LogicalKeyboardKey.f2,
-    3 => LogicalKeyboardKey.f3,
-    4 => LogicalKeyboardKey.f4,
-    5 => LogicalKeyboardKey.f5,
-    6 => LogicalKeyboardKey.f6,
-    7 => LogicalKeyboardKey.f7,
-    8 => LogicalKeyboardKey.f8,
-    9 => LogicalKeyboardKey.f9,
-    10 => LogicalKeyboardKey.f10,
-    11 => LogicalKeyboardKey.f11,
-    12 => LogicalKeyboardKey.f12,
-    _ => LogicalKeyboardKey.f13,
-  };
 
   /// Translates a recorded [HotKey] back into `modifier+key` form.
   String? _acceleratorOf(HotKey hotKey) {
@@ -173,26 +243,9 @@ class _HotkeyEditor extends StatelessWidget {
         _ => '',
       });
     }
-    final key = _keyName(hotKey.logicalKey);
+    final key = captureKeyName(hotKey.logicalKey);
     if (key == null) return null;
     parts.add(key);
-    final accelerator = parts.where((p) => p.isNotEmpty).join('+');
-    return isScreenshotHotkey(accelerator) ? accelerator : null;
-  }
-
-  String? _keyName(LogicalKeyboardKey key) {
-    final id = key.keyId;
-    final a = LogicalKeyboardKey.keyA.keyId;
-    if (id >= a && id <= a + 25) {
-      return String.fromCharCode(0x61 + id - a);
-    }
-    final d = LogicalKeyboardKey.digit0.keyId;
-    if (id >= d && id <= d + 9) {
-      return String.fromCharCode(0x30 + id - d);
-    }
-    for (var n = 1; n <= 13; n++) {
-      if (key == _functionKey(n)) return 'f$n';
-    }
-    return null;
+    return parts.where((p) => p.isNotEmpty).join('+');
   }
 }
