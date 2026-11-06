@@ -943,6 +943,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get myCardClipboardSummaryDisabled => 'Sync disabled';
 
   @override
+  String get myCardScreenshot => 'Screenshot';
+
+  @override
+  String get myCardScreenshotSummaryEnabled => 'On · global hotkey active';
+
+  @override
+  String get myCardScreenshotSummaryDisabled => 'Off';
+
+  @override
   String get myCardSettings => 'Settings';
 
   @override

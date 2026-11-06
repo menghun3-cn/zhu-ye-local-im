@@ -47,4 +47,17 @@ abstract interface class HostShell {
 
   /// Makes [enabled] true of starting with the system.
   Future<void> setAutostart(bool enabled);
+
+  /// Whether the notification-area menu offers the screenshot history.
+  ///
+  /// The menu is built natively, so the feature's on/off switch has to be
+  /// pushed to it the same way the close-button behaviour is: the host keeps
+  /// the projection, the profile remains the authority.
+  Future<void> setScreenshotEnabled(bool value);
+
+  /// Emits once per "open the screenshot history" tray menu pick.
+  ///
+  /// A host with no tray never emits; the history window is still reachable
+  /// from the app's own surfaces.
+  Stream<void> get screenshotHistoryRequests;
 }

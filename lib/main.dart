@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'core/core.dart';
 import 'ui/app.dart';
 import 'ui/android_package_installer.dart';
+import 'ui/screenshot/screenshot_service.dart';
+import 'ui/screenshot/screenshot_window.dart';
 import 'ui/seams.dart';
 import 'ui/update_install.dart';
 
@@ -29,6 +31,21 @@ Future<void> main(List<String> arguments) async {
   final handoff = UpdateHandoff.parse(arguments);
   if (handoff != null) {
     exit(await handoff.run());
+  }
+
+  // The screenshot feature's extra windows are separate Flutter engines
+  // launched by the same executable; the window arguments are the only thing
+  // telling this process apart from the main one. They run before the seams
+  // are opened because they need none of them — each reads its own files.
+  final windowArgs = await ScreenshotWindowArgs.current();
+  if (windowArgs != null) {
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: screenshotWindowRoot(windowArgs),
+      ),
+    );
+    return;
   }
 
   // What earlier hand-overs left in the temporary directory, and the package

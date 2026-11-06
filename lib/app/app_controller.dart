@@ -822,6 +822,46 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// Whether the screenshot feature is switched on.
+  ///
+  /// Read from the profile rather than remembered: the answer has to survive
+  /// restarts because what it gates — a global hotkey and a screen-capture
+  /// overlay — is exactly the kind of thing a user turns off and expects to
+  /// stay off. See [DeviceProfile.screenshotEnabled] for what "off" leaves
+  /// running.
+  bool get screenshotEnabled => _local?.profile.screenshotEnabled ?? false;
+
+  /// Switches the screenshot feature on or off, and persists it.
+  Future<void> setScreenshotEnabled(bool value) async {
+    final local = _requireLocal();
+    if (local.profile.screenshotEnabled == value) return;
+    local.profile.screenshotEnabled = value;
+    await _persist();
+    _notify();
+  }
+
+  /// The accelerator that summons the capture overlay.
+  String get screenshotHotkey =>
+      _local?.profile.screenshotHotkey ?? defaultScreenshotHotkey;
+
+  /// Sets the capture hotkey, and persists it.
+  ///
+  /// [accelerator] must satisfy [isScreenshotHotkey]; anything else is
+  /// refused here rather than at registration time, where a failure would
+  /// look like the feature simply not working. The running registration is
+  /// re-synced by the host that owns it — the controller only remembers the
+  /// choice.
+  Future<void> setScreenshotHotkey(String accelerator) async {
+    final local = _requireLocal();
+    if (!isScreenshotHotkey(accelerator)) {
+      throw ArgumentError.value(accelerator, 'accelerator');
+    }
+    if (local.profile.screenshotHotkey == accelerator) return;
+    local.profile.screenshotHotkey = accelerator;
+    await _persist();
+    _notify();
+  }
+
   /// Whether this app starts with the system.
   bool get autostartEnabled => _autostart;
 

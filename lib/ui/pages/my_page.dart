@@ -12,10 +12,11 @@ import '../widgets.dart';
 import 'about_page.dart';
 import 'clipboard_page.dart';
 import 'devices_page.dart';
+import 'screenshot_page.dart';
 import 'settings_page.dart';
 
 /// Which sub-page is shown.
-enum _SubPage { devices, clipboard, settings, about }
+enum _SubPage { devices, clipboard, screenshot, settings, about }
 
 /// The header shown above each sub-page, with a back button.
 class _SubPageHeader extends StatelessWidget {
@@ -213,6 +214,21 @@ class _MyPageState extends State<MyPage> {
               : l10n.myCardClipboardSummary,
           onTap: () => _openSubPage(_SubPage.clipboard),
         ),
+        // The screenshot card exists only where the feature can run: the
+        // capture overlay, the pins and the global hotkey are all Windows
+        // machinery, and a card on Android would lead to a page that can do
+        // nothing.
+        if (widget.seams.platform == DevicePlatform.windows) ...[
+          const SizedBox(height: WeChat.sectionGap),
+          _MyCard(
+            icon: Icons.screenshot_monitor_outlined,
+            title: l10n.myCardScreenshot,
+            summary: controller.screenshotEnabled
+                ? l10n.myCardScreenshotSummaryEnabled
+                : l10n.myCardScreenshotSummaryDisabled,
+            onTap: () => _openSubPage(_SubPage.screenshot),
+          ),
+        ],
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
           icon: Icons.settings_outlined,
@@ -257,6 +273,12 @@ class _MyPageState extends State<MyPage> {
         children: [
           _SubPageHeader(title: l10n.tabClipboard, onBack: _closeSubPage),
           const Expanded(child: ClipboardPage()),
+        ],
+      ),
+      _SubPage.screenshot => Column(
+        children: [
+          _SubPageHeader(title: l10n.myCardScreenshot, onBack: _closeSubPage),
+          const Expanded(child: ScreenshotPage()),
         ],
       ),
       _SubPage.settings => Column(

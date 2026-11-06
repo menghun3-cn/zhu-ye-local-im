@@ -31,6 +31,15 @@ bool FlutterWindow::OnCreate() {
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   host_shell_.Attach(GetHandle());
+  // The tray menu's "screenshot history" entry reaches Dart through the same
+  // channel the other host calls use: the menu lives in HostShell, which has
+  // no Flutter in it, so the window is the one that translates the command
+  // into a method call.
+  host_shell_.set_screenshot_history_handler([this]() {
+    if (host_channel_) {
+      host_channel_->InvokeMethod("screenshotHistory", nullptr);
+    }
+  });
   host_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), kHostChannelName,
@@ -80,6 +89,17 @@ void FlutterWindow::HandleHostMethodCall(
       return;
     }
     host_shell_.set_close_to_tray(*value);
+    result->Success();
+    return;
+  }
+
+  if (method == "setScreenshotEnabled") {
+    const bool* value = std::get_if<bool>(call.arguments());
+    if (value == nullptr) {
+      result->Error("bad_arguments", "setScreenshotEnabled expects a bool");
+      return;
+    }
+    host_shell_.set_screenshot_enabled(*value);
     result->Success();
     return;
   }

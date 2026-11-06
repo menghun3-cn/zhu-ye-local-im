@@ -1483,6 +1483,22 @@ class ScriptedHostShell implements HostShell {
     if (refusesAutostartWrites) return;
     autostart = enabled;
   }
+
+  /// Every screenshot-enabled value the app has pushed, oldest first.
+  final List<bool> screenshotEnabledRequests = [];
+
+  final StreamController<void> _screenshotHistory =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get screenshotHistoryRequests => _screenshotHistory.stream;
+
+  /// Stands in for the tray menu's "screenshot history" pick.
+  void emitScreenshotHistoryRequest() => _screenshotHistory.add(null);
+
+  @override
+  Future<void> setScreenshotEnabled(bool value) async =>
+      screenshotEnabledRequests.add(value);
 }
 
 /// A one-pixel PNG, for the tests that need the clipboard to hold a picture.
