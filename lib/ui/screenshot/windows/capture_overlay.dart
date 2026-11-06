@@ -1,9 +1,11 @@
-import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../core/core.dart';
+import '../capture_key_names.dart';
 import '../native/win_desktop.dart';
 import '../screenshot_window.dart';
 
@@ -72,6 +74,15 @@ class CaptureOverlay extends StatefulWidget {
 
 enum _Mode { region, window, full }
 
+/// The capture action each mode button stands for — the same names the
+/// profile's `captureKeys` are stored under, so the toolbar hint and the
+/// key binding can never disagree about which key switches to which mode.
+const Map<_Mode, CaptureAction> _modeActions = {
+  _Mode.region: CaptureAction.region,
+  _Mode.window: CaptureAction.window,
+  _Mode.full: CaptureAction.full,
+};
+
 class _CaptureOverlayState extends State<CaptureOverlay> {
   _Mode _mode = _Mode.region;
   Rect? _selection;
@@ -80,6 +91,16 @@ class _CaptureOverlayState extends State<CaptureOverlay> {
   Offset? _dragStart;
   double _dpr = 1;
   Rect _screen = Rect.zero;
+  bool _capturing = false;
+
+  /// The bindings this overlay was launched with, action → normalized
+  /// accelerator, and their inverse for key matching. Resolved once: the
+  /// arguments are the overlay's only link to the profile, and they do not
+  /// change while the window is open.
+  late final Map<CaptureAction, String> _bindings = _resolveBindings();
+  late final Map<String, CaptureAction> _keyActions = {
+    for (final entry in _bindings.entries) entry.value: entry.key,
+  };
 
   @override
   void initState() {
@@ -108,6 +129,21 @@ class _CaptureOverlayState extends State<CaptureOverlay> {
     await windowManager.show();
     await windowManager.focus();
     if (mounted) setState(() {});
+  }
+
+  /// Reads the launch arguments into per-action bindings, falling back to
+  /// the defaults for anything absent or malformed — a hand-edited or
+  /// truncated argument string must not leave the overlay keyless.
+  Map<CaptureAction, String> _resolveBindings() {
+    final wire = widget.args.overlayKeys;
+    return {
+      for (final action in CaptureAction.values)
+        action: switch (wire?[action.wireName]) {
+          final raw? =>
+            normalizeCaptureHotkey(raw) ?? defaultCaptureKey(action),
+          _ => defaultCaptureKey(action),
+        },
+    };
   }
 
   /// Flutter-local logical point → physical screen pixel.
@@ -163,6 +199,76 @@ class _CaptureOverlayState extends State<CaptureOverlay> {
     final selection = _selection;
     if (selection == null) return null;
     return selection.intersect(_screen);
+  }
+
+  void _setMode(_Mode mode) {
+    setState(() {
+      _mode = mode;
+      _selection = null;
+      _hoveredWindow = null;
+    });
+  }
+
+  /// Handles a key press against the configured bindings.
+  ///
+  /// Sits on a [Focus] above the whole overlay, so it sees keys no matter
+  /// which toolbar button last held focus — and returning `handled` for a
+  /// bound key keeps e.g. `Enter` from also clicking the button under it.
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final accelerator = _acceleratorOf(event);
+    if (accelerator == null) return KeyEventResult.ignored;
+    final action = _keyActions[accelerator];
+    if (action == null) return KeyEventResult.ignored;
+    _runAction(action);
+    return KeyEventResult.handled;
+  }
+
+  /// Translates a key event into the canonical `modifier+key` string the
+  /// bindings are stored in. Modifier state comes from the keyboard rather
+  /// than the event because a `KeyDownEvent` only names the key that went
+  /// down — `Ctrl+Enter` arrives as `enter` with control already held.
+  String? _acceleratorOf(KeyEvent event) {
+    final key = captureKeyName(event.logicalKey);
+    if (key == null) return null;
+    final keyboard = HardwareKeyboard.instance;
+    return [
+      if (keyboard.isControlPressed) 'ctrl',
+      if (keyboard.isShiftPressed) 'shift',
+      if (keyboard.isAltPressed) 'alt',
+      if (keyboard.isMetaPressed) 'win',
+      key,
+    ].join('+');
+  }
+
+  void _runAction(CaptureAction action) {
+    switch (action) {
+      case CaptureAction.region:
+        _setMode(_Mode.region);
+      case CaptureAction.window:
+        _setMode(_Mode.window);
+      case CaptureAction.full:
+        _setMode(_Mode.full);
+      case CaptureAction.copy:
+        unawaited(_captureGuarded(pin: false));
+      case CaptureAction.pin:
+        unawaited(_captureGuarded(pin: true));
+      case CaptureAction.cancel:
+        _cancel();
+    }
+  }
+
+  /// [_capture] is async and the window stays open until it finishes, so a
+  /// held-down `Enter` would otherwise start a second capture on top of the
+  /// first — the guard makes the binding a single press.
+  Future<void> _captureGuarded({required bool pin}) async {
+    if (_capturing) return;
+    _capturing = true;
+    try {
+      await _capture(pin: pin);
+    } finally {
+      _capturing = false;
+    }
   }
 
   Future<void> _capture({required bool pin}) async {
@@ -232,49 +338,50 @@ class _CaptureOverlayState extends State<CaptureOverlay> {
         : null;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Listener(
-        onPointerDown: _onPointerDown,
-        onPointerMove: _onPointerMove,
-        onPointerUp: _onPointerUp,
-        child: CustomPaint(
-          painter: _OverlayPainter(
-            selection: localSelection,
-            hoveredWindow: localHover,
-          ),
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: _Toolbar(
-                    mode: _mode,
-                    canCapture: _captureRect != null || _mode == _Mode.full,
-                    onMode: (mode) => setState(() {
-                      _mode = mode;
-                      _selection = null;
-                      _hoveredWindow = null;
-                    }),
-                    onCopy: () => _capture(pin: false),
-                    onPin: () => _capture(pin: true),
-                    onCancel: _cancel,
-                  ),
-                ),
-              ),
-              if (_selection != null && _mode == _Mode.region)
-                Positioned(
-                  left: (_selection!.left - _screen.left) / _dpr + 8,
-                  top: (_selection!.top - _screen.top) / _dpr + 8,
-                  child: Text(
-                    '${_selection!.width.round()} × ${_selection!.height.round()}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      shadows: [Shadow(blurRadius: 4)],
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        child: Listener(
+          onPointerDown: _onPointerDown,
+          onPointerMove: _onPointerMove,
+          onPointerUp: _onPointerUp,
+          child: CustomPaint(
+            painter: _OverlayPainter(
+              selection: localSelection,
+              hoveredWindow: localHover,
+            ),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: _Toolbar(
+                      mode: _mode,
+                      bindings: _bindings,
+                      canCapture: _captureRect != null || _mode == _Mode.full,
+                      onMode: _setMode,
+                      onCopy: () => unawaited(_captureGuarded(pin: false)),
+                      onPin: () => unawaited(_captureGuarded(pin: true)),
+                      onCancel: _cancel,
                     ),
                   ),
                 ),
-            ],
+                if (_selection != null && _mode == _Mode.region)
+                  Positioned(
+                    left: (_selection!.left - _screen.left) / _dpr + 8,
+                    top: (_selection!.top - _screen.top) / _dpr + 8,
+                    child: Text(
+                      '${_selection!.width.round()} × ${_selection!.height.round()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        shadows: [Shadow(blurRadius: 4)],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -285,6 +392,7 @@ class _CaptureOverlayState extends State<CaptureOverlay> {
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.mode,
+    required this.bindings,
     required this.canCapture,
     required this.onMode,
     required this.onCopy,
@@ -293,11 +401,36 @@ class _Toolbar extends StatelessWidget {
   });
 
   final _Mode mode;
+
+  /// The overlay's key bindings, action → accelerator, so each button can
+  /// show the key that does the same thing.
+  final Map<CaptureAction, String> bindings;
   final bool canCapture;
   final ValueChanged<_Mode> onMode;
   final VoidCallback onCopy;
   final VoidCallback onPin;
   final VoidCallback onCancel;
+
+  /// The key hint for [action], or null when the binding cannot be spelled
+  /// — a hint is decoration, never a reason to hide the button.
+  String? _hint(CaptureAction action) {
+    final accelerator = bindings[action];
+    return accelerator == null ? null : captureHotkeyLabel(accelerator);
+  }
+
+  Widget _hinted(Widget child, String? hint) => hint == null
+      ? child
+      : Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            child,
+            const SizedBox(width: 4),
+            Text(
+              hint,
+              style: const TextStyle(fontSize: 11, color: Colors.white54),
+            ),
+          ],
+        );
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +446,10 @@ class _Toolbar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           minimumSize: Size.zero,
         ),
-        child: Text(label, style: const TextStyle(fontSize: 13)),
+        child: _hinted(
+          Text(label, style: const TextStyle(fontSize: 13)),
+          _hint(_modeActions[value]!),
+        ),
       ),
     );
     return Material(
@@ -335,18 +471,27 @@ class _Toolbar extends StatelessWidget {
                 backgroundColor: const Color(0xFF07C160),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
               ),
-              child: const Text('完成', style: TextStyle(fontSize: 13)),
+              child: _hinted(
+                const Text('完成', style: TextStyle(fontSize: 13)),
+                _hint(CaptureAction.copy),
+              ),
             ),
             const SizedBox(width: 6),
             TextButton(
               onPressed: canCapture ? onPin : null,
               style: TextButton.styleFrom(foregroundColor: Colors.white),
-              child: const Text('钉图', style: TextStyle(fontSize: 13)),
+              child: _hinted(
+                const Text('钉图', style: TextStyle(fontSize: 13)),
+                _hint(CaptureAction.pin),
+              ),
             ),
             TextButton(
               onPressed: onCancel,
               style: TextButton.styleFrom(foregroundColor: Colors.white70),
-              child: const Text('取消', style: TextStyle(fontSize: 13)),
+              child: _hinted(
+                const Text('取消', style: TextStyle(fontSize: 13)),
+                _hint(CaptureAction.cancel),
+              ),
             ),
           ],
         ),

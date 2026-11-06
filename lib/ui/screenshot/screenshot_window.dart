@@ -22,6 +22,7 @@ final class ScreenshotWindowArgs {
     this.entryId,
     this.pinId,
     this.pinKind,
+    this.overlayKeys,
   });
 
   /// Which window to run.
@@ -45,6 +46,12 @@ final class ScreenshotWindowArgs {
   /// overload [entryId].
   final String? pinKind;
 
+  /// The capture overlay's key bindings — action name to accelerator — for
+  /// [ScreenshotWindowKind.capture] only. Carried in the arguments because
+  /// the overlay runs in its own engine with no link back to the profile;
+  /// every other kind ignores it.
+  final Map<String, String>? overlayKeys;
+
   /// The arguments for the main window, which carries no payload.
   static const main = ScreenshotWindowArgs(kind: ScreenshotWindowKind.capture);
 
@@ -60,6 +67,7 @@ final class ScreenshotWindowArgs {
     if (entryId != null) 'id': entryId,
     if (pinId != null) 'pin': pinId,
     if (pinKind != null) 'pk': pinKind,
+    if (overlayKeys != null) 'keys': overlayKeys,
   };
 
   String encode() => jsonEncode(toJson());
@@ -99,7 +107,19 @@ final class ScreenshotWindowArgs {
       entryId: json['id'] as String?,
       pinId: json['pin'] as String?,
       pinKind: json['pk'] as String?,
+      overlayKeys: _stringMap(json['keys']),
     );
+  }
+
+  static Map<String, String>? _stringMap(Object? value) {
+    if (value is! Map) return null;
+    final map = <String, String>{};
+    for (final entry in value.entries) {
+      if (entry.key is String && entry.value is String) {
+        map[entry.key as String] = entry.value as String;
+      }
+    }
+    return map;
   }
 }
 
@@ -112,6 +132,7 @@ Future<WindowController> openScreenshotWindow(
   String? pinPath,
   String? entryId,
   String? pinId,
+  Map<String, String>? overlayKeys,
 }) async {
   final wanted = ScreenshotWindowArgs(
     kind: kind,
@@ -119,6 +140,7 @@ Future<WindowController> openScreenshotWindow(
     pinPath: pinPath,
     entryId: entryId,
     pinId: pinId,
+    overlayKeys: overlayKeys,
   );
   for (final controller in await WindowController.getAll()) {
     final args = ScreenshotWindowArgs.fromJson(

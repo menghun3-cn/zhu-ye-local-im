@@ -47,3 +47,7 @@ Windows 和 Android 调试构建检查：
 flutter build windows --debug
 flutter build apk --debug
 ```
+
+## 反馈问题或建议
+
+遇到问题或有建议，欢迎加入 QQ 交流群：[QQ交流群](https://qm.qq.com/q/rpttgcx0MC)

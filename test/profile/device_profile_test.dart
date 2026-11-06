@@ -5,6 +5,7 @@ import 'package:local_transfer/core/host/close_behaviour.dart';
 import 'package:local_transfer/core/identity/fingerprint.dart';
 import 'package:local_transfer/core/identity/owner_group.dart';
 import 'package:local_transfer/core/profile/device_profile.dart';
+import 'package:local_transfer/core/screenshot/capture_action.dart';
 import 'package:local_transfer/core/update/update_check_interval.dart';
 
 Fingerprint _fp(String seed) {
@@ -607,6 +608,150 @@ void main() {
         'platform': 'windows',
       });
       expect(restored.group.isAlone, isTrue);
+    });
+
+    group('the screenshot feature', () {
+      test(
+        'a new profile has it on, because the hotkey is opt-in by press',
+        () {
+          final profile = DeviceProfile(
+            self: _fp('a'),
+            alias: 'Desk',
+            platform: DevicePlatform.windows,
+          );
+          expect(profile.screenshotEnabled, isTrue);
+        },
+      );
+
+      test('a profile JSON missing the flag stays off — an old install '
+          'was never asked', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.screenshotEnabled, isFalse);
+      });
+    });
+
+    group('the capture-overlay keys', () {
+      test('a new profile carries the defaults for every action', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        expect(profile.captureKey(CaptureAction.region), 'q');
+        expect(profile.captureKey(CaptureAction.window), 'w');
+        expect(profile.captureKey(CaptureAction.full), 'e');
+        expect(profile.captureKey(CaptureAction.copy), 'enter');
+        expect(profile.captureKey(CaptureAction.pin), 'ctrl+enter');
+        expect(profile.captureKey(CaptureAction.cancel), 'escape');
+      });
+
+      test('custom bindings survive a JSON round trip', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setCaptureKey(CaptureAction.region, 'ctrl+shift+r');
+        profile.setCaptureKey(CaptureAction.cancel, 'f12');
+        final restored = DeviceProfile.fromJson(profile.toJson());
+        expect(restored.captureKey(CaptureAction.region), 'ctrl+shift+r');
+        expect(restored.captureKey(CaptureAction.cancel), 'f12');
+        expect(restored.captureKey(CaptureAction.copy), 'enter');
+      });
+
+      test('a profile JSON missing the map reads as all defaults', () {
+        final json = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        ).toJson();
+        json.remove('captureKeys');
+        final restored = DeviceProfile.fromJson(json);
+        expect(restored.captureKey(CaptureAction.region), 'q');
+        expect(restored.captureKey(CaptureAction.pin), 'ctrl+enter');
+      });
+
+      test('a malformed or colliding stored binding falls back per action', () {
+        final json = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        ).toJson();
+        json['captureKeys'] = {
+          'region': 'not a key',
+          'window': 'q', // collides with region's default
+          'copy': 42, // wrong type
+          'bogus': 'x', // an action this build does not know
+        };
+        final restored = DeviceProfile.fromJson(json);
+        expect(restored.captureKey(CaptureAction.region), 'q');
+        expect(restored.captureKey(CaptureAction.window), 'w');
+        expect(restored.captureKey(CaptureAction.copy), 'enter');
+        expect(restored.captureKey(CaptureAction.cancel), 'escape');
+      });
+
+      test('setCaptureKey refuses a binding another action holds', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        expect(
+          () => profile.setCaptureKey(CaptureAction.window, 'q'),
+          throwsArgumentError,
+        );
+        // Moving the incumbent first makes the same claim legal.
+        profile.setCaptureKey(CaptureAction.region, 'f9');
+        profile.setCaptureKey(CaptureAction.window, 'q');
+        expect(profile.captureKey(CaptureAction.window), 'q');
+      });
+
+      test('setCaptureKey normalizes modifier order before storing', () {
+        final profile = DeviceProfile(
+          self: _fp('a'),
+          alias: 'Desk',
+          platform: DevicePlatform.windows,
+        );
+        profile.setCaptureKey(CaptureAction.full, 'shift+ctrl+f7');
+        expect(profile.captureKey(CaptureAction.full), 'ctrl+shift+f7');
+      });
+    });
+  });
+
+  group('the capture-hotkey grammar', () {
+    test('bare keys and named keys are legal inside the overlay', () {
+      expect(isCaptureHotkey('q'), isTrue);
+      expect(isCaptureHotkey('enter'), isTrue);
+      expect(isCaptureHotkey('escape'), isTrue);
+      expect(isCaptureHotkey('ctrl+enter'), isTrue);
+      expect(isCaptureHotkey('shift+alt+f12'), isTrue);
+    });
+
+    test('the summon hotkey still demands a modifier and a plain key', () {
+      expect(isScreenshotHotkey('q'), isFalse);
+      expect(isScreenshotHotkey('enter'), isFalse);
+      expect(isScreenshotHotkey('ctrl+shift+a'), isTrue);
+    });
+
+    test('modifier-only, key-only-modifier-order and junk are refused', () {
+      expect(isCaptureHotkey('ctrl+shift'), isFalse);
+      expect(isCaptureHotkey('q+ctrl'), isFalse);
+      expect(isCaptureHotkey('ctrl++q'), isFalse);
+      expect(isCaptureHotkey(''), isFalse);
+      expect(isCaptureHotkey('hyper+q'), isFalse);
+    });
+
+    test('normalizeCaptureHotkey sorts modifiers into canonical order', () {
+      expect(
+        normalizeCaptureHotkey('win+alt+ctrl+shift+f5'),
+        'ctrl+shift+alt+win+f5',
+      );
+      expect(normalizeCaptureHotkey('q'), 'q');
+      expect(normalizeCaptureHotkey('junk'), isNull);
     });
   });
 
