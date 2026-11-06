@@ -46,6 +46,7 @@ String labelForState(TransferState state, AppLocalizations l10n) =>
       TransferState.completed => l10n.stateCompleted,
       TransferState.rejected => l10n.stateRejected,
       TransferState.cancelled => l10n.stateCancelled,
+      TransferState.withdrawn => l10n.stateWithdrawn,
       TransferState.failed => l10n.stateFailed,
     };
 
@@ -57,6 +58,7 @@ IconData iconForState(TransferState state) => switch (state) {
   TransferState.completed => Icons.check_circle_outline,
   TransferState.rejected => Icons.block,
   TransferState.cancelled => Icons.cancel_outlined,
+  TransferState.withdrawn => Icons.undo,
   TransferState.failed => Icons.error_outline,
 };
 
@@ -207,7 +209,8 @@ String? describeTransferDuration(
     TransferState.verifying => (now.toUtc().difference(view.at.toUtc()), true),
     TransferState.completed ||
     TransferState.failed ||
-    TransferState.cancelled => (
+    TransferState.cancelled ||
+    TransferState.withdrawn => (
       view.settledAt?.toUtc().difference(view.at.toUtc()),
       false,
     ),

@@ -44,6 +44,9 @@ enum TransferState {
   /// One side abandoned the Transfer.
   cancelled,
 
+  /// The message was withdrawn by the sender within the time window.
+  withdrawn,
+
   /// The Transfer could not complete.
   failed;
 
@@ -55,6 +58,7 @@ enum TransferState {
     TransferState.completed ||
     TransferState.rejected ||
     TransferState.cancelled ||
+    TransferState.withdrawn ||
     TransferState.failed => true,
   };
 }
@@ -139,6 +143,17 @@ final class TransferCancelled extends TransferOutcome {
   String toString() => 'TransferCancelled(${reason.wireName}, byPeer: $byPeer)';
 }
 
+/// The sender withdrew the message within the allowed time window.
+final class TransferWithdrawn extends TransferOutcome {
+  const TransferWithdrawn({required this.byPeer});
+
+  /// Whether the peer asked for the withdrawal, rather than this Device.
+  final bool byPeer;
+
+  @override
+  String toString() => 'TransferWithdrawn(byPeer: $byPeer)';
+}
+
 /// The Transfer could not complete.
 final class TransferFailed extends TransferOutcome {
   const TransferFailed({this.reason, this.itemId, this.detail});
@@ -209,6 +224,7 @@ abstract base class Transfer {
   int _transferred = 0;
   late int _totalBytes;
   List<PayloadItem> _accepted = const [];
+  DateTime? _completedAt;
 
   /// Where the Transfer has got to.
   TransferState get state => _state;
@@ -225,8 +241,14 @@ abstract base class Transfer {
   /// The items the receiver agreed to take. Empty until an Offer is answered.
   List<PayloadItem> get acceptedItems => _accepted;
 
+  /// When the Transfer completed, if it has.
+  DateTime? get completedAt => _completedAt;
+
   /// Whether the Transfer has ended.
   bool get isSettled => _state.isSettled;
+
+  /// Internal: the completion timestamp, accessible to subclasses.
+  DateTime? get completionTime => _completedAt;
 
   /// The current state and byte counts.
   TransferProgress get progress => TransferProgress(
@@ -248,6 +270,9 @@ abstract base class Transfer {
   void finish(TransferOutcome outcome) {
     if (_outcome.isCompleted) return;
     _state = _stateFor(outcome);
+    if (outcome is TransferCompleted) {
+      _completedAt = DateTime.now();
+    }
     _emit();
     _outcome.complete(outcome);
     onSettled();
@@ -319,6 +344,12 @@ abstract base class Transfer {
   /// in. Subclasses send the wire message that settles the far side.
   Future<void> cancel([RejectionReason reason = RejectionReason.declined]);
 
+  /// Withdraws this Transfer within the allowed time window.
+  ///
+  /// Only valid for outgoing text/image/file transfers that completed recently.
+  /// The sender can withdraw a message to remove it from both sides' history.
+  Future<void> withdraw();
+
   /// Called once, when the Transfer ends, to release whatever it was holding.
   void onSettled() {}
 
@@ -339,6 +370,7 @@ abstract base class Transfer {
     TransferCompleted() => TransferState.completed,
     TransferRejected() => TransferState.rejected,
     TransferCancelled() => TransferState.cancelled,
+    TransferWithdrawn() => TransferState.withdrawn,
     TransferFailed() => TransferState.failed,
   };
 
