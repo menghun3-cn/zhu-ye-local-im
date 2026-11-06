@@ -16,9 +16,13 @@ text, files and mirrored entries between paired Devices.
 
 The ask was deliberately Snipaste-shaped rather than "add a screenshot
 button": pin windows that persist across restarts, a floating history, an
-annotation editor, and a customizable global hotkey, gated behind a switch
-that is **off by default** because a global hotkey that captures the screen
-is the most invasive thing this app can do.
+annotation editor, and a customizable global hotkey, gated behind a
+switch. The switch originally defaulted **off** — a global hotkey that
+captures the screen is the most invasive thing this app can do — and was
+flipped to on-for-new-Devices on 2026-11-06; see
+[2026-11-06-screenshot-on-by-default-and-overlay-keys](2026-11-06-screenshot-on-by-default-and-overlay-keys.md)
+for that change and for the overlay's own key bindings, which this note
+predates.
 
 ## Decision
 
@@ -29,7 +33,8 @@ Flutter engine via `desktop_multi_window`:
   (`GetSystemMetrics(SM_*VIRTUALSCREEN)`), always-on-top and
   click-through-free. Region drag, window mode (`EnumWindows` +
   `WindowFromPoint` + `PrintWindow`, which captures occluded windows), and
-  full-screen mode, switchable from a toolbar. Finishing copies the PNG to
+  full-screen mode, switchable from a toolbar or the configurable
+  in-overlay keys added later. Finishing copies the PNG to
   the clipboard as `CF_DIB` — written by hand through Win32 because
   Flutter's `Clipboard` carries text only — and appends it to the history.
 * **History** — a `ScreenshotLibrary` (index JSON + one PNG per entry,
@@ -53,7 +58,9 @@ over the `Ctrl+Alt` family QQ and WeChat already own globally). A
 `ScreenshotService` in the main engine reconciles registration through
 `hotkey_manager` and pushes the enabled flag to the tray menu over the
 existing host channel; disabling unregisters the hotkey and hides the
-entries but keeps pins and history, which are the user's pictures.
+entries but keeps pins and history, which are the user's pictures. The
+overlay's own key bindings live beside them as `captureKeys`; see the
+2026-11-06 note for that addition.
 
 UIA control-boundary snapping was explicitly deferred: no plugin offers it
 and v1 ships ordinary reference-line selection.

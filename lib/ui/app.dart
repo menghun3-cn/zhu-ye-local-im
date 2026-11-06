@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
@@ -77,6 +78,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   StreamSubscription<void>? _screenshotTray;
   bool? _screenshotEnabledSeen;
   String? _screenshotHotkeySeen;
+  Map<String, String>? _screenshotKeysSeen;
 
   @override
   void initState() {
@@ -176,13 +178,21 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     if (service == null) return;
     final enabled = controller.screenshotEnabled;
     final hotkey = controller.screenshotHotkey;
+    final keys = controller.screenshotCaptureKeyWire;
     if (!force &&
         enabled == _screenshotEnabledSeen &&
-        hotkey == _screenshotHotkeySeen) {
+        hotkey == _screenshotHotkeySeen &&
+        mapEquals(keys, _screenshotKeysSeen)) {
       return;
     }
     _screenshotEnabledSeen = enabled;
     _screenshotHotkeySeen = hotkey;
+    _screenshotKeysSeen = keys;
+    // The overlay reads its bindings from the service at capture time, so
+    // they are pushed even when nothing about the hotkey registration
+    // changed — an edited key takes effect on the next overlay, not the
+    // next restart.
+    service.captureKeys = keys;
     await service.syncHotkey(enabled: enabled, accelerator: hotkey);
     await widget.seams.hostShell.setScreenshotEnabled(enabled);
   }

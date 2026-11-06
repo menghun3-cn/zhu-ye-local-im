@@ -43,6 +43,18 @@ final class ScreenshotService {
   final String? libraryPath;
   final String? pinPath;
 
+  /// The capture overlay's key bindings, as action name → accelerator.
+  ///
+  /// Pushed by the app on every profile sync rather than passed per call:
+  /// [openCapture] is invoked by the global hotkey, which has no profile
+  /// in hand, and the bindings only matter at the moment the overlay
+  /// opens. Defaults to the profile defaults so a capture opened before
+  /// the first sync still has sane keys.
+  Map<String, String> captureKeys = {
+    for (final action in CaptureAction.values)
+      action.wireName: defaultCaptureKey(action),
+  };
+
   HotKey? _registered;
   bool _restored = false;
 
@@ -92,6 +104,7 @@ final class ScreenshotService {
       ScreenshotWindowKind.capture,
       libraryPath: libraryPath,
       pinPath: pinPath,
+      overlayKeys: captureKeys,
     );
   }
 
