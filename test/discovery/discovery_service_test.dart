@@ -31,6 +31,12 @@ final class _ProbeTransport implements BeaconTransport {
   InternetAddress? sentTo;
   int? sentPort;
 
+  /// Every unicast send this transport was asked for, in order.
+  final List<({InternetAddress address, int port})> sends = [];
+
+  /// How many broadcasts this transport was asked for.
+  int broadcasts = 0;
+
   @override
   Stream<BeaconDatagram> get received => _received.stream;
 
@@ -43,6 +49,7 @@ final class _ProbeTransport implements BeaconTransport {
     sent = datagram;
     sentTo = address;
     sentPort = port;
+    sends.add((address: address, port: port));
   }
 
   void answer(DeviceDescriptor device, InternetAddress from) {
@@ -60,7 +67,9 @@ final class _ProbeTransport implements BeaconTransport {
   }
 
   @override
-  void broadcast(List<int> datagram) {}
+  void broadcast(List<int> datagram) {
+    broadcasts++;
+  }
 
   @override
   Future<void> close() => _received.close();
@@ -287,6 +296,119 @@ void main() {
       expect(peer?.device.alias, 'beta');
       expect(peer?.address.address, target.address);
       expect(peer?.sessionPort, 51002);
+
+      await alpha.close();
+    });
+
+    test('unicast targets are probed on their own cadence', () async {
+      final transport = _ProbeTransport();
+      final alpha = DiscoveryService(
+        transport: transport,
+        local: testDevice('alpha', listenPort: 51001),
+        announceInterval: const Duration(seconds: 30),
+        sweepInterval: const Duration(seconds: 30),
+        unicastTargets: () async => [
+          InternetAddress('100.64.0.1'),
+          InternetAddress('100.64.0.2'),
+          // A duplicate must not cost a second datagram.
+          InternetAddress('100.64.0.1'),
+        ],
+        unicastProbeInterval: const Duration(milliseconds: 40),
+      );
+      alpha.start();
+
+      await until(() => transport.sends.length >= 4, description: '两轮单播探测发出');
+
+      // Two distinct targets per round: the duplicate was dropped.
+      expect(transport.sends.map((send) => send.address.address).toSet(), {
+        '100.64.0.1',
+        '100.64.0.2',
+      });
+      expect(
+        transport.sends.every((send) => send.port == discoveryPort),
+        isTrue,
+      );
+
+      await alpha.close();
+    });
+
+    test('unicast targets are capped per round', () async {
+      final transport = _ProbeTransport();
+      final alpha = DiscoveryService(
+        transport: transport,
+        local: testDevice('alpha', listenPort: 51001),
+        announceInterval: const Duration(seconds: 30),
+        sweepInterval: const Duration(seconds: 30),
+        unicastTargets: () async => [
+          for (var i = 0; i < 10; i++) InternetAddress('100.64.0.$i'),
+        ],
+        unicastProbeInterval: const Duration(milliseconds: 40),
+        maxUnicastTargets: 3,
+      );
+      alpha.start();
+
+      await until(() => transport.sends.length >= 3, description: '第一轮单播探测发出');
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      // Ten targets were offered; every round sent a multiple of the cap,
+      // never all ten.
+      expect(transport.sends.length, greaterThanOrEqualTo(3));
+      expect(transport.sends.length % 3, 0);
+
+      await alpha.close();
+    });
+
+    test('a failing unicast provider does not stop discovery', () async {
+      final transport = _ProbeTransport();
+      var calls = 0;
+      final alpha = DiscoveryService(
+        transport: transport,
+        local: testDevice('alpha', listenPort: 51001),
+        announceInterval: const Duration(milliseconds: 40),
+        sweepInterval: const Duration(seconds: 30),
+        unicastTargets: () async {
+          calls++;
+          throw StateError('no directory');
+        },
+        unicastProbeInterval: const Duration(milliseconds: 40),
+      );
+      alpha.start();
+
+      await until(
+        () => transport.broadcasts > 0 && calls > 0,
+        description: '广播照常、provider 被调用',
+      );
+      expect(alpha.isRunning, isTrue);
+
+      await alpha.close();
+    });
+
+    test('an announce answering a unicast probe joins the peer list', () async {
+      final transport = _ProbeTransport();
+      final alpha = DiscoveryService(
+        transport: transport,
+        local: testDevice('alpha', listenPort: 51001),
+        announceInterval: const Duration(seconds: 30),
+        sweepInterval: const Duration(seconds: 30),
+        unicastTargets: () async => [InternetAddress('100.64.0.9')],
+        unicastProbeInterval: const Duration(milliseconds: 40),
+      );
+      alpha.start();
+
+      await until(() => transport.sends.isNotEmpty, description: '单播探测发出');
+      transport.answer(
+        testDevice('beta', listenPort: 51002),
+        InternetAddress('100.64.0.9'),
+      );
+
+      await until(
+        () => alpha.currentPeers.length == 1,
+        description: '应答者进入 peer 列表',
+      );
+      final peer = alpha.currentPeers.single;
+      expect(peer.device.alias, 'beta');
+      expect(peer.address.address, '100.64.0.9');
+      expect(peer.sessionPort, 51002);
 
       await alpha.close();
     });

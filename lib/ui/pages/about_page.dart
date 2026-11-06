@@ -9,6 +9,7 @@ import '../labels.dart';
 import '../update_check.dart';
 import '../update_install.dart';
 import '../update_notes.dart';
+import '../update_session.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -36,83 +37,49 @@ import '../widgets.dart';
 /// process asks first — [_ConfirmUpdateDialog] — because the last thing this
 /// build does before its window goes away is close itself on purpose.
 class AboutPage extends StatefulWidget {
-  /// Shows what this build is, installing [offeredUpdate] when asked to.
-  const AboutPage({
-    super.key,
-    this.offeredUpdate,
-    this.installRequest = 0,
-    this.installOnOpen = false,
-    this.onUpdateBusyChanged,
-    this.onUpdateProgressChanged,
-  });
+  /// Shows what this build is, installing through [session] when asked to.
+  const AboutPage({super.key, this.session, this.onUpdateBusyChanged});
 
-  /// What the application's own update check found, when it was asked at all.
+  /// The update the shell is carrying out, when there is one.
   ///
-  /// Handed down by the shell from the notice it already holds — see
-  /// `UpdateNotice`, which is asked once as the application comes up — so that
-  /// the rail's update entry can start an install on a card that has not been
-  /// opened and asked first. It is *not* shown for that reason alone: the
-  /// answer is adopted only when a request arrives, which is what keeps this
-  /// card saying nothing until somebody asks it something.
-  final UpdateCheck? offeredUpdate;
-
-  /// How many times the user has asked for the newer build to be installed.
-  ///
-  /// Counted by the shell, which is the only thing that knows the rail's
-  /// update entry was pressed. A change in it is that press arriving: the
-  /// rail has no room for a download's progress, the question before closing
-  /// or the sentence an attempt ends in, and this card has all three — so the
-  /// entry hands the work here rather than duplicating it in a 72-pixel strip.
-  ///
-  /// A counter rather than a pending flag, so that two presses are two
-  /// installs and a rebuild in between is not one.
-  final int installRequest;
-
-  /// Whether this page's first frame should start the install it was opened for.
-  ///
-  /// The rail's entry can arrive before this card has ever been built. A
-  /// counter cannot be "seen" by a widget that did not exist for the previous
-  /// value, so the page that opens the card for that press says so once here;
-  /// every later press still travels as [installRequest].
-  final bool installOnOpen;
+  /// The download, its progress, the package waiting for the question and the
+  /// sentence a failure arrives as all live in the session rather than here,
+  /// because this page is not always built: My shows it only while its
+  /// sub-page is open, and a download owned by a page that can go away is a
+  /// download that goes away with it. A session handed in is the shell's and
+  /// outlives this page; one made here is this page's own, for a tree that
+  /// has no shell above it — a test, mostly.
+  final UpdateInstallSession? session;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
-  /// The rail has no room for the download's detail, so the one thing it needs
-  /// from the card is whether its own entry may be pressed: while a download or
-  /// the closing hand-over is in flight a second press must not be possible.
+  /// The rail has no room for a download's progress, so the one thing it needs
+  /// from the card is whether its own entry may be pressed while the card's
+  /// own *check* is out — the install's phases are heard from the session
+  /// itself, which is why they are not reported through here any more.
   final ValueChanged<bool>? onUpdateBusyChanged;
-
-  /// What the shell's rail entry should draw while an update is in flight.
-  ///
-  /// Null when nothing is being installed; a stage while it is. The rail turns
-  /// the download's byte counts into the one percentage it has room for, and
-  /// every other stage into the same "updating" state.
-  final ValueChanged<UpdateInstallProgress?>? onUpdateProgressChanged;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
 }
 
 class _AboutPageState extends State<AboutPage> {
-  /// The last answer, or null while none has been asked for.
+  /// The session this page reports, handed in or made for this page alone.
+  late final UpdateInstallSession _session;
+
+  /// Whether [_session] was made here and is this state's to dispose.
+  bool _ownsSession = false;
+
+  /// The last answer this card asked for, or null while none has been.
+  ///
+  /// The session keeps its own answer — the one an install was started
+  /// for — and it is the one the card describes while there is one; this is
+  /// the fallback for the ordinary "check for updates" road.
   UpdateCheck? _answer;
 
   /// Whether a question is out. The button is inert while it is, because a
   /// second press would only ask the same thing again.
   bool _asking = false;
-
-  /// What an update is doing, or null when none is.
-  ///
-  /// Held here rather than in the notice the rail reads: the rail's entry is
-  /// about *asking*, and an update is something a person pressed a button on
-  /// this card to start. Switching surfaces and coming back leaves it where it
-  /// was — the shell keeps every page alive — which is what a user who started
-  /// a download and went to look at something else will expect to find.
-  UpdateInstallProgress? _progress;
-
-  /// Why an update this run did not happen, or null.
-  UpdateInstallFailure? _failure;
 
   /// Why the last hand-over this app ever attempted did not finish, or null.
   ///
@@ -122,84 +89,102 @@ class _AboutPageState extends State<AboutPage> {
   /// window that came and went.
   UpdateInstallFailure? _leftOver;
 
-  /// What has been fetched and checked, waiting for the word that puts it in
-  /// place, or null.
+  /// The prepared update the question has already been asked about, or null.
   ///
-  /// Kept rather than thrown away when the question is answered no: the package
-  /// is already in the update folder, so offering it again costs nothing and
-  /// fetching it again would cost twenty megabytes for nothing.
-  PreparedUpdate? _prepared;
+  /// A package that appears is followed by the question once — the way it
+  /// always was — unless it is one a restart found on disk, which is offered
+  /// rather than announced. Answering no keeps the package, and the press
+  /// that asks again is a new [UpdateInstallSession.confirmRequests] count,
+  /// not this field changing.
+  PreparedUpdate? _askedPrepared;
 
-  /// Whether the question before closing is on screen.
-  ///
-  /// Separate from [_prepared]: a ready package is not work in flight once the
-  /// question has been answered, but while the question is open a second press
-  /// must not open a second one.
-  bool _confirmingUpdate = false;
-
-  /// The newest progress the rail has not been told about yet.
-  ///
-  /// Reports are coalesced to the end of the frame: an install can be started
-  /// from `didUpdateWidget`, where asking the parent to rebuild immediately
-  /// would be a `setState` during build, and a download reports once per
-  /// received chunk — more often than the rail's one percentage can change.
-  UpdateInstallProgress? _progressToReport;
-  bool _hasProgressToReport = false;
-  bool _progressReportScheduled = false;
+  /// The session's [UpdateInstallSession.confirmRequests] this page has
+  /// already answered, so a request made while the page was not built is not
+  /// replayed on every visit — only a press that arrives while it is.
+  int _seenConfirmRequests = 0;
 
   @override
   void initState() {
     super.initState();
+    final handed = widget.session;
+    _session = handed ?? UpdateInstallSession();
+    _ownsSession = handed == null;
     _leftOver = UpdateInstallResolution.installer.previousFailure();
-    if (widget.installOnOpen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_install(offered: widget.offeredUpdate));
-      });
-    }
-  }
-
-  /// Tells the rail whether an update is in flight, when there is a rail.
-  void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
-
-  /// Tells the rail what the update is doing, at most once a frame.
-  void _reportProgress(UpdateInstallProgress? progress) {
-    if (widget.onUpdateProgressChanged == null) return;
-    _progressToReport = progress;
-    _hasProgressToReport = true;
-    if (_progressReportScheduled) return;
-    _progressReportScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _progressReportScheduled = false;
-      if (!mounted || !_hasProgressToReport) return;
-      final latest = _progressToReport;
-      _progressToReport = null;
-      _hasProgressToReport = false;
-      widget.onUpdateProgressChanged?.call(latest);
-    });
+    _seenConfirmRequests = _session.confirmRequests;
+    _session.addListener(_onSession);
+    // The session may already hold an answer from before this page existed —
+    // a download that finished while the user was on another surface, or a
+    // package a restart found. The question it leads to needs a frame first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onSession());
   }
 
   @override
-  void didUpdateWidget(AboutPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // The rail's entry was pressed. The answer it was drawn from is adopted
-    // first: the card may never have been asked, and an install needs a
-    // version to fetch.
-    final installRequest = widget.installRequest;
-    if (installRequest == oldWidget.installRequest) return;
-    // While a download is in flight or the page is asking GitHub, a second
-    // press is only the same request again, so it is dropped rather than
-    // queued twice. Once the package is ready, `_busy` is null again and a
-    // later press is what is behind the currently open question — it has to
-    // reach this same dialog, not become a second install.
-    if (_asking || (_busy && _prepared == null)) return;
-    unawaited(_install(offered: widget.offeredUpdate ?? _answer));
+  void dispose() {
+    _session.removeListener(_onSession);
+    if (_ownsSession) _session.dispose();
+    super.dispose();
   }
 
-  /// Whether an update is in flight.
-  bool get _busy => _progress != null;
+  /// Tells the rail whether the card's own check is in flight.
+  void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
 
   /// Whether this build can replace itself.
   bool get _canInstall => UpdateInstallResolution.installer.supported;
+
+  /// Reacts to whatever the session now holds.
+  ///
+  /// The session's fields are the card's fields, so the first thing every
+  /// change gets is a rebuild. Two things are not drawing and follow it: a
+  /// prepared update that has not been asked about — which is followed by the
+  /// question, the way it always was, unless a restart found it on disk and
+  /// it is only offered — and a request for the question counted while this
+  /// page was not built, which is answered the moment it is. The leftover
+  /// hand-over sentence is also retired here: once an update is under way or
+  /// has ended, it is a report about a run that is no longer this one.
+  void _onSession() {
+    if (!mounted) return;
+    setState(() {
+      if (_leftOver != null &&
+          (_session.progress != null ||
+              _session.prepared != null ||
+              _session.failure != null)) {
+        _leftOver = null;
+      }
+    });
+    final prepared = _session.prepared;
+    if (prepared != null && prepared != _askedPrepared) {
+      _askedPrepared = prepared;
+      if (!_session.preparedIsRestore) _askToApply();
+      return;
+    }
+    if (_session.confirmRequests != _seenConfirmRequests) {
+      _seenConfirmRequests = _session.confirmRequests;
+      if (_session.prepared != null) _askToApply();
+    }
+  }
+
+  /// Puts the question an update asks before anything closes.
+  ///
+  /// A dialog of its own rather than a line on the card: what it is asking
+  /// about is the window going away, and a question that shared a surface
+  /// with the progress it follows would read as one more status line.
+  /// Answering no is the quiet option and also the safe one — the package
+  /// stays in the update folder and the application carries on exactly as it
+  /// was.
+  Future<void> _askToApply() async {
+    final prepared = _session.prepared;
+    if (prepared == null || !mounted) return;
+    final restarts = UpdateInstallResolution.installer.restartsApplication;
+    final closing = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ConfirmUpdateDialog(
+        version: _session.answer?.version ?? '',
+        restartsApplication: restarts,
+      ),
+    );
+    if (!mounted || closing != true) return;
+    await _session.apply(prepared);
+  }
 
   /// Asks GitHub again, because somebody pressed the button that says so.
   Future<void> _check() async {
@@ -212,168 +197,21 @@ class _AboutPageState extends State<AboutPage> {
     setState(() {
       _answer = answer;
       _asking = false;
-      // A fresh question invalidates anything a previous one readied: the
-      // version it named may not be the one on offer now, and a package for a
-      // version nobody asked about is litter with a download in it.
-      _prepared = null;
     });
+    // A fresh question invalidates anything a previous one readied: the
+    // version it named may not be the one on offer now, and a package for a
+    // version nobody asked about is litter with a download in it.
+    _session.reset();
     _reportBusy(false);
-  }
-
-  /// Downloads the newer build, checks it, and hands this folder over to it.
-  ///
-  /// In two steps with a question between them. The first is everything that
-  /// can be done while this build still runs — fetching, checking, unpacking —
-  /// and it answers with what is ready or why nothing is. What is left ends the
-  /// process, because the files it replaces are open until it does, so the user
-  /// is asked before anything closes: on success this does not come back, and
-  /// what the page shows after that call is the last thing the old build draws.
-  ///
-  /// [offered] is the answer to install when the caller has one this page was
-  /// never asked for — the rail's update entry, pressing straight through to
-  /// here from the application's own check. It defaults to what this card last
-  /// asked, which is the road this page's own button takes. Either way the
-  /// answer is adopted as this page's own, so the card describes the update it
-  /// is carrying out rather than staying silent about one that is under way.
-  ///
-  /// The rail is told about the phases out of band — after the build phase a
-  /// press-pushed `didUpdateWidget` is in, the parent shell must not be marked
-  /// dirty from inside it. The enter/exit edges of the update are reported by
-  /// the async work itself, so whichever press opened them lands with the
-  /// frame.
-  Future<void> _install({UpdateCheck? offered}) async {
-    // The button is disabled as soon as the first progress state lands. Guard
-    // the method itself as well so two entry points in one frame cannot start
-    // two downloads before that disabled frame is drawn.
-    if (_busy || _confirmingUpdate) return;
-    final answer = offered ?? _answer;
-    if (answer == null || answer.outcome != UpdateOutcome.available) return;
-    final installer = UpdateInstallResolution.installer;
-    final restarts = installer.restartsApplication;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
-    setState(() => _answer = answer);
-    var prepared = _prepared;
-    if (prepared == null) {
-      setState(() {
-        _failure = null;
-        _leftOver = null;
-        _progress = const UpdateInstallProgress(UpdateInstallStage.downloading);
-      });
-      _reportProgress(
-        const UpdateInstallProgress(UpdateInstallStage.downloading),
-      );
-      final staged = await installer.prepare(
-        answer,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _progress = progress);
-            _reportProgress(progress);
-          }
-        },
-      );
-      if (!mounted) return;
-      prepared = staged.prepared;
-      if (prepared == null) {
-        setState(() {
-          _failure = staged.failure;
-          _progress = null;
-        });
-        _reportProgress(null);
-        _reportBusy(false);
-        return;
-      }
-      setState(() {
-        _prepared = prepared;
-        // Nothing is in flight any more: what is left is a question, and a
-        // progress bar over a question is a claim about work that is not
-        // happening.
-        _progress = null;
-      });
-      _reportProgress(null);
-    }
-    // The question. Everything the update still has to do ends this process,
-    // and the user is the one who has to say so — the package is already in
-    // place, so answering no costs nothing and changes nothing.
-    setState(() => _confirmingUpdate = true);
-    final closing = await showDialog<bool>(
-      context: context,
-      builder: (_) => _ConfirmUpdateDialog(
-        version: answer.version ?? '',
-        restartsApplication: restarts,
-      ),
-    );
-    if (!mounted) return;
-    setState(() {
-      _confirmingUpdate = false;
-      if (closing != true) _progress = null;
-    });
-    if (closing != true) {
-      _reportProgress(null);
-      _reportBusy(false);
-      return;
-    }
-    const handingOver = UpdateInstallProgress(UpdateInstallStage.handingOver);
-    const installing = UpdateInstallProgress(UpdateInstallStage.installing);
-    setState(() {
-      // The question is past: what is left closes this program, so the buttons
-      // that opened the question have nothing left to say. Windows draws
-      // nothing during the hand-over either — the new window is what the user
-      // asked for, and the installer's own progress is silent too. Android
-      // still hands itself to the system installer, whose progress is real.
-      if (!restarts) _progress = installing;
-    });
-    _reportProgress(restarts ? handingOver : installing);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(true));
-    try {
-      await installer.apply(
-        prepared,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _progress = progress);
-            _reportProgress(progress);
-          }
-        },
-      );
-    } on UpdateInstallException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _failure = error.failure;
-        _progress = null;
-      });
-      _reportProgress(null);
-      _reportBusy(false);
-      return;
-    } on Object {
-      if (!mounted) return;
-      setState(() {
-        _failure = UpdateInstallFailure.installer;
-        _progress = null;
-      });
-      _reportProgress(null);
-      _reportBusy(false);
-      return;
-    }
-    if (!mounted) return;
-    if (!restarts) {
-      // Android returns as soon as the system installer has been opened. The
-      // APK stays on disk so cancelling there and pressing again costs no new
-      // download.
-      setState(() => _progress = null);
-    }
-    _reportProgress(null);
-    // A scripted installer returns without ending the process; the real one
-    // never reaches here. Unlock only so a test that walks through the whole
-    // flow does not leave the rail pinned behind it.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportBusy(false));
   }
 
   /// Whether an install or its download is in flight.
   ///
-  /// This includes the time the confirmation question is open, to prevent
-  /// double-clicking the button. A package that is ready but no longer being
-  /// asked about is not in flight: answering no leaves it in place, and the
-  /// same button is the way to ask about it again.
-  bool get _installing => _progress != null || _confirmingUpdate;
+  /// The session's own busy edge: while a package is merely *waiting* for the
+  /// question nothing is running, and the button stays live — pressing it is
+  /// how the question is asked again, which is what answering no leaves
+  /// behind.
+  bool get _installing => _session.busy;
 
   /// What an update that is under way is doing, as a sentence.
   ///
@@ -412,7 +250,7 @@ class _AboutPageState extends State<AboutPage> {
 
   /// Where a newer build can be fetched, when one has been found.
   String? get _downloadUrl {
-    final answer = _answer;
+    final answer = _session.answer ?? _answer;
     if (answer == null || answer.outcome != UpdateOutcome.available) {
       return null;
     }
@@ -424,16 +262,20 @@ class _AboutPageState extends State<AboutPage> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colors = WeChatColors.of(context);
-    final answer = _answer;
+    // The session's answer is the one an install was started for — adopted
+    // from the rail's entry or this card's own press — and it is the one the
+    // card describes while there is one. The card's own last check is the
+    // fallback for the ordinary road.
+    final answer = _session.answer ?? _answer;
     final url = _downloadUrl;
     // Empty for the three outcomes that carry no release, which is what makes
     // the panel below appear exactly when there is a better version to describe
     // — `UpdateCheck.notes` is filled by `parseRelease` for that case alone.
     final notes = readUpdateNotes(answer?.notes);
-    final progress = _progress;
-    final failure = _failure;
+    final progress = _session.progress;
+    final failure = _session.failure;
     final leftOver = _leftOver;
-    final prepared = _prepared;
+    final prepared = _session.prepared;
     final installer = UpdateInstallResolution.installer;
     final restarts = installer.restartsApplication;
     final canInstall =
@@ -496,7 +338,7 @@ class _AboutPageState extends State<AboutPage> {
                       onPressed: _asking || _installing
                           ? null
                           : canInstall
-                          ? () => unawaited(_install())
+                          ? () => unawaited(_session.install(answer!))
                           : () => unawaited(_check()),
                       icon: const Icon(Icons.system_update_alt, size: 18),
                       label: Text(

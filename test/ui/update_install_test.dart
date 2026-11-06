@@ -772,6 +772,116 @@ void main() {
         ),
       );
     });
+
+    group('hasFetchedPackage', () {
+      /// A release naming the portable package, checked by [digest].
+      UpdateCheck portableRelease(String digest) => UpdateCheck(
+        UpdateOutcome.available,
+        version: 'v9.9.9',
+        assets: [
+          UpdateAsset(
+            name: 'LocalTransfer-9.9.9-windows-x64-portable.zip',
+            url: 'https://example.test/portable.zip',
+            size: 10,
+            digest: digest,
+          ),
+        ],
+      );
+
+      /// The package on disk under [root]'s update folder, with its digest.
+      (Directory, String) fetchedPackage(String body) {
+        final root = folder('lt_app_');
+        final update = updateDirectory(root.path);
+        File(
+          pathUnder(
+            update.path,
+            'LocalTransfer-9.9.9-windows-x64-portable.zip',
+          ),
+        ).writeAsStringSync(body);
+        return (root, 'sha256:${sha256.convert(utf8.encode(body))}');
+      }
+
+      test('is true for a package that is there and matches', () async {
+        if (!Platform.isWindows) return;
+        final (root, digest) = fetchedPackage('the whole package');
+        final installer = PlatformUpdateInstaller(application: root.path);
+
+        expect(
+          await installer.hasFetchedPackage(portableRelease(digest)),
+          isTrue,
+        );
+      });
+
+      test('is false when nothing was fetched', () async {
+        if (!Platform.isWindows) return;
+        final installer = PlatformUpdateInstaller(
+          application: folder('lt_app_').path,
+        );
+
+        expect(
+          await installer.hasFetchedPackage(
+            portableRelease('sha256:${sha256.convert(utf8.encode('x'))}'),
+          ),
+          isFalse,
+        );
+      });
+
+      test('is false when what is there is not what was published', () async {
+        // A half-written or corrupted package is not a finished download:
+        // treating it as one would skip the fetch that would fix it.
+        if (!Platform.isWindows) return;
+        final (root, _) = fetchedPackage('half of a package');
+        final installer = PlatformUpdateInstaller(application: root.path);
+
+        expect(
+          await installer.hasFetchedPackage(
+            portableRelease('sha256:${sha256.convert(utf8.encode('other'))}'),
+          ),
+          isFalse,
+        );
+      });
+
+      test('is false when the release carries no checksum to match', () async {
+        if (!Platform.isWindows) return;
+        final (root, digest) = fetchedPackage('the whole package');
+        final installer = PlatformUpdateInstaller(application: root.path);
+
+        expect(
+          await installer.hasFetchedPackage(portableRelease(digest)),
+          isTrue,
+        );
+        expect(
+          await installer.hasFetchedPackage(
+            UpdateCheck(
+              UpdateOutcome.available,
+              version: 'v9.9.9',
+              assets: const [
+                UpdateAsset(
+                  name: 'LocalTransfer-9.9.9-windows-x64-portable.zip',
+                  url: 'https://example.test/portable.zip',
+                  size: 10,
+                ),
+              ],
+            ),
+          ),
+          isFalse,
+          reason: 'an asset with no published checksum cannot be verified',
+        );
+      });
+
+      test('is false on a platform that cannot install', () async {
+        final (root, digest) = fetchedPackage('the whole package');
+        final installer = PlatformUpdateInstaller(
+          application: root.path,
+          platform: UpdateInstallPlatform.other,
+        );
+
+        expect(
+          await installer.hasFetchedPackage(portableRelease(digest)),
+          isFalse,
+        );
+      });
+    });
   });
 
   group('the update folder', () {

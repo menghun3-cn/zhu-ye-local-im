@@ -165,9 +165,9 @@ void main() {
     // and fetch it by hand.
     expect(find.byType(ScriptedLinkOpener), findsNothing);
 
-    // It hands the job to the My surface, which has the About card that has room
-    // for a download's progress and the question before closing — and the card
-    // is already open, because the press was the request that opened it.
+    // It hands the job to the My surface, and opens the About card it was
+    // handed to — a press that landed on the card list would have started a
+    // download the user cannot see.
     expect(selectedSurface(tester, window: windowA), mySurface);
     expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
     await pumpUntil(
@@ -197,8 +197,8 @@ void main() {
 
     await tester.tap(updateEntry(windowA));
     await settleRoute(tester);
-    // The rail entry navigates to My and opens the About card it hands the
-    // install to, so the question is already the one on screen.
+    // The rail entry navigates to My and opens the About card the session's
+    // install is shown on, so the question is already the one on screen.
     expect(selectedSurface(tester, window: windowA), mySurface);
     expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
     await pumpUntil(

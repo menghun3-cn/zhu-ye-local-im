@@ -286,22 +286,15 @@ Finder _buttonShowing(Finder scope, String label) => find.descendant(
 
 /// Opens the card titled [label] on the My page.
 ///
-/// The My page shows four cards, each with a "View details" button. This helper
-/// taps that button to open the corresponding page as a route.
+/// The My page shows four cards, each tappable as a whole — there is no
+/// separate "view details" button; the card's [InkWell] is the way in. This
+/// helper taps the card's title, which is inside it.
 Future<void> openMyCard(
   WidgetTester tester,
   String label, {
   required TestWindow window,
 }) async {
-  // Find the view details button that is in the same card as the title
-  final button = window.within(
-    find.ancestor(of: find.text(label), matching: find.byType(Card)),
-  );
-  final detailsButton = find.descendant(
-    of: button,
-    matching: find.text(l10n.myViewDetails),
-  );
-  await tester.tap(detailsButton);
+  await tester.tap(window.within(find.text(label)));
   await settleRoute(tester);
 }
 
@@ -1263,6 +1256,7 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
     this.applyFailure,
     this.leftOver,
     this.hold,
+    this.fetched = false,
   });
 
   /// Whether this stand-in says it can replace the build it is running in.
@@ -1289,10 +1283,17 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
   /// What [previousFailure] answers.
   final UpdateInstallFailure? leftOver;
 
+  /// What [hasFetchedPackage] answers: whether a finished download is already
+  /// waiting in the update folder, as a restart would find it.
+  final bool fetched;
+
   /// When set, [prepare] reports [progress] and then waits for this to complete
   /// instead of answering — a download that is still running, which is the only
   /// way a test can look at the middle of one.
   final Completer<UpdatePrepareResult>? hold;
+
+  /// Every answer [hasFetchedPackage] was asked about, in order.
+  final List<UpdateCheck> fetchedAsked = [];
 
   /// Every answer the installer was handed, in order.
   final List<UpdateCheck> askedFor = [];
@@ -1314,6 +1315,7 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
     UpdateInstallFailure? applyFailure,
     UpdateInstallFailure? leftOver,
     Completer<UpdatePrepareResult>? hold,
+    bool fetched = false,
   }) {
     final installer = ScriptedUpdateInstaller(
       supported: supported,
@@ -1324,6 +1326,7 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
       applyFailure: applyFailure,
       leftOver: leftOver,
       hold: hold,
+      fetched: fetched,
     );
     UpdateInstallResolution.installer = installer;
     addTearDown(UpdateInstallResolution.reset);
@@ -1332,6 +1335,12 @@ class ScriptedUpdateInstaller implements UpdateInstaller {
 
   @override
   UpdateInstallFailure? previousFailure() => leftOver;
+
+  @override
+  Future<bool> hasFetchedPackage(UpdateCheck check) async {
+    fetchedAsked.add(check);
+    return fetched;
+  }
 
   @override
   Future<UpdatePrepareResult> prepare(

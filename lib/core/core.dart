@@ -16,6 +16,7 @@ export 'discovery/beacon.dart';
 export 'discovery/beacon_transport.dart';
 export 'discovery/discovery_service.dart';
 export 'discovery/peer_registry.dart';
+export 'discovery/tailscale_directory.dart';
 export 'discovery/udp_beacon_transport.dart';
 export 'emoji/emoji.dart';
 export 'history/conversation_reading.dart';

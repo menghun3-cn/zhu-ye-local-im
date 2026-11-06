@@ -170,6 +170,68 @@ void main() {
       registry.close();
     });
 
+    test('a peer heard on two links keeps both addresses', () {
+      var now = DateTime(2026, 9, 29, 12);
+      final registry = PeerRegistry(
+        localFingerprint: me.fingerprint,
+        clock: () => now,
+      );
+      final lan = InternetAddress('192.168.1.20');
+      final vpn = InternetAddress('100.64.0.20');
+
+      registry.observe(device: alice, address: lan);
+      now = now.add(const Duration(seconds: 1));
+      // Heard again on the VPN: a second sighting, not a move.
+      expect(registry.observe(device: alice, address: vpn), isTrue);
+
+      final peer = registry.peers.single;
+      expect(peer.addresses.map((s) => s.address.address), [
+        '100.64.0.20',
+        '192.168.1.20',
+      ]);
+      expect(peer.address.address, '100.64.0.20');
+
+      // A re-announce on the LAN address refreshes that sighting only: the
+      // address set is unchanged, so nothing visible happened — but the
+      // freshest address honestly moves to the one just heard.
+      now = now.add(const Duration(seconds: 1));
+      expect(registry.observe(device: alice, address: lan), isFalse);
+      expect(registry.peers.single.address.address, '192.168.1.20');
+
+      registry.close();
+    });
+
+    test('each address expires on its own schedule', () {
+      var now = DateTime(2026, 9, 29, 12);
+      final registry = PeerRegistry(
+        localFingerprint: me.fingerprint,
+        ttl: const Duration(seconds: 10),
+        clock: () => now,
+      );
+      final lan = InternetAddress('192.168.1.20');
+      final vpn = InternetAddress('100.64.0.20');
+
+      registry.observe(device: alice, address: lan);
+      now = now.add(const Duration(seconds: 5));
+      registry.observe(device: alice, address: vpn);
+
+      // The LAN sighting is now five seconds stale; the VPN one is fresh.
+      now = now.add(const Duration(seconds: 6));
+      final dropped = registry.expire();
+      expect(dropped, isEmpty, reason: 'the VPN sighting still answers');
+
+      final peer = registry.peers.single;
+      expect(peer.addresses.map((s) => s.address.address), ['100.64.0.20']);
+      expect(peer.address.address, '100.64.0.20');
+
+      // Once the last sighting ages out the peer itself is dropped.
+      now = now.add(const Duration(seconds: 11));
+      expect(registry.expire(), [alice.fingerprint]);
+      expect(registry.peers, isEmpty);
+
+      registry.close();
+    });
+
     test('peers are listed most recently seen first', () {
       var now = DateTime(2026, 9, 29, 12);
       final registry = PeerRegistry(

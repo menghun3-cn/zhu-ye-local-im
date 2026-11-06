@@ -325,6 +325,17 @@ abstract interface class UpdateInstaller {
   /// failure the user has already dealt with.
   UpdateInstallFailure? previousFailure();
 
+  /// Whether the package [check] names is already in the update folder,
+  /// whole and matching the checksum the release published.
+  ///
+  /// The question a restart asks before deciding there is nothing to resume:
+  /// a fetch that finished leaves its package behind — see the note at the
+  /// top of this file — and this is how a later run finds it without asking
+  /// the network anything. False covers every "no": nothing fetched, a
+  /// partial still in flight, a file that is not what the release published,
+  /// and a platform that cannot install at all.
+  Future<bool> hasFetchedPackage(UpdateCheck check);
+
   /// Fetches [check] and stages it: everything that can be done while this
   /// build is still running.
   ///
@@ -441,6 +452,32 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
       _platform == UpdateInstallPlatform.windows
       ? readHandoverReport(File(_within(_root, handoverReportName)))
       : null;
+
+  @override
+  Future<bool> hasFetchedPackage(UpdateCheck check) async {
+    if (!supported) return false;
+    // The same question prepare asks of the same facts: which payload this
+    // shape of copy needs, which file the release calls it, and whether what
+    // is on disk is it. Only the digest is read — a missing file answers the
+    // same way a wrong one does, which is the answer this method owes.
+    final payload = _platform == UpdateInstallPlatform.android
+        ? UpdatePayload.androidPackage
+        : File(_within(_root, installedCopyMarker)).existsSync()
+        ? UpdatePayload.installer
+        : UpdatePayload.portablePackage;
+    final asset = updateAssetFor(check, payload);
+    final expected = asset?.sha256;
+    if (asset == null || expected == null) return false;
+    try {
+      final update = updateDirectory(_root);
+      return await _matchesDigest(
+        File(_within(update.path, _fileName(asset.name))),
+        expected,
+      );
+    } on Object {
+      return false;
+    }
+  }
 
   @override
   Future<UpdatePrepareResult> prepare(

@@ -5,8 +5,8 @@ import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
-import '../update_install.dart';
 import '../update_notice.dart';
+import '../update_session.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 import 'about_page.dart';
@@ -127,9 +127,9 @@ class MyPage extends StatefulWidget {
     super.key,
     required this.seams,
     this.update,
-    this.installRequest = 0,
+    this.installSession,
+    this.openAboutRequests = 0,
     this.onUpdateBusyChanged,
-    this.onUpdateProgressChanged,
   });
 
   /// The platform facts a page needs but the controller does not carry.
@@ -139,14 +139,22 @@ class MyPage extends StatefulWidget {
   /// something that knows.
   final UpdateNotice? update;
 
-  /// How many times the user has asked for the newer build to be installed.
+  /// The update the shell is carrying out, when there is one.
   ///
-  /// Counted by the shell, which is the only thing that knows the rail's
-  /// update entry was pressed. A change in it is that press arriving: the
-  /// rail has no room for a download's progress, the question before closing
-  /// or the sentence an attempt ends in, and the About card has all three — so
-  /// the entry hands the work here rather than duplicating it in a 72-pixel strip.
-  final int installRequest;
+  /// Handed to the About card, which is where an install's progress, its
+  /// question and its failure are shown. The session outlives this page — it
+  /// is owned by the shell — so a download that is under way when the user
+  /// backs out to the card list is still there when they return.
+  final UpdateInstallSession? installSession;
+
+  /// How many times the rail's update entry has asked for the About card.
+  ///
+  /// The session owns the install itself — the press reaches it directly — so
+  /// all this page owes a request is the sub-page the card lives on: a press
+  /// that landed on the card list would have started a download the user
+  /// cannot see. A counter rather than a flag, so that every press is a
+  /// request even when the card was already open.
+  final int openAboutRequests;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
@@ -154,12 +162,6 @@ class MyPage extends StatefulWidget {
   /// from the card is whether its own entry may be pressed: while a download or
   /// the closing hand-over is in flight a second press must not be possible.
   final ValueChanged<bool>? onUpdateBusyChanged;
-
-  /// What the shell's rail entry should draw while an update is in flight.
-  ///
-  /// Forwarded unchanged from the About card: the rail owns no update work of
-  /// its own, so it can only ever be a projection of what that card reports.
-  final ValueChanged<UpdateInstallProgress?>? onUpdateProgressChanged;
 
   @override
   State<MyPage> createState() => _MyPageState();
@@ -169,57 +171,23 @@ class _MyPageState extends State<MyPage> {
   /// Which sub-page is currently shown, or null for the card list.
   _SubPage? _currentSubPage;
 
-  /// Whether an update is in flight.
-  ///
-  /// Relayed rather than owned here: the About card is where the work happens,
-  /// and this page passes the state up to the rail that asked for it.
-  bool _updateLocked = false;
-
-  /// Whether the About card now open was opened *for* an install request.
-  ///
-  /// The card only reads this once, when it is first built; it is cleared after
-  /// that first frame, so a later visit to the same card does not start the
-  /// download again.
-  bool _installOnOpen = false;
-
-  /// Tells the rail whether an update is in flight, when there is a rail.
+  /// Tells the rail whether the About card's own check is in flight.
   void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
 
-  /// Tells the rail what the update is doing, when there is a rail.
-  void _reportProgress(UpdateInstallProgress? progress) =>
-      widget.onUpdateProgressChanged?.call(progress);
-
-  /// Reports that the update a press started has reached [busy].
+  /// Reports that the About card's own check has reached [busy].
   ///
-  /// This is called by the About card, which is where the actual work happens.
-  void _setUpdateLocked(bool busy) {
-    if (busy) _installOnOpen = false;
-    if (_updateLocked == busy) return;
-    setState(() => _updateLocked = busy);
-    _reportBusy(busy);
-  }
+  /// This is called by the About card. The install's phases are not reported
+  /// here — the shell hears those from the session directly, which is what
+  /// lets the download survive this page never being built at all.
+  void _setUpdateLocked(bool busy) => _reportBusy(busy);
 
   @override
   void didUpdateWidget(MyPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.installRequest == oldWidget.installRequest) return;
-    if (_currentSubPage == _SubPage.about) {
-      // The card is already there and sees the counter itself; telling it to
-      // install on open as well would be the same press counted twice.
-      _installOnOpen = false;
-      return;
-    }
-    _installOnOpen = true;
+    if (widget.openAboutRequests == oldWidget.openAboutRequests) return;
+    // The press that started the install wants the card that shows it: the
+    // download's progress, the question before closing, the failure sentence.
     _currentSubPage = _SubPage.about;
-    // The flag is only for the card's first frame. Clearing it here rather than
-    // waiting for the install to report busy means a request that turns out not
-    // to start — no installable answer reached the card — cannot linger and
-    // start a later visit by itself.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _installOnOpen) {
-        setState(() => _installOnOpen = false);
-      }
-    });
   }
 
   /// Opens a sub-page.
@@ -321,11 +289,8 @@ class _MyPageState extends State<MyPage> {
           _SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
           Expanded(
             child: AboutPage(
-              offeredUpdate: widget.update?.answer,
-              installRequest: widget.installRequest,
-              installOnOpen: _installOnOpen,
+              session: widget.installSession,
               onUpdateBusyChanged: _setUpdateLocked,
-              onUpdateProgressChanged: _reportProgress,
             ),
           ),
         ],

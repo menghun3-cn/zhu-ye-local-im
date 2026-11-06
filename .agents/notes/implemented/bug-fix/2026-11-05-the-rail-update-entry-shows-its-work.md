@@ -4,83 +4,85 @@ Status: implemented
 
 English | [中文](2026-11-05-the-rail-update-entry-shows-its-work.zh.md)
 
-Narrows [the rail entry installs instead of opening a browser](../feature/2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md):
-the install still belongs to the About card, but the rail entry now has to prove
-the press landed and report the compact state it has room for.
+Narrows [the rail entry installs instead of opening a browser](../feature/2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md)
+and builds on [the update download owned by a session](2026-11-05-update-download-session.md):
+the install already survives the page that asked for it, but the rail entry
+still has to prove the press landed and say what it has room to say.
 
 ## Problem
 
-After the automatic check found a newer build, the rail showed 「更新」. Pressing
-it could look like nothing happened: the shell switched to the My surface, but
-the About card is a sub-page inside My, so an `installRequest` counter alone did
-not open it or start the install. The rail also only knew a boolean "busy"
-answer, so it could not say that the press had been accepted, could not show
-that work was running, and could not show how far the download had got.
+After the automatic check found a newer build, the rail showed 「更新」. A press
+started the install in the session and switched to the My surface — but landed
+on the card list, where nothing about the download was visible, and the entry
+itself only knew a boolean "busy" answer: it could be greyed, but it could not
+say the press had been accepted, could not say work was running, and could not
+show how far the download had got. To a user the button still looked dead.
 
 ## Decision
 
-**The rail press opens the card it hands the install to.** `MyPage` treats a
-new `installRequest` as "open About and start once" through `installOnOpen`;
-once the About card exists, later presses still travel as the counter and are
-answered by `didUpdateWidget`. The one-shot flag is cleared after the first
-frame, so a request that turns out not to start cannot linger and start a later
-visit by itself.
+**The rail press opens the card that shows the work.** The session owns the
+install — the press reaches it directly, whenever the About card happens to be
+built — so all `MyPage` owes a request is the sub-page the card lives on:
+`openAboutRequests` is a counter the shell increments beside `_index`, and a
+change in it opens `_SubPage.about`. A counter rather than a flag, so every
+press is a request even when the card was already open; the card itself needs
+no install-on-open path, because there is no request for it to consume — the
+session already has the work.
 
-**The rail draws the newest stage the card reports.** `AboutPage` forwards
-`UpdateInstallProgress` through `MyPage` to `HomeShell`, coalesced to at most
-one report per frame because a download reports per received chunk and an
-install can be started from `didUpdateWidget`. While progress is non-null the
-entry is disabled and reads 「更新中」 / "Updating"; a download with known byte
-counts adds the percentage line, and every other stage is the same updating
-state. Null restores 「更新」 / "Update".
+**The rail draws the state the session reports.** `HomeShell` already listens
+to the session for the busy edge; it now also keeps `_sessionPercent`, the
+rounded percentage a download with known byte counts earns. The comparison is
+on the displayed values, not the progress objects, so a per-chunk report does
+not rebuild the rail faster than the number can change. While the session is
+busy the entry is disabled and reads 「更新中」 / "Updating"; a known download
+fraction adds the percentage line, and every other stage is the same updating
+state. When the session goes idle — failure, cancellation, or the hand-over —
+the entry reads 「更新」 again and is the retry.
 
-**A ready package is not the same as work in flight.** `_confirmingUpdate`
-separates "the question before closing is open" from "a package is prepared".
-Answering no, failing, or handing off to the installer clears the in-flight
-state without discarding the package, so the same control is the retry and does
-not fetch twenty megabytes again.
+**The prepared-but-unanswered window stays pressable.** `session.busy` is
+false while a package waits for the question, so the entry is not locked
+behind a modal dialog it could not reach anyway; a press there counts another
+`confirmRequests`, which is how the card asks the same question again rather
+than starting a second download.
 
 ## Alternatives considered
 
-**Keep the press as only a surface switch.** Rejected: that is the reported
-bug. A user who presses 「更新」 and lands on a card list has been given no
-evidence that anything was asked for.
+**Let the press land on the card list.** Rejected: the download would run
+invisibly except for the rail label, and the progress bar, the question and
+the failure sentence would all sit one more tap away. The press asked for the
+update; showing its card is the answer.
 
-**Let the shell own a second download state.** Rejected: the rail would then
-have its own idea of what "downloading" means, beside the About card's real one.
-Two sources for one update drift; the rail is a projection of the card's
-reports, not a second installer.
-
-**Report only busy, not progress.** Rejected: the requirement is that the
-button show updating and, where possible, a percentage. A boolean can grey the
-entry but cannot say how far the download has got.
+**Plumb a progress callback from the card upward.** Rejected: the card is a
+view over the session now, and the shell already listens to that session — a
+second reporting channel would be a second source for one update.
 
 **Draw a progress bar in the rail.** Rejected: the rail is 84 pixels wide and
 already carries an icon plus a label. The About card keeps the byte counts and
 the determinate bar; the rail carries the one percentage it has room for.
 
+**Lock the entry while the question is open.** Rejected: `session.busy` is
+already false there, and locking would hide the one press that means "ask me
+again" — the question is modal, so the entry could not be pressed regardless.
+
 ## Consequences
 
-- `lib/ui/pages/my_page.dart` opens the About sub-page for a new
-  `installRequest` and forwards `UpdateInstallProgress` upward.
-- `lib/ui/pages/about_page.dart` accepts `installOnOpen` and
-  `onUpdateProgressChanged`, reports progress at frame boundaries, and uses
-  `_confirmingUpdate` so prepared-but-answered-no state re-enables the action.
-- `lib/ui/home_shell.dart` stores the latest reported progress and passes it to
-  the rail entry, which disables itself and switches from 「更新」 to
-  「更新中」 plus a percentage when the download's byte counts are known.
+- `lib/ui/home_shell.dart` tracks `_sessionPercent` beside `_sessionBusy`,
+  passes `openAboutRequests` to `MyPage`, and gives `_UpdateEntry` the
+  `updating`/`percent` pair that selects 「更新中」 plus the percentage.
+- `lib/ui/pages/my_page.dart` opens the About sub-page when `openAboutRequests`
+  changes; it owns no install state at all.
 - `lib/l10n/app_en.arb` and `lib/l10n/app_zh.arb` add `railUpdateRunning` and
   `railUpdatePercent`; generated localizations are committed.
-- `test_flutter/ui/update_rail_test.dart` now asserts that the press opens
-  About and starts the installer, that the entry is disabled and shows the
-  percentage while a held download is in flight, and that failure restores the
-  retry. `test_flutter/support/ui_harness.dart` finds the entry by its icon so
-  the finder still works after the label changes.
+- `test_flutter/ui/update_rail_test.dart` asserts that the press opens About
+  and reaches the installer, that a held download disables the entry and shows
+  the percentage, and that failure restores the retry.
+- `test_flutter/support/ui_harness.dart` finds the entry by its icon so the
+  finder still works after the label changes.
 
 ## Testing
 
 `flutter test test_flutter/ui/update_rail_test.dart` and
-`flutter test test_flutter/ui/about_page_test.dart` cover the rail opening the
-card, the held-download disabled/percentage state, retry after failure,
+`flutter test test_flutter/ui/update_session_test.dart` cover the rail opening
+the card, the held-download disabled/percentage state, retry after failure,
 prepared-package reuse after a cancelled question, and the Android installer
 handoff.

@@ -38,12 +38,15 @@ Discovery is UDP broadcast on a fixed port, in `lib/core/discovery/`:
 - `beacon.dart` — the datagram format: `{v, k, n, device}` where `v` is
   `beaconVersion` (1), `k` is `probe` or `announce`, `n` is a per-Device random
   Nonce, and `device` is the same `DeviceDescriptor` a handshake carries.
-- `peer_registry.dart` — the peer table, keyed by Fingerprint, with a TTL.
+- `peer_registry.dart` — the peer table, keyed by Fingerprint with a TTL, keeping every address a peer was heard at;
 - `beacon_transport.dart` — the seam, plus an in-memory hub for tests.
 - `udp_beacon_transport.dart` — the real socket, bound to `discoveryPort`
   (47654) with `broadcastEnabled`.
 - `discovery_service.dart` — the policy: probe at start, announce every three
   seconds, answer a probe directly, expire peers after ten seconds of silence.
+  It also sends its probe **unicast** to provider-named addresses on a faster
+  cadence, for the links broadcast cannot cross — see
+  [discovery across VPNs and tailnets](../../implemented/feature/2026-11-05-discovery-across-vpn-and-tailnets.md).
 
 The wire is deliberately **unauthenticated**. Any host can send a beacon and any
 host can read one; nothing about a beacon proves anything about its sender. It
@@ -137,12 +140,13 @@ inviting.
 
 ## Consequences
 
-- Discovery answers "who is on this link", and nothing else. Cross-subnet
-  discovery — one of the two gaps this product exists to close (see
-  [build-from-scratch-not-fork-localsend](2026-09-29-build-from-scratch-not-fork-localsend.md))
-  — is **not implemented**. Broadcast does not cross a router boundary, so a
-  phone on cellular-adjacent Wi-Fi and a laptop on Ethernet will not see each
-  other. This is a named gap, not an oversight.
+- Broadcast itself still answers "who is on this link", and nothing else.
+  Cross-subnet discovery is now partially covered — unicast probes reach the
+  addresses a provider names (remembered peers, tailnet members) — by
+  [discovery across VPNs and tailnets](../../implemented/feature/2026-11-05-discovery-across-vpn-and-tailnets.md).
+  What remains uncovered is the cold start between two Devices that have
+  never met on a network nobody enumerated: no broadcast, no memory, no
+  directory. That residue is a named gap, not an oversight.
 - The beacon is a wire format and is now versioned (`beaconVersion`). An
   unknown version is rejected rather than half-understood, so a future change to
   discovery cannot silently interoperate with this one.

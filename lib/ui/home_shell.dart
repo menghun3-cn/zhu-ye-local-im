@@ -11,8 +11,10 @@ import 'pages/conversations_page.dart';
 import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
+import 'update_check.dart';
 import 'update_install.dart';
 import 'update_notice.dart';
+import 'update_session.dart';
 import 'wechat/theme.dart';
 
 /// Where the Conversations surface sits, for the one place that has to name it.
@@ -114,31 +116,54 @@ class _HomeShellState extends State<HomeShell> {
   /// and come back.
   int _conversationArrivals = 1;
 
-  /// How many times the rail's update entry has been pressed.
+  /// The update this shell is carrying out, if any.
   ///
-  /// The entry is where a user presses "install the newer build", and the
-  /// About card (reachable from My) is where an install is carried out — see
-  /// [_mySurface]. A counter rather than a call, because the shell cannot
-  /// reach into a page that is built in the `IndexedStack` below: what travels
-  /// down is the count, and the card answers the change.
-  int _installRequests = 0;
+  /// Owned here rather than by the About card because the card is not always
+  /// built — My builds it only while its sub-page is open — and a download
+  /// that died with the page would be a download the user has to start over.
+  /// The shell is the one widget that outlives every surface, which is what
+  /// lets a fetch finish in the background and a finished package survive a
+  /// restart — see `update_session.dart`.
+  final UpdateInstallSession _installSession = UpdateInstallSession();
+
+  /// Whether the session reports work in flight, for the rail's lock.
+  bool _sessionBusy = false;
+
+  /// The percentage the rail can show for the update in flight, or null.
+  ///
+  /// Tracked as the rounded number rather than the progress object: the entry
+  /// draws exactly this and nothing else, and comparing it is what keeps a
+  /// per-chunk report from rebuilding the rail faster than the number can
+  /// change.
+  int? _sessionPercent;
+
+  /// How many times the rail's update entry has asked for the About card.
+  ///
+  /// The session owns the install itself — the press reaches it directly — so
+  /// all the My page owes a request is the sub-page the card lives on. A
+  /// counter rather than a flag, so that every press is a request even when
+  /// the card was already open.
+  int _aboutRequests = 0;
+
+  /// The notice currently being listened to for restore lookups.
+  UpdateNotice? _watchedUpdate;
 
   /// Whether an install is under way and the entry must go quiet.
   ///
   /// The shell cannot see into the About card, so the card reports the phases
-  /// that must pin the entry: from the press until the attempt ends — failure,
-  /// cancellation, or the closing hand-over — a second press must not be able
-  /// to queue a second download. The question before closing sits inside that
-  /// window: it is modal, so the entry could not be pressed anyway, and a
-  /// disabled entry is the honest state for an install the card still owns.
+  /// that must pin the entry: the update *check* the card runs on its own
+  /// button. The install's own phases are heard from [_installSession]
+  /// directly — a download or the closing hand-over locks the entry all the
+  /// way through, while the moment between a successful download and the
+  /// question stays unlocked so that a second press can find the question the
+  /// first press opened.
   bool _updateLocked = false;
 
-  /// What the update in flight is doing, when the card has said.
-  ///
-  /// Null means the entry is not mid-update and draws its plain label. A
-  /// download's byte counts become the one percentage the rail has room for;
-  /// every other stage is the same "updating" state.
-  UpdateInstallProgress? _updateProgress;
+  @override
+  void initState() {
+    super.initState();
+    _installSession.addListener(_syncSessionBusy);
+  }
 
   @override
   void didChangeDependencies() {
@@ -149,7 +174,42 @@ class _HomeShellState extends State<HomeShell> {
     _windowActivity ??= widget.seams.hostShell.windowActivity.listen(
       _setWindowActive,
     );
+    _watchUpdate(widget.update);
     _syncUnread();
+  }
+
+  /// Hears the session's reports for the rail's lock and label.
+  void _syncSessionBusy() {
+    final busy = _installSession.busy;
+    final percent = _railPercent(_installSession.progress);
+    if (busy == _sessionBusy && percent == _sessionPercent) return;
+    setState(() {
+      _sessionBusy = busy;
+      _sessionPercent = percent;
+    });
+  }
+
+  /// Follows [update] for the answer a restore is looked up from.
+  ///
+  /// The notice is the app's one answer to "is there a newer build", asked
+  /// once as the application comes up and again on the interval the profile
+  /// names. Whenever it lands on a version, the session is asked whether a
+  /// download for it already finished on an earlier run — the package the
+  /// update folder keeps is what makes a restart cheap.
+  void _watchUpdate(UpdateNotice? update) {
+    if (identical(update, _watchedUpdate)) return;
+    _watchedUpdate?.removeListener(_restoreFetched);
+    _watchedUpdate = update;
+    update?.addListener(_restoreFetched);
+    _restoreFetched();
+  }
+
+  /// Asks the session to look for a finished download once the notice has an
+  /// answer worth restoring for.
+  void _restoreFetched() {
+    final answer = widget.update?.answer;
+    if (answer?.outcome != UpdateOutcome.available) return;
+    unawaited(_installSession.restore(answer!));
   }
 
   void _setWindowActive(bool active) {
@@ -173,9 +233,20 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   @override
+  void didUpdateWidget(HomeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.update, oldWidget.update)) {
+      _watchUpdate(widget.update);
+    }
+  }
+
+  @override
   void dispose() {
     unawaited(_changes?.cancel());
     unawaited(_windowActivity?.cancel());
+    _watchedUpdate?.removeListener(_restoreFetched);
+    _installSession.removeListener(_syncSessionBusy);
+    _installSession.dispose();
     super.dispose();
   }
 
@@ -192,26 +263,27 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  /// Brings the My surface forward and asks it to install what was found.
+  /// Brings the My surface forward and asks for the newer build to be
+  /// installed.
   ///
   /// What the rail's update entry does when it is pressed. It used to leave the
   /// application for a browser, which made a user who had just been told a newer
   /// build exists go and fetch it by hand — the one thing an entry pinned to the
   /// rail should save them. It installs instead: the answer the entry was drawn
-  /// from is *already here*, on the notice that found it, and the About card
-  /// (reachable from My) carries the whole of what an install does.
-  ///
-  /// The card is where the work happens rather than here, because the rail has
-  /// nowhere to put any of it: [WeChat.railWidth] pixels hold neither a
-  /// download's progress, nor the question an update asks before it closes this
-  /// program, nor the sentence an attempt ends in. So the shell switches to the
-  /// one surface that has all three and passes the count down; the card answers
-  /// the change, and a press that arrives while one is already under way is
-  /// dropped rather than queued — two downloads of one package is one too many.
+  /// from is *already here*, on the notice that found it, and the session is
+  /// where the download lives — so the fetch starts on the press rather than
+  /// waiting for the About card to be opened, and it keeps running if the user
+  /// looks at something else meanwhile. The card has the room for the
+  /// progress, the question before closing and the failure sentence, which is
+  /// why the shell still brings its surface forward — and the About card
+  /// itself, because a press that lands on the card list has shown the user
+  /// nothing of the work it started.
   void _installUpdate() {
+    final answer = widget.update?.answer;
+    if (answer != null) unawaited(_installSession.install(answer));
     setState(() {
       _index = _mySurface;
-      _installRequests++;
+      _aboutRequests++;
     });
   }
 
@@ -226,15 +298,6 @@ class _HomeShellState extends State<HomeShell> {
   void _setUpdateLocked(bool busy) {
     if (_updateLocked == busy) return;
     setState(() => _updateLocked = busy);
-  }
-
-  /// Reports what the update in flight is doing, for the entry's label.
-  ///
-  /// The card reports at most once a frame, so this is a projection rather
-  /// than a second source of truth: the rail draws the newest stage it was
-  /// told about and owns none of the work itself.
-  void _setUpdateProgress(UpdateInstallProgress? progress) {
-    setState(() => _updateProgress = progress);
   }
 
   @override
@@ -264,9 +327,9 @@ class _HomeShellState extends State<HomeShell> {
       MyPage(
         seams: widget.seams,
         update: widget.update,
-        installRequest: _installRequests,
+        installSession: _installSession,
+        openAboutRequests: _aboutRequests,
         onUpdateBusyChanged: _setUpdateLocked,
-        onUpdateProgressChanged: _setUpdateProgress,
       ),
     ];
     // The three surfaces, in the order both layouts show them. One list rather
@@ -340,8 +403,9 @@ class _HomeShellState extends State<HomeShell> {
                     : _UpdateEntry(
                         version: version,
                         onInstall: _installUpdate,
-                        enabled: !_updateLocked,
-                        progress: _updateProgress,
+                        enabled: !_updateLocked && !_sessionBusy,
+                        updating: _sessionBusy,
+                        percent: _sessionPercent,
                       ),
               );
             },
@@ -406,6 +470,17 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
+/// The percentage the rail can show for [progress], or null.
+///
+/// Only a download whose total size is known earns a number; every other
+/// stage — and a download that has not learned its length yet — is the same
+/// "updating" state without one.
+int? _railPercent(UpdateInstallProgress? progress) {
+  if (progress?.stage != UpdateInstallStage.downloading) return null;
+  final fraction = progress?.fraction;
+  return fraction == null ? null : (fraction * 100).round();
+}
+
 /// The rail's update entry: one state on the rail, the version on the hover.
 ///
 /// The rail has room for one word — plus one percentage while a download's byte
@@ -426,7 +501,8 @@ class _UpdateEntry extends StatelessWidget {
     required this.version,
     required this.onInstall,
     required this.enabled,
-    this.progress,
+    required this.updating,
+    this.percent,
   });
 
   /// The newer version, named on the hover.
@@ -444,22 +520,24 @@ class _UpdateEntry extends StatelessWidget {
   /// so a second press cannot queue a second download.
   final bool enabled;
 
-  /// What the update in flight is doing, or null when none is.
+  /// Whether the session the press started is still working.
   ///
-  /// The rail has room for one word and one number, so a download's byte
-  /// counts become a percentage and every other stage is the same updating
-  /// state.
-  final UpdateInstallProgress? progress;
+  /// Drawn as 「更新中」 rather than 「更新」: the press was accepted, and the
+  /// entry saying so is the difference between "it worked" and "it looked
+  /// dead". The About card keeps the byte counts and the stage sentences —
+  /// the rail carries the one state it has room for.
+  final bool updating;
+
+  /// The download's percentage, when its byte counts are known.
+  ///
+  /// Null for every other stage and for a download whose length is not known
+  /// yet: those are the same "updating" state without a number.
+  final int? percent;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
-    final updating = !enabled || progress != null;
-    final fraction = progress?.stage == UpdateInstallStage.downloading
-        ? progress?.fraction
-        : null;
-    final percent = fraction == null ? null : (fraction * 100).round();
     return Padding(
       // Room to breathe under the last destination: without it the entry sits
       // flush against the bottom edge of the window and reads as a tab that has
@@ -504,9 +582,9 @@ class _UpdateEntry extends StatelessWidget {
                 updating ? l10n.railUpdateRunning : l10n.railUpdate,
                 style: const TextStyle(fontSize: WeChat.fontSizeMeta),
               ),
-              if (percent != null)
+              if (updating && percent != null)
                 Text(
-                  l10n.railUpdatePercent(percent),
+                  l10n.railUpdatePercent(percent!),
                   style: const TextStyle(fontSize: WeChat.fontSizeMeta),
                 ),
             ],

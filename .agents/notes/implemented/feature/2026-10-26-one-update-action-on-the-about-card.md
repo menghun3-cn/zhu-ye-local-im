@@ -28,12 +28,12 @@ The card owns one filled primary action in one position:
 - `Check for updates` when no installable update is known.
 - `Checking…`, disabled, while the check is in flight.
 - `Update` after an available update and a supported in-app installer.
-- `Update`, disabled, while download, verification, staging, hand-over, or the
-  confirmation question is in progress. Progress text remains separate and
-  names the phase.
+- `Update`, disabled, while the session reports work in flight — download,
+  verification, staging or hand-over. Progress text remains separate and names
+  the phase.
 - `Update` again after failure or after a cancelled confirmation. A prepared
-  package is reused, and the install entry refuses a call while `_busy` or
-  `_confirmingUpdate`.
+  package is reused: while it waits for the question the action stays live, and
+  a press counts another `confirmRequests` rather than a second download.
 
 Windows and Android share the `aboutUpdate` string, "Update". Platform-specific
 hint and confirmation copy still explains restart versus opening the system
@@ -69,9 +69,9 @@ identical.
   confirmation.
 - The secondary `Open the download page` control remains unchanged and is
   disabled while checking or updating.
-- `_install` rejects a call while `_busy` or the confirmation question is open,
-  independently of the disabled button, so two entry points cannot start two
-  downloads before the disabled frame is rendered.
+- `UpdateInstallSession.install` joins a prepare already running and turns a
+  press that finds a prepared package into a `confirmRequests` bump, so two
+  entry points cannot start two downloads.
 
 ## Testing
 
