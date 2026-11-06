@@ -795,6 +795,47 @@ void main() {
       await shutdown(tester, [device]);
     });
 
+    testWidgets('the card counts the platform default as a receive folder', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
+      );
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+
+      // Nothing has been chosen, but the platform's own folder is where a
+      // file would land — the card must not call that "unset".
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummary)),
+        findsOneWidget,
+      );
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummaryUnset)),
+        findsNothing,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the card says unset when no folder exists at all', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummaryUnset)),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
     testWidgets('says so when there is nowhere to keep an identity', (
       tester,
     ) async {
