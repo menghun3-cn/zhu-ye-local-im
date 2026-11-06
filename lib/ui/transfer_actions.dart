@@ -140,7 +140,7 @@ Future<void> shareByLink(BuildContext context, TransferView view) async {
 
   if (!context.mounted) return;
 
-  final link = linkTransfer.createLink(path);
+  final link = await linkTransfer.createLink(path);
   if (link == null) {
     if (overlay != null) {
       await TopToast.showIn(overlay, l10n.shareByLinkFailed);
