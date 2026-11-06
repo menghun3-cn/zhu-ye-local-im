@@ -253,8 +253,18 @@ class LinkTransferServer {
 
   /// Gets the local IP address for the download link.
   String _getLocalIp() {
-    // This would need platform-specific implementation
-    // For now, return localhost as fallback
+    try {
+      final interfaces = NetworkInterface.listSync();
+      for (final interface in interfaces) {
+        for (final addr in interface.addresses) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            return addr.address;
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback to localhost if we can't determine the IP
+    }
     return 'localhost';
   }
 
