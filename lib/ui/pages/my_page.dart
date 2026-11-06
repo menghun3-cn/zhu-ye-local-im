@@ -6,6 +6,7 @@ import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
 import '../update_notice.dart';
+import '../update_session.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 import 'about_page.dart';
@@ -126,7 +127,7 @@ class MyPage extends StatefulWidget {
     super.key,
     required this.seams,
     this.update,
-    this.installRequest = 0,
+    this.installSession,
     this.onUpdateBusyChanged,
   });
 
@@ -137,14 +138,13 @@ class MyPage extends StatefulWidget {
   /// something that knows.
   final UpdateNotice? update;
 
-  /// How many times the user has asked for the newer build to be installed.
+  /// The update the shell is carrying out, when there is one.
   ///
-  /// Counted by the shell, which is the only thing that knows the rail's
-  /// update entry was pressed. A change in it is that press arriving: the
-  /// rail has no room for a download's progress, the question before closing
-  /// or the sentence an attempt ends in, and the About card has all three — so
-  /// the entry hands the work here rather than duplicating it in a 72-pixel strip.
-  final int installRequest;
+  /// Handed to the About card, which is where an install's progress, its
+  /// question and its failure are shown. The session outlives this page — it
+  /// is owned by the shell — so a download that is under way when the user
+  /// backs out to the card list is still there when they return.
+  final UpdateInstallSession? installSession;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
@@ -161,24 +161,15 @@ class _MyPageState extends State<MyPage> {
   /// Which sub-page is currently shown, or null for the card list.
   _SubPage? _currentSubPage;
 
-  /// Whether an update is in flight.
-  ///
-  /// Held here rather than in the notice the rail reads: the rail's entry is
-  /// about *asking*, and an update is something a person pressed a button on
-  /// the About card to start. This page passes the state to the About card.
-  bool _updateLocked = false;
-
-  /// Tells the rail whether an update is in flight, when there is a rail.
+  /// Tells the rail whether the About card's own check is in flight.
   void _reportBusy(bool busy) => widget.onUpdateBusyChanged?.call(busy);
 
-  /// Reports that the update a press started has reached [busy].
+  /// Reports that the About card's own check has reached [busy].
   ///
-  /// This is called by the About card, which is where the actual work happens.
-  void _setUpdateLocked(bool busy) {
-    if (_updateLocked == busy) return;
-    setState(() => _updateLocked = busy);
-    _reportBusy(busy);
-  }
+  /// This is called by the About card. The install's phases are not reported
+  /// here — the shell hears those from the session directly, which is what
+  /// lets the download survive this page never being built at all.
+  void _setUpdateLocked(bool busy) => _reportBusy(busy);
 
   /// Opens a sub-page.
   void _openSubPage(_SubPage page) {
@@ -279,8 +270,7 @@ class _MyPageState extends State<MyPage> {
           _SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
           Expanded(
             child: AboutPage(
-              offeredUpdate: widget.update?.answer,
-              installRequest: widget.installRequest,
+              session: widget.installSession,
               onUpdateBusyChanged: _setUpdateLocked,
             ),
           ),
