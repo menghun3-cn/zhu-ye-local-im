@@ -291,7 +291,12 @@ DiscoveredPeer discoveredFor(
     listenPort: sessionPort,
     pairingPort: pairingPort,
   ),
-  address: InternetAddress.loopbackIPv4,
+  addresses: [
+    PeerAddress(
+      address: InternetAddress.loopbackIPv4,
+      lastSeen: DateTime.now(),
+    ),
+  ],
   lastSeen: DateTime.now(),
 );
 
