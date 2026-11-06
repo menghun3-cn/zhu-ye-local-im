@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>竹叶局域网传输 · Local Transfer</title>
-<meta name="description" content="在同一个局域网里的设备之间传文件、传文字、同步剪贴板。没有服务端、没有账号、没有云端。">
+<meta name="description" content="在同一个局域网里的设备之间传文件、传文字、同步剪贴板；Windows 版还带截图标注工具。没有服务端、没有账号、没有云端。">
 <meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="styles.css">
 <!-- 主题在首屏之前定下来，避免浅色闪一下再切深色 -->
@@ -76,7 +76,7 @@
           <p class="lede">
             在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板。
             没有服务端、没有账号、没有云端 —— 程序平时只和局域网说话，
-            唯一一次访问外网，是你亲自点「检查更新」的时候。
+            与外界的唯一往来是向 GitHub 询问有没有新版本（只问版本号，不发送任何内容）。
           </p>
           <div class="hero__actions">
             <a class="btn btn--primary" id="heroDownload"
@@ -136,7 +136,7 @@
             <circle cx="8" cy="8" r="1.9" fill="currentColor"/>
           </svg>
           <span class="nots__k">外网请求</span>
-          <span class="nots__v">仅「检查更新」</span>
+          <span class="nots__v">仅更新检查</span>
         </li>
       </ul>
     </section>
@@ -147,7 +147,7 @@
         <span class="tag tag--brand">Windows 与 Android</span>
       </div>
       <p class="block__lede">
-        六件事，每一件都只发生在你自己的网络里。点开任意一张看它到底怎么工作。
+        七件事，每一件都只发生在你自己的网络里。点开任意一张看它到底怎么工作。
       </p>
 
       <div class="grid grid--features">
@@ -166,6 +166,7 @@
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>TCP 47656 自动建立设备组信任</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>TCP 47655 承载文件、消息与剪贴板</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>发现不到时，可以手动填对方 IP 直连</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>装了 Tailscale 的设备也能互相发现：tailnet 不过广播，改走单播探测</li>
           </ul>
         </article>
 
@@ -231,8 +232,26 @@
           <p>左列会话、右侧消息流。传文件、发图片、聊天在同一个地方完成。</p>
           <ul>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>回车发送、Shift+回车换行；长文件名折行显示，不会被截断</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>右键「打开所在目录」「复制图片」</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>别人发来的文件就地显示「接受 / 拒绝」，不用换页</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>表情面板带「最近使用」；会话列表可按内容搜索，未读会标 [N]</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>对话记录保存在本机磁盘，重启后仍在；单条消息可删，也能清空或整个删除某个会话</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>右键「打开所在目录」「复制图片」；别人发来的文件就地显示「接受 / 拒绝」</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/>
+              <path d="M9 12h6M12 9v6"/>
+            </svg>
+          </div>
+          <h3>截图工具（仅 Windows）</h3>
+          <p>不只是传输：按一个全局快捷键，直接在任意应用上截图、标注、钉住。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>框选、窗口、全屏三种截图，默认 Ctrl+Shift+A 呼出，快捷键可自定义</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>标注工具齐全：箭头、矩形、画笔、文字、序号标记</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>截图自动进历史，钉图可以悬浮在桌面上；新装默认开启，在「我的 → 截图」里管理</li>
           </ul>
         </article>
 
@@ -248,8 +267,9 @@
           <p>该安静的安静，该听话的听话。</p>
           <ul>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>单实例：重复启动只会叫出已在运行的那个窗口</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>关闭按钮最小化到托盘，也可以设成直接退出</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>可以开机自启（默认关闭），侧栏底部会提示新版本</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>关闭按钮最小化到托盘，也可以设成直接退出；可以开机自启（默认关闭）</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>应用内一键更新：下载、校验、更新并重启都在程序里完成，侧栏「更新」入口实时显示进度</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>深色模式跟随系统；低频功能（设备、剪贴板、截图、设置、关于）收在「我的」页里</li>
           </ul>
         </article>
 
@@ -348,14 +368,14 @@
 
         <dt>外网</dt>
         <dd>
-          程序平时只和局域网说话。唯一一次访问外网是你点「检查更新」的时候：
-          它会去 GitHub 查这个项目有没有发布过更新的版本，然后把版本号显示在侧栏底部。
-          不点，就不会发生。
+          程序平时只和局域网说话。与外界的唯一往来是更新检查：启动时会向 GitHub
+          查一次有没有新版本，之后按「设置」里选的频率继续查（默认每小时，可改可关）。
+          它只问版本号，不发送任何内容；点「更新」才会真正把新包下载下来。
         </dd>
 
         <dt>已知限制</dt>
         <dd>
-          对话记录会保存到磁盘，重启后仍在，单条消息可以右键删除；同一台机器上不要同时开两个本程序（发现用的 UDP 端口只能被一个进程持有）。
+          对话记录会保存到磁盘，重启后仍在，单条消息可以删除；同一台机器上不要同时开两个本程序（发现用的 UDP 端口只能被一个进程持有）。截图工具目前只有 Windows 版。
         </dd>
 
         <dt>许可与源码</dt>

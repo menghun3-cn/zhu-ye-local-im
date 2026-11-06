@@ -38,8 +38,9 @@ there is no code, button, prompt, or acceptance step.
 _Avoid_: Manual pairing, Pair request, Pair again, 手工配对
 
 **Favorite**:
-A Device the user has marked as trusted, so Transfers with it can skip
-per-transfer confirmation. Being a Favorite is **not** membership of an Owner
+A Device the user has marked as trusted. The marker is shown in the UI and
+nothing more: every Transfer still asks for per-transfer confirmation,
+favorited or not. Being a Favorite is **not** membership of an Owner
 Group, and confers no clipboard access.
 _Avoid_: Paired, Trusted, Friend, Contact, Saved
 
