@@ -12,7 +12,11 @@ unchanged and still current.
 
 Partially superseded by [the About card's single update action](2026-10-26-one-update-action-on-the-about-card.md),
 which combines the card's check and install buttons into one control. The rail
-entry and the shared install flow described here are unchanged.
+entry is unchanged in where it sits and what a press means; who owns the
+install moved twice since — first onto `UpdateInstallSession`
+([the update download owned by a session](2026-11-05-update-download-session.md)),
+then the entry learned to open the card and show its state
+([the rail update entry shows its work](2026-11-05-the-rail-update-entry-shows-its-work.md)).
 
 ## Problem
 
@@ -43,24 +47,29 @@ entry and the shared install flow described here are unchanged.
 
 ## Decision
 
-**把 rail 上的更新按钮接到已有的安装流程上，安装过程放在 About 页面上。**
+**把 rail 上的更新按钮接到安装流程上，安装过程由 session 持有、展示放在 About 页面。**
 
-shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index = _aboutSurface` 并自增；About 页
-通过 `didUpdateWidget` 观察计数的变化，用 `offeredUpdate`（应用启动时那次检查的答案）启动 `_install()`。
+shell 的 `_installUpdate` 把 rail 按下的答案交给 `UpdateInstallSession.install` —— 下载、
+校验、解压、确认与交接的全部状态都活在 shell 持有的 session 里（见
+[更新下载由 session 持有](2026-11-05-update-download-session.md)）—— 同时把 `_index`
+切到 `_mySurface`，并自增 `_aboutRequests`，由 `MyPage` 应答为打开 About 子页。rail 入口
+不再认识 `installRequest` 计数器：页面何时被构建都不重要，session 一直在；页面只是它的
+视图。页面应答请求的那条路径见
+[左侧「更新」入口显示它正在做的事](../bug-fix/2026-11-05-the-rail-update-entry-shows-its-work.md)。
 
-为什么把活儿放到 About 页而不是 rail 上自己做：rail 只有 72px 宽，放不下载进度条、放不下「关闭并更新？」
-这个确认框、也放不下失败时那句话。这三样 About 页全都有，而且就是同一个 `_install()`
-—— 第二次实现一遍是不可能的，两个实现之间必然漂移。
+为什么把展示放到 About 页而不是 rail 上自己做：rail 只有 84px 宽，放不下载进度条、放不下
+「更新并重启？」这个确认框、也放不下失败时那句话。这三样 About 页全都有 —— 它是 session
+的视图，而不是工作本身的所有者 —— 在 rail 上再实现一遍必然漂移。
 
-为什么 rail 按下去要切到 About 页：装的时候用户需要看见进度。不切过去的话，用户点在 rail 上、然后看到
-什么都没有发生（当前停在对话页或设备页），只会再点一次。
+为什么 rail 按下去要切表面并打开卡片：装的时候用户需要看见进度。不切过去的话，用户点在
+rail 上、然后看到什么都没有发生（当前停在对话页或传输页），只会再点一次。
 
 `_updateEntry` 的 `url` 参数被删除，改成 `onInstall: VoidCallback` 回调：widget 在 rail 深处，
 没有道理让它知道 shell 的 `_index`。按钮的职责止于「用户说想装」，去哪是 shell 的决定。
 
 ## Alternatives considered
 
-**在 rail 上放一个进度指示器** —— 72px 只够放一个圆环，放不下百分比、放不下「正在校验」、
+**在 rail 上放一个进度指示器** —— 84px 只够放一个紧凑状态加一个百分比，放不下「正在校验」、
 放不下失败原因。失败时用户还得自己去 About 页看是什么原因，那不如一开始就在能说清楚的地方做。
 
 **弹一个对话框放进度** —— shell 需要自己管一个 dialog 的开与关，而且确认框（「关闭并更新？」）本来
@@ -70,7 +79,7 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 程序，一个不打招呼就消失的程序是不可接受的。而确认框在 About 页里，所以必然要经过它。
 
 **保留「打开下载页」作为备选按钮** —— About 页右侧的「打开下载页面」按钮一直在，哪里需要手动下载
-都还能去。rail 上 72px 放不下两个按钮。
+都还能去。rail 上 84px 放不下两个按钮。
 
 ### 顺手带上的第三条需求
 
@@ -104,18 +113,17 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 ### Decision
 
 - About 页把更新过程当成**一个不可再进入的状态**：当前只有一个状态化主操作和
-  「打开下载页」，`_asking` 或 `_busy` 期间两者都置灰；失败后 `_busy` 清零并恢复。
+  「打开下载页」，`_asking` 或 `_session.busy` 期间两者都置灰；失败后恢复。
   主操作在「检查更新」与「更新」之间切换，见
   [关于页只有一个更新操作](2026-10-26-one-update-action-on-the-about-card.md)。
-- 左侧菜单的「更新」按钮由 shell 用 `_updateLocked` 状态置灰：About 页通过新的
-  `onUpdateBusyChanged` 回调把「进入更新」「退出更新」报给 shell，rail 的 `_UpdateEntry`
-  在 `enabled: false` 时 `onPressed: null`。
-- 状态同步放在 `addPostFrameCallback` 里而不是 `_install()` 开头：rail 点击经由
-  `didUpdateWidget` 到达 About 页，而那一次仍在 build 阶段，直接 `setState` 父级
-  HomeShell 会触发 `setState() called during build`。
-- 下载完成后（`_prepared != null`）到确认框打开之间 `_busy` 为空，shell 不置灰：
-  这是为了让用户在确认框打开时再点 rail 的「更新」能命中正在等着的同一个确认框，
-  而不是静默丢弃。确认框确认后到进程结束前再次置灰。
+- 左侧菜单的「更新」按钮由 shell 置灰：安装的各个阶段直接听 `_installSession`
+  （`_sessionBusy`），About 卡片自己的「检查更新」仍通过 `onUpdateBusyChanged` →
+  `_updateLocked` 上报；rail 的 `_UpdateEntry` 在 `enabled: false` 时
+  `onPressed: null`。
+- 安装进行中 rail 显示「更新中」，下载字节数已知时追加百分比 —— 见
+  [左侧「更新」入口显示它正在做的事](../bug-fix/2026-11-05-the-rail-update-entry-shows-its-work.md)。
+- `session.busy` 在「包已就绪、等回答」时为 false，rail 在那段窗口保持可点：再按
+  一次计入一次 `confirmRequests`，卡片把同一个问题再问一遍，而不是开始第二次下载。
 - 文案：确认框标题/正文/按钮从「关闭并更新」改为「更新并重启」；按钮下方那段说明里
   的指引也同步改名。
 
@@ -128,21 +136,21 @@ shell 里加一个 `_installRequests` 计数器，rail 按钮按下时 `_index =
 notice 的职责是「启动时问一次」的答案；更新动作是从 About 页发起的，通知本身并不感知下载。
 让 notice 兼任会把它变成一个四处都是的全局状态。
 
-**确认框打开期间也置灰** —— 会丢掉一次「再点一次 rail 入口打开同一个确认框」的机会；
-用户双击 rail 按钮时第二次点击不应成了空气。置灰的窗口期是「真正有工作在跑」的窗口期，
-不是「等待用户回答」的窗口期。
+**确认框打开期间锁住 rail** —— 后来由 session 的语义改写：`busy` 在包就绪等回答时
+为 false，rail 保持可点，再按一次经 `confirmRequests` 把同一个问题再带出来。真正
+不能点的窗口期是「有工作在跑」的整个窗口期。
 
 ### Consequences
 
-- `lib/ui/pages/about_page.dart`：`AboutPage.onUpdateBusyChanged`；`_check`/`_install`
-  各阶段调用 `_reportBusy`；`_install` 开头与确认后经 `addPostFrameCallback` 同步，
-  避免 build 阶段 setState 父级。
-- `lib/ui/home_shell.dart`：`_updateLocked`、`_setUpdateLocked`；`_UpdateEntry`
-  增加 `enabled`，置灰时 `onPressed: null`（Material 的 disabled 样式就是置灰）。
-- `lib/l10n/app_zh.arb` / `app_en.arb`：确认框三句 + 安装说明改为「更新并重启」。
-- `test_flutter/ui/update_rail_test.dart`：新增「下载中 rail 入口置灰、失败后恢复」。
-- `test_flutter/ui/about_page_test.dart`：新增「下载中关于页主操作与下载页置灰、
-  失败后恢复且不能重复下载」。
+- `lib/ui/update_session.dart`：`UpdateInstallSession` 持有安装全程，机制见
+  [更新下载由 session 持有](2026-11-05-update-download-session.md)。
+- `lib/ui/home_shell.dart`：`_installUpdate()` 把答案交给 session、切到 My 并计数
+  `_aboutRequests`；`_sessionBusy`/`_sessionPercent` 把 session 的状态投影到 rail。
+- `lib/ui/pages/my_page.dart`：`openAboutRequests` 计数变化时打开 About 子页。
+- `lib/ui/pages/about_page.dart`：作为 session 的视图展示进度、失败与就绪状态，
+  并把「包已就绪」变成确认框；`onUpdateBusyChanged` 只上报卡片自己的检查。
+- `lib/l10n/app_zh.arb` / `app_en.arb`：确认框三句 + 安装说明改为「更新并重启」，
+  以及 rail 的「更新中」与百分比文案。
 
 ### 门禁
 
@@ -151,11 +159,14 @@ notice 的职责是「启动时问一次」的答案；更新动作是从 About 
 
 ## Consequences
 
-- `lib/ui/home_shell.dart`：rail 更新按钮改为安装；新增 `_installUpdate()`；About 页接两个新参数；
-  删除未使用的 `external_links.dart` import。
-- `lib/ui/pages/about_page.dart`：`AboutPage` 加 `offeredUpdate` 与 `installRequest`；
-  加 `didUpdateWidget`；`_install({UpdateCheck? offered})` 支持从外部答案启动。
-- `test_flutter/support/ui_harness.dart`：新增 `aboutSurface` 常量。
+- `lib/ui/update_session.dart`：安装全程的所有者（后续笔记
+  `2026-11-05-update-download-session` 详述）。
+- `lib/ui/home_shell.dart`：rail 更新按钮把答案交给 session；`_installUpdate()` 切到
+  My 并计数 `_aboutRequests`；`_sessionBusy`/`_sessionPercent` 投影到 rail 入口。
+- `lib/ui/pages/my_page.dart`：`openAboutRequests` 计数变化时打开 About 子页。
+- `lib/ui/pages/about_page.dart`：session 的视图，展示进度、失败与就绪状态并负责
+  确认框。
+- `test_flutter/support/ui_harness.dart`：`updateEntry` 按图标查找，标签变化后仍有效。
 - `test_flutter/ui/update_rail_test.dart`：两个「打开浏览器」测试改写成三个安装测试
   （切到 About 页并调 installer、先问再关、失败时显示原因）。
 - `test_flutter/ui/pages_test.dart`：新增「切回对话菜单重新打开最后一次对话并可立即输入」。

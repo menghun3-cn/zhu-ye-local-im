@@ -129,6 +129,7 @@ class MyPage extends StatefulWidget {
     required this.seams,
     this.update,
     this.installSession,
+    this.openAboutRequests = 0,
     this.onUpdateBusyChanged,
   });
 
@@ -146,6 +147,15 @@ class MyPage extends StatefulWidget {
   /// is owned by the shell — so a download that is under way when the user
   /// backs out to the card list is still there when they return.
   final UpdateInstallSession? installSession;
+
+  /// How many times the rail's update entry has asked for the About card.
+  ///
+  /// The session owns the install itself — the press reaches it directly — so
+  /// all this page owes a request is the sub-page the card lives on: a press
+  /// that landed on the card list would have started a download the user
+  /// cannot see. A counter rather than a flag, so that every press is a
+  /// request even when the card was already open.
+  final int openAboutRequests;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
@@ -171,6 +181,15 @@ class _MyPageState extends State<MyPage> {
   /// here — the shell hears those from the session directly, which is what
   /// lets the download survive this page never being built at all.
   void _setUpdateLocked(bool busy) => _reportBusy(busy);
+
+  @override
+  void didUpdateWidget(MyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.openAboutRequests == oldWidget.openAboutRequests) return;
+    // The press that started the install wants the card that shows it: the
+    // download's progress, the question before closing, the failure sentence.
+    _currentSubPage = _SubPage.about;
+  }
 
   /// Opens a sub-page.
   void _openSubPage(_SubPage page) {

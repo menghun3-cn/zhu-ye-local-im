@@ -759,6 +759,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get railUpdate => 'Update';
 
   @override
+  String get railUpdateRunning => 'Updating';
+
+  @override
+  String railUpdatePercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get aliasHelper => 'What other Devices show for this one';
 
   @override

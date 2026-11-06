@@ -1328,6 +1328,18 @@ abstract class AppLocalizations {
   /// **'Update'**
   String get railUpdate;
 
+  /// No description provided for @railUpdateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating'**
+  String get railUpdateRunning;
+
+  /// No description provided for @railUpdatePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String railUpdatePercent(int percent);
+
   /// No description provided for @aliasHelper.
   ///
   /// In en, this message translates to:
