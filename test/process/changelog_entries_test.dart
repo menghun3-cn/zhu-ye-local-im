@@ -327,7 +327,12 @@ Set<String> distinguishingFragments(String subject) {
     'discovery': '发现',
     'device': '设备',
     'devices': '设备',
+    'download': '下载',
+    'image': '图片',
     'long-press': '长按',
+    'low-frequency': '低频',
+    'presence': '在线',
+    'secret': '密钥',
   };
 
   // Latin words of four letters or more. Short words are excluded because
