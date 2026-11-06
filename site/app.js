@@ -47,6 +47,29 @@
   }
 
   /* ---------------------------------------------------------------------
+     「关于」下拉：点开显示反馈入口，点外面或 Esc 关闭。
+     --------------------------------------------------------------------- */
+  var aboutDrop = document.getElementById('aboutDrop');
+  if (aboutDrop) {
+    var aboutBtn = aboutDrop.querySelector('.nav-drop__btn');
+    var aboutPanel = aboutDrop.querySelector('.nav-drop__panel');
+    function setAboutOpen(open) {
+      aboutPanel.hidden = !open;
+      aboutBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    aboutBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setAboutOpen(aboutPanel.hidden);
+    });
+    document.addEventListener('click', function (e) {
+      if (!aboutPanel.hidden && !aboutDrop.contains(e.target)) setAboutOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !aboutPanel.hidden) setAboutOpen(false);
+    });
+  }
+
+  /* ---------------------------------------------------------------------
      最新版本：按钮默认都指向 releases/latest，能读到 API 时就换成具体产物。
      读不到（离线、被限流、还没有发布）就原样保留 —— 页面照常可用。
 

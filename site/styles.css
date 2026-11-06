@@ -169,6 +169,27 @@ svg { display: block; }
 .topbar__nav a { color: var(--text-2); font-weight: 600; }
 .topbar__nav a:hover { color: var(--brand-strong); }
 
+.nav-drop { position: relative; }
+.nav-drop__btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--text-2); font-weight: 600; font-size: inherit;
+}
+.nav-drop__btn:hover { color: var(--brand-strong); }
+.nav-drop__panel {
+  position: absolute; right: 0; top: calc(100% + 10px);
+  min-width: 200px; padding: var(--s2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--sh2);
+}
+.nav-drop__item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--s2) var(--s3); border-radius: var(--r-sm);
+  color: var(--text); text-decoration: none !important;
+}
+.nav-drop__item:hover { background: var(--surface-3); }
+.nav-drop__title { font-size: var(--fs-label); font-weight: 600; }
+.nav-drop__desc { font-size: var(--fs-meta); color: var(--text-3); }
+
 .theme-toggle {
   width: 34px; height: 34px; flex: none;
   display: grid; place-items: center;
