@@ -10,6 +10,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Add Maven mirrors for China network to avoid rate limiting
+repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
+    maven { url = uri("https://maven.aliyun.com/repository/google") }
+}
+
 // 发布签名。密钥与口令放在 android/key.properties（已被 .gitignore 忽略）；
 // CI 由 .github/workflows/release.yml 从 GitHub Secrets 写出同名的文件，
 // 于是本机与流水线走的是同一条路径、同一个约定。
