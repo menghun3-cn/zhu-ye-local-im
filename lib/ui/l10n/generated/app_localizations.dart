@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'Cancelled'**
   String get stateCancelled;
 
+  /// No description provided for @stateWithdrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawn'**
+  String get stateWithdrawn;
+
   /// No description provided for @stateFailed.
   ///
   /// In en, this message translates to:
@@ -818,6 +824,54 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get deleteMessage;
 
+  /// No description provided for @withdrawMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw'**
+  String get withdrawMessage;
+
+  /// No description provided for @shareByLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Share by link'**
+  String get shareByLink;
+
+  /// No description provided for @shareByLinkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share by link'**
+  String get shareByLinkTitle;
+
+  /// No description provided for @shareByLinkDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone with this link can download the file. The link expires in 30 minutes.'**
+  String get shareByLinkDesc;
+
+  /// No description provided for @shareByLinkExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Link expires in 30 minutes'**
+  String get shareByLinkExpiry;
+
+  /// No description provided for @shareByLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get shareByLinkCopied;
+
+  /// No description provided for @shareByLinkCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get shareByLinkCopy;
+
+  /// No description provided for @shareByLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create link'**
+  String get shareByLinkFailed;
+
   /// No description provided for @clipboardSyncHeader.
   ///
   /// In en, this message translates to:
@@ -1321,6 +1375,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The system installer did not open. Try again, or open the download page and install the APK by hand.'**
   String get updateFailureInstaller;
+
+  /// No description provided for @myCardTroubleshooting.
+  ///
+  /// In en, this message translates to:
+  /// **'Troubleshooting'**
+  String get myCardTroubleshooting;
+
+  /// No description provided for @myCardTroubleshootingSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Network diagnostics and common solutions'**
+  String get myCardTroubleshootingSummary;
+
+  /// No description provided for @troubleshootingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Troubleshooting'**
+  String get troubleshootingTitle;
+
+  /// No description provided for @troubleshootingDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get troubleshootingDiagnostics;
+
+  /// No description provided for @troubleshootingNetworkCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Network connection'**
+  String get troubleshootingNetworkCheck;
+
+  /// No description provided for @troubleshootingNetworkCheckDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Check if your device is connected to the network'**
+  String get troubleshootingNetworkCheckDesc;
+
+  /// No description provided for @troubleshootingFirewallCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall settings'**
+  String get troubleshootingFirewallCheck;
+
+  /// No description provided for @troubleshootingFirewallCheckDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure the app is allowed through the firewall'**
+  String get troubleshootingFirewallCheckDesc;
+
+  /// No description provided for @troubleshootingPortCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Port availability'**
+  String get troubleshootingPortCheck;
+
+  /// No description provided for @troubleshootingPortCheckDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify required ports are not blocked'**
+  String get troubleshootingPortCheckDesc;
+
+  /// No description provided for @troubleshootingVpnCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN interference'**
+  String get troubleshootingVpnCheck;
+
+  /// No description provided for @troubleshootingVpnCheckDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Check if VPN is affecting local network discovery'**
+  String get troubleshootingVpnCheckDesc;
+
+  /// No description provided for @troubleshootingSolutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Common solutions'**
+  String get troubleshootingSolutions;
+
+  /// No description provided for @troubleshootingManualIp.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual IP connection'**
+  String get troubleshootingManualIp;
+
+  /// No description provided for @troubleshootingManualIpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the + button in the conversation list to manually enter an IP address'**
+  String get troubleshootingManualIpDesc;
+
+  /// No description provided for @troubleshootingFirewall.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall configuration'**
+  String get troubleshootingFirewall;
+
+  /// No description provided for @troubleshootingFirewallDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the app in Windows Firewall settings'**
+  String get troubleshootingFirewallDesc;
+
+  /// No description provided for @troubleshootingRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart the app'**
+  String get troubleshootingRestart;
+
+  /// No description provided for @troubleshootingRestartDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Close and reopen the application'**
+  String get troubleshootingRestartDesc;
 
   /// No description provided for @railUpdate.
   ///

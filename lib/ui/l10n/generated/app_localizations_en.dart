@@ -136,6 +136,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stateCancelled => 'Cancelled';
 
   @override
+  String get stateWithdrawn => 'Withdrawn';
+
+  @override
   String get stateFailed => 'Failed';
 
   @override
@@ -461,6 +464,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteMessage => 'Delete';
 
   @override
+  String get withdrawMessage => 'Withdraw';
+
+  @override
+  String get shareByLink => 'Share by link';
+
+  @override
+  String get shareByLinkTitle => 'Share by link';
+
+  @override
+  String get shareByLinkDesc =>
+      'Anyone with this link can download the file. The link expires in 30 minutes.';
+
+  @override
+  String get shareByLinkExpiry => 'Link expires in 30 minutes';
+
+  @override
+  String get shareByLinkCopied => 'Link copied to clipboard';
+
+  @override
+  String get shareByLinkCopy => 'Copy';
+
+  @override
+  String get shareByLinkFailed => 'Failed to create link';
+
+  @override
   String get clipboardSyncHeader => 'Clipboard sync';
 
   @override
@@ -754,6 +782,70 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateFailureInstaller =>
       'The system installer did not open. Try again, or open the download page and install the APK by hand.';
+
+  @override
+  String get myCardTroubleshooting => 'Troubleshooting';
+
+  @override
+  String get myCardTroubleshootingSummary =>
+      'Network diagnostics and common solutions';
+
+  @override
+  String get troubleshootingTitle => 'Troubleshooting';
+
+  @override
+  String get troubleshootingDiagnostics => 'Diagnostics';
+
+  @override
+  String get troubleshootingNetworkCheck => 'Network connection';
+
+  @override
+  String get troubleshootingNetworkCheckDesc =>
+      'Check if your device is connected to the network';
+
+  @override
+  String get troubleshootingFirewallCheck => 'Firewall settings';
+
+  @override
+  String get troubleshootingFirewallCheckDesc =>
+      'Ensure the app is allowed through the firewall';
+
+  @override
+  String get troubleshootingPortCheck => 'Port availability';
+
+  @override
+  String get troubleshootingPortCheckDesc =>
+      'Verify required ports are not blocked';
+
+  @override
+  String get troubleshootingVpnCheck => 'VPN interference';
+
+  @override
+  String get troubleshootingVpnCheckDesc =>
+      'Check if VPN is affecting local network discovery';
+
+  @override
+  String get troubleshootingSolutions => 'Common solutions';
+
+  @override
+  String get troubleshootingManualIp => 'Manual IP connection';
+
+  @override
+  String get troubleshootingManualIpDesc =>
+      'Use the + button in the conversation list to manually enter an IP address';
+
+  @override
+  String get troubleshootingFirewall => 'Firewall configuration';
+
+  @override
+  String get troubleshootingFirewallDesc =>
+      'Allow the app in Windows Firewall settings';
+
+  @override
+  String get troubleshootingRestart => 'Restart the app';
+
+  @override
+  String get troubleshootingRestartDesc => 'Close and reopen the application';
 
   @override
   String get railUpdate => 'Update';

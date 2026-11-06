@@ -112,14 +112,16 @@ class AppNavRail extends StatelessWidget {
             // is a block, and a block that sized itself to its label would make
             // six blocks of three widths.
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.start,
             spacing: WeChat.railItemGap,
             children: [
               const _BrandMark(),
               for (var index = 0; index < firstPinned; index++) _entry(index),
               // The space between the surfaces and the tools. It goes to the
               // gap rather than to the entries, which is what makes the tools
-              // read as a foot rather than as items four and five.
-              const Spacer(),
+              // read as a foot rather than as items four and five. Only show
+              // the spacer when there are pinned items to separate.
+              if (firstPinned < destinations.length) const Spacer(),
               for (
                 var index = firstPinned;
                 index < destinations.length;

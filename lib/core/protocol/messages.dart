@@ -235,6 +235,7 @@ sealed class WireMessage {
       'pairAdmit' => PairAdmitMessage.fromJson(json),
       'pairConfirmed' => PairConfirmedMessage.fromJson(json),
       'error' => ErrorMessage.fromJson(json),
+      'withdraw' => WithdrawMessage.fromJson(json),
       _ => throw FormatException('unknown message type "$type"'),
     };
   }
@@ -529,6 +530,23 @@ final class CancelMessage extends WireMessage {
     transferId: _string(json, 'tid'),
     reason: RejectionReason.fromWireName(_string(json, 'reason')),
   );
+}
+
+/// Withdraws a previously sent message within a time window.
+final class WithdrawMessage extends WireMessage {
+  const WithdrawMessage({required this.transferId});
+
+  /// The Transfer being withdrawn.
+  final String transferId;
+
+  @override
+  String get type => 'withdraw';
+
+  @override
+  Map<String, Object?> toJson() => {'tid': transferId};
+
+  static WithdrawMessage fromJson(Map<String, Object?> json) =>
+      WithdrawMessage(transferId: _string(json, 'tid'));
 }
 
 /// Carries a ClipboardEntry to a peer inside the same Owner Group.

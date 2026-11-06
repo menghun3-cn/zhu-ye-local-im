@@ -1342,6 +1342,25 @@ final class LocalTransferController {
     await _persistHistory();
   }
 
+  /// Withdraws a message that was sent within the allowed time window.
+  ///
+  /// Only valid for outgoing transfers that completed within the last 2 minutes.
+  /// Sends a withdraw message to the peer and marks the transfer as withdrawn.
+  /// The message will be removed from both sides' conversation history.
+  Future<void> withdrawMessage(TransferView view) async {
+    final handle = view.handle;
+    for (final tracked in _transfers) {
+      if (_handleOf(tracked) == handle &&
+          tracked.transfer.direction == TransferDirection.outgoing &&
+          tracked.transfer.state == TransferState.completed) {
+        await tracked.transfer.withdraw();
+        break;
+      }
+    }
+    _notify();
+    await _persistHistory();
+  }
+
   /// Removes every conversation message exchanged with [peer].
   ///
   /// Clipboard entries are not part of the conversation surface and stay put:

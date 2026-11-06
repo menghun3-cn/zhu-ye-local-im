@@ -156,6 +156,17 @@ final class IncomingTransfer extends Transfer {
     await sendQuietly(_channel, CancelMessage(transferId: id, reason: reason));
   }
 
+  /// Withdraws a completed message within the allowed time window.
+  ///
+  /// Only valid for incoming transfers that completed recently.
+  /// The receiver cannot withdraw a message - only the sender can.
+  /// This method exists to satisfy the interface but does nothing.
+  @override
+  Future<void> withdraw() async {
+    // Receivers cannot withdraw messages - only senders can.
+    // This is a no-op for incoming transfers.
+  }
+
   /// Internal: a slice of payload arrived.
   Future<void> onChunk(ChunkFrame frame) async {
     if (isSettled) return;
@@ -305,6 +316,11 @@ final class IncomingTransfer extends Transfer {
   /// Internal: the sender abandoned the Transfer.
   void onCancel(CancelMessage message) {
     finish(TransferCancelled(message.reason, byPeer: true));
+  }
+
+  /// Internal: the sender withdrew the message.
+  void onWithdraw(WithdrawMessage message) {
+    finish(TransferWithdrawn(byPeer: true));
   }
 
   /// Internal: the Session failed or ended before the Transfer did.

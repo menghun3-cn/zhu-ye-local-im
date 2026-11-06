@@ -14,9 +14,17 @@ import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'screenshot_page.dart';
 import 'settings_page.dart';
+import 'troubleshooting_page.dart';
 
 /// Which sub-page is shown.
-enum _SubPage { devices, clipboard, screenshot, settings, about }
+enum _SubPage {
+  devices,
+  clipboard,
+  screenshot,
+  settings,
+  troubleshooting,
+  about,
+}
 
 /// The header shown above each sub-page, with a back button.
 class _SubPageHeader extends StatelessWidget {
@@ -262,6 +270,13 @@ class _MyPageState extends State<MyPage> {
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
+          icon: Icons.healing_outlined,
+          title: l10n.myCardTroubleshooting,
+          summary: l10n.myCardTroubleshootingSummary,
+          onTap: () => _openSubPage(_SubPage.troubleshooting),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        _MyCard(
           icon: Icons.announcement,
           title: l10n.myCardAbout,
           summary: _aboutSummary(widget.update, l10n),
@@ -307,6 +322,15 @@ class _MyPageState extends State<MyPage> {
         children: [
           _SubPageHeader(title: l10n.tabSettings, onBack: _closeSubPage),
           Expanded(child: SettingsPage(seams: widget.seams)),
+        ],
+      ),
+      _SubPage.troubleshooting => Column(
+        children: [
+          _SubPageHeader(
+            title: l10n.troubleshootingTitle,
+            onBack: _closeSubPage,
+          ),
+          const Expanded(child: TroubleshootingPage()),
         ],
       ),
       _SubPage.about => Column(

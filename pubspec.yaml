@@ -96,6 +96,10 @@ dependencies:
   # Path joining for the screenshot library's files.
   path: ^1.9.0
 
+  # HTTP server for link-based file transfer.
+  shelf: ^1.4.1
+  shelf_static: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -123,6 +127,10 @@ flutter:
   # and `flutter build`, so a string that is added to the template without a
   # translation is a build-time difference rather than a runtime surprise.
   generate: true
+
+  # Assets for link transfer web page.
+  assets:
+    - assets/link_transfer/index.html
 
   # To add assets to your application, add an assets section, like this:
   # assets:

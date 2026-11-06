@@ -307,6 +307,18 @@ final class TransferEngine {
           return;
         }
         incoming.onCancel(message);
+      case WithdrawMessage():
+        final outgoing = _outgoingTransfers[message.transferId];
+        if (outgoing != null) {
+          outgoing.onWithdraw(message);
+          return;
+        }
+        final incoming = _incomingTransfers[message.transferId];
+        if (incoming == null) {
+          _noteUnknown('withdraw', message.transferId);
+          return;
+        }
+        incoming.onWithdraw(message);
       case HelloMessage():
       case HelloAckMessage():
       case SessionConfirmMessage():

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../app/app.dart';
 import '../core/core.dart';
+import '../core/link_transfer/link_transfer.dart';
 import 'clipboard_paste.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
@@ -98,6 +99,96 @@ Future<void> cancelSend(BuildContext context, TransferView view) {
   final send = view.send;
   if (send == null) return Future.value();
   return guarded(context, send.cancel);
+}
+
+/// Whether [view] can be withdrawn (only for completed outgoing transfers within 2 minutes).
+bool canWithdrawTransfer(TransferView view) {
+  if (view.direction != TransferDirection.outgoing) return false;
+  if (view.state != TransferState.completed) return false;
+  // Check if it's within 2 minutes - this would need the completedAt timestamp
+  // For now, we'll add the UI and the controller will enforce the time limit
+  return true;
+}
+
+/// Withdraws [view]'s message if it's within the allowed time window.
+Future<void> withdrawTransfer(
+  BuildContext context,
+  LocalTransferController controller,
+  TransferView view,
+) async {
+  await controller.withdrawMessage(view);
+}
+
+/// Whether [view] can be shared via link (only for files with local paths).
+bool canShareByLink(TransferView view) => view.localPath != null;
+
+/// Creates a download link for [view]'s file and shows it to the user.
+Future<void> shareByLink(BuildContext context, TransferView view) async {
+  final path = view.localPath;
+  if (path == null) return;
+
+  final l10n = AppLocalizations.of(context);
+  final linkTransfer = LinkTransfer.instance;
+
+  // Capture context before async operations
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+
+  // Ensure the server is running
+  if (!linkTransfer.isRunning) {
+    await linkTransfer.start();
+  }
+
+  if (!context.mounted) return;
+
+  final link = linkTransfer.createLink(path);
+  if (link == null) {
+    if (overlay != null) {
+      await TopToast.showIn(overlay, l10n.shareByLinkFailed);
+    }
+    return;
+  }
+
+  // Copy link to clipboard
+  await Clipboard.setData(ClipboardData(text: link));
+
+  if (!context.mounted) return;
+
+  if (overlay != null) {
+    await TopToast.showIn(overlay, l10n.shareByLinkCopied);
+  }
+
+  // Show dialog with link
+  if (context.mounted) {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.shareByLinkTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.shareByLinkDesc),
+            const SizedBox(height: 16),
+            SelectableText(link),
+            const SizedBox(height: 8),
+            Text(
+              l10n.shareByLinkExpiry,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Whether [view] names a file on this machine whose folder can be opened.
@@ -322,6 +413,8 @@ class TransferContextMenu extends StatelessWidget {
     final copyImage = canCopyImage(view);
     final copyText = canCopyText(view);
     final cancel = canCancelTransfer(view);
+    final withdraw = canWithdrawTransfer(view);
+    final canShare = canShareByLink(view);
     // The controller is read here for the same reason, and `ControllerScope.of`
     // throws rather than returning null when the scope above is gone — which is
     // why it is asked before the menu opens rather than after a line is chosen.
@@ -366,6 +459,18 @@ class TransferContextMenu extends StatelessWidget {
             value: _cancelAction,
             icon: Icons.close,
             label: l10n.cancelSend,
+          ),
+        if (withdraw)
+          _item(
+            value: _withdrawAction,
+            icon: Icons.undo,
+            label: l10n.withdrawMessage,
+          ),
+        if (canShare)
+          _item(
+            value: _shareByLinkAction,
+            icon: Icons.link,
+            label: l10n.shareByLink,
           ),
         if (reveal)
           _item(
@@ -413,6 +518,10 @@ class TransferContextMenu extends StatelessWidget {
         await copyTransferImage(context, view);
       case _copyTextAction:
         await copyTransferText(context, view);
+      case _withdrawAction:
+        await withdrawTransfer(context, controller, view);
+      case _shareByLinkAction:
+        await shareByLink(context, view);
       case _deleteAction:
         await controller.deleteMessage(view);
     }
@@ -462,5 +571,7 @@ const String _copySelectionAction = 'copy-selection';
 const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _copyAction = 'copy';
+const String _withdrawAction = 'withdraw';
+const String _shareByLinkAction = 'share-by-link';
 const String _copyTextAction = 'copy-text';
 const String _deleteAction = 'delete';

@@ -505,9 +505,13 @@ void main() {
         reason: 'the product name is in the title bar, not in the window',
       );
 
-      // The Device's own name still has somewhere to be: the Devices surface,
-      // which is where everything about this Device already lives.
-      await openTab(tester, l10n.tabDevices, window: windowA);
+      // The Device's own name still has somewhere to be: the My surface,
+      // which aggregates the low-frequency pages including Devices. Navigate
+      // to the Devices sub-page to see the device name.
+      await openTab(tester, l10n.tabMy, window: windowA);
+      // Tap on the Devices card to open the Devices sub-page.
+      await tester.tap(find.text(l10n.tabDevices));
+      await tester.pumpAndSettle();
       expect(windowA.within(find.text('Alice')), findsWidgets);
 
       // Renaming publishes a new descriptor and re-saves the profile, both of

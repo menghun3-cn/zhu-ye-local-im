@@ -133,6 +133,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stateCancelled => '已取消';
 
   @override
+  String get stateWithdrawn => '已撤回';
+
+  @override
   String get stateFailed => '失败';
 
   @override
@@ -445,6 +448,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteMessage => '删除';
 
   @override
+  String get withdrawMessage => '撤回';
+
+  @override
+  String get shareByLink => '通过链接分享';
+
+  @override
+  String get shareByLinkTitle => '通过链接分享';
+
+  @override
+  String get shareByLinkDesc => '任何拥有此链接的人都可以下载文件。链接30分钟后过期。';
+
+  @override
+  String get shareByLinkExpiry => '链接30分钟后过期';
+
+  @override
+  String get shareByLinkCopied => '链接已复制到剪贴板';
+
+  @override
+  String get shareByLinkCopy => '复制';
+
+  @override
+  String get shareByLinkFailed => '创建链接失败';
+
+  @override
   String get clipboardSyncHeader => '剪贴板同步';
 
   @override
@@ -714,6 +741,63 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateFailureInstaller => '系统安装器没有打开。请重试，或打开下载页手动安装 APK。';
+
+  @override
+  String get myCardTroubleshooting => '故障排查';
+
+  @override
+  String get myCardTroubleshootingSummary => '网络诊断和常见解决方案';
+
+  @override
+  String get troubleshootingTitle => '故障排查';
+
+  @override
+  String get troubleshootingDiagnostics => '诊断检查';
+
+  @override
+  String get troubleshootingNetworkCheck => '网络连接';
+
+  @override
+  String get troubleshootingNetworkCheckDesc => '检查设备是否已连接到网络';
+
+  @override
+  String get troubleshootingFirewallCheck => '防火墙设置';
+
+  @override
+  String get troubleshootingFirewallCheckDesc => '确保应用已被防火墙允许';
+
+  @override
+  String get troubleshootingPortCheck => '端口可用性';
+
+  @override
+  String get troubleshootingPortCheckDesc => '验证所需端口未被阻止';
+
+  @override
+  String get troubleshootingVpnCheck => 'VPN干扰';
+
+  @override
+  String get troubleshootingVpnCheckDesc => '检查VPN是否影响局域网发现';
+
+  @override
+  String get troubleshootingSolutions => '常见解决方案';
+
+  @override
+  String get troubleshootingManualIp => '手动输入IP地址';
+
+  @override
+  String get troubleshootingManualIpDesc => '在对话列表搜索框右侧的+号按钮中手动输入IP地址';
+
+  @override
+  String get troubleshootingFirewall => '防火墙配置';
+
+  @override
+  String get troubleshootingFirewallDesc => '在Windows防火墙设置中允许本应用';
+
+  @override
+  String get troubleshootingRestart => '重启应用';
+
+  @override
+  String get troubleshootingRestartDesc => '关闭并重新打开应用程序';
 
   @override
   String get railUpdate => '更新';
