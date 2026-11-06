@@ -220,10 +220,8 @@ void main() {
       // connect on their own the moment Discovery places him: this surface is
       // read without asking for anything, and there is no Connect here to ask
       // with. The conversation list is where that state shows, and the test
-      // below covers it.
-      // Pop back to the shell, then open Conversations
-      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-      await tester.pumpAndSettle();
+      // below covers it. The sub-page is in-page state, so the rail is still
+      // there to switch surfaces with — nothing to pop.
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
@@ -791,6 +789,47 @@ void main() {
       );
       expect(
         onPage(windowA, SettingsPage, find.text(l10n.nothingWentWrong)),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the card counts the platform default as a receive folder', (
+      tester,
+    ) async {
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        defaultIncomingDirectory: 'C:/downloads/LocalTransfer',
+      );
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+
+      // Nothing has been chosen, but the platform's own folder is where a
+      // file would land — the card must not call that "unset".
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummary)),
+        findsOneWidget,
+      );
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummaryUnset)),
+        findsNothing,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('the card says unset when no folder exists at all', (
+      tester,
+    ) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+
+      expect(
+        windowA.within(find.text(l10n.myCardSettingsSummaryUnset)),
         findsOneWidget,
       );
 
@@ -2390,9 +2429,6 @@ void main() {
         );
         await openTab(tester, l10n.tabMy, window: windowA);
         await openMyCard(tester, l10n.myCardDevices, window: windowA);
-        // Pop back to shell, then open Conversations
-        Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-        await tester.pumpAndSettle();
         await openTab(tester, l10n.tabConversation, window: windowA);
         await settleRoute(tester);
 
@@ -2587,9 +2623,6 @@ void main() {
       // *return*, and a return from nowhere tests nothing.
       await openTab(tester, l10n.tabMy, window: windowA);
       await openMyCard(tester, l10n.myCardSettings, window: windowA);
-      // Pop back to shell, then open Conversations
-      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-      await tester.pumpAndSettle();
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,

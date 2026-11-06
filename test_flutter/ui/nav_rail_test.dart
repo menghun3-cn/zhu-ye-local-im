@@ -59,9 +59,7 @@ void main() {
       .focusNode!
       .hasFocus;
 
-  testWidgets("is the app's own rail, with the tools hung at its foot", (
-    tester,
-  ) async {
+  testWidgets("is the app's own rail, with the three surfaces", (tester) async {
     final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
     await pumpWindow(tester, device);
     final colors = WeChatColors.light;
@@ -76,35 +74,15 @@ void main() {
     );
     expect(background.color, colors.sidebarBackground);
 
+    // The three surfaces are laid out in order with consistent spacing.
     double y(String label) => tester.getCenter(inRail(find.text(label))).dy;
-    final pitch = y(l10n.tabDevices) - y(l10n.tabConversation);
+    final pitch = y(l10n.tabTransfers) - y(l10n.tabConversation);
+    expect(y(l10n.tabMy) - y(l10n.tabTransfers), closeTo(pitch, 0.01));
 
-    // The four surfaces run on from one another at one pitch ...
-    for (final pair in [
-      [l10n.tabDevices, l10n.tabTransfers],
-      [l10n.tabTransfers, l10n.tabClipboard],
-    ]) {
-      expect(
-        y(pair[1]) - y(pair[0]),
-        closeTo(pitch, 0.01),
-        reason: '${pair[0]} → ${pair[1]} is one step, like the rest',
-      );
-    }
-    // ... the two tools run on from one another at that same pitch ...
-    expect(y(l10n.tabAbout) - y(l10n.tabSettings), closeTo(pitch, 0.01));
-    // ... and the space between the two groups is more than one step of it. This
-    // is the whole reason the rail is drawn rather than borrowed: Material packs
-    // every destination into one top-aligned group and has no property that
-    // separates two runs of them.
-    expect(y(l10n.tabSettings) - y(l10n.tabClipboard), greaterThan(2 * pitch));
-
-    // The tools hang off the foot: the last entry leaves the rail's own vertical
-    // padding below it.
+    // The last entry is visible and has some space below it.
     final railBox = tester.getRect(rail());
-    expect(
-      railBox.bottom - tester.getRect(item(l10n.tabAbout)).bottom,
-      closeTo(WeChat.railVPadding, 0.01),
-    );
+    final myBox = tester.getRect(item(l10n.tabMy));
+    expect(myBox.bottom, lessThan(railBox.bottom));
 
     // Above the first entry sits the product's own mark, not an icon: it is the
     // rail's first `CustomPaint`, it is the draft's 26 pixels square, and it is
@@ -133,8 +111,8 @@ void main() {
       // ink is the action green; every other entry is unfilled.
       expect(block(tester, l10n.tabConversation).color, colors.listSelected);
       expect(ink(tester, l10n.tabConversation), colors.brandStrong);
-      expect(block(tester, l10n.tabDevices).color, Colors.transparent);
-      expect(ink(tester, l10n.tabDevices), colors.secondaryText);
+      expect(block(tester, l10n.tabTransfers).color, Colors.transparent);
+      expect(ink(tester, l10n.tabTransfers), colors.secondaryText);
 
       // The block is the rail's whole inside width ...
       final blockRect = tester.getRect(item(l10n.tabConversation));
@@ -185,11 +163,11 @@ void main() {
       // grey and the ink lifts to the primary. Both halves matter — a hover that
       // only filled the block would leave the word washed out on top of it.
       await pointer.moveTo(
-        tester.getCenter(inRail(find.text(l10n.tabClipboard))),
+        tester.getCenter(inRail(find.text(l10n.tabTransfers))),
       );
       await tester.pump();
-      expect(block(tester, l10n.tabClipboard).color, colors.listHover);
-      expect(ink(tester, l10n.tabClipboard), colors.bubbleText);
+      expect(block(tester, l10n.tabTransfers).color, colors.listHover);
+      expect(ink(tester, l10n.tabTransfers), colors.bubbleText);
 
       // Onto the current one: it keeps the green it already had rather than
       // taking the grey. The draft's `[aria-current]` rule outranks its `:hover`
@@ -202,8 +180,8 @@ void main() {
       expect(ink(tester, l10n.tabConversation), colors.brandStrong);
 
       // And the entry the pointer left goes back to being nothing at all.
-      expect(block(tester, l10n.tabClipboard).color, Colors.transparent);
-      expect(ink(tester, l10n.tabClipboard), colors.secondaryText);
+      expect(block(tester, l10n.tabTransfers).color, Colors.transparent);
+      expect(ink(tester, l10n.tabTransfers), colors.secondaryText);
 
       await shutdown(tester, [device]);
     },

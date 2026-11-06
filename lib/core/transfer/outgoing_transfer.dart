@@ -216,6 +216,11 @@ final class OutgoingTransfer extends Transfer {
     finish(TransferCancelled(message.reason, byPeer: true));
   }
 
+  /// Internal: the peer withdrew the message.
+  void onWithdraw(WithdrawMessage message) {
+    finish(TransferWithdrawn(byPeer: true));
+  }
+
   /// Internal: the Session failed or ended before the Transfer did.
   @override
   void onChannelError(Object error) {
@@ -230,6 +235,23 @@ final class OutgoingTransfer extends Transfer {
     if (isSettled) return;
     finish(TransferCancelled(reason, byPeer: false));
     await sendQuietly(_channel, CancelMessage(transferId: id, reason: reason));
+  }
+
+  /// Withdraws a completed message within the allowed time window.
+  ///
+  /// Only valid for transfers that completed within the last 2 minutes.
+  /// Sends a withdraw message to the peer and marks this transfer as withdrawn.
+  @override
+  Future<void> withdraw() async {
+    if (isSettled || state != TransferState.completed) return;
+    final completedAt = completionTime;
+    if (completedAt == null) return;
+
+    final elapsed = DateTime.now().difference(completedAt);
+    if (elapsed.inMinutes >= 2) return;
+
+    finish(TransferWithdrawn(byPeer: false));
+    await sendQuietly(_channel, WithdrawMessage(transferId: id));
   }
 
   @override

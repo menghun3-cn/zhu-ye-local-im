@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object -- 2026-11-06-settings-card-counts-the-default-incoming-folder.md
+#   git hash-object -- 2026-11-06-settings-card-counts-the-default-incoming-folder.zh.md
+2026-11-06-settings-card-counts-the-default-incoming-folder.md: 00c2a90c8aa2adca1ea20cbbe731c520da74d59c
+2026-11-06-settings-card-counts-the-default-incoming-folder.zh.md: 73fb40adb13c2c80112a649a31b6aac5a357b9da

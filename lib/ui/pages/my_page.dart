@@ -14,9 +14,17 @@ import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'screenshot_page.dart';
 import 'settings_page.dart';
+import 'troubleshooting_page.dart';
 
 /// Which sub-page is shown.
-enum _SubPage { devices, clipboard, screenshot, settings, about }
+enum _SubPage {
+  devices,
+  clipboard,
+  screenshot,
+  settings,
+  troubleshooting,
+  about,
+}
 
 /// The header shown above each sub-page, with a back button.
 class _SubPageHeader extends StatelessWidget {
@@ -252,10 +260,20 @@ class _MyPageState extends State<MyPage> {
         _MyCard(
           icon: Icons.settings_outlined,
           title: l10n.myCardSettings,
-          summary: controller.incomingDirectory == null
+          // The folder that would actually be used, not only the one the user
+          // typed: the platform default is a real destination too, so "unset"
+          // is honest only when neither exists.
+          summary: incoming == null
               ? l10n.myCardSettingsSummaryUnset
               : l10n.myCardSettingsSummary,
           onTap: () => _openSubPage(_SubPage.settings),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        _MyCard(
+          icon: Icons.healing_outlined,
+          title: l10n.myCardTroubleshooting,
+          summary: l10n.myCardTroubleshootingSummary,
+          onTap: () => _openSubPage(_SubPage.troubleshooting),
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
@@ -304,6 +322,15 @@ class _MyPageState extends State<MyPage> {
         children: [
           _SubPageHeader(title: l10n.tabSettings, onBack: _closeSubPage),
           Expanded(child: SettingsPage(seams: widget.seams)),
+        ],
+      ),
+      _SubPage.troubleshooting => Column(
+        children: [
+          _SubPageHeader(
+            title: l10n.troubleshootingTitle,
+            onBack: _closeSubPage,
+          ),
+          const Expanded(child: TroubleshootingPage()),
         ],
       ),
       _SubPage.about => Column(

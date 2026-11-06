@@ -206,6 +206,7 @@ String _stateName(TransferState state) => switch (state) {
   TransferState.completed => 'completed',
   TransferState.rejected => 'rejected',
   TransferState.cancelled => 'cancelled',
+  TransferState.withdrawn => 'withdrawn',
   TransferState.failed => 'failed',
   TransferState.awaitingDecision ||
   TransferState.transferring ||
@@ -220,6 +221,7 @@ TransferState _stateOf(String value) => switch (value) {
   'completed' => TransferState.completed,
   'rejected' => TransferState.rejected,
   'cancelled' => TransferState.cancelled,
+  'withdrawn' => TransferState.withdrawn,
   'failed' => TransferState.failed,
   _ => throw FormatException('unknown state "$value"'),
 };

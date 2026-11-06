@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.38+38
+version: 0.1.39+39
 
 environment:
   sdk: ^3.13.4
@@ -96,6 +96,10 @@ dependencies:
   # Path joining for the screenshot library's files.
   path: ^1.9.0
 
+  # HTTP server for link-based file transfer.
+  shelf: ^1.4.1
+  shelf_static: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -123,6 +127,10 @@ flutter:
   # and `flutter build`, so a string that is added to the template without a
   # translation is a build-time difference rather than a runtime surprise.
   generate: true
+
+  # Assets for link transfer web page.
+  assets:
+    - assets/link_transfer/index.html
 
   # To add assets to your application, add an assets section, like this:
   # assets:
