@@ -37,7 +37,14 @@ Future<void> main(List<String> arguments) async {
   // launched by the same executable; the window arguments are the only thing
   // telling this process apart from the main one. They run before the seams
   // are opened because they need none of them — each reads its own files.
-  final windowArgs = await ScreenshotWindowArgs.current();
+  // Only Windows can spawn them: the plugin behind the question has no
+  // Android implementation, so asking it there throws
+  // MissingPluginException before the first frame — a blank window, not the
+  // app. The comparison is written out for the same reason controlsWindow is:
+  // adding a platform is a decision somebody has to make here.
+  final windowArgs = currentPlatform() == DevicePlatform.windows
+      ? await ScreenshotWindowArgs.current()
+      : null;
   if (windowArgs != null) {
     runApp(
       MaterialApp(
