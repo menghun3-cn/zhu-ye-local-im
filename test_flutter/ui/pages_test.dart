@@ -220,10 +220,8 @@ void main() {
       // connect on their own the moment Discovery places him: this surface is
       // read without asking for anything, and there is no Connect here to ask
       // with. The conversation list is where that state shows, and the test
-      // below covers it.
-      // Pop back to the shell, then open Conversations
-      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-      await tester.pumpAndSettle();
+      // below covers it. The sub-page is in-page state, so the rail is still
+      // there to switch surfaces with — nothing to pop.
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
@@ -2390,9 +2388,6 @@ void main() {
         );
         await openTab(tester, l10n.tabMy, window: windowA);
         await openMyCard(tester, l10n.myCardDevices, window: windowA);
-        // Pop back to shell, then open Conversations
-        Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-        await tester.pumpAndSettle();
         await openTab(tester, l10n.tabConversation, window: windowA);
         await settleRoute(tester);
 
@@ -2587,9 +2582,6 @@ void main() {
       // *return*, and a return from nowhere tests nothing.
       await openTab(tester, l10n.tabMy, window: windowA);
       await openMyCard(tester, l10n.myCardSettings, window: windowA);
-      // Pop back to shell, then open Conversations
-      Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-      await tester.pumpAndSettle();
       await openTab(tester, l10n.tabConversation, window: windowA);
       await pumpUntil(
         tester,
