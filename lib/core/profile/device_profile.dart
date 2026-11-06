@@ -153,6 +153,8 @@ final class DeviceProfile {
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
     this.updateCheckInterval = UpdateCheckInterval.hourly,
+    this.screenshotEnabled = false,
+    this.screenshotHotkey = defaultScreenshotHotkey,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        _favorites = {...favorites}
@@ -205,6 +207,26 @@ final class DeviceProfile {
   /// the answer has to survive restarts. Defaults to hourly, which is what a
   /// tool whose whole point is receiving things quietly was shipped for.
   UpdateCheckInterval updateCheckInterval;
+
+  /// Whether the screenshot feature is switched on.
+  ///
+  /// Off by default: capturing the screen is the most invasive thing this
+  /// app can do, and a global hotkey that fires it must be something the
+  /// user asked for rather than something they discover. Turning it off
+  /// stops new captures and unregisters the hotkey; pins and history that
+  /// already exist stay — they are the user's pictures, not the feature's
+  /// state.
+  bool screenshotEnabled;
+
+  /// The accelerator that summons the capture overlay, as
+  /// `modifier+modifier+key` in lower case — `ctrl+shift+a`.
+  ///
+  /// A string rather than a structure because the format is the wire format:
+  /// the settings screen records it, the host parses it, and a profile
+  /// written by a newer version that knows more modifiers still reads as a
+  /// string here. [defaultScreenshotHotkey] is what an untouched profile
+  /// resolves to.
+  String screenshotHotkey;
 
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
@@ -327,6 +349,8 @@ final class DeviceProfile {
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
     'closeBehaviour': closeBehaviour.wireName,
     'updateCheckInterval': updateCheckInterval.wireName,
+    'screenshotEnabled': screenshotEnabled,
+    'screenshotHotkey': screenshotHotkey,
     'known': [for (final device in knownDevices) device.toJson()],
     'recentEmojis': recentEmojis,
   };
@@ -388,6 +412,10 @@ final class DeviceProfile {
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
       closeBehaviour: _closeBehaviour(json['closeBehaviour']),
       updateCheckInterval: _updateCheckInterval(json['updateCheckInterval']),
+      screenshotEnabled: json['screenshotEnabled'] is bool
+          ? json['screenshotEnabled'] as bool
+          : false,
+      screenshotHotkey: _screenshotHotkey(json['screenshotHotkey']),
     );
   }
 
@@ -452,4 +480,55 @@ CloseBehaviour _closeBehaviour(Object? value) {
 UpdateCheckInterval _updateCheckInterval(Object? value) {
   if (value is! String) return UpdateCheckInterval.hourly;
   return UpdateCheckInterval.fromWireName(value) ?? UpdateCheckInterval.hourly;
+}
+
+/// Reads the screenshot hotkey, falling back to the default.
+///
+/// Tolerant the same way the other preferences are: an absent or malformed
+/// value means "the user has not said otherwise". A hotkey that cannot be
+/// parsed is worse than the default — the settings screen offers the recorded
+/// string back for editing either way.
+String _screenshotHotkey(Object? value) {
+  if (value is! String) return defaultScreenshotHotkey;
+  return isScreenshotHotkey(value) ? value : defaultScreenshotHotkey;
+}
+
+/// The accelerator a fresh profile starts with.
+///
+/// `Ctrl+Shift+A`: chosen over the PrintScreen default because it does not
+/// steal the system's own screenshot key, and over the `Ctrl+Alt` family
+/// because QQ (`Ctrl+Alt+A`/`S`) and WeChat (`Alt+A`) already own those
+/// globally — a hotkey that loses the registration race fails silently,
+/// which is the worst way for a shortcut to not work.
+const String defaultScreenshotHotkey = 'ctrl+shift+a';
+
+/// Whether [accelerator] is a hotkey string this build can register.
+///
+/// The grammar is `modifier+modifier+key`, lower-case, modifiers drawn from
+/// `ctrl`, `shift`, `alt`, `win` and the key being a single letter, digit or
+/// function key. Kept deliberately small: the recorder only ever produces
+/// this shape, and anything else is refused at the settings screen rather
+/// than at registration time, where the failure would be invisible.
+bool isScreenshotHotkey(String accelerator) {
+  final parts = accelerator.split('+');
+  if (parts.length < 2 || parts.length > 4) return false;
+  if (parts.any((part) => part.isEmpty)) return false;
+  var sawKey = false;
+  for (final part in parts) {
+    if (const {'ctrl', 'shift', 'alt', 'win'}.contains(part)) continue;
+    if (sawKey) return false;
+    sawKey = true;
+    if (!_isHotkeyKey(part)) return false;
+  }
+  return sawKey;
+}
+
+bool _isHotkeyKey(String key) {
+  if (key.length == 1) {
+    final code = key.codeUnitAt(0);
+    return (code >= 0x61 && code <= 0x7A) || (code >= 0x30 && code <= 0x39);
+  }
+  return key.startsWith('f') &&
+      key.length <= 3 &&
+      int.tryParse(key.substring(1)) != null;
 }

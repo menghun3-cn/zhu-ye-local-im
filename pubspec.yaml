@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.35+35
+version: 0.1.36+36
 
 environment:
   sdk: ^3.13.4
@@ -63,6 +63,38 @@ dependencies:
   # or a file copied in Explorer is invisible to it; this plugin reads the
   # desktop clipboard's file list and its bitmap.
   pasteboard: ^0.5.0
+
+  # The screenshot feature's extra windows — the capture overlay, the history
+  # strip, the annotation editor and each pinned image — each run in their own
+  # Flutter engine, because a window that must cover the whole screen and stay
+  # above every other application cannot be a route inside the main window.
+  desktop_multi_window: ^0.3.1
+
+  # Sizes, moves, hides and always-on-top's the windows above, per engine.
+  # Held at 0.5.x deliberately: 0.6.x is days old and rewrites the whole API
+  # onto nativeapi, which this feature does not need.
+  window_manager: 0.5.2
+
+  # The global hotkey that summons the capture overlay from any application.
+  # Held at 0.2.x for the same reason: 0.3.x is a days-old rewrite.
+  hotkey_manager: 0.2.3
+
+  # Direct Win32 access for what no plugin offers: enumerating other
+  # applications' windows for window-mode capture, reading the virtual screen
+  # metrics, writing a bitmap to the clipboard, and the WS_EX_TRANSPARENT
+  # click-through a pinned image needs.
+  win32: ^6.4.0
+
+  # PNG encode/decode and DIB conversion for the captures and the clipboard.
+  image: ^4.10.1
+
+  # `calloc` for the Win32 calls above; declared directly because importing a
+  # transitive dependency is exactly what `depend_on_referenced_packages`
+  # exists to catch.
+  ffi: ^2.2.0
+
+  # Path joining for the screenshot library's files.
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

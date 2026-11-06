@@ -12,6 +12,7 @@ import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
 import 'seams.dart';
 import 'update_check.dart';
+import 'update_install.dart';
 import 'update_notice.dart';
 import 'update_session.dart';
 import 'wechat/theme.dart';
@@ -128,6 +129,22 @@ class _HomeShellState extends State<HomeShell> {
   /// Whether the session reports work in flight, for the rail's lock.
   bool _sessionBusy = false;
 
+  /// The percentage the rail can show for the update in flight, or null.
+  ///
+  /// Tracked as the rounded number rather than the progress object: the entry
+  /// draws exactly this and nothing else, and comparing it is what keeps a
+  /// per-chunk report from rebuilding the rail faster than the number can
+  /// change.
+  int? _sessionPercent;
+
+  /// How many times the rail's update entry has asked for the About card.
+  ///
+  /// The session owns the install itself — the press reaches it directly — so
+  /// all the My page owes a request is the sub-page the card lives on. A
+  /// counter rather than a flag, so that every press is a request even when
+  /// the card was already open.
+  int _aboutRequests = 0;
+
   /// The notice currently being listened to for restore lookups.
   UpdateNotice? _watchedUpdate;
 
@@ -161,11 +178,15 @@ class _HomeShellState extends State<HomeShell> {
     _syncUnread();
   }
 
-  /// Hears the session's busy edge for the rail's lock.
+  /// Hears the session's reports for the rail's lock and label.
   void _syncSessionBusy() {
     final busy = _installSession.busy;
-    if (busy == _sessionBusy) return;
-    setState(() => _sessionBusy = busy);
+    final percent = _railPercent(_installSession.progress);
+    if (busy == _sessionBusy && percent == _sessionPercent) return;
+    setState(() {
+      _sessionBusy = busy;
+      _sessionPercent = percent;
+    });
   }
 
   /// Follows [update] for the answer a restore is looked up from.
@@ -254,11 +275,16 @@ class _HomeShellState extends State<HomeShell> {
   /// waiting for the About card to be opened, and it keeps running if the user
   /// looks at something else meanwhile. The card has the room for the
   /// progress, the question before closing and the failure sentence, which is
-  /// why the shell still brings its surface forward.
+  /// why the shell still brings its surface forward — and the About card
+  /// itself, because a press that lands on the card list has shown the user
+  /// nothing of the work it started.
   void _installUpdate() {
     final answer = widget.update?.answer;
     if (answer != null) unawaited(_installSession.install(answer));
-    setState(() => _index = _mySurface);
+    setState(() {
+      _index = _mySurface;
+      _aboutRequests++;
+    });
   }
 
   /// Reports that the update a press started has reached [busy].
@@ -302,6 +328,7 @@ class _HomeShellState extends State<HomeShell> {
         seams: widget.seams,
         update: widget.update,
         installSession: _installSession,
+        openAboutRequests: _aboutRequests,
         onUpdateBusyChanged: _setUpdateLocked,
       ),
     ];
@@ -377,6 +404,8 @@ class _HomeShellState extends State<HomeShell> {
                         version: version,
                         onInstall: _installUpdate,
                         enabled: !_updateLocked && !_sessionBusy,
+                        updating: _sessionBusy,
+                        percent: _sessionPercent,
                       ),
               );
             },
@@ -441,10 +470,22 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// The rail's update entry: one word on the rail, the version on the hover.
+/// The percentage the rail can show for [progress], or null.
 ///
-/// The rail has room for one word, so the version number — which is the whole
-/// reason the entry exists rather than a coloured dot — rides on the hover.
+/// Only a download whose total size is known earns a number; every other
+/// stage — and a download that has not learned its length yet — is the same
+/// "updating" state without one.
+int? _railPercent(UpdateInstallProgress? progress) {
+  if (progress?.stage != UpdateInstallStage.downloading) return null;
+  final fraction = progress?.fraction;
+  return fraction == null ? null : (fraction * 100).round();
+}
+
+/// The rail's update entry: one state on the rail, the version on the hover.
+///
+/// The rail has room for one word — plus one percentage while a download's byte
+/// counts are known — so the version number, which is the whole reason the
+/// entry exists rather than a coloured dot, rides on the hover.
 /// That the version is the payload and not the label is why the tooltip is
 /// [AppLocalizations.aboutUpdateAvailable] rather than a sentence invented
 /// here: the About card already says exactly this fact, in exactly this shape,
@@ -460,6 +501,8 @@ class _UpdateEntry extends StatelessWidget {
     required this.version,
     required this.onInstall,
     required this.enabled,
+    required this.updating,
+    this.percent,
   });
 
   /// The newer version, named on the hover.
@@ -476,6 +519,20 @@ class _UpdateEntry extends StatelessWidget {
   /// Whether a press can start anything. False while an update is in flight,
   /// so a second press cannot queue a second download.
   final bool enabled;
+
+  /// Whether the session the press started is still working.
+  ///
+  /// Drawn as 「更新中」 rather than 「更新」: the press was accepted, and the
+  /// entry saying so is the difference between "it worked" and "it looked
+  /// dead". The About card keeps the byte counts and the stage sentences —
+  /// the rail carries the one state it has room for.
+  final bool updating;
+
+  /// The download's percentage, when its byte counts are known.
+  ///
+  /// Null for every other stage and for a download whose length is not known
+  /// yet: those are the same "updating" state without a number.
+  final int? percent;
 
   @override
   Widget build(BuildContext context) {
@@ -522,9 +579,14 @@ class _UpdateEntry extends StatelessWidget {
               const Icon(Icons.system_update_alt),
               const SizedBox(height: 2),
               Text(
-                l10n.railUpdate,
+                updating ? l10n.railUpdateRunning : l10n.railUpdate,
                 style: const TextStyle(fontSize: WeChat.fontSizeMeta),
               ),
+              if (updating && percent != null)
+                Text(
+                  l10n.railUpdatePercent(percent!),
+                  style: const TextStyle(fontSize: WeChat.fontSizeMeta),
+                ),
             ],
           ),
         ),

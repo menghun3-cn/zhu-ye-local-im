@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
+import '../core/core.dart';
 import 'controller_scope.dart';
 import 'feedback.dart';
 import 'home_shell.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'screenshot/screenshot_service.dart';
 import 'seams.dart';
 import 'update_notice.dart';
 import 'wechat/theme.dart';
@@ -69,6 +71,13 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   /// the interval the user picked on the Settings surface.
   final UpdateNotice _update = UpdateNotice();
 
+  /// The screenshot feature's service, on the one platform that has it.
+  ScreenshotService? _screenshots;
+  StreamSubscription<void>? _screenshotChanges;
+  StreamSubscription<void>? _screenshotTray;
+  bool? _screenshotEnabledSeen;
+  String? _screenshotHotkeySeen;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +134,57 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     // be armed until the controller has brought that profile up.
     _update.attach(controller);
     setState(() => _controller = controller);
+    unawaited(_openScreenshots(controller));
+  }
+
+  /// Brings the screenshot feature up on Windows: the service that owns the
+  /// global hotkey, the tray entry, and the pins a restart should restore.
+  ///
+  /// Everything here is best-effort by design — a platform that cannot host
+  /// the feature simply never gets a service, and the settings surface hides
+  /// itself the same way it hides the window-only options.
+  Future<void> _openScreenshots(LocalTransferController controller) async {
+    final seams = widget.seams;
+    if (seams.platform != DevicePlatform.windows) return;
+    final service = await ScreenshotService.open(
+      libraryPath: seams.screenshotLibraryPath,
+      pinPath: seams.pinPath,
+    );
+    if (service == null || !mounted) return;
+    screenshotService = service;
+    _screenshots = service;
+    _screenshotChanges = controller.changes.listen((_) {
+      unawaited(_syncScreenshots(controller));
+    });
+    _screenshotTray = seams.hostShell.screenshotHistoryRequests.listen((_) {
+      unawaited(service.openHistory());
+    });
+    await _syncScreenshots(controller, force: true);
+    if (controller.screenshotEnabled) {
+      unawaited(service.restorePins());
+    }
+  }
+
+  /// Pushes the profile's screenshot settings to the hotkey registration and
+  /// the tray menu. [force] bypasses the change-detection cache, which is
+  /// what startup needs because nothing has been seen yet.
+  Future<void> _syncScreenshots(
+    LocalTransferController controller, {
+    bool force = false,
+  }) async {
+    final service = _screenshots;
+    if (service == null) return;
+    final enabled = controller.screenshotEnabled;
+    final hotkey = controller.screenshotHotkey;
+    if (!force &&
+        enabled == _screenshotEnabledSeen &&
+        hotkey == _screenshotHotkeySeen) {
+      return;
+    }
+    _screenshotEnabledSeen = enabled;
+    _screenshotHotkeySeen = hotkey;
+    await service.syncHotkey(enabled: enabled, accelerator: hotkey);
+    await widget.seams.hostShell.setScreenshotEnabled(enabled);
   }
 
   @override
@@ -132,6 +192,10 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     // The seams are not closed with it: this widget was handed them and does
     // not own them.
     unawaited(_controller?.close());
+    unawaited(_screenshots?.dispose());
+    unawaited(_screenshotChanges?.cancel());
+    unawaited(_screenshotTray?.cancel());
+    screenshotService = null;
     _update.dispose();
     super.dispose();
   }

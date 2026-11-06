@@ -759,6 +759,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get railUpdate => 'Update';
 
   @override
+  String get railUpdateRunning => 'Updating';
+
+  @override
+  String railUpdatePercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get aliasHelper => 'What other Devices show for this one';
 
   @override
@@ -941,6 +949,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get myCardClipboardSummaryDisabled => 'Sync disabled';
+
+  @override
+  String get myCardScreenshot => 'Screenshot';
+
+  @override
+  String get myCardScreenshotSummaryEnabled => 'On · global hotkey active';
+
+  @override
+  String get myCardScreenshotSummaryDisabled => 'Off';
 
   @override
   String get myCardSettings => 'Settings';

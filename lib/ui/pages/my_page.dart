@@ -12,10 +12,11 @@ import '../widgets.dart';
 import 'about_page.dart';
 import 'clipboard_page.dart';
 import 'devices_page.dart';
+import 'screenshot_page.dart';
 import 'settings_page.dart';
 
 /// Which sub-page is shown.
-enum _SubPage { devices, clipboard, settings, about }
+enum _SubPage { devices, clipboard, screenshot, settings, about }
 
 /// The header shown above each sub-page, with a back button.
 class _SubPageHeader extends StatelessWidget {
@@ -128,6 +129,7 @@ class MyPage extends StatefulWidget {
     required this.seams,
     this.update,
     this.installSession,
+    this.openAboutRequests = 0,
     this.onUpdateBusyChanged,
   });
 
@@ -145,6 +147,15 @@ class MyPage extends StatefulWidget {
   /// is owned by the shell — so a download that is under way when the user
   /// backs out to the card list is still there when they return.
   final UpdateInstallSession? installSession;
+
+  /// How many times the rail's update entry has asked for the About card.
+  ///
+  /// The session owns the install itself — the press reaches it directly — so
+  /// all this page owes a request is the sub-page the card lives on: a press
+  /// that landed on the card list would have started a download the user
+  /// cannot see. A counter rather than a flag, so that every press is a
+  /// request even when the card was already open.
+  final int openAboutRequests;
 
   /// What the shell's rail entry should hear about the phases of an update.
   ///
@@ -170,6 +181,15 @@ class _MyPageState extends State<MyPage> {
   /// here — the shell hears those from the session directly, which is what
   /// lets the download survive this page never being built at all.
   void _setUpdateLocked(bool busy) => _reportBusy(busy);
+
+  @override
+  void didUpdateWidget(MyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.openAboutRequests == oldWidget.openAboutRequests) return;
+    // The press that started the install wants the card that shows it: the
+    // download's progress, the question before closing, the failure sentence.
+    _currentSubPage = _SubPage.about;
+  }
 
   /// Opens a sub-page.
   void _openSubPage(_SubPage page) {
@@ -213,6 +233,21 @@ class _MyPageState extends State<MyPage> {
               : l10n.myCardClipboardSummary,
           onTap: () => _openSubPage(_SubPage.clipboard),
         ),
+        // The screenshot card exists only where the feature can run: the
+        // capture overlay, the pins and the global hotkey are all Windows
+        // machinery, and a card on Android would lead to a page that can do
+        // nothing.
+        if (widget.seams.platform == DevicePlatform.windows) ...[
+          const SizedBox(height: WeChat.sectionGap),
+          _MyCard(
+            icon: Icons.screenshot_monitor_outlined,
+            title: l10n.myCardScreenshot,
+            summary: controller.screenshotEnabled
+                ? l10n.myCardScreenshotSummaryEnabled
+                : l10n.myCardScreenshotSummaryDisabled,
+            onTap: () => _openSubPage(_SubPage.screenshot),
+          ),
+        ],
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
           icon: Icons.settings_outlined,
@@ -257,6 +292,12 @@ class _MyPageState extends State<MyPage> {
         children: [
           _SubPageHeader(title: l10n.tabClipboard, onBack: _closeSubPage),
           const Expanded(child: ClipboardPage()),
+        ],
+      ),
+      _SubPage.screenshot => Column(
+        children: [
+          _SubPageHeader(title: l10n.myCardScreenshot, onBack: _closeSubPage),
+          const Expanded(child: ScreenshotPage()),
         ],
       ),
       _SubPage.settings => Column(

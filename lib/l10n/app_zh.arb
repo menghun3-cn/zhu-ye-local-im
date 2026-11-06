@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "zh",
 
   "appTitle": "竹叶局域网传输",
@@ -224,6 +224,8 @@
   "updateFailurePermission": "还没有获得「安装未知应用」权限。请在系统设置里允许本应用安装未知应用，然后回来再点一次。",
   "updateFailureInstaller": "系统安装器没有打开。请重试，或打开下载页手动安装 APK。",
   "railUpdate": "更新",
+  "railUpdateRunning": "更新中",
+  "railUpdatePercent": "{percent}%",
 
   "aliasHelper": "其他设备上显示的名称",
   "cancel": "取消",
@@ -281,6 +283,9 @@
   "myCardClipboard": "剪贴板",
   "myCardClipboardSummary": "同步已开启",
   "myCardClipboardSummaryDisabled": "同步已关闭",
+  "myCardScreenshot": "截图",
+  "myCardScreenshotSummaryEnabled": "已开启 · 全局快捷键可用",
+  "myCardScreenshotSummaryDisabled": "已关闭",
   "myCardSettings": "设置",
   "myCardSettingsSummary": "接收文件夹已设置",
   "myCardSettingsSummaryUnset": "接收文件夹未设置",

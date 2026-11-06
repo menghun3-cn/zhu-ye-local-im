@@ -21,10 +21,10 @@ Status: implemented
 发现机制是固定端口上的 UDP 广播，位于 `lib/core/discovery/`：
 
 - `beacon.dart` —— 数据报格式：`{v, k, n, device}`，其中 `v` 是 `beaconVersion`（1），`k` 为 `probe` 或 `announce`，`n` 是每台 Device 各有其随机值的 Nonce，`device` 就是握手所携带的同一个 `DeviceDescriptor`。
-- `peer_registry.dart` —— 以 Fingerprint 为键、带 TTL 的对等表。
+- `peer_registry.dart` —— 以 Fingerprint 为键、带 TTL 的对等表，记录 peer 被听到过的每一个地址；
 - `beacon_transport.dart` —— 接缝，以及测试用的内存集线器。
 - `udp_beacon_transport.dart` —— 真实 socket，绑定 `discoveryPort`（47654）并开启 `broadcastEnabled`。
-- `discovery_service.dart` —— 策略：启动即 probe、每三秒 announce、收到 probe 直接作答、十秒无音信即过期。
+- `discovery_service.dart` —— 策略：启动即 probe、每三秒 announce、收到 probe 直接作答、十秒无音信即过期。它还会按更快的节奏把 probe **单播**给提供者给出的地址，以覆盖广播到不了的链路 —— 见[跨越 VPN 与 tailnet 的发现](../../implemented/feature/2026-11-05-discovery-across-vpn-and-tailnets.zh.md)。
 
 线上刻意**不做认证**。任何主机都能发信标、任何主机都能读信标；信标的任何内容都不构成对其发送者的证明。它是存在性通告，不是身份。
 
@@ -63,7 +63,7 @@ Status: implemented
 
 ## Consequences
 
-- 发现只回答「这条链路上有谁」，仅此而已。跨子网发现 —— 本产品存在的两个理由之一（见 [build-from-scratch-not-fork-localsend](2026-09-29-build-from-scratch-not-fork-localsend.zh.md)）—— **尚未实现**。广播不跨路由器边界，因此一台连在蜂窝邻近 Wi-Fi 上的手机和一台接以太网的笔记本互相看不见。这是被点名的缺口，不是疏漏。
+- 广播本身仍只回答「这条链路上有谁」，仅此而已。跨子网发现现已被部分覆盖——单播探测能到达提供者给出的地址（记住的对端、tailnet 成员）——由[跨越 VPN 与 tailnet 的发现](../../implemented/feature/2026-11-05-discovery-across-vpn-and-tailnets.zh.md)实现。仍未覆盖的是两台从未相遇的 Device 在无人枚举的网络上的冷启动：没有广播、没有记忆、没有目录。残余部分是被点名的缺口，不是疏漏。
 - 信标是一种线上格式，因而现在带版本（`beaconVersion`）。未知版本被直接拒绝，而不是被半懂不懂地解析，于是未来对发现的改动不可能与这一版静默互通。
 - 链路上每台 Device 都能看到其他每台 Device 的 Alias 与平台，并且可以伪造其中任何一项。这是无认证发现的固有性质；应对方式不是让发现变得可信，而是让它保持不可信 —— UI 的职责，是在 SAS 比对确认之前，一直把对端显示为未验证。
 - Android 还差两块本增量未做的平台层工作：在任何 socket 打开前请求 `ACCESS_LOCAL_NETWORK` 权限；以及决定发现是否只在前台运行。两者都属于 Android 层，且都是「发现在 Android 上能否工作」的前置条件。

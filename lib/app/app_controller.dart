@@ -94,6 +94,7 @@ final class LocalTransferController {
     this.dialSocket,
     this.pairingDialTransport,
     this.addressProbe,
+    TailscaleDirectory? tailscaleDirectory,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -117,6 +118,8 @@ final class LocalTransferController {
        _messages = messageStore,
        // ignore: prefer_initializing_formals
        _hostShell = hostShell,
+       // ignore: prefer_initializing_formals
+       _tailscale = tailscaleDirectory ?? TailscaleDirectory(),
        _clock = clock ?? DateTime.now;
 
   final ProfileStore _store;
@@ -197,6 +200,12 @@ final class LocalTransferController {
   /// especially one where two Devices are deliberately not on the same
   /// broadcast domain.
   final Future<DiscoveredPeer?> Function(String host)? addressProbe;
+
+  /// Where tailnet peer addresses come from, for unicast discovery probes.
+  ///
+  /// Only a test replaces it: production reads tailscaled's local API, which
+  /// a test link cannot and should not model.
+  final TailscaleDirectory _tailscale;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -809,6 +818,46 @@ final class LocalTransferController {
     final local = _requireLocal();
     if (local.profile.updateCheckInterval == value) return;
     local.profile.updateCheckInterval = value;
+    await _persist();
+    _notify();
+  }
+
+  /// Whether the screenshot feature is switched on.
+  ///
+  /// Read from the profile rather than remembered: the answer has to survive
+  /// restarts because what it gates — a global hotkey and a screen-capture
+  /// overlay — is exactly the kind of thing a user turns off and expects to
+  /// stay off. See [DeviceProfile.screenshotEnabled] for what "off" leaves
+  /// running.
+  bool get screenshotEnabled => _local?.profile.screenshotEnabled ?? false;
+
+  /// Switches the screenshot feature on or off, and persists it.
+  Future<void> setScreenshotEnabled(bool value) async {
+    final local = _requireLocal();
+    if (local.profile.screenshotEnabled == value) return;
+    local.profile.screenshotEnabled = value;
+    await _persist();
+    _notify();
+  }
+
+  /// The accelerator that summons the capture overlay.
+  String get screenshotHotkey =>
+      _local?.profile.screenshotHotkey ?? defaultScreenshotHotkey;
+
+  /// Sets the capture hotkey, and persists it.
+  ///
+  /// [accelerator] must satisfy [isScreenshotHotkey]; anything else is
+  /// refused here rather than at registration time, where a failure would
+  /// look like the feature simply not working. The running registration is
+  /// re-synced by the host that owns it — the controller only remembers the
+  /// choice.
+  Future<void> setScreenshotHotkey(String accelerator) async {
+    final local = _requireLocal();
+    if (!isScreenshotHotkey(accelerator)) {
+      throw ArgumentError.value(accelerator, 'accelerator');
+    }
+    if (local.profile.screenshotHotkey == accelerator) return;
+    local.profile.screenshotHotkey = accelerator;
     await _persist();
     _notify();
   }
@@ -1521,6 +1570,7 @@ final class LocalTransferController {
       transport: _beacon,
       local: descriptor,
       clock: _clock,
+      unicastTargets: _unicastTargets,
     );
     _discovery = discovery;
     _discoveryKey = key;
@@ -1547,6 +1597,33 @@ final class LocalTransferController {
       _notify();
     }, onError: (Object error) => _notice('discovery failed: $error'));
     discovery.start();
+  }
+
+  /// The addresses unicast discovery probes go to each round.
+  ///
+  /// Two sources, unioned: every address a Known Device was last reached at
+  /// — which is how a Device met once over a VPN is found again without
+  /// being met twice — and every peer tailscaled reports, which is how two
+  /// Devices that have never met find each other on a tailnet. Broadcast
+  /// cannot cross either boundary, so these probes are the only way across.
+  Future<List<InternetAddress>> _unicastTargets() async {
+    final targets = <InternetAddress>[];
+    final seen = <String>{};
+    void add(String? raw) {
+      final address = raw == null ? null : InternetAddress.tryParse(raw);
+      if (address != null && seen.add(address.address)) targets.add(address);
+    }
+
+    final profile = _local?.profile;
+    if (profile != null) {
+      for (final known in profile.knownDevices) {
+        add(known.lastAddress);
+      }
+    }
+    for (final address in await _tailscale.peers()) {
+      if (seen.add(address.address)) targets.add(address);
+    }
+    return targets;
   }
 
   /// The peers an automatic connect is currently trying, by fingerprint hex.
@@ -2251,17 +2328,21 @@ final class LocalTransferController {
 
   int? _pairingPortAt(String host) {
     for (final discovered in _discovered) {
-      if (discovered.address.address == host) return discovered.pairingPort;
+      if (_heardAt(discovered, host)) return discovered.pairingPort;
     }
     return null;
   }
 
   DiscoveredPeer? _peerAtAddress(String host) {
     for (final discovered in _discovered) {
-      if (discovered.address.address == host) return discovered;
+      if (_heardAt(discovered, host)) return discovered;
     }
     return null;
   }
+
+  /// Whether [peer] was heard at [host], on any of its addresses.
+  static bool _heardAt(DiscoveredPeer peer, String host) =>
+      peer.addresses.any((sighting) => sighting.address.address == host);
 
   Future<DiscoveredPeer?> _probeAddress(String host) {
     final probe = addressProbe;

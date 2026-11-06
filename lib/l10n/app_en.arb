@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
 
   "appTitle": "Zhuye Local Transfer",
@@ -338,6 +338,11 @@
   "updateFailurePermission": "This app is not yet allowed to install unknown apps. Allow it in Android Settings, then come back and press the button again.",
   "updateFailureInstaller": "The system installer did not open. Try again, or open the download page and install the APK by hand.",
   "railUpdate": "Update",
+  "railUpdateRunning": "Updating",
+  "railUpdatePercent": "{percent}%",
+  "@railUpdatePercent": {
+    "placeholders": { "percent": { "type": "int" } }
+  },
 
   "aliasHelper": "What other Devices show for this one",
   "cancel": "Cancel",
@@ -408,6 +413,9 @@
   "myCardClipboard": "Clipboard",
   "myCardClipboardSummary": "Sync enabled",
   "myCardClipboardSummaryDisabled": "Sync disabled",
+  "myCardScreenshot": "Screenshot",
+  "myCardScreenshotSummaryEnabled": "On · global hotkey active",
+  "myCardScreenshotSummaryDisabled": "Off",
   "myCardSettings": "Settings",
   "myCardSettingsSummary": "Receive folder configured",
   "myCardSettingsSummaryUnset": "Receive folder not set",

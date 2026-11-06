@@ -917,14 +917,15 @@ Finder onConversation(TestWindow window, Finder matching) => window.within(
 
 /// The rail's update entry in [window], as the thing to tap.
 ///
-/// Found through the label rather than by index: the entry is pinned under the
-/// destinations rather than listed with them, so there is no position to name
-/// it by — and if there were, a test would then be asserting the position
-/// twice over. A window whose rail has no entry matches nothing.
+/// Found through its icon rather than its label: the label is the part that
+/// changes — 「更新」 while it is a question, 「更新中」 and a percentage while
+/// the work it started is in flight — and a finder on the words would stop
+/// matching at exactly the moment a test needs to see the disabled state.
+/// A window whose rail has no entry matches nothing.
 Finder updateEntry(TestWindow window) => find.descendant(
   of: window.within(find.byType(AppNavRail)),
   matching: find.ancestor(
-    of: find.text(l10n.railUpdate),
+    of: find.byIcon(Icons.system_update_alt),
     matching: find.byType(TextButton),
   ),
 );
@@ -1483,6 +1484,22 @@ class ScriptedHostShell implements HostShell {
     if (refusesAutostartWrites) return;
     autostart = enabled;
   }
+
+  /// Every screenshot-enabled value the app has pushed, oldest first.
+  final List<bool> screenshotEnabledRequests = [];
+
+  final StreamController<void> _screenshotHistory =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get screenshotHistoryRequests => _screenshotHistory.stream;
+
+  /// Stands in for the tray menu's "screenshot history" pick.
+  void emitScreenshotHistoryRequest() => _screenshotHistory.add(null);
+
+  @override
+  Future<void> setScreenshotEnabled(bool value) async =>
+      screenshotEnabledRequests.add(value);
 }
 
 /// A one-pixel PNG, for the tests that need the clipboard to hold a picture.

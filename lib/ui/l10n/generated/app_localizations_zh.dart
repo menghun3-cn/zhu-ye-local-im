@@ -719,6 +719,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get railUpdate => '更新';
 
   @override
+  String get railUpdateRunning => '更新中';
+
+  @override
+  String railUpdatePercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get aliasHelper => '其他设备上显示的名称';
 
   @override
@@ -892,6 +900,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get myCardClipboardSummaryDisabled => '同步已关闭';
+
+  @override
+  String get myCardScreenshot => '截图';
+
+  @override
+  String get myCardScreenshotSummaryEnabled => '已开启 · 全局快捷键可用';
+
+  @override
+  String get myCardScreenshotSummaryDisabled => '已关闭';
 
   @override
   String get myCardSettings => '设置';

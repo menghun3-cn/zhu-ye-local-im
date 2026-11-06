@@ -1328,6 +1328,18 @@ abstract class AppLocalizations {
   /// **'Update'**
   String get railUpdate;
 
+  /// No description provided for @railUpdateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating'**
+  String get railUpdateRunning;
+
+  /// No description provided for @railUpdatePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String railUpdatePercent(int percent);
+
   /// No description provided for @aliasHelper.
   ///
   /// In en, this message translates to:
@@ -1651,6 +1663,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync disabled'**
   String get myCardClipboardSummaryDisabled;
+
+  /// No description provided for @myCardScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot'**
+  String get myCardScreenshot;
+
+  /// No description provided for @myCardScreenshotSummaryEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'On · global hotkey active'**
+  String get myCardScreenshotSummaryEnabled;
+
+  /// No description provided for @myCardScreenshotSummaryDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get myCardScreenshotSummaryDisabled;
 
   /// No description provided for @myCardSettings.
   ///
