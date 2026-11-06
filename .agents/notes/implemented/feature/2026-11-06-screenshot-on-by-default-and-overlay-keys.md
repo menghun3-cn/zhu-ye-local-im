@@ -52,7 +52,7 @@ link a screenshot window has to the profile.
 
 **The settings page lists all of them.** "我的 → 截图" gained a
 截图内快捷键 card: one recorder row per action, each with its own
-`HotKeyRecorder` and a reset-to-default. `DeviceProfile.setCaptureKey`
+recorder and a reset-to-default. `DeviceProfile.setCaptureKey`
 refuses malformed bindings and any binding another action already holds
 — two actions on one key would make the overlay's dispatch a coin flip.
 The controller adds one more refusal the profile cannot see: a binding

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
 
 import '../../app/app_controller.dart';
 import '../../core/core.dart';
@@ -49,7 +48,7 @@ class ScreenshotPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  '在任意应用中按下该组合键呼出截图遮罩',
+                  '在任意应用中按下该组合键呼出截图遮罩；点击下方按键后按下新组合键即可更改',
                   style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
                 const SizedBox(height: 12),
@@ -76,7 +75,7 @@ class ScreenshotPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  '截图遮罩打开时生效；可以只按一个键，不必带修饰键',
+                  '截图遮罩打开时生效；可以只按一个键，不必带修饰键；点击按键后按下新组合键即可更改',
                   style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
                 const SizedBox(height: 12),
@@ -159,13 +158,19 @@ class _OverlayKeyRow extends StatelessWidget {
   }
 }
 
-/// The hotkey recorder row: shows the current accelerator and records a new
-/// one on the next key press.
+/// The hotkey editor row: shows the current binding and records a new one
+/// on tap.
 ///
-/// Recording uses hotkey_manager's own recorder, which listens to hardware
-/// keys; the result is translated back into the profile's `ctrl+shift+a`
-/// string form, which is also what the validators check.
-class _HotkeyEditor extends StatelessWidget {
+/// Recording listens to hardware keys directly rather than going through
+/// hotkey_manager's recorder widget: that widget renders its own key caps,
+/// and its modifier caps come out as glyphs (`⌃`, `⇧`) that do not say
+/// "Ctrl" or "Shift". The row only listens while armed — every row on the
+/// page shares the same physical keyboard, so an always-on listener would
+/// record every key press into every row at once. The recorded chord is
+/// translated into the profile's `ctrl+shift+a` string form — the same
+/// form the validators check and [captureHotkeyLabel] renders — so what
+/// the row shows is exactly what gets stored.
+class _HotkeyEditor extends StatefulWidget {
   const _HotkeyEditor({
     required this.accelerator,
     required this.onChanged,
@@ -179,73 +184,127 @@ class _HotkeyEditor extends StatelessWidget {
   /// Called with the normalized binding the recorder produced.
   final FutureOr<void> Function(String accelerator) onChanged;
 
-  /// The grammar this row accepts — the global hotkey demands a modifier,
-  /// the in-overlay bindings do not.
+  /// The grammar this row accepts — the global hotkey demands a modifier
+  /// (or a bare function key), the in-overlay bindings do not.
   final bool Function(String accelerator) accepts;
 
   /// Returns the binding to its default, when the row offers that.
   final VoidCallback? onReset;
 
   @override
+  State<_HotkeyEditor> createState() => _HotkeyEditorState();
+}
+
+class _HotkeyEditorState extends State<_HotkeyEditor> {
+  /// The one row currently listening for a chord. Rows share the physical
+  /// keyboard, so arming one must silence the rest — otherwise a single
+  /// key press would be recorded into every row on the page.
+  static _HotkeyEditorState? _armed;
+
+  bool _recording = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    if (_armed == this) _armed = null;
+    super.dispose();
+  }
+
+  void _arm() {
+    final previous = _armed;
+    if (previous != null && previous != this) previous._disarm();
+    _armed = this;
+    setState(() => _recording = true);
+  }
+
+  void _disarm() {
+    if (_armed == this) _armed = null;
+    if (mounted) setState(() => _recording = false);
+  }
+
+  /// Turns a key press into an accelerator candidate while armed.
+  ///
+  /// Modifier-only presses return false — they are the first half of a
+  /// chord, not a binding — and so does any key [captureKeyName] cannot
+  /// spell. A bare `escape` disarms instead of recording on rows whose
+  /// grammar refuses it, which is the cancel gesture; on rows that accept
+  /// `escape` it records like any other key. The candidate is normalized
+  /// and then filtered by [widget.accepts]; a refused binding leaves the
+  /// display on the effective one rather than showing a promise that was
+  /// not kept.
+  bool _handleKeyEvent(KeyEvent event) {
+    if (!_recording || event is! KeyDownEvent) return false;
+    final name = captureKeyName(event.logicalKey);
+    if (name == null) return false;
+    final keyboard = HardwareKeyboard.instance;
+    final recorded = [
+      if (keyboard.isControlPressed) 'ctrl',
+      if (keyboard.isShiftPressed) 'shift',
+      if (keyboard.isAltPressed) 'alt',
+      if (keyboard.isMetaPressed) 'win',
+      name,
+    ].join('+');
+    if (recorded == 'escape' && !widget.accepts('escape')) {
+      _disarm();
+      return true;
+    }
+    final normalized = normalizeCaptureHotkey(recorded);
+    if (normalized != null && widget.accepts(normalized)) {
+      _disarm();
+      widget.onChanged(normalized);
+    }
+    return true;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: HotKeyRecorder(
-            initalHotKey: _toHotKey(accelerator),
-            onHotKeyRecorded: (hotKey) {
-              final recorded = _acceleratorOf(hotKey);
-              if (recorded != null && accepts(recorded)) {
-                onChanged(normalizeCaptureHotkey(recorded)!);
-              }
-            },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _recording ? _disarm : _arm,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: _recording
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : Theme.of(context).canvasColor,
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _recording
+                      ? '按下组合键…'
+                      : captureHotkeyLabel(widget.accelerator),
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        if (onReset != null)
-          TextButton(onPressed: onReset, child: const Text('恢复默认')),
+        if (widget.onReset != null)
+          TextButton(onPressed: widget.onReset, child: const Text('恢复默认')),
       ],
     );
-  }
-
-  HotKey? _toHotKey(String accelerator) {
-    final modifiers = <HotKeyModifier>[];
-    LogicalKeyboardKey? key;
-    for (final part in accelerator.split('+')) {
-      switch (part) {
-        case 'ctrl':
-          modifiers.add(HotKeyModifier.control);
-        case 'shift':
-          modifiers.add(HotKeyModifier.shift);
-        case 'alt':
-          modifiers.add(HotKeyModifier.alt);
-        case 'win':
-          modifiers.add(HotKeyModifier.meta);
-        default:
-          // A second non-modifier part means the string is not a binding
-          // this recorder can show; the validators refuse it anyway.
-          if (key != null) return null;
-          key = captureKeyOf(part);
-      }
-    }
-    if (key == null) return null;
-    return HotKey(key: key, modifiers: modifiers);
-  }
-
-  /// Translates a recorded [HotKey] back into `modifier+key` form.
-  String? _acceleratorOf(HotKey hotKey) {
-    final parts = <String>[];
-    for (final modifier in hotKey.modifiers ?? const <HotKeyModifier>[]) {
-      parts.add(switch (modifier) {
-        HotKeyModifier.control => 'ctrl',
-        HotKeyModifier.shift => 'shift',
-        HotKeyModifier.alt => 'alt',
-        HotKeyModifier.meta => 'win',
-        _ => '',
-      });
-    }
-    final key = captureKeyName(hotKey.logicalKey);
-    if (key == null) return null;
-    parts.add(key);
-    return parts.where((p) => p.isNotEmpty).join('+');
   }
 }
