@@ -252,7 +252,10 @@ class _MyPageState extends State<MyPage> {
         _MyCard(
           icon: Icons.settings_outlined,
           title: l10n.myCardSettings,
-          summary: controller.incomingDirectory == null
+          // The folder that would actually be used, not only the one the user
+          // typed: the platform default is a real destination too, so "unset"
+          // is honest only when neither exists.
+          summary: incoming == null
               ? l10n.myCardSettingsSummaryUnset
               : l10n.myCardSettingsSummary,
           onTap: () => _openSubPage(_SubPage.settings),
