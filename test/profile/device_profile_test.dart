@@ -731,10 +731,19 @@ void main() {
       expect(isCaptureHotkey('shift+alt+f12'), isTrue);
     });
 
-    test('the summon hotkey still demands a modifier and a plain key', () {
+    test('the summon hotkey demands a modifier, or a bare function key', () {
       expect(isScreenshotHotkey('q'), isFalse);
+      expect(isScreenshotHotkey('a'), isFalse);
       expect(isScreenshotHotkey('enter'), isFalse);
       expect(isScreenshotHotkey('ctrl+shift+a'), isTrue);
+      expect(isScreenshotHotkey('ctrl+f1'), isTrue);
+      // A bare F-key is the one chord-free binding allowed: nothing else
+      // uses it for typing, unlike a letter or `enter`.
+      expect(isScreenshotHotkey('f1'), isTrue);
+      expect(isScreenshotHotkey('f24'), isTrue);
+      expect(isScreenshotHotkey('f25'), isFalse);
+      expect(isScreenshotHotkey('f0'), isFalse);
+      expect(isScreenshotHotkey('ctrl+f99'), isFalse);
     });
 
     test('modifier-only, key-only-modifier-order and junk are refused', () {

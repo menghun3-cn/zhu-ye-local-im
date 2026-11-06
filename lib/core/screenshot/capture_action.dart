@@ -152,7 +152,13 @@ bool _isHotkeyKey(String key) {
     final code = key.codeUnitAt(0);
     return (code >= 0x61 && code <= 0x7A) || (code >= 0x30 && code <= 0x39);
   }
-  return key.startsWith('f') &&
-      key.length <= 3 &&
-      int.tryParse(key.substring(1)) != null;
+  return _isFunctionKey(key);
+}
+
+/// `f1`–`f24` — the range [captureKeyOf] can spell back, so a binding
+/// outside it could be stored but never matched.
+bool _isFunctionKey(String key) {
+  if (!key.startsWith('f') || key.length > 3) return false;
+  final n = int.tryParse(key.substring(1));
+  return n != null && n >= 1 && n <= 24;
 }

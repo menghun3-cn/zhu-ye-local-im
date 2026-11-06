@@ -587,13 +587,17 @@ const String defaultScreenshotHotkey = 'ctrl+shift+a';
 ///
 /// The grammar is `modifier+modifier+key`, lower-case, modifiers drawn from
 /// `ctrl`, `shift`, `alt`, `win` and the key being a single letter, digit or
-/// function key. Kept deliberately small: the recorder only ever produces
-/// this shape, and anything else is refused at the settings screen rather
-/// than at registration time, where the failure would be invisible.
+/// function key — plus one chord-free exception: a bare `f1`–`f24`. A
+/// function key is the only key safe to claim globally without a modifier,
+/// because nothing else uses it for typing; a bare letter or `enter` would
+/// fire on ordinary use. Kept deliberately small: the recorder only ever
+/// produces this shape, and anything else is refused at the settings screen
+/// rather than at registration time, where the failure would be invisible.
 bool isScreenshotHotkey(String accelerator) {
   final parts = accelerator.split('+');
-  if (parts.length < 2 || parts.length > 4) return false;
   if (parts.any((part) => part.isEmpty)) return false;
+  if (parts.length == 1) return _isFunctionKey(parts.single);
+  if (parts.length > 4) return false;
   var sawKey = false;
   for (final part in parts) {
     if (const {'ctrl', 'shift', 'alt', 'win'}.contains(part)) continue;
@@ -609,7 +613,12 @@ bool _isHotkeyKey(String key) {
     final code = key.codeUnitAt(0);
     return (code >= 0x61 && code <= 0x7A) || (code >= 0x30 && code <= 0x39);
   }
-  return key.startsWith('f') &&
-      key.length <= 3 &&
-      int.tryParse(key.substring(1)) != null;
+  return _isFunctionKey(key);
+}
+
+/// `f1`–`f24`, the only keys allowed to stand alone as the summon hotkey.
+bool _isFunctionKey(String key) {
+  if (!key.startsWith('f') || key.length > 3) return false;
+  final n = int.tryParse(key.substring(1));
+  return n != null && n >= 1 && n <= 24;
 }
