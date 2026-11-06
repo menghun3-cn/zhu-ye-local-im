@@ -14,6 +14,7 @@ import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'screenshot_page.dart';
 import 'settings_page.dart';
+import 'share_by_link_page.dart';
 import 'troubleshooting_page.dart';
 
 /// Which sub-page is shown.
@@ -23,6 +24,7 @@ enum _SubPage {
   screenshot,
   settings,
   troubleshooting,
+  shareByLink,
   about,
 }
 
@@ -277,6 +279,13 @@ class _MyPageState extends State<MyPage> {
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
+          icon: Icons.link,
+          title: l10n.myCardShareByLink,
+          summary: l10n.myCardShareByLinkSummary,
+          onTap: () => _openSubPage(_SubPage.shareByLink),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        _MyCard(
           icon: Icons.announcement,
           title: l10n.myCardAbout,
           summary: _aboutSummary(widget.update, l10n),
@@ -331,6 +340,12 @@ class _MyPageState extends State<MyPage> {
             onBack: _closeSubPage,
           ),
           const Expanded(child: TroubleshootingPage()),
+        ],
+      ),
+      _SubPage.shareByLink => Column(
+        children: [
+          _SubPageHeader(title: l10n.myCardShareByLink, onBack: _closeSubPage),
+          const Expanded(child: ShareByLinkPage()),
         ],
       ),
       _SubPage.about => Column(

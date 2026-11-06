@@ -791,6 +791,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Network diagnostics and common solutions';
 
   @override
+  String get myCardShareByLink => 'Share by Link';
+
+  @override
+  String get myCardShareByLinkSummary =>
+      'Download files without installing the app';
+
+  @override
+  String get shareByLinkEmpty =>
+      'No shared links yet. Click the button above to select files and generate links.';
+
+  @override
   String get troubleshootingTitle => 'Troubleshooting';
 
   @override

@@ -1388,6 +1388,24 @@ abstract class AppLocalizations {
   /// **'Network diagnostics and common solutions'**
   String get myCardTroubleshootingSummary;
 
+  /// No description provided for @myCardShareByLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Share by Link'**
+  String get myCardShareByLink;
+
+  /// No description provided for @myCardShareByLinkSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Download files without installing the app'**
+  String get myCardShareByLinkSummary;
+
+  /// No description provided for @shareByLinkEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared links yet. Click the button above to select files and generate links.'**
+  String get shareByLinkEmpty;
+
   /// No description provided for @troubleshootingTitle.
   ///
   /// In en, this message translates to:

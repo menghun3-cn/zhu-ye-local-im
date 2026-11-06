@@ -749,6 +749,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get myCardTroubleshootingSummary => '网络诊断和常见解决方案';
 
   @override
+  String get myCardShareByLink => '链接分享';
+
+  @override
+  String get myCardShareByLinkSummary => '无需安装即可下载文件';
+
+  @override
+  String get shareByLinkEmpty => '还没有分享的链接。点击上方按钮选择文件生成链接。';
+
+  @override
   String get troubleshootingTitle => '故障排查';
 
   @override
