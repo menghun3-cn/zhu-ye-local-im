@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../discovery/peer_registry.dart';
 import 'link_server.dart';
 
 /// Link-based file transfer service.
@@ -32,11 +33,33 @@ class LinkTransfer {
 
   /// Creates a download link for a file.
   ///
-  /// Returns the full URL or null if the server is not running or
-  /// the file does not exist.
-  Future<String?> createLink(String filePath, {String? fileName}) async {
+  /// [peerAddresses] are passed to [shareAddressHints]-style callers as the
+  /// addresses Devices were recently heard at; they steer which of this
+  /// machine's interfaces the link names. Returns the full URL or null if
+  /// the server is not running or the file does not exist.
+  Future<String?> createLink(
+    String filePath, {
+    String? fileName,
+    List<String> peerAddresses = const [],
+  }) async {
     if (!_server.isRunning) return null;
     if (!File(filePath).existsSync()) return null;
-    return _server.createLink(filePath, fileName: fileName);
+    return _server.createLink(
+      filePath,
+      fileName: fileName,
+      peerAddresses: peerAddresses,
+    );
   }
+}
+
+/// Flattens discovered peers into the address hints a share link prefers:
+/// every address each peer was heard at, freshest sightings first.
+///
+/// A peer reachable over both a LAN and a VPN contributes both addresses —
+/// whichever link the recipient is actually on, the local address sharing
+/// its prefix is the one the link can name.
+List<String> shareAddressHints(Iterable<DiscoveredPeer> peers) {
+  final sightings = [for (final peer in peers) ...peer.addresses]
+    ..sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
+  return [for (final sighting in sightings) sighting.address.address];
 }

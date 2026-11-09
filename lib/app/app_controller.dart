@@ -437,6 +437,14 @@ final class LocalTransferController {
     return views;
   }
 
+  /// The Devices Discovery currently hears, exactly as it reports them.
+  ///
+  /// Unlike [peers] this is not merged with the group, the Known Devices
+  /// record, or live Sessions: it is only what was heard lately, and every
+  /// address each peer was heard at — which is what a share link needs to
+  /// pick a local address on a link a recipient can actually reach.
+  List<DiscoveredPeer> get discoveredPeers => _discovered;
+
   /// Every message in every conversation this Device has had, newest first.
   ///
   /// Two sources, and the live one wins. A Transfer this process took part in

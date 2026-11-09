@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-09-share-link-picks-a-reachable-address.md
+#   git hash-object 2026-11-09-share-link-picks-a-reachable-address.zh.md
+2026-11-09-share-link-picks-a-reachable-address.md: 7ef62a8b5a86ba54334eb196fdd3972804b93b98
+2026-11-09-share-link-picks-a-reachable-address.zh.md: ac65a104512f4982e16a2968557600700a5e01e4
