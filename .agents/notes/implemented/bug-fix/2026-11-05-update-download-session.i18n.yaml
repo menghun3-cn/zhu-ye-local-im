@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-05-update-download-session.md
 #   git hash-object -- 2026-11-05-update-download-session.zh.md
-2026-11-05-update-download-session.md: 6ad069a2b5e05d90ef78bce4859996c56b681483
-2026-11-05-update-download-session.zh.md: d6b6d00dd92b1a8bec8165f4a524126f5d520bc4
+2026-11-05-update-download-session.md: de6e7d41863fac7b55191f83afd8af1522cb87be
+2026-11-05-update-download-session.zh.md: 343377a47529281d8dc9ca2b1c1973bfc957d491

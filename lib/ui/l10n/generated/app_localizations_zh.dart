@@ -673,33 +673,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      '点「更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后问一句「更新并重启」——确认后程序先关闭，更新完成自动重新打开。做不了的时候，旁边那个按钮会打开手动下载的页面。';
+      '点「更新」就行：程序把更新包取到本目录下的 update 文件夹、按发布方公布的校验值核一遍，然后自动关闭、更新并重新打开，不再多问一句。做不了的时候，旁边那个按钮会打开手动下载的页面。';
 
   @override
   String get aboutUpdateInstallHintAndroid =>
-      '点「更新」：程序把 APK 下载到应用自己的目录，按发布方公布的校验值核一遍，然后问一句「安装更新」——确认后会打开系统安装器。第一次安装时，系统可能会先让你允许本应用安装未知应用。';
-
-  @override
-  String get aboutUpdateConfirmTitle => '更新并重启？';
-
-  @override
-  String aboutUpdateConfirmBody(String version) {
-    return '新版本 $version 已经下载完成，并核对过发布方公布的校验值。点「更新并重启」：程序先关闭，更新完成后自动重新打开。';
-  }
-
-  @override
-  String get aboutUpdateConfirmApply => '更新并重启';
-
-  @override
-  String get aboutUpdateConfirmTitleAndroid => '安装更新？';
-
-  @override
-  String aboutUpdateConfirmBodyAndroid(String version) {
-    return '新版本 $version 已经下载完成，并核对过发布方公布的校验值。点「打开安装器」：系统会接管安装，完成后可以重新打开本应用。';
-  }
-
-  @override
-  String get aboutUpdateConfirmApplyAndroid => '打开安装器';
+      '点「更新」：程序把 APK 下载到应用自己的目录，按发布方公布的校验值核一遍，然后直接交给系统安装器。第一次安装时，系统可能会先让你允许本应用安装未知应用。';
 
   @override
   String get aboutUpdateReady => '更新包已就绪。再点一次「更新」即可安装，不用重新下载。';

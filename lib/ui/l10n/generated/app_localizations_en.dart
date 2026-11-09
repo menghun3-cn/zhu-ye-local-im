@@ -703,33 +703,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutUpdateInstallHint =>
-      'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.';
+      'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then the program closes, updates itself and reopens — the press was already the answer. When that cannot be done, the button beside it opens the page to download by hand.';
 
   @override
   String get aboutUpdateInstallHintAndroid =>
-      'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.';
-
-  @override
-  String get aboutUpdateConfirmTitle => 'Update and restart?';
-
-  @override
-  String aboutUpdateConfirmBody(String version) {
-    return 'Version $version has been downloaded and checked against the checksum the release published. Press Update and restart: the program closes first, updates itself, and reopens when it is done.';
-  }
-
-  @override
-  String get aboutUpdateConfirmApply => 'Update and restart';
-
-  @override
-  String get aboutUpdateConfirmTitleAndroid => 'Install the update?';
-
-  @override
-  String aboutUpdateConfirmBodyAndroid(String version) {
-    return 'Version $version has been downloaded and checked against the checksum the release published. Press Open installer: Android takes over the installation, and you can reopen this app when it finishes.';
-  }
-
-  @override
-  String get aboutUpdateConfirmApplyAndroid => 'Open installer';
+      'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then handed to the system installer. On the first install, Android may ask you to allow this app to install unknown apps.';
 
   @override
   String get aboutUpdateReady =>

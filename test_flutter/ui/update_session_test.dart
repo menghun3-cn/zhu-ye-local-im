@@ -20,8 +20,8 @@ import '../support/ui_harness.dart';
 /// is the owner now, and these tests stand on either side of it: that the
 /// work survives the page, that a second request joins the first rather than
 /// starting another, that a package a restart finds on disk is offered
-/// rather than downloaded again, and that the question before closing is
-/// asked once per prepared update.
+/// rather than downloaded again, and that a finished prepare is applied
+/// without a second question.
 void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
@@ -58,13 +58,6 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Waits for the question an update asks before anything closes.
-  Future<void> pumpUntilAsked(WidgetTester tester) => pumpUntil(
-    tester,
-    () => find.byType(AlertDialog).evaluate().isNotEmpty,
-    description: 'the update to ask before anything closes',
-  );
-
   group('UpdateInstallSession', () {
     test('joins a second install request to the one in flight', () async {
       final running = Completer<UpdatePrepareResult>();
@@ -89,30 +82,34 @@ void main() {
 
       expect(session.prepared, prepared);
       expect(session.busy, isFalse);
+      // A finished prepare is applied without being asked again: the press
+      // that started the download was already the answer.
+      expect(installer.applied, [prepared]);
     });
 
-    test(
-      'counts a press on a prepared update as a request for the question',
-      () async {
-        final installer = ScriptedUpdateInstaller.replace(
-          supported: true,
-          prepared: prepared,
-        );
-        final session = UpdateInstallSession();
-        addTearDown(session.dispose);
+    test('applies a package restore found without fetching again', () async {
+      final installer = ScriptedUpdateInstaller.replace(
+        supported: true,
+        fetched: true,
+        prepared: prepared,
+      );
+      final session = UpdateInstallSession();
+      addTearDown(session.dispose);
 
-        await session.install(available);
-        expect(session.confirmRequests, 0);
+      // What a restart does: stage what the update folder already holds. A
+      // restored package is only offered — opening a page is not a request
+      // to close the app — so nothing has been applied yet.
+      await session.restore(available);
+      expect(installer.applied, isEmpty);
 
-        await session.install(available);
-        await session.install(available);
+      await session.install(available);
+      await session.install(available);
 
-        // The package was fetched once; the presses after it are what is left —
-        // the question, asked again rather than a download started over.
-        expect(installer.askedFor, hasLength(1));
-        expect(session.confirmRequests, 2);
-      },
-    );
+      // The package was fetched once; the presses after it are applies of
+      // the same prepared update, not downloads started over.
+      expect(installer.askedFor, hasLength(1));
+      expect(installer.applied, hasLength(2));
+    });
 
     test(
       'restore fetches nothing when no finished download is there',
@@ -142,10 +139,11 @@ void main() {
 
       // The prepare that ran is the local verify-and-stage one: the package
       // was already on disk, so this is the same call a press would make —
-      // and the flag is what tells the card to offer it rather than announce.
+      // and finding it is not a request to close the app, so nothing was
+      // applied.
       expect(installer.askedFor.single.version, '9.9.9');
       expect(session.prepared, prepared);
-      expect(session.preparedIsRestore, isTrue);
+      expect(installer.applied, isEmpty);
     });
 
     test('looks for a finished download once per version', () async {
@@ -203,21 +201,24 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       expect(session.busy, isTrue);
 
-      // The fetch was never the page's to cancel: it finishes anyway, and a
-      // card built afterwards finds the question already owed.
+      // The fetch was never the page's to cancel: it finishes anyway, and the
+      // hand-over that follows needs no page at all.
       running.complete(const UpdatePrepareResult.ready(prepared));
-      await show(tester, session);
-      await pumpUntilAsked(tester);
+      await pumpUntil(
+        tester,
+        () => installer.applied.isNotEmpty,
+        description: 'the finished download to be applied',
+      );
 
-      expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
-      expect(installer.applied, isEmpty);
+      expect(installer.applied.single.package, prepared.package);
+      expect(find.byType(AlertDialog), findsNothing);
     });
 
     testWidgets('shows the progress of a download still running to a card '
         'built mid-flight', (tester) async {
       ScriptedUpdateChecker.install(available);
       final running = Completer<UpdatePrepareResult>();
-      ScriptedUpdateInstaller.replace(
+      final installer = ScriptedUpdateInstaller.replace(
         supported: true,
         progress: const [
           UpdateInstallProgress(
@@ -243,7 +244,11 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
 
       running.complete(const UpdatePrepareResult.ready(prepared));
-      await pumpUntilAsked(tester);
+      await pumpUntil(
+        tester,
+        () => installer.applied.isNotEmpty,
+        description: 'the finished download to be applied',
+      );
     });
 
     testWidgets('offers a package a restart found, without a question', (
@@ -265,18 +270,23 @@ void main() {
       await tester.pumpAndSettle();
 
       // Ready is a state, not a popup: the card says the package is waiting
-      // and no question was asked — opening a page is not a request to close
+      // and nothing was applied — opening a page is not a request to close
       // the app.
       expect(find.text(l10n.aboutUpdateReady), findsOneWidget);
       expect(find.byType(AlertDialog), findsNothing);
+      expect(installer.applied, isEmpty);
 
-      // The press that means it asks the question, and nothing is fetched
+      // The press that means it applies the package, and nothing is fetched
       // again to answer it.
       await press(tester, l10n.aboutUpdate);
-      await pumpUntilAsked(tester);
+      await pumpUntil(
+        tester,
+        () => installer.applied.isNotEmpty,
+        description: 'the offered package to be applied',
+      );
 
       expect(installer.askedFor, hasLength(1));
-      expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
+      expect(installer.applied.single.package, prepared.package);
     });
   });
 }

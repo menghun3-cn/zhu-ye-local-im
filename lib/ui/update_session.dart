@@ -26,9 +26,12 @@ import 'update_install.dart';
 /// — restoring must never be the thing that starts a download nobody asked
 /// for.
 ///
-/// The question before the process ends is still the page's: this session
-/// reports [prepared] and counts [confirmRequests], and the About card turns
-/// either into the dialog — see `about_page.dart`.
+/// There is no question before the process ends: the press that asked for the
+/// update is the answer to it. A prepare that finishes — fetched, checked and
+/// staged — is applied straight away, and a press that finds a package already
+/// waiting applies that rather than downloading again. The one exception is
+/// [restore]: a package a restart found on disk is only *offered*, because
+/// opening the About page is not a request to close the app.
 class UpdateInstallSession extends ChangeNotifier {
   /// Starts idle: no answer adopted, nothing in flight, nothing ready.
   UpdateInstallSession();
@@ -42,31 +45,25 @@ class UpdateInstallSession extends ChangeNotifier {
   /// Why the last attempt ended without anything ready, or null.
   UpdateInstallFailure? _failure;
 
-  /// What is fetched, checked and staged, waiting for the word that puts it
-  /// in place — or null.
-  PreparedUpdate? _prepared;
-
-  /// Whether [_prepared] came from [restore] rather than from a press.
+  /// What is fetched, checked and staged, waiting to be put in place — or
+  /// null.
   ///
-  /// The difference is what the page does with it: a prepared update that a
-  /// download just produced is followed by the question straight away, the
-  /// way it always was, while one a restart found on disk is only *offered* —
-  /// the user opening the About page is not a request to close the app, so
-  /// the card shows it ready and waits for the press that means it.
-  bool _preparedIsRestore = false;
+  /// A package reached this way without [restore] is applied the moment it
+  /// lands, so in practice it is only ever set for a restored package — the
+  /// one case where "found on disk" is not "just asked for".
+  PreparedUpdate? _prepared;
 
   /// The prepare call in flight, so a second request joins it rather than
   /// starting a second fetch of the same package.
   Future<void>? _inFlight;
 
-  /// How many times somebody has asked for the question to be put again.
+  /// Whether [apply] is running: the hand-over that ends this process.
   ///
-  /// Counted rather than called, because the surface that can draw the
-  /// question — the About card — may not be built when the request arrives:
-  /// the rail's entry can be pressed from any surface. A change in the count
-  /// is a request; the card answers the change the way it answers
-  /// `installRequest` used to travel.
-  int _confirmRequests = 0;
+  /// Tracked beside [_progress] rather than as a stage of it, because the
+  /// hand-over reports no progress of its own on the platforms that replace
+  /// themselves — and a [UpdateInstallStage] that drew a bar for it would be
+  /// a bar for a process that is already on its way out.
+  bool _applying = false;
 
   /// The version [restore] has already looked for on disk, or null.
   ///
@@ -92,18 +89,12 @@ class UpdateInstallSession extends ChangeNotifier {
   /// What is ready to put in place, or null.
   PreparedUpdate? get prepared => _prepared;
 
-  /// Whether [prepared] was found on disk rather than just fetched.
-  bool get preparedIsRestore => _preparedIsRestore;
-
-  /// How many times the question has been asked for again.
-  int get confirmRequests => _confirmRequests;
-
   /// Whether work is in flight: a fetch, a check, an unpack, a hand-over.
   ///
-  /// False while a prepared update waits for the question — nothing is
-  /// running then, and the entry that started it stays pressable so a second
-  /// press can be the answer "ask me again" rather than "start over".
-  bool get busy => _progress != null;
+  /// False while a prepared update waits to be applied — nothing is running
+  /// then, and the entry that started it stays pressable so a second press is
+  /// the apply rather than a second download.
+  bool get busy => _progress != null || _applying;
 
   /// Whether this build can replace itself at all.
   bool get supported => UpdateInstallResolution.installer.supported;
@@ -113,20 +104,22 @@ class UpdateInstallSession extends ChangeNotifier {
       UpdateInstallResolution.installer.restartsApplication;
 
   /// Fetches, checks and stages [answer] — everything that can be done while
-  /// this build still runs — unless it is already under way or already done.
+  /// this build still runs — unless it is already under way or already done,
+  /// and then puts it in place: the press that asked for the update is the
+  /// consent the hand-over needs, so a finished prepare is applied without a
+  /// second question.
   ///
   /// The entry point for "install this": the About card's button and the
   /// rail's entry both land here. When a prepared update for the same version
-  /// is already waiting, the press is not a second download — it is a request
-  /// for the question, counted in [confirmRequests] for whichever surface is
-  /// showing.
+  /// is already waiting — one [restore] found on disk — the press is not a
+  /// second download: it is the apply.
   Future<void> install(UpdateCheck answer) async {
     if (answer.outcome != UpdateOutcome.available) return;
     _useAnswer(answer);
     if (busy) return;
-    if (_prepared != null) {
-      _confirmRequests++;
-      _notify();
+    final ready = _prepared;
+    if (ready != null) {
+      await apply(ready);
       return;
     }
     await _prepare(answer, restored: false);
@@ -173,21 +166,23 @@ class UpdateInstallSession extends ChangeNotifier {
     _progress = null;
     _failure = null;
     _prepared = null;
-    _preparedIsRestore = false;
     _notify();
   }
 
   /// Puts [prepared] in place — the step that ends this process on the
   /// platforms that replace themselves.
   ///
-  /// What the page calls once the question has been answered yes. Progress
-  /// and failure land in the same fields a prepare reports them in, because
-  /// to a surface watching they are the same update getting closer or
-  /// further away.
+  /// What [install] calls once there is nothing left to fetch: a prepare that
+  /// just finished calls it itself, and a press on a package [restore] found
+  /// waiting calls it through [install]. Progress and failure land in the
+  /// same fields a prepare reports them in, because to a surface watching they
+  /// are the same update getting closer or further away.
   Future<void> apply(PreparedUpdate prepared) async {
     if (busy) return;
     final installer = UpdateInstallResolution.installer;
+    _applying = true;
     _failure = null;
+    _notify();
     try {
       await installer.apply(
         prepared,
@@ -197,22 +192,25 @@ class UpdateInstallSession extends ChangeNotifier {
         },
       );
     } on UpdateInstallException catch (error) {
+      _applying = false;
       _failure = error.failure;
       _progress = null;
       _notify();
       return;
     } on Object {
+      _applying = false;
       _failure = UpdateInstallFailure.installer;
       _progress = null;
       _notify();
       return;
     }
-    if (!installer.restartsApplication) {
-      // Android returns as soon as the system installer has been opened. The
-      // package stays on disk so cancelling there and pressing again costs no
-      // new download — which is what the ready line on the card says.
-      _progress = null;
-    }
+    _applying = false;
+    // Android returns as soon as the system installer has been opened. The
+    // package stays on disk so cancelling there and pressing again costs no
+    // new download — which is what the ready line on the card says. On the
+    // platforms that replace themselves this line is never reached: the
+    // process is already gone.
+    _progress = null;
     _notify();
   }
 
@@ -240,7 +238,6 @@ class UpdateInstallSession extends ChangeNotifier {
     _answer = answer;
     if (same || busy) return;
     _prepared = null;
-    _preparedIsRestore = false;
     _failure = null;
     _progress = null;
   }
@@ -283,8 +280,16 @@ class UpdateInstallSession extends ChangeNotifier {
         _progress = null;
       } else if (result.prepared != null) {
         _prepared = result.prepared;
-        _preparedIsRestore = restored;
         _progress = null;
+        _notify();
+        if (!restored) {
+          // Everything that could be done while this build ran has been, so
+          // the hand-over follows without a second question — the press that
+          // started the download already answered it. A restored package is
+          // the exception: finding one on disk is not a request to close the
+          // app, so it waits for the press that means it.
+          await apply(result.prepared!);
+        }
       } else {
         _failure = result.failure;
         _progress = null;
