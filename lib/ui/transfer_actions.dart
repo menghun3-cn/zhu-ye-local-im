@@ -140,7 +140,15 @@ Future<void> shareByLink(BuildContext context, TransferView view) async {
 
   if (!context.mounted) return;
 
-  final link = await linkTransfer.createLink(path);
+  // The addresses peers were heard at tell the link server which of this
+  // machine's interfaces a recipient can reach — LAN or VPN.
+  final peerAddresses = shareAddressHints(
+    ControllerScope.of(context).discoveredPeers,
+  );
+  final link = await linkTransfer.createLink(
+    path,
+    peerAddresses: peerAddresses,
+  );
   if (link == null) {
     if (overlay != null) {
       await TopToast.showIn(overlay, l10n.shareByLinkFailed);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/link_transfer/link_transfer.dart';
+import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../pickers.dart';
 import '../wechat/theme.dart';
@@ -41,12 +42,22 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
 
       if (!mounted) return;
 
+      // The addresses peers were heard at tell the link server which of this
+      // machine's interfaces a recipient can reach — LAN or VPN.
+      final peerAddresses = shareAddressHints(
+        ControllerScope.of(context).discoveredPeers,
+      );
+
       final newLinks = <_SharedLink>[];
       for (final file in chosen) {
         final path = file.path;
         if (!File(path).existsSync()) continue;
 
-        final link = await linkTransfer.createLink(path, fileName: file.name);
+        final link = await linkTransfer.createLink(
+          path,
+          fileName: file.name,
+          peerAddresses: peerAddresses,
+        );
         if (link != null) {
           newLinks.add(
             _SharedLink(
