@@ -184,6 +184,7 @@ Future<UiDevice> startUiDevice(
       beaconTransport: transport,
       clipboard: clipboard,
       alias: alias,
+      platform: platform,
       sessionListenPort: sessionListenPort,
       pairingPort: pairingPort,
       clipboardMode: clipboardMode,
@@ -1431,7 +1432,8 @@ class ScriptedLinkOpener implements LinkOpener {
 /// it asked for — see `LocalTransferController.setAutostart`, which is the
 /// behaviour these two fields exist to check.
 class ScriptedHostShell implements HostShell {
-  /// Starts with the app's own default: not starting with the system.
+  /// Starts with no entry in the operating system's start-up list — the state
+  /// a fresh install's registry is in before the app writes its default.
   ScriptedHostShell({this.autostart = false});
 
   /// Whether this host says it starts with the system. Set directly by a test

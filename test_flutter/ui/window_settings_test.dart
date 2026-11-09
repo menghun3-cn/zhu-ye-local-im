@@ -227,7 +227,43 @@ void main() {
       await shutdown(tester, [device]);
     });
 
-    testWidgets('turning starting-with-the-system on asks the host for it', (
+    testWidgets('starts with the system by default on a fresh Device', (
+      tester,
+    ) async {
+      final host = ScriptedHostShell();
+      final device = await startUiDevice(
+        tester,
+        MemoryBeaconHub().a,
+        'Alice',
+        hostShell: host,
+      );
+
+      // The default is written once, as the Device comes up, and the switch
+      // reports what the host now says rather than what was asked for.
+      expect(host.autostart, isTrue);
+      expect(host.autostartRequests, [true]);
+      expect(device.controller.autostartEnabled, isTrue);
+
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
+      expect(
+        tester.widget<SwitchListTile>(_startWithWindowsSwitch()).value,
+        isTrue,
+      );
+      expect(
+        onPage(
+          windowA,
+          SettingsPage,
+          find.text(l10n.settingsStartWithWindowsOn),
+        ),
+        findsOneWidget,
+      );
+
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('turning starting-with-the-system off asks the host for it', (
       tester,
     ) async {
       final host = ScriptedHostShell();
@@ -241,7 +277,23 @@ void main() {
       await openTab(tester, l10n.tabMy, window: windowA);
       await openMyCard(tester, l10n.myCardSettings, window: windowA);
 
+      // The default already turned it on; the switch is a choice, not a
+      // one-way door.
+      expect(host.autostart, isTrue);
+      expect(
+        tester.widget<SwitchListTile>(_startWithWindowsSwitch()).value,
+        isTrue,
+      );
+
+      await tester.tap(_startWithWindowsSwitch());
+      await pumpUntil(
+        tester,
+        () => !device.controller.autostartEnabled,
+        description: 'the switch to follow what the host now says',
+      );
+
       expect(host.autostart, isFalse);
+      expect(host.autostartRequests, [true, false]);
       expect(
         onPage(
           windowA,
@@ -251,25 +303,56 @@ void main() {
         findsOneWidget,
       );
 
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('an install that predates the default keeps what it had', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final firstHost = ScriptedHostShell();
+      final first = await startUiDevice(
+        tester,
+        hub.a,
+        'Alice',
+        hostShell: firstHost,
+      );
+      await pumpWindow(tester, first, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
       await tester.tap(_startWithWindowsSwitch());
       await pumpUntil(
         tester,
-        () => device.controller.autostartEnabled,
-        description: 'the switch to follow what the host now says',
+        () => !first.controller.autostartEnabled,
+        description: 'the first Device to turn starting with the system off',
       );
+      expect(firstHost.autostart, isFalse);
+      await shutdown(tester, [first]);
 
-      expect(host.autostart, isTrue);
-      expect(host.autostartRequests, [true]);
+      // The second Device is the same install coming back: the choice is
+      // already recorded in the profile, so the default does not apply again
+      // and the host is never asked to write anything.
+      final secondHost = ScriptedHostShell();
+      final second = await startUiDevice(
+        tester,
+        hub.join(),
+        'Alice',
+        profileStore: first.store,
+        hostShell: secondHost,
+      );
+      expect(secondHost.autostartRequests, isEmpty);
+      expect(secondHost.autostart, isFalse);
+      expect(second.controller.autostartEnabled, isFalse);
+
+      await pumpWindow(tester, second, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      await openMyCard(tester, l10n.myCardSettings, window: windowA);
       expect(
-        onPage(
-          windowA,
-          SettingsPage,
-          find.text(l10n.settingsStartWithWindowsOn),
-        ),
-        findsOneWidget,
+        tester.widget<SwitchListTile>(_startWithWindowsSwitch()).value,
+        isFalse,
       );
 
-      await shutdown(tester, [device]);
+      await shutdown(tester, [second]);
     });
 
     testWidgets('a write that does not take leaves the switch where it was', (
