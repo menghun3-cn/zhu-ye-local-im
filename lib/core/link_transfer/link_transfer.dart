@@ -34,7 +34,7 @@ class LinkTransfer {
   ///
   /// Returns the full URL or null if the server is not running or
   /// the file does not exist.
-  String? createLink(String filePath, {String? fileName}) {
+  Future<String?> createLink(String filePath, {String? fileName}) async {
     if (!_server.isRunning) return null;
     if (!File(filePath).existsSync()) return null;
     return _server.createLink(filePath, fileName: fileName);
