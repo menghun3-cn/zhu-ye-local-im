@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'share_address.dart';
+
 /// Temporary HTTP server for link-based file transfer.
 ///
 /// Serves a simple web page that allows recipients to download files
@@ -53,8 +55,15 @@ class LinkTransferServer {
 
   /// Creates a download link for a file.
   ///
-  /// Returns the full URL or null if the server is not running.
-  Future<String?> createLink(String filePath, {String? fileName}) async {
+  /// [peerAddresses] are the addresses Devices were recently heard at; they
+  /// tell [chooseShareAddress] which of this machine's several interfaces a
+  /// recipient can actually reach. Returns the full URL or null if the
+  /// server is not running.
+  Future<String?> createLink(
+    String filePath, {
+    String? fileName,
+    List<String> peerAddresses = const [],
+  }) async {
     if (_server == null) return null;
 
     final token = _generateToken();
@@ -66,7 +75,7 @@ class LinkTransferServer {
       createdAt: DateTime.now(),
     );
 
-    final ip = await _getLocalIp();
+    final ip = await _getLocalIp(peerAddresses);
     return 'http://$ip:$actualPort/download/$token';
   }
 
@@ -253,16 +262,31 @@ class LinkTransferServer {
   }
 
   /// Gets the local IP address for the download link.
-  Future<String> _getLocalIp() async {
+  ///
+  /// The first non-loopback address is not good enough: a machine on both a
+  /// router LAN and a VPN or tailnet enumerates several, and whichever comes
+  /// first is as likely to be the adapter nobody else can reach. The peers'
+  /// own addresses say which link the link belongs on; without them the
+  /// ranking in [chooseShareAddress] prefers physical private interfaces.
+  Future<String> _getLocalIp(List<String> peerAddresses) async {
     try {
-      final interfaces = await NetworkInterface.list();
-      for (final interface in interfaces) {
-        for (final addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            return addr.address;
-          }
-        }
-      }
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+      );
+      final chosen = chooseShareAddress(
+        candidates: [
+          for (final interface in interfaces)
+            for (final address in interface.addresses)
+              if (address.type == InternetAddressType.IPv4)
+                ShareAddressCandidate(
+                  address: address.address,
+                  interfaceName: interface.name,
+                ),
+        ],
+        peerAddresses: peerAddresses,
+      );
+      if (chosen != null) return chosen;
     } catch (e) {
       // Fallback to localhost if we can't determine the IP
     }
