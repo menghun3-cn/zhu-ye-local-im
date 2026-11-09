@@ -67,14 +67,22 @@ window that hides with no way back is a process the user cannot reach, and
 The icon is put back on the shell's `TaskbarCreated` broadcast, which is the one
 moment Windows drops every icon at once.
 
-**Starting with Windows is read, never remembered.** The entry is
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LocalTransfer`, holding the
+**Starting with Windows is read, never remembered — and defaulted once.**
+The entry is
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\竹叶局域网传输`, holding the
 quoted path of the running executable — quoted because the entry is launched as a
-command line and the path routinely contains spaces. Nothing about it is cached
-on the Dart side: `autostartEnabled` asks the registry, and `setAutostart` reads
-the answer back *after* writing. A write that failed, and a user who deleted the
-entry by hand, therefore both surface as what will actually happen rather than as
-what was asked for.
+command line and the path routinely contains spaces. The value name is what
+Windows shows for the startup app; earlier builds wrote `LocalTransfer`, which
+is still read for the enabled answer and migrated on launch — see
+[the startup entry's product name](../bug-fix/2026-11-09-windows-startup-entry-uses-product-name.md).
+Nothing about the entry itself is cached on the Dart side: `autostartEnabled`
+asks the registry, and `setAutostart` reads the answer back *after* writing. A
+write that failed, and a user who deleted the entry by hand, therefore both
+surface as what will actually happen rather than as what was asked for. What the
+profile does keep is whether the choice has been made — see
+[the start-with-Windows default](2026-11-09-windows-autostart-defaults-on.md):
+a fresh Device gets the entry written once, an install that predates the default
+keeps what it had, and a user's later "off" is never overwritten by it.
 
 ## What Dart decides, and what the host decides
 
@@ -104,8 +112,9 @@ from a newer build read as the default rather than fail an older one.
 `ScriptedHostShell`: that the group is absent when `controlsWindow` is false, that
 the close choice reaches both the running window and the stored profile, that a
 host which already starts with the system is what the switch shows *without*
-anything having been asked, and that a write which does not take leaves the switch
-off rather than on.
+anything having been asked, that a fresh Device is written the default once, that
+an install which predates the default keeps what it had, and that a write which
+does not take leaves the switch off rather than on.
 
 The runner itself has no test. It is verified by being compiled —
 `cmake --build build/windows/x64 --config Release --target local_transfer` — which
@@ -133,7 +142,10 @@ whether the platform is currently reachable.
 
 **Remembering the autostart state in the profile.** Rejected: a second copy of a
 fact the operating system owns. The two could disagree, and the copy would be the
-one that is wrong.
+one that is wrong. What is kept instead is only whether the choice was ever made
+— [the start-with-Windows default](2026-11-09-windows-autostart-defaults-on.md) —
+and that marker is not a copy of the entry: the entry is still read back on every
+launch.
 
 **`SetQuitOnClose(false)`, so that closing never ends anything.** Rejected:
 quitting has to keep working, and `quit_on_close_` is what ends the message loop.
@@ -149,7 +161,8 @@ entry behind an application the user may have opened to send a single file.
 
 **Bought.** The application can be left running with no window on screen and still
 receive things; two launches are one window; starting with Windows is a switch
-that reports what the operating system will actually do; and the close choice
+that reports what the operating system will actually do, and it is on by default
+for a Device that has never been asked; and the close choice
 survives a restart, because it is a profile field rather than window state.
 
 **The runner sits outside every gate.** `analysis_options.yaml` excludes

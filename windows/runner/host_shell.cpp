@@ -26,12 +26,15 @@ namespace {
 constexpr const wchar_t kSingleInstanceMutex[] =
     L"Local\\cn.hnasct.local_transfer.instance";
 
-// The per-user autostart entry, and the name it is stored under. The name is
-// ASCII so that it is legible and stable in regedit regardless of the display
-// language.
+// The per-user autostart entry. The value name is what Windows shows for the
+// startup app, so it carries the product name rather than the executable's
+// internal one. LocalTransfer is the name earlier builds wrote: it is read so
+// those entries still count, and migrated so they stop showing the old name.
 constexpr const wchar_t kRunKey[] =
     L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr const wchar_t kRunValue[] = L"LocalTransfer";
+constexpr const wchar_t kRunValue[] =
+    L"\u7af9\u53f6\u5c40\u57df\u7f51\u4f20\u8f93";
+constexpr const wchar_t kLegacyRunValue[] = L"LocalTransfer";
 
 constexpr const wchar_t kShowExistingMessageName[] =
     L"cn.hnasct.local_transfer.show-existing-instance";
@@ -99,10 +102,10 @@ bool PointsAtThisExecutable(const std::wstring& entry) {
   return ::_wcsicmp(trimmed.c_str(), self.c_str()) == 0;
 }
 
-// The stored autostart entry, or an empty string when there is none or it is
-// not a string. An entry pointing somewhere else is returned as it is, for
-// PointsAtThisExecutable to reject.
-std::wstring ReadAutostartEntry() {
+// The stored autostart entry under |name|, or an empty string when there is
+// none or it is not a string. An entry pointing somewhere else is returned as
+// it is, for PointsAtThisExecutable to reject.
+std::wstring ReadAutostartEntry(const wchar_t* name) {
   HKEY key = nullptr;
   if (::RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &key) !=
       ERROR_SUCCESS) {
@@ -112,11 +115,11 @@ std::wstring ReadAutostartEntry() {
   std::wstring entry;
   DWORD type = 0;
   DWORD size = 0;
-  if (::RegQueryValueExW(key, kRunValue, nullptr, &type, nullptr, &size) ==
+  if (::RegQueryValueExW(key, name, nullptr, &type, nullptr, &size) ==
           ERROR_SUCCESS &&
       type == REG_SZ && size >= sizeof(wchar_t)) {
     entry.resize(size / sizeof(wchar_t));
-    if (::RegQueryValueExW(key, kRunValue, nullptr, &type,
+    if (::RegQueryValueExW(key, name, nullptr, &type,
                            reinterpret_cast<BYTE*>(&entry[0]),
                            &size) != ERROR_SUCCESS) {
       entry.clear();
@@ -127,6 +130,59 @@ std::wstring ReadAutostartEntry() {
   }
   ::RegCloseKey(key);
   return entry;
+}
+
+// Writes the autostart entry under |name|, pointed at this executable. The
+// command is quoted because the entry is launched as a command line and the
+// path routinely contains spaces.
+bool WriteAutostartEntry(const wchar_t* name) {
+  const std::wstring path = CurrentExecutablePath();
+  if (path.empty()) {
+    return false;
+  }
+
+  HKEY key = nullptr;
+  if (::RegCreateKeyExW(HKEY_CURRENT_USER, kRunKey, 0, nullptr,
+                        REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key,
+                        nullptr) != ERROR_SUCCESS) {
+    return false;
+  }
+
+  const std::wstring command = L"\"" + path + L"\"";
+  const bool written =
+      ::RegSetValueExW(key, name, 0, REG_SZ,
+                       reinterpret_cast<const BYTE*>(command.c_str()),
+                       static_cast<DWORD>((command.size() + 1) *
+                                          sizeof(wchar_t))) == ERROR_SUCCESS;
+  ::RegCloseKey(key);
+  return written;
+}
+
+void DeleteAutostartEntry(const wchar_t* name) {
+  HKEY key = nullptr;
+  if (::RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key) !=
+      ERROR_SUCCESS) {
+    return;
+  }
+  ::RegDeleteValueW(key, name);
+  ::RegCloseKey(key);
+}
+
+// Moves an entry written under the old product-unaware name onto the current
+// one. Only an entry that still points at this executable is moved: one that
+// points elsewhere belongs to another install and is left alone.
+void MigrateAutostartEntry() {
+  const std::wstring legacy = ReadAutostartEntry(kLegacyRunValue);
+  if (legacy.empty() || !PointsAtThisExecutable(legacy)) {
+    return;
+  }
+  if (PointsAtThisExecutable(ReadAutostartEntry(kRunValue))) {
+    DeleteAutostartEntry(kLegacyRunValue);
+    return;
+  }
+  if (WriteAutostartEntry(kRunValue)) {
+    DeleteAutostartEntry(kLegacyRunValue);
+  }
 }
 
 // A small red circle, drawn at the size Windows asks for taskbar overlays.
@@ -292,6 +348,9 @@ bool HostShell::AcquireSingleInstance() {
 
 void HostShell::Attach(HWND window) {
   window_ = window;
+  // The startup entry's display name changed with the product name; move an
+  // entry an older build wrote before Windows reads it as this app.
+  MigrateAutostartEntry();
   // The tray icon is the one door back to this window once it is hidden, and
   // "hidden" can happen for the very first time at startup. Showing the icon
   // now, while the window is still visible, is what gives a user something to
@@ -322,34 +381,22 @@ void HostShell::set_unread(bool value) {
 }
 
 bool HostShell::autostart_enabled() const {
-  return PointsAtThisExecutable(ReadAutostartEntry());
+  return PointsAtThisExecutable(ReadAutostartEntry(kRunValue)) ||
+         PointsAtThisExecutable(ReadAutostartEntry(kLegacyRunValue));
 }
 
 void HostShell::set_autostart(bool enabled) {
-  HKEY key = nullptr;
-  if (::RegCreateKeyExW(HKEY_CURRENT_USER, kRunKey, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key,
-                        nullptr) != ERROR_SUCCESS) {
-    return;
-  }
-
   if (!enabled) {
-    ::RegDeleteValueW(key, kRunValue);
-    ::RegCloseKey(key);
+    DeleteAutostartEntry(kRunValue);
+    DeleteAutostartEntry(kLegacyRunValue);
     return;
   }
 
-  const std::wstring path = CurrentExecutablePath();
-  if (!path.empty()) {
-    // Quoted, and rewritten on every enable, so that an entry left behind by an
-    // earlier install or an older location is replaced rather than shadowed.
-    const std::wstring command = L"\"" + path + L"\"";
-    ::RegSetValueExW(
-        key, kRunValue, 0, REG_SZ,
-        reinterpret_cast<const BYTE*>(command.c_str()),
-        static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
+  // Rewritten on every enable, so an entry left behind by an earlier install
+  // or an older location is replaced rather than shadowed.
+  if (WriteAutostartEntry(kRunValue)) {
+    DeleteAutostartEntry(kLegacyRunValue);
   }
-  ::RegCloseKey(key);
 }
 
 void HostShell::AddTrayIcon() {
