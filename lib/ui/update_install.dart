@@ -48,16 +48,15 @@ import 'update_check.dart';
 /// [clearFetchedUpdate]. The unpacked build beside it is the transient part,
 /// and it lives where transient things live.
 ///
-/// ## Two steps, and a question between them
+/// ## Two steps, and no question between them
 ///
 /// Everything that can be done while this build still runs — fetching the
 /// package, checking it against the checksum the release published, unpacking
 /// it — is one call, [UpdateInstaller.prepare]. What is left ends the process,
 /// because the files it replaces are open until it does, and that is a second
-/// call, [UpdateInstaller.apply]. Between the two the user is asked: the last
-/// thing this build does before its window goes away is close itself on
-/// purpose, and a program that did that without a word would be a program that
-/// disappeared. See `about_page.dart` for the question.
+/// call, [UpdateInstaller.apply]. Nothing asks between the two: the press that
+/// started the update is already the consent to close this window, and
+/// `UpdateInstallSession` runs them back to back — see `update_session.dart`.
 
 /// The file an installed copy has and an unpacked one does not.
 ///
@@ -342,8 +341,7 @@ abstract interface class UpdateInstaller {
   /// Answers what is ready, or why nothing is. Nothing here ends the process or
   /// touches the folder this build runs from — the package lands in the update
   /// folder and the unpacked build in a folder of its own — so a caller that
-  /// stops here leaves the application exactly as it was. That is what a user
-  /// answering "not now" to the question in `about_page.dart` amounts to.
+  /// stops here leaves the application exactly as it was.
   Future<UpdatePrepareResult> prepare(
     UpdateCheck check, {
     required void Function(UpdateInstallProgress progress) onProgress,
@@ -674,7 +672,7 @@ final class PlatformUpdateInstaller implements UpdateInstaller {
   /// Says that a hand-over has started, and ends the process it was started
   /// from. Nothing is drawn in between — the updated build is the window the
   /// user asked for, and a gap would read as a crash only to a user who had
-  /// not already answered the question that said the app was about to restart.
+  /// not already pressed the button that said the app was about to restart.
   Future<void> _handOver(
     void Function(UpdateInstallProgress progress) onProgress,
   ) async {

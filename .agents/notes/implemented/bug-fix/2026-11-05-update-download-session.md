@@ -4,6 +4,11 @@ Status: implemented
 
 English | [中文](2026-11-05-update-download-session.zh.md)
 
+The session ownership decided here is unchanged;
+[an update applies without asking again](../simplification/2026-11-09-update-applies-without-asking.md)
+later removed the confirmation step and the `confirmRequests` mechanism this
+note describes — a finished prepare is applied by the session itself.
+
 ## Problem
 
 The update install — fetch, checksum, unpack, the question, the hand-over —

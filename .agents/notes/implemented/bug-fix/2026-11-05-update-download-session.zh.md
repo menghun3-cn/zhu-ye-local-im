@@ -4,6 +4,11 @@ Status: implemented
 
 [English](2026-11-05-update-download-session.md) | 中文
 
+本笔记决定的会话持有机制不变；
+[更新不再询问](../simplification/2026-11-09-update-applies-without-asking.zh.md)
+后来移除了本笔记描述的确认步骤与 `confirmRequests` 机制——完成的 prepare 由
+会话自己应用。
+
 ## Problem
 
 更新安装——下载、校验、解包、提问、交接——原本存在 About 页的 State 里。而

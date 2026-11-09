@@ -1253,50 +1253,14 @@ abstract class AppLocalizations {
   /// No description provided for @aboutUpdateInstallHint.
   ///
   /// In en, this message translates to:
-  /// **'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then you are asked once before anything closes — confirm, and the program closes, updates itself and reopens. When that cannot be done, the button beside it opens the page to download by hand.'**
+  /// **'Press Update: the package is fetched into the update folder beside this program, checked against the checksum the release published, and then the program closes, updates itself and reopens — the press was already the answer. When that cannot be done, the button beside it opens the page to download by hand.'**
   String get aboutUpdateInstallHint;
 
   /// No description provided for @aboutUpdateInstallHintAndroid.
   ///
   /// In en, this message translates to:
-  /// **'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then you are asked once before the system installer opens. On the first install, Android may ask you to allow this app to install unknown apps.'**
+  /// **'Press Update: the APK is fetched into this app\'s private folder, checked against the checksum the release published, and then handed to the system installer. On the first install, Android may ask you to allow this app to install unknown apps.'**
   String get aboutUpdateInstallHintAndroid;
-
-  /// No description provided for @aboutUpdateConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Update and restart?'**
-  String get aboutUpdateConfirmTitle;
-
-  /// No description provided for @aboutUpdateConfirmBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Update and restart: the program closes first, updates itself, and reopens when it is done.'**
-  String aboutUpdateConfirmBody(String version);
-
-  /// No description provided for @aboutUpdateConfirmApply.
-  ///
-  /// In en, this message translates to:
-  /// **'Update and restart'**
-  String get aboutUpdateConfirmApply;
-
-  /// No description provided for @aboutUpdateConfirmTitleAndroid.
-  ///
-  /// In en, this message translates to:
-  /// **'Install the update?'**
-  String get aboutUpdateConfirmTitleAndroid;
-
-  /// No description provided for @aboutUpdateConfirmBodyAndroid.
-  ///
-  /// In en, this message translates to:
-  /// **'Version {version} has been downloaded and checked against the checksum the release published. Press Open installer: Android takes over the installation, and you can reopen this app when it finishes.'**
-  String aboutUpdateConfirmBodyAndroid(String version);
-
-  /// No description provided for @aboutUpdateConfirmApplyAndroid.
-  ///
-  /// In en, this message translates to:
-  /// **'Open installer'**
-  String get aboutUpdateConfirmApplyAndroid;
 
   /// No description provided for @aboutUpdateReady.
   ///

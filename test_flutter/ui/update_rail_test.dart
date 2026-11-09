@@ -27,9 +27,9 @@ import '../support/ui_harness.dart';
 /// of the requirement: a user who has been told a newer build exists should not
 /// then have to go and fetch it by hand. The rail has nowhere to put a download
 /// — so what it does is bring the About card forward, which is where the
-/// download, the question before closing and the failure sentence live. The
-/// assertions below therefore check both halves: that the shell switched to
-/// that surface, and that the card was handed the press.
+/// download and the failure sentence live. The assertions below therefore check
+/// both halves: that the shell switched to that surface, and that the card was
+/// handed the press.
 ///
 /// The notice is built here and handed to the shell rather than made inside it
 /// — see `HomeShell.update` — which is what lets a test put a known answer in
@@ -179,13 +179,11 @@ void main() {
     await shutdown(tester, [device]);
   });
 
-  testWidgets('asks before anything closes, exactly as the card does', (
-    tester,
-  ) async {
-    // The rail's press is the About card's own install, not a second one: if it
-    // skipped the question, a user who pressed an entry on a rail would lose
-    // their window without ever being asked — which is the one thing the
-    // question exists to prevent.
+  testWidgets('hands the finished download straight to the installer, exactly '
+      'as the card does', (tester) async {
+    // The rail's press is the About card's own install, not a second one: the
+    // session fetches, checks and stages, then hands over without asking —
+    // there is no question for a rail press to skip.
     final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
     final installer = ScriptedUpdateInstaller.replace(
       supported: true,
@@ -198,24 +196,16 @@ void main() {
     await tester.tap(updateEntry(windowA));
     await settleRoute(tester);
     // The rail entry navigates to My and opens the About card the session's
-    // install is shown on, so the question is already the one on screen.
+    // install is shown on, so the hand-over is already the thing on screen.
     expect(selectedSurface(tester, window: windowA), mySurface);
     expect(windowA.within(find.byType(AboutPage)), findsOneWidget);
     await pumpUntil(
       tester,
-      () => dialogIsOpen(windowA),
-      description: 'the update to ask before anything closes',
+      () => installer.applied.isNotEmpty,
+      description: 'the finished download to be applied',
     );
 
-    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
-    expect(installer.applied, isEmpty);
-
-    await tapDialogButton(
-      tester,
-      l10n.aboutUpdateConfirmApply,
-      window: windowA,
-    );
-
+    expect(find.byType(AlertDialog), findsNothing);
     expect(
       installer.applied.single.package,
       'LocalTransfer-0.1.7-windows-x64-setup.exe',

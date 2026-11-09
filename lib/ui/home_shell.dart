@@ -30,9 +30,9 @@ const int _conversationsSurface = 0;
 /// Where the My surface sits, named for the one place that has to know it.
 ///
 /// The rail's update entry brings this surface forward: it has nowhere to *put*
-/// an update — no room for a download's progress, for the question before
-/// closing, or for the sentence an attempt ends in — and the About card has all
-/// three. Writing the index once is what keeps the entry and the My
+/// an update — no room for a download's progress or for the sentence an attempt
+/// ends in — and the About card has both. Writing the index once is what keeps
+/// the entry and the My
 /// destination agreeing; two spellings of it would be two chances for the entry
 /// to open a surface that is not the one it thinks it is.
 ///
@@ -154,9 +154,8 @@ class _HomeShellState extends State<HomeShell> {
   /// that must pin the entry: the update *check* the card runs on its own
   /// button. The install's own phases are heard from [_installSession]
   /// directly — a download or the closing hand-over locks the entry all the
-  /// way through, while the moment between a successful download and the
-  /// question stays unlocked so that a second press can find the question the
-  /// first press opened.
+  /// way through, while a package a restart found on disk stays unlocked so
+  /// that a press is the apply.
   bool _updateLocked = false;
 
   @override
@@ -274,10 +273,10 @@ class _HomeShellState extends State<HomeShell> {
   /// where the download lives — so the fetch starts on the press rather than
   /// waiting for the About card to be opened, and it keeps running if the user
   /// looks at something else meanwhile. The card has the room for the
-  /// progress, the question before closing and the failure sentence, which is
-  /// why the shell still brings its surface forward — and the About card
-  /// itself, because a press that lands on the card list has shown the user
-  /// nothing of the work it started.
+  /// progress and the failure sentence, which is why the shell still brings
+  /// its surface forward — and the About card itself, because a press that
+  /// lands on the card list has shown the user nothing of the work it
+  /// started.
   void _installUpdate() {
     final answer = widget.update?.answer;
     if (answer != null) unawaited(_installSession.install(answer));
@@ -551,9 +550,8 @@ class _UpdateEntry extends StatelessWidget {
           // is that a user who has been told a newer build exists should not
           // then have to go and fetch it by hand. What it does instead is
           // hand the job to the About card, which has the room to show a
-          // download's progress, ask the one question before closing, and say
-          // how an attempt ended — so the shell switches to it and counts the
-          // press.
+          // download's progress and say how an attempt ended — so the shell
+          // switches to it and counts the press.
           onPressed: enabled ? onInstall : null,
           // The colour is named rather than inherited because the rest of the
           // style is: the theme's text-button slot holds this green already, but

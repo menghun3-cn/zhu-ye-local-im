@@ -30,19 +30,19 @@ import '../widgets.dart';
 ///
 /// The page also offers to install what the question turns up — see
 /// `update_install.dart` for what that does to the folder this build runs from,
-/// and note that the offer is left out entirely on a platform that cannot:
-/// a button that could only ever fail is worse than no button. Installing is
-/// two steps with a question between them: everything that can be done while
-/// this build still runs happens without a word, and the step that ends the
-/// process asks first — [_ConfirmUpdateDialog] — because the last thing this
-/// build does before its window goes away is close itself on purpose.
+/// and note that the offer is left out entirely on a platform that cannot.
+/// Installing is one step: the session fetches, checks and stages the package,
+/// then hands over without asking again — the press on 更新 was already the
+/// answer to "close this window and reopen updated". The one package that is
+/// *not* applied on arrival is one a restart found on disk: it is only offered,
+/// and the same button applies it.
 class AboutPage extends StatefulWidget {
   /// Shows what this build is, installing through [session] when asked to.
   const AboutPage({super.key, this.session, this.onUpdateBusyChanged});
 
   /// The update the shell is carrying out, when there is one.
   ///
-  /// The download, its progress, the package waiting for the question and the
+  /// The download, its progress, the package waiting to be applied and the
   /// sentence a failure arrives as all live in the session rather than here,
   /// because this page is not always built: My shows it only while its
   /// sub-page is open, and a download owned by a page that can go away is a
@@ -89,20 +89,6 @@ class _AboutPageState extends State<AboutPage> {
   /// window that came and went.
   UpdateInstallFailure? _leftOver;
 
-  /// The prepared update the question has already been asked about, or null.
-  ///
-  /// A package that appears is followed by the question once — the way it
-  /// always was — unless it is one a restart found on disk, which is offered
-  /// rather than announced. Answering no keeps the package, and the press
-  /// that asks again is a new [UpdateInstallSession.confirmRequests] count,
-  /// not this field changing.
-  PreparedUpdate? _askedPrepared;
-
-  /// The session's [UpdateInstallSession.confirmRequests] this page has
-  /// already answered, so a request made while the page was not built is not
-  /// replayed on every visit — only a press that arrives while it is.
-  int _seenConfirmRequests = 0;
-
   @override
   void initState() {
     super.initState();
@@ -110,11 +96,10 @@ class _AboutPageState extends State<AboutPage> {
     _session = handed ?? UpdateInstallSession();
     _ownsSession = handed == null;
     _leftOver = UpdateInstallResolution.installer.previousFailure();
-    _seenConfirmRequests = _session.confirmRequests;
     _session.addListener(_onSession);
     // The session may already hold an answer from before this page existed —
     // a download that finished while the user was on another surface, or a
-    // package a restart found. The question it leads to needs a frame first.
+    // package a restart found. The card describes it from the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) => _onSession());
   }
 
@@ -133,14 +118,11 @@ class _AboutPageState extends State<AboutPage> {
 
   /// Reacts to whatever the session now holds.
   ///
-  /// The session's fields are the card's fields, so the first thing every
-  /// change gets is a rebuild. Two things are not drawing and follow it: a
-  /// prepared update that has not been asked about — which is followed by the
-  /// question, the way it always was, unless a restart found it on disk and
-  /// it is only offered — and a request for the question counted while this
-  /// page was not built, which is answered the moment it is. The leftover
-  /// hand-over sentence is also retired here: once an update is under way or
-  /// has ended, it is a report about a run that is no longer this one.
+  /// The session's fields are the card's fields, so the only thing a change
+  /// gets is a rebuild — the work itself, including the hand-over that ends
+  /// this process, is the session's and needs no surface to drive it. The
+  /// leftover hand-over sentence is retired here: once an update is under way
+  /// or has ended, it is a report about a run that is no longer this one.
   void _onSession() {
     if (!mounted) return;
     setState(() {
@@ -151,39 +133,6 @@ class _AboutPageState extends State<AboutPage> {
         _leftOver = null;
       }
     });
-    final prepared = _session.prepared;
-    if (prepared != null && prepared != _askedPrepared) {
-      _askedPrepared = prepared;
-      if (!_session.preparedIsRestore) _askToApply();
-      return;
-    }
-    if (_session.confirmRequests != _seenConfirmRequests) {
-      _seenConfirmRequests = _session.confirmRequests;
-      if (_session.prepared != null) _askToApply();
-    }
-  }
-
-  /// Puts the question an update asks before anything closes.
-  ///
-  /// A dialog of its own rather than a line on the card: what it is asking
-  /// about is the window going away, and a question that shared a surface
-  /// with the progress it follows would read as one more status line.
-  /// Answering no is the quiet option and also the safe one — the package
-  /// stays in the update folder and the application carries on exactly as it
-  /// was.
-  Future<void> _askToApply() async {
-    final prepared = _session.prepared;
-    if (prepared == null || !mounted) return;
-    final restarts = UpdateInstallResolution.installer.restartsApplication;
-    final closing = await showDialog<bool>(
-      context: context,
-      builder: (_) => _ConfirmUpdateDialog(
-        version: _session.answer?.version ?? '',
-        restartsApplication: restarts,
-      ),
-    );
-    if (!mounted || closing != true) return;
-    await _session.apply(prepared);
   }
 
   /// Asks GitHub again, because somebody pressed the button that says so.
@@ -207,10 +156,9 @@ class _AboutPageState extends State<AboutPage> {
 
   /// Whether an install or its download is in flight.
   ///
-  /// The session's own busy edge: while a package is merely *waiting* for the
-  /// question nothing is running, and the button stays live — pressing it is
-  /// how the question is asked again, which is what answering no leaves
-  /// behind.
+  /// The session's own busy edge: while a package found on disk is merely
+  /// *waiting* to be applied nothing is running, and the button stays live —
+  /// pressing it is the apply.
   bool get _installing => _session.busy;
 
   /// What an update that is under way is doing, as a sentence.
@@ -433,9 +381,11 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                     ),
                   ),
-                // What a fetched package is waiting for. Not a progress line —
-                // nothing is in flight — and not a failure either: answering no
-                // to the question left the package exactly where it was.
+                // What a package found on disk is waiting for. Not a progress
+                // line — nothing is in flight — and not a failure either: a
+                // fresh download applies itself the moment it lands, so the
+                // only prepared update that can sit here is one a restart
+                // found, offered until the press that means it.
                 if (prepared != null && failure == null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -465,58 +415,6 @@ class _AboutPageState extends State<AboutPage> {
                 HintText(canInstall ? installHint : manualHint),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The question an update asks before anything closes.
-///
-/// A dialog of its own rather than a line on the card: what it is asking about
-/// is the window going away, and a question that shared a surface with the
-/// progress it follows would read as one more status line. Answering no is the
-/// quiet option and also the safe one — the package stays in the update folder
-/// and the application carries on exactly as it was.
-class _ConfirmUpdateDialog extends StatelessWidget {
-  /// Asks about installing [version].
-  const _ConfirmUpdateDialog({
-    required this.version,
-    required this.restartsApplication,
-  });
-
-  /// The version that has been fetched and checked.
-  final String version;
-
-  /// Whether confirming closes this process and starts it again.
-  final bool restartsApplication;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(
-        restartsApplication
-            ? l10n.aboutUpdateConfirmTitle
-            : l10n.aboutUpdateConfirmTitleAndroid,
-      ),
-      content: Text(
-        restartsApplication
-            ? l10n.aboutUpdateConfirmBody(version)
-            : l10n.aboutUpdateConfirmBodyAndroid(version),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(
-            restartsApplication
-                ? l10n.aboutUpdateConfirmApply
-                : l10n.aboutUpdateConfirmApplyAndroid,
           ),
         ),
       ],
