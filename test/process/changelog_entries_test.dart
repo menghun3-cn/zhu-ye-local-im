@@ -320,6 +320,7 @@ Set<String> distinguishingFragments(String subject) {
   // the names of recurring features searchable in both languages, so a
   // translated release note is not reported as missing its commit.
   const translated = <String, String>{
+    'asking': '确认',
     'automatically': '自动',
     'address': '地址',
     'card': '卡片',
@@ -328,16 +329,19 @@ Set<String> distinguishingFragments(String subject) {
     'discovery': '发现',
     'changelog': '更新日志',
     'folder': '文件夹',
+    'finished': '完成',
     'incoming': '接收',
     'device': '设备',
     'devices': '设备',
     'download': '下载',
     'hotkey': '快捷键',
     'image': '图片',
+    'link': '链接',
     'long-press': '长按',
     'low-frequency': '低频',
     'navigation': '导航',
     'overlay': '遮罩',
+    'page': '页面',
     'presence': '在线',
     'probe': '探测',
     'progress': '进度',
@@ -345,6 +349,7 @@ Set<String> distinguishingFragments(String subject) {
     'screenshots': '截图',
     'secret': '密钥',
     'settings': '设置',
+    'share': '分享',
     'unicast': '单播',
   };
 

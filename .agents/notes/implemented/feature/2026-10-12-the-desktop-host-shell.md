@@ -68,13 +68,16 @@ The icon is put back on the shell's `TaskbarCreated` broadcast, which is the one
 moment Windows drops every icon at once.
 
 **Starting with Windows is read, never remembered.** The entry is
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LocalTransfer`, holding the
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\竹叶局域网传输`, holding the
 quoted path of the running executable — quoted because the entry is launched as a
-command line and the path routinely contains spaces. Nothing about it is cached
-on the Dart side: `autostartEnabled` asks the registry, and `setAutostart` reads
-the answer back *after* writing. A write that failed, and a user who deleted the
-entry by hand, therefore both surface as what will actually happen rather than as
-what was asked for.
+command line and the path routinely contains spaces. The value name is what
+Windows shows for the startup app; earlier builds wrote `LocalTransfer`, which
+is still read for the enabled answer and migrated on launch — see
+[the startup entry's product name](../bug-fix/2026-11-09-windows-startup-entry-uses-product-name.md).
+Nothing about it is cached on the Dart side: `autostartEnabled` asks the
+registry, and `setAutostart` reads the answer back *after* writing. A write
+that failed, and a user who deleted the entry by hand, therefore both surface
+as what will actually happen rather than as what was asked for.
 
 ## What Dart decides, and what the host decides
 

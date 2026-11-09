@@ -50,10 +50,13 @@ Windows 程序共用的名字。第二次启动若按这个名字去找窗口，
 广播 `TaskbarCreated` 时补回来，那是 Windows 一次把所有图标全部丢掉的唯一时刻。
 
 **开机自启是读出来的，从不记下来。** 条目是
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LocalTransfer`，内容为正在运行的可执行文件的
-路径，带引号 —— 因为这条目是当作命令行来启动的，而路径里常有空格。Dart 这一侧不缓存关于它的任何东
-西：`autostartEnabled` 去问注册表，`setAutostart` 在写完*之后*把答案读回来。因此一次失败的写入，和
-一个亲手删掉条目的使用者，两者都会表现为「实际会发生什么」，而不是「被要求了什么」。
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\竹叶局域网传输`，内容为正在运行的可执行文件的
+路径，带引号 —— 因为这条目是当作命令行来启动的，而路径里常有空格。值名就是 Windows 在启动应用列
+表里显示的名字；旧版本写的是 `LocalTransfer`，它仍会参与「是否启用」的读取，并在启动时迁移 ——
+见[自启动项的产品名](../bug-fix/2026-11-09-windows-startup-entry-uses-product-name.zh.md)。Dart
+这一侧不缓存关于它的任何东西：`autostartEnabled` 去问注册表，`setAutostart` 在写完*之后*把答案读
+回来。因此一次失败的写入，和一个亲手删掉条目的使用者，两者都会表现为「实际会发生什么」，而不是
+「被要求了什么」。
 
 ## 哪些由 Dart 决定，哪些由宿主决定
 
