@@ -466,6 +466,51 @@ void main() {
       });
     });
 
+    group('the start-with-Windows choice', () {
+      DeviceProfile profileOf(DevicePlatform platform) =>
+          DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
+
+      test('a new profile has not decided yet', () {
+        // Null is the whole point of the field: it is what lets the app's
+        // default apply exactly once, to a Device that has never been asked.
+        expect(profileOf(DevicePlatform.windows).autostartPreference, isNull);
+      });
+
+      test('a profile written before the key existed reads as undecided', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.autostartPreference, isNull);
+      });
+
+      test('a value of the wrong type reads as undecided too', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'autostartPreference': 'yes',
+        });
+        expect(restored.autostartPreference, isNull);
+      });
+
+      test('the choice is written only once it has been made', () {
+        final profile = profileOf(DevicePlatform.windows);
+        expect(
+          profile.toJson().containsKey('autostartPreference'),
+          isFalse,
+          reason: 'undecided is the absence of the key, not a stored null',
+        );
+        profile.autostartPreference = false;
+        expect(profile.toJson()['autostartPreference'], isFalse);
+        expect(
+          DeviceProfile.fromJson(profile.toJson()).autostartPreference,
+          isFalse,
+        );
+      });
+    });
+
     group('the update-check interval', () {
       DeviceProfile profileOf(DevicePlatform platform) =>
           DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
@@ -572,6 +617,7 @@ void main() {
         clipboardPeers: {_fp('e')},
         incomingDirectory: 'D:/shared/inbox',
         closeBehaviour: CloseBehaviour.quit,
+        autostartPreference: false,
         updateCheckInterval: UpdateCheckInterval.everyThreeDays,
         known: {
           _fp('d').hex: KnownDevice(
@@ -592,6 +638,7 @@ void main() {
       expect(restored.clipboardPeers, [_fp('e')]);
       expect(restored.incomingDirectory, 'D:/shared/inbox');
       expect(restored.closeBehaviour, CloseBehaviour.quit);
+      expect(restored.autostartPreference, isFalse);
       expect(restored.updateCheckInterval, UpdateCheckInterval.everyThreeDays);
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);

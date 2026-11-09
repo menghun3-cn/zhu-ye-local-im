@@ -135,6 +135,12 @@ final class KnownDevice {
 ///   in the window because the window cannot remember anything: it is the thing
 ///   that goes away. The host is told which one is in force as the app starts
 ///   and whenever it changes;
+/// * `autostartPreference` — whether the start-with-Windows choice has been
+///   made, and which way. Null means "never decided": the operating system
+///   still holds the entry itself, and this is only the record that decides
+///   whether the app's default may still apply. A Device minted before the
+///   default flipped reads as decided-once, so an existing install is never
+///   switched on behind the user's back;
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -153,6 +159,7 @@ final class DeviceProfile {
     List<String> recentEmojis = const [],
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
+    this.autostartPreference,
     this.updateCheckInterval = UpdateCheckInterval.hourly,
     this.screenshotEnabled = true,
     this.screenshotHotkey = defaultScreenshotHotkey,
@@ -201,6 +208,17 @@ final class DeviceProfile {
   /// it describes, and is read at startup to tell the host what to do — see
   /// [CloseBehaviour].
   CloseBehaviour closeBehaviour;
+
+  /// Whether starting with the system has been decided, and which way.
+  ///
+  /// Three states, not two: null is "never decided", which is what a profile
+  /// written before the choice existed — and a brand-new Device — carries. The
+  /// entry itself lives in the operating system and is read back from there
+  /// every launch; this field only records that the app's default-on has
+  /// already had its one chance to apply, so it is never applied twice and a
+  /// user's later "off" is not overwritten by it. See
+  /// `2026-11-09-windows-autostart-defaults-on.md`.
+  bool? autostartPreference;
 
   /// How often this Device asks GitHub whether a newer build has been
   /// published.
@@ -391,6 +409,7 @@ final class DeviceProfile {
     'clipboardPeers': [for (final peer in clipboardPeers) peer.hex],
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
     'closeBehaviour': closeBehaviour.wireName,
+    if (autostartPreference != null) 'autostartPreference': autostartPreference,
     'updateCheckInterval': updateCheckInterval.wireName,
     'screenshotEnabled': screenshotEnabled,
     'screenshotHotkey': screenshotHotkey,
@@ -458,6 +477,9 @@ final class DeviceProfile {
       recentEmojis: recentEmojis,
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
       closeBehaviour: _closeBehaviour(json['closeBehaviour']),
+      autostartPreference: json['autostartPreference'] is bool
+          ? json['autostartPreference'] as bool
+          : null,
       updateCheckInterval: _updateCheckInterval(json['updateCheckInterval']),
       screenshotEnabled: json['screenshotEnabled'] is bool
           ? json['screenshotEnabled'] as bool

@@ -582,6 +582,9 @@ final class LocalTransferController {
     if (_closed) throw StateError('this controller is closed');
     if (_started) return;
     _started = true;
+    // Read before the profile is loaded or minted: "no profile yet" is the one
+    // fact that tells a first launch from an install that has been running.
+    final isNewDevice = (await _store.load()) == null;
     final local = await loadOrGenerateLocalProfile(
       _store,
       platform: _platform,
@@ -599,6 +602,26 @@ final class LocalTransferController {
     // this one call reports both what the app last wrote and what a user has
     // changed behind its back.
     _autostart = await _hostShell?.autostartEnabled() ?? false;
+    // Starting with Windows is the default, but only for a Device that has
+    // never been asked. The profile records whether the choice exists: a fresh
+    // Device gets the default written once, an install that predates it keeps
+    // exactly what it had, and either way the entry itself is still read from
+    // the operating system on every launch.
+    if (_hostShell != null &&
+        _platform == DevicePlatform.windows &&
+        local.profile.autostartPreference == null) {
+      if (isNewDevice) {
+        if (!_autostart) {
+          await setAutostart(true);
+        } else {
+          local.profile.autostartPreference = true;
+          await _persist();
+        }
+      } else {
+        local.profile.autostartPreference = _autostart;
+        await _persist();
+      }
+    }
     // The conversation is read before anything can add to it. Both the load
     // and the archive work on `_history`, and a Transfer that settled while the
     // file was still being read would be appended to a list that was about to
@@ -913,17 +936,24 @@ final class LocalTransferController {
 
   /// Turns starting with the system on or off.
   ///
-  /// Nothing is written to the profile: the operating system holds the entry,
-  /// and a second copy of that fact could only disagree with it. What ends up
-  /// in [_autostart] is read off the host *after* the change, so the switch
-  /// reports what will happen rather than what was asked for — a write that
-  /// failed and a user who removed the entry by hand both show up as the truth,
-  /// which is what a switch with nothing behind it cannot do.
+  /// The operating system holds the entry, and a second copy of *that* fact
+  /// could only disagree with it — but the profile does record that the choice
+  /// has been made ([DeviceProfile.autostartPreference]), because the default
+  /// may only apply once. What ends up in [_autostart] is read off the host
+  /// *after* the change, so the switch reports what will happen rather than
+  /// what was asked for — a write that failed and a user who removed the entry
+  /// by hand both show up as the truth, which is what a switch with nothing
+  /// behind it cannot do.
   Future<void> setAutostart(bool value) async {
     final shell = _hostShell;
     if (shell == null) return;
+    final local = _requireLocal();
     await shell.setAutostart(value);
     final real = await shell.autostartEnabled();
+    // Recorded even when the write did not take: what was asked for is a fact
+    // about the user, and it is what stops the default from applying again.
+    local.profile.autostartPreference = value;
+    await _persist();
     if (real == _autostart) return;
     _autostart = real;
     _notify();
