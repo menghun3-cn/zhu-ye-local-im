@@ -1,10 +1,11 @@
-/* 官网脚本只做三件事：切主题、滚动入场、把最新版本的下载链接填上。
-   不引第三方库、不做埋点、不读 Cookie。 */
+/* 官网脚本只做四件事：切主题、滚动入场、把最新版本的下载链接填上、
+   在 hero 区显示累计下载数。不引第三方库、不做埋点、不读 Cookie。 */
 (function () {
   'use strict';
 
   var REPO = 'menghun3-cn/zhu-ye-local-im';
   var RELEASES = 'https://github.com/' + REPO + '/releases';
+  var RELEASES_API = 'https://api.github.com/repos/' + REPO + '/releases';
 
   /* ---------------------------------------------------------------------
      主题：跟随系统开局（首屏内联脚本已经定过），这里只管手动切换与记住。
@@ -96,6 +97,18 @@
     return fallback;
   }
 
+  function fetchAllReleases(page, acc) {
+    return fetch(RELEASES_API + '?per_page=100&page=' + page, {
+      headers: { Accept: 'application/vnd.github+json' }
+    }).then(function (response) {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return response.json();
+    }).then(function (list) {
+      var all = acc.concat(list);
+      return list.length === 100 && page < 10 ? fetchAllReleases(page + 1, all) : all;
+    });
+  }
+
   function fillRelease(release) {
     var version = String(release.tag_name || '').replace(/^v/, '');
     if (!version) return;
@@ -146,4 +159,25 @@
         releaseTag.addEventListener('click', function () { window.open(RELEASES, '_blank', 'noopener'); });
       }
     });
+
+  /* ---------------------------------------------------------------------
+     累计下载：把所有 Release 的所有附件 download_count 加总，显示在 hero 区。
+     按 ?per_page=100 翻页直到不满页为止；以后新增平台的产物不需要改这里，
+     它们作为普通附件自然计入。`-latest-` 别名也是独立可下载的文件，一并计入。
+     读不到（离线、被限流、还没有发布）就保持 hidden，不显示 0 或 NaN。
+     --------------------------------------------------------------------- */
+  var totalEl = document.getElementById('heroDownloads');
+  var totalCountEl = document.getElementById('heroDownloadsCount');
+  if (totalEl && totalCountEl) {
+    fetchAllReleases(1, []).then(function (releases) {
+      var total = 0;
+      releases.forEach(function (release) {
+        (release.assets || []).forEach(function (asset) {
+          total += asset.download_count || 0;
+        });
+      });
+      totalCountEl.textContent = total.toLocaleString('zh-CN') + ' 次';
+      totalEl.hidden = false;
+    }).catch(function () { /* 数字只是点缀，拿不到就不显示 */ });
+  }
 })();
