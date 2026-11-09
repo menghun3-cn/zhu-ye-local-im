@@ -6,7 +6,9 @@ Status: implemented
 
 部分取代[左侧菜单更新按钮改为一键安装并在 About 页进行](2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md)：
 旧笔记在关于页留下了「检查更新」和安装两个按钮。左侧菜单入口、安装流程、
-确认框和忙碌状态上报仍然有效。
+确认框和忙碌状态上报仍然有效——除了确认框本身，它已被
+[更新不再询问](../simplification/2026-11-09-update-applies-without-asking.zh.md)
+移除：完成的 prepare 现在不再询问直接应用。
 
 ## Problem
 

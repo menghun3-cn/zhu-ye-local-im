@@ -7,7 +7,9 @@ English | [中文](2026-10-26-one-update-action-on-the-about-card.zh.md)
 Partially supersedes [the rail entry installs instead of opening a browser](2026-10-15-the-rail-entry-installs-instead-of-opening-a-browser.md),
 which left asking and installing as two buttons on the About card. The rail
 entry, install pipeline, confirmation dialog, and busy-state reporting remain
-current.
+current — except the dialog itself, which
+[an update applies without asking again](../simplification/2026-11-09-update-applies-without-asking.md)
+removed: a finished prepare is now applied without it.
 
 ## Problem
 

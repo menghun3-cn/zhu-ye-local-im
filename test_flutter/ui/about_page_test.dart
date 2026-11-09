@@ -27,11 +27,11 @@ import '../support/ui_harness.dart';
 ///
 /// The second half is the one-click install: that it is offered exactly when
 /// this build can replace itself *and* there is something to replace it with,
-/// that the folder is only handed over once somebody has answered the question
-/// the update asks first, that answering no leaves the fetched package where it
-/// is, and that each way it can fail arrives as its own sentence. What an
-/// install does to the folder — the download, the checksum, the renames — is
-/// not here: it needs no widgets, and it is `test/ui/update_install_test.dart`.
+/// that a finished download is applied without a second question — the press
+/// on 「更新」 was already the answer — and that each way it can fail arrives
+/// as its own sentence. What an install does to the folder — the download, the
+/// checksum, the renames — is not here: it needs no widgets, and it is
+/// `test/ui/update_install_test.dart`.
 void main() {
   final l10n = lookupAppLocalizations(appLocale);
 
@@ -54,48 +54,6 @@ void main() {
   Future<void> press(WidgetTester tester, String label) async {
     await tester.tap(find.text(label));
     await tester.pumpAndSettle();
-  }
-
-  /// Presses the button showing [label] and draws the frames it causes.
-  ///
-  /// `pumpAndSettle` cannot be used for the hand-over, and the reason is worth
-  /// writing down: the last thing this card draws is a bar whose length is not
-  /// known, and an indeterminate [LinearProgressIndicator] animates for as long
-  /// as it is on screen. Waiting for the tree to go quiet is therefore waiting
-  /// for a process that is on its way out — which never happens. Two frames
-  /// instead of one, because the first is the press and the second is the state
-  /// the callbacks left behind.
-  Future<void> pressAndDraw(WidgetTester tester, String label) async {
-    await tester.tap(find.text(label));
-    await tester.pump();
-    await tester.pump();
-  }
-
-  /// Waits for the question an update asks before anything closes.
-  ///
-  /// A dialog of the tree's own rather than a state on the page, so what is
-  /// waited for is the dialog itself.
-  Future<void> pumpUntilAsked(WidgetTester tester) => pumpUntil(
-    tester,
-    () => find.byType(AlertDialog).evaluate().isNotEmpty,
-    description: 'the update to ask before anything closes',
-  );
-
-  /// Answers the question the update asked with the button showing [label], and
-  /// lets the answer land.
-  ///
-  /// The dialog is waited out rather than pumped past: its exit animation is
-  /// what stands between the tap and the page's own continuation, and a fixed
-  /// number of frames would be a guess about how long a route takes.
-  Future<void> tapUpdateAnswer(WidgetTester tester, String label) async {
-    await tester.tap(find.text(label));
-    await pumpUntil(
-      tester,
-      () => find.byType(AlertDialog).evaluate().isEmpty,
-      description: 'the question to close',
-    );
-    await tester.pump();
-    await tester.pump();
   }
 
   /// The answer that says a newer build exists.
@@ -361,9 +319,8 @@ void main() {
     expect(find.text(l10n.aboutOpenDownload), findsOneWidget);
   });
 
-  testWidgets('asks before it closes, and installs when told to', (
-    tester,
-  ) async {
+  testWidgets('applies the update as soon as it is checked, without asking '
+      'again', (tester) async {
     ScriptedUpdateChecker.install(available);
     final installer = ScriptedUpdateInstaller.replace(
       supported: true,
@@ -383,31 +340,22 @@ void main() {
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await pressAndDraw(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
+    await press(tester, l10n.aboutUpdate);
 
-    // The question is on screen and nothing has been handed over: the package
-    // is in place and this build is still running, which is the whole point of
-    // asking rather than doing.
-    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
-    expect(find.text(l10n.aboutUpdateConfirmBody('9.9.9')), findsOneWidget);
-    expect(installer.applied, isEmpty);
-
-    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApply);
-
+    // No question: the press that started the download was already the answer.
+    // The package was fetched, checked and staged, and then handed over.
+    expect(find.byType(AlertDialog), findsNothing);
     expect(
       installer.applied.single.package,
       'LocalTransfer-9.9.9-windows-x64-setup.exe',
     );
-    // The question was the only announcement; after it the old build ends
-    // without drawing a progress bar or a hand-over sentence, because the
-    // real installer takes over and the new window is what the user sees.
+    // The hand-over is silent — the updated build is what the user sees — so
+    // the card draws neither a progress bar nor a hand-over sentence.
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
-  testWidgets('changes nothing when the question is answered no', (
-    tester,
-  ) async {
+  testWidgets('reports a failed hand-over and retries the ready package '
+      'without downloading again', (tester) async {
     ScriptedUpdateChecker.install(available);
     final installer = ScriptedUpdateInstaller.replace(
       supported: true,
@@ -415,28 +363,26 @@ void main() {
       prepared: const PreparedUpdate.installer(
         'LocalTransfer-9.9.9-windows-x64-setup.exe',
       ),
+      applyFailure: UpdateInstallFailure.handover,
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
 
-    await pressAndDraw(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
-    await tapUpdateAnswer(tester, l10n.cancel);
+    await press(tester, l10n.aboutUpdate);
 
-    // Nothing was handed over, nothing failed, and the package is where it was
-    // fetched to — which is what the line says and the button offers again.
-    expect(installer.applied, isEmpty);
-    expect(find.text(l10n.aboutUpdateReady), findsOneWidget);
+    // The hand-over failed, and the card says so in the failure sentence's
+    // own words. The package is still where it was fetched to.
+    expect(find.text(l10n.updateFailureHandover), findsOneWidget);
+    expect(installer.applied, hasLength(1));
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text(l10n.aboutUpdate), findsOneWidget);
 
-    // And it offers it without fetching anything again: the package is already
-    // in the update folder.
+    // Pressing again applies the same package rather than fetching it again:
+    // the download is the expensive half, and it already happened.
     await press(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
 
     expect(installer.askedFor, hasLength(1));
-    expect(find.text(l10n.aboutUpdateConfirmTitle), findsOneWidget);
+    expect(installer.applied, hasLength(2));
   });
 
   testWidgets('shows the bytes while a download is running', (tester) async {
@@ -596,16 +542,11 @@ void main() {
     expect(find.text(l10n.aboutUpdate), findsOneWidget);
     expect(find.text(l10n.aboutUpdateInstallHintAndroid), findsOneWidget);
 
-    await pressAndDraw(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
+    await press(tester, l10n.aboutUpdate);
 
-    expect(find.text(l10n.aboutUpdateConfirmTitleAndroid), findsOneWidget);
-    expect(
-      find.text(l10n.aboutUpdateConfirmBodyAndroid('9.9.9')),
-      findsOneWidget,
-    );
-    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
-
+    // No question: the hand-off to the system installer follows the checked
+    // download directly.
+    expect(find.byType(AlertDialog), findsNothing);
     expect(installer.applied.single.package, 'LocalTransfer-9.9.9-android.apk');
     // Opening the installer is a hand-off, not the end of this process. Once
     // the system page has been opened the card returns to a usable state so a
@@ -628,9 +569,7 @@ void main() {
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
-    await pressAndDraw(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
-    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
+    await press(tester, l10n.aboutUpdate);
 
     expect(find.text(l10n.updateFailurePermission), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
@@ -656,9 +595,7 @@ void main() {
     );
     await show(tester);
     await press(tester, l10n.aboutCheckForUpdates);
-    await pressAndDraw(tester, l10n.aboutUpdate);
-    await pumpUntilAsked(tester);
-    await tapUpdateAnswer(tester, l10n.aboutUpdateConfirmApplyAndroid);
+    await press(tester, l10n.aboutUpdate);
 
     expect(find.text(l10n.updateFailureInstaller), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);

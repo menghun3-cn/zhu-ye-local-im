@@ -17,6 +17,9 @@ install moved twice since — first onto `UpdateInstallSession`
 ([the update download owned by a session](2026-11-05-update-download-session.md)),
 then the entry learned to open the card and show its state
 ([the rail update entry shows its work](2026-11-05-the-rail-update-entry-shows-its-work.md)).
+The confirmation dialog this note argued for is gone —
+[an update applies without asking again](../simplification/2026-11-09-update-applies-without-asking.md)
+removed it; the rail entry itself is unchanged.
 
 ## Problem
 

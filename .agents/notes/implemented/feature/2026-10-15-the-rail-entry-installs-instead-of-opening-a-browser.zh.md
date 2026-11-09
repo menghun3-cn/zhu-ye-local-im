@@ -9,6 +9,8 @@ Status: implemented
 含义不变；安装的所有者此后换过两次 —— 先交给 `UpdateInstallSession`
 （[更新下载由 session 持有](2026-11-05-update-download-session.zh.md)），再由入口学会
 打开卡片并展示状态（[左侧「更新」入口显示它正在做的事](../bug-fix/2026-11-05-the-rail-update-entry-shows-its-work.zh.md)）。
+本笔记论证过的确认框已被[更新不再询问](../simplification/2026-11-09-update-applies-without-asking.zh.md)
+移除；rail 入口本身不变。
 
 ## Problem
 
