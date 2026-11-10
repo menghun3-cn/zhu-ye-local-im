@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'share_address.dart';
@@ -28,12 +29,11 @@ class LinkTransferServer {
 
     try {
       _server = await HttpServer.bind(InternetAddress.anyIPv4, preferredPort);
-      _actualPort = preferredPort;
     } on SocketException {
       // Port is in use, try a random port
       _server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
-      _actualPort = _server!.port;
     }
+    _actualPort = _server!.port;
 
     _server!.listen(_handleRequest);
 
@@ -81,19 +81,31 @@ class LinkTransferServer {
 
   /// Handles incoming HTTP requests.
   void _handleRequest(HttpRequest request) async {
-    final path = request.uri.path;
+    try {
+      final path = request.uri.path;
 
-    if (path == '/') {
-      await _serveIndex(request);
-    } else if (path.startsWith('/download/')) {
-      final token = path.substring('/download/'.length);
-      await _serveDownload(request, token);
-    } else if (path.startsWith('/info/')) {
-      final token = path.substring('/info/'.length);
-      await _serveInfo(request, token);
-    } else {
-      request.response.statusCode = HttpStatus.notFound;
-      await request.response.close();
+      if (path == '/') {
+        await _serveIndex(request);
+      } else if (path.startsWith('/download/')) {
+        final token = path.substring('/download/'.length);
+        await _serveDownload(request, token);
+      } else if (path.startsWith('/info/')) {
+        final token = path.substring('/info/'.length);
+        await _serveInfo(request, token);
+      } else {
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+      }
+    } catch (_) {
+      // A handler that throws before answering — an unwritable header, a file
+      // that vanished mid-check — must still close the request, or the
+      // recipient's browser waits on a connection that will never answer.
+      try {
+        request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+      } catch (_) {
+        // The response is already gone; nothing left to tell the client.
+      }
     }
   }
 
@@ -214,11 +226,13 @@ class LinkTransferServer {
     final expiresIn = entry.expiresAt.difference(DateTime.now());
 
     request.response.headers.contentType = ContentType.json;
-    request.response.write('''{
-        "fileName": "${entry.fileName}",
-        "size": ${stats.size},
-        "expiresIn": "${expiresIn.inMinutes} minutes"
-    }''');
+    request.response.write(
+      jsonEncode({
+        'fileName': entry.fileName,
+        'size': stats.size,
+        'expiresIn': '${expiresIn.inMinutes} minutes',
+      }),
+    );
     await request.response.close();
   }
 
@@ -241,18 +255,75 @@ class LinkTransferServer {
       return;
     }
 
+    final stats = await file.stat();
     request.response.headers.contentType = ContentType(
       'application',
       'octet-stream',
     );
+    request.response.headers.contentLength = stats.size;
     request.response.headers.set(
       'Content-Disposition',
-      'attachment; filename="${entry.fileName}"',
+      _contentDisposition(entry.fileName),
     );
 
     await request.response.addStream(file.openRead());
     await request.response.close();
   }
+
+  /// Builds a `Content-Disposition` value that survives any file name.
+  ///
+  /// HTTP header values are latin-1 at best, so the real name travels in the
+  /// RFC 5987 `filename*` parameter while `filename` carries an ASCII
+  /// fallback. Interpolating the name raw made `headers.set` throw on any
+  /// non-latin-1 name — `报告.pdf`, say — and the throw happened before the
+  /// response was answered, so the recipient's browser saw a dead connection
+  /// instead of a download.
+  static String _contentDisposition(String fileName) {
+    final fallback = String.fromCharCodes(
+      fileName.runes.map(
+        (rune) => rune >= 0x20 && rune <= 0x7E && rune != 0x22 && rune != 0x5C
+            ? rune
+            : 0x5F,
+      ),
+    );
+    final encoded = _encodeAttrValue(fileName);
+    return 'attachment; filename="${fallback.isEmpty ? 'file' : fallback}"; '
+        "filename*=UTF-8''$encoded";
+  }
+
+  /// Percent-encodes [value] as UTF-8, leaving RFC 5987 attr-char bytes as-is.
+  static String _encodeAttrValue(String value) {
+    final out = StringBuffer();
+    for (final byte in utf8.encode(value)) {
+      final isAttrChar =
+          (byte >= 0x30 && byte <= 0x39) || // 0-9
+          (byte >= 0x41 && byte <= 0x5A) || // A-Z
+          (byte >= 0x61 && byte <= 0x7A) || // a-z
+          _attrChars.contains(byte);
+      if (isAttrChar) {
+        out.writeCharCode(byte);
+      } else {
+        out.write('%${byte.toRadixString(16).toUpperCase().padLeft(2, '0')}');
+      }
+    }
+    return out.toString();
+  }
+
+  /// The punctuation RFC 5987 allows unencoded in an attribute value.
+  static const Set<int> _attrChars = {
+    0x21, // !
+    0x23, // #
+    0x24, // $
+    0x26, // &
+    0x2B, // +
+    0x2D, // -
+    0x2E, // .
+    0x5E, // ^
+    0x5F, // _
+    0x60, // `
+    0x7C, // |
+    0x7E, // ~
+  };
 
   /// Generates a unique token for link identification.
   String _generateToken() {
