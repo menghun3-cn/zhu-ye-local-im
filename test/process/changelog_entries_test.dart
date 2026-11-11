@@ -334,6 +334,7 @@ Set<String> distinguishingFragments(String subject) {
     'device': '设备',
     'devices': '设备',
     'download': '下载',
+    'downloads': '下载',
     'hotkey': '快捷键',
     'image': '图片',
     'link': '链接',
@@ -350,6 +351,7 @@ Set<String> distinguishingFragments(String subject) {
     'secret': '密钥',
     'settings': '设置',
     'share': '分享',
+    'share-link': '链接分享',
     'unicast': '单播',
   };
 

@@ -351,7 +351,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get emojiRecent => '最近使用';
 
   @override
-  String get dropToSend => '松手即发送';
+  String get dropToAttach => '松手加入输入框';
 
   @override
   String get trustDevice => '信任这台设备';

@@ -116,12 +116,14 @@ thing replaced is the dialog itself.
 
 ### One drop target, and it says what it will do
 
-The history is wrapped in a `DropTarget`, enabled only when there is a peer to
-send to. A drag that enters tints the area and shows a hint; the drop is
-classified into images and other files and each is sent as what it is. The
-classification lives in `pickers.dart` next to the picker rather than in the
-page, so "what counts as an image" is answered in one place for both the dialog
-and the drop.
+The history *and* the composer are wrapped in a `DropTarget`, enabled only when
+there is a peer to send to. A drag that enters tints the area and shows a hint;
+the drop is staged into the composer's attachment tray exactly like a picked
+or pasted file, and 发送 releases it — see
+[a drop stages in the composer](2026-11-11-a-drop-stages-in-the-composer.md).
+The classification lives in `pickers.dart` next to the picker rather than in
+the page, so "what counts as an image" is answered in one place for the dialog,
+the paste and the drop.
 
 ## Alternatives considered
 
