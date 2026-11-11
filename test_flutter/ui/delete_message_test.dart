@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
 import 'package:local_transfer/ui/reveal.dart';
+import 'package:local_transfer/ui/transfer_actions.dart';
 
 import '../support/ui_harness.dart';
 
@@ -145,6 +146,52 @@ void main() {
       );
 
       await shutdown(tester, [sent.alice, sent.bob]);
+    });
+
+    testWidgets('a long press offers the same menu where there is no right '
+        'button', (tester) async {
+      // Android has no secondary mouse button, so the gesture that opens the
+      // menu there is the held press — the one every messaging app on a phone
+      // answers. The seam is set rather than the platform faked: what is under
+      // test is which gesture `TransferContextMenu` listens for, and that
+      // answer lives in `TransferMenuGestures`.
+      final longPressWas = TransferMenuGestures.longPressMenu;
+      TransferMenuGestures.longPressMenu = true;
+      try {
+        final sent = await shownText(tester);
+        final body = onConversation(windowA, find.text('see you at six'));
+
+        await tester.longPress(body);
+        await settleRoute(tester);
+        await pumpUntil(
+          tester,
+          () => windowA
+              .within(find.text(l10n.deleteMessage))
+              .evaluate()
+              .isNotEmpty,
+          description: 'the long press to offer the message\'s actions',
+        );
+        expect(windowA.within(find.text(l10n.copyText)), findsOneWidget);
+
+        await tester.tap(windowA.within(find.text(l10n.deleteMessage)));
+        await pumpUntil(
+          tester,
+          () => onConversation(
+            windowA,
+            find.text('see you at six'),
+          ).evaluate().isEmpty,
+          description: 'the message to leave the conversation',
+        );
+        expect(
+          sent.alice.controller.transfers,
+          isEmpty,
+          reason: 'the menu is not the only thing the message left',
+        );
+
+        await shutdown(tester, [sent.alice, sent.bob]);
+      } finally {
+        TransferMenuGestures.longPressMenu = longPressWas;
+      }
     });
 
     testWidgets('Copy text hands the whole message to the clipboard', (

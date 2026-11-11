@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-11-android-conversation-surface.md
+#   git hash-object 2026-11-11-android-conversation-surface.zh.md
+2026-11-11-android-conversation-surface.md: ce2c4c528634721865e2b5f8a0b74f112b8650f1
+2026-11-11-android-conversation-surface.zh.md: 04e93751592822e5888b5d125d930082ba12d4ab

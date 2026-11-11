@@ -321,6 +321,12 @@ class _HomeShellState extends State<HomeShell> {
         requestedPeer: _requestedConversation,
         focusRequest: _conversationArrivals,
         isVisible: _index == _conversationsSurface,
+        // Android's layout is the narrow kind — list and conversation are
+        // separate screens — so restoring the last conversation there would
+        // skip the list the user opened the app to see. Every other platform
+        // keeps the pre-selection beside the list.
+        restoresLastConversation:
+            widget.seams.platform != DevicePlatform.android,
       ),
       TransfersPage(defaultIncomingDirectory: incoming),
       MyPage(

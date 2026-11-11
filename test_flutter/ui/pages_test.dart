@@ -2753,6 +2753,60 @@ void main() {
 
       await shutdown(tester, [alice, bob]);
     });
+
+    testWidgets('an Android window reopens on the list, not the conversation', (
+      tester,
+    ) async {
+      // The remembered conversation is a pre-selection beside the list on a
+      // wide surface; on the narrow layout Android always gets, the same
+      // fallback would skip the list entirely and land inside a chat nobody
+      // asked for. The shell therefore withholds it there — see
+      // `ConversationsPage.restoresLastConversation`.
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(
+        tester,
+        hub.a,
+        'Alice',
+        platform: DevicePlatform.android,
+      );
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      await pumpWindow(tester, alice, size: narrowWindow);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'Bob to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await pumpUntil(
+        tester,
+        () => alice.controller.lastConversation == bob.fingerprint,
+        description: 'the conversation to be remembered',
+      );
+
+      // The restart: the controller keeps what was remembered, and the whole
+      // tree — shell and page alike — is built again from nothing.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpWindow(tester, alice, size: narrowWindow);
+
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the list to be what the window opens on',
+      );
+      expect(
+        windowA.within(find.byType(ConversationView)),
+        findsNothing,
+        reason:
+            'a remembered conversation must not skip the list on a platform '
+            'whose layout shows one pane at a time',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
   });
 
   group('pasting into the composer', () {
