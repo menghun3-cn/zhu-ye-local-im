@@ -77,7 +77,10 @@ class _ConversationViewState extends State<ConversationView> {
   final TextEditingController _message = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
-  /// Whether a drag from outside the window is over the history right now.
+  /// Whether a drag from outside the window is over the drop area right now.
+  ///
+  /// The drop area is the history *and* the composer — everything a message
+  /// is written or read in — but not the header, which is chrome.
   bool _dropping = false;
 
   /// What the user has currently selected among the messages, or null.
@@ -269,25 +272,6 @@ class _ConversationViewState extends State<ConversationView> {
     return staged.length;
   }
 
-  /// Sends each of [paths] as its own message, pictures as pictures.
-  ///
-  /// The drag-and-drop path, and the only one that still sends straight away:
-  /// the overlay a drag draws over the history says "松手即发送", so a drop is a
-  /// person choosing to send a thing rather than to compose a message around
-  /// it. Picking and pasting stage instead, and 发送 is what releases those.
-  Future<void> _sendDropped(List<String> paths) async {
-    final classified = classifyPaths(paths);
-    if (classified.isEmpty) return;
-    final controller = ControllerScope.of(context);
-    await guarded(context, () async {
-      for (final entry in classified) {
-        await (entry.isImage
-            ? controller.sendImage(entry.file, to: widget.peer)
-            : controller.sendFile(entry.file, to: widget.peer));
-      }
-    });
-  }
-
   /// Takes the staged attachment at [index] back out of the composer.
   void _removeStaged(int index) {
     if (index < 0 || index >= _staged.length) return;
@@ -307,7 +291,7 @@ class _ConversationViewState extends State<ConversationView> {
     }
   }
 
-  /// The frame drawn over the history while a drag is in progress.
+  /// The frame drawn over the drop area while a drag is in progress.
   ///
   /// A drop with no visible answer is the worst kind: the user is holding a
   /// file over a window that looks exactly as it did before, and has no way to
@@ -329,10 +313,10 @@ class _ConversationViewState extends State<ConversationView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.file_download_outlined, color: colors.brand, size: 28),
+              Icon(Icons.attach_file, color: colors.brand, size: 28),
               const SizedBox(height: 8),
               Text(
-                l10n.dropToSend,
+                l10n.dropToAttach,
                 style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
                   color: colors.bubbleText,
@@ -430,44 +414,59 @@ class _ConversationViewState extends State<ConversationView> {
         children: [
           if (widget.header != null) widget.header!,
           Expanded(
-            // The history is a white board with a grey bubble on it for anything
-            // received: the WeChat conversation inverted, which is what the two
-            // fills trading places means. The header and the composer keep their
-            // own greys, so only this pane moves.
-            child: ColoredBox(
-              color: WeChatColors.of(context).conversationBackground,
-              child: DropTarget(
-                // Only registered when there is a peer: a target that accepted a
-                // drop it could not send would swallow the file silently.
-                enable: canSend,
-                onDragEntered: (_) => setState(() => _dropping = true),
-                onDragExited: (_) => setState(() => _dropping = false),
-                onDragDone: (detail) {
-                  setState(() => _dropping = false);
-                  unawaited(
-                    _sendDropped([for (final file in detail.files) file.path]),
-                  );
-                },
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: history),
-                    if (_dropping) _dropOverlay(),
-                  ],
-                ),
+            // The drop target covers the history *and* the composer: a file
+            // dragged anywhere onto the conversation is staged into the box,
+            // the same road a picked or pasted file takes, and 发送 is what
+            // releases it. The header stays outside — it is chrome, not
+            // somewhere a message is written.
+            child: DropTarget(
+              // Only registered when there is a peer: a target that accepted a
+              // drop it could not send would swallow the file silently.
+              enable: canSend,
+              onDragEntered: (_) => setState(() => _dropping = true),
+              onDragExited: (_) => setState(() => _dropping = false),
+              onDragDone: (detail) {
+                setState(() => _dropping = false);
+                _stagePaths([for (final file in detail.files) file.path]);
+              },
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      Expanded(
+                        // The history is a white board with a grey bubble on it
+                        // for anything received: the WeChat conversation
+                        // inverted, which is what the two fills trading places
+                        // means. The composer keeps its own grey, so only this
+                        // pane moves.
+                        child: ColoredBox(
+                          color: WeChatColors.of(context)
+                              .conversationBackground,
+                          child: history,
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ConversationComposer(
+                        message: _message,
+                        attachments: _staged,
+                        onRemoveAttachment: _removeStaged,
+                        onSend: () => _sendMessage(controller),
+                        onPaste: () => _pasteIntoComposer(controller),
+                        onAttach: canSend
+                            ? () => unawaited(_pickFiles())
+                            : null,
+                        onEmoji: canSend
+                            ? (face) => _insertEmoji(controller, face)
+                            : null,
+                        recentEmojis: controller.recentEmojis,
+                        autoFocus: widget.autoFocusComposer,
+                      ),
+                    ],
+                  ),
+                  if (_dropping) _dropOverlay(),
+                ],
               ),
             ),
-          ),
-          const Divider(height: 1),
-          ConversationComposer(
-            message: _message,
-            attachments: _staged,
-            onRemoveAttachment: _removeStaged,
-            onSend: () => _sendMessage(controller),
-            onPaste: () => _pasteIntoComposer(controller),
-            onAttach: canSend ? () => unawaited(_pickFiles()) : null,
-            onEmoji: canSend ? (face) => _insertEmoji(controller, face) : null,
-            recentEmojis: controller.recentEmojis,
-            autoFocus: widget.autoFocusComposer,
           ),
         ],
       ),

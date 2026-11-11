@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // `flutter_test` has a `TestWindow` of its own — an unrelated handle on the
@@ -2982,6 +2983,72 @@ void main() {
         alice.controller.transfers,
         isEmpty,
         reason: 'choosing a file is not sending one',
+      );
+
+      await tester.tap(sendButton(windowA));
+      await pumpUntil(
+        tester,
+        () => alice.controller.transfers.length == 1,
+        description: 'the staged file to be sent',
+      );
+      expect(alice.controller.transfers.single.kind, PayloadKind.file);
+
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(() => bob.controller.reject(bob.offers.single));
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('a dropped file waits until 发送 is pressed', (tester) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      final home = tempDirectory('local-transfer-drop-');
+      final source = File('${home.path}${Platform.pathSeparator}notes.txt');
+      source.writeAsBytesSync([for (var i = 0; i < 16; i++) i]);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+
+      // The platform's drop arrives as a `DropDoneDetails` on the target's own
+      // callback — the OS drag itself is not something a widget test can
+      // drive, so the callback is invoked the way the plugin would.
+      final target = onConversation(windowA, find.byType(DropTarget));
+      expect(target, findsOneWidget);
+      tester.widget<DropTarget>(target).onDragDone!(
+        DropDoneDetails(
+          files: [DropItemFile(source.path)],
+          localPosition: Offset.zero,
+          globalPosition: Offset.zero,
+        ),
+      );
+      await tester.pump();
+
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('notes.txt'),
+        ).evaluate().isNotEmpty,
+        description: 'the dropped file to appear in the composer',
+      );
+      expect(
+        alice.controller.transfers,
+        isEmpty,
+        reason: 'dropping a file onto the conversation is not sending one',
       );
 
       await tester.tap(sendButton(windowA));

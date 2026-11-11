@@ -362,7 +362,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emojiRecent => 'Recent';
 
   @override
-  String get dropToSend => 'Let go to send';
+  String get dropToAttach => 'Let go to attach';
 
   @override
   String get trustDevice => 'Trust this Device';

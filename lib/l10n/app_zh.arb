@@ -108,7 +108,7 @@
   "menuSendFile": "发送文件",
   "menuSendEmoji": "发送表情",
   "emojiRecent": "最近使用",
-  "dropToSend": "松手即发送",
+  "dropToAttach": "松手加入输入框",
   "trustDevice": "信任这台设备",
   "stopTrustingDevice": "不再信任这台设备",
   "openSession": "建立连接",
