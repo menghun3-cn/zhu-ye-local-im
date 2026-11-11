@@ -46,6 +46,7 @@ class ConversationsPage extends StatefulWidget {
     this.requestedPeer,
     this.focusRequest = 0,
     this.isVisible = true,
+    this.restoresLastConversation = true,
   });
 
   /// Where a file received here lands when the user has not said otherwise.
@@ -77,6 +78,16 @@ class ConversationsPage extends StatefulWidget {
   /// and the row keeps counting it; coming back to this surface is what
   /// reads it.
   final bool isVisible;
+
+  /// Whether arriving with nothing picked opens the conversation the user was
+  /// last in.
+  ///
+  /// On a wide surface the list and the conversation are one screen, so the
+  /// remembered peer is only a pre-selection beside the list — restoring it
+  /// costs the user nothing. On Android the two are separate screens, and the
+  /// same fallback would skip the list entirely: opening the app would land
+  /// inside a conversation nobody asked for. The shell turns this off there.
+  final bool restoresLastConversation;
 
   @override
   State<ConversationsPage> createState() => _ConversationsPageState();
@@ -230,7 +241,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
     // The remembered peer is only a *fallback*: once the user has tapped a row
     // or a request has arrived, [_untouched] is false and this stops applying,
     // so a choice made in this sitting is never overwritten by an older one.
-    final remembered = _untouched && _selected == null
+    // [ConversationsPage.restoresLastConversation] is the platform's answer to
+    // whether the fallback exists at all — see its doc.
+    final remembered =
+        widget.restoresLastConversation && _untouched && _selected == null
         ? controller.lastConversation?.hex
         : null;
     final wanted = _selected ?? remembered;

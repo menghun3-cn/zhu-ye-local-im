@@ -102,17 +102,3 @@ List<ClassifiedPath> classifyPaths(List<String> paths) => [
     if (File(path).existsSync())
       (file: File(path), isImage: looksLikeImage(path)),
 ];
-
-/// The result of a drop, as the two things a dropped path can mean.
-///
-/// Returned rather than acted on so that the widget layer keeps the deciding:
-/// this file knows what a path *is*, and the conversation knows what to do
-/// about it.
-({List<File> images, List<File> files}) classifyDrop(List<String> paths) {
-  final images = <File>[];
-  final files = <File>[];
-  for (final entry in classifyPaths(paths)) {
-    (entry.isImage ? images : files).add(entry.file);
-  }
-  return (images: images, files: files);
-}

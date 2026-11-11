@@ -656,11 +656,11 @@ abstract class AppLocalizations {
   /// **'Recent'**
   String get emojiRecent;
 
-  /// No description provided for @dropToSend.
+  /// No description provided for @dropToAttach.
   ///
   /// In en, this message translates to:
-  /// **'Let go to send'**
-  String get dropToSend;
+  /// **'Let go to attach'**
+  String get dropToAttach;
 
   /// No description provided for @trustDevice.
   ///

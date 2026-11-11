@@ -343,14 +343,34 @@ class MessageSelection extends InheritedWidget {
   bool updateShouldNotify(MessageSelection oldWidget) => text != oldWidget.text;
 }
 
-/// Offers what can be done with a Transfer, on a right-click.
+/// Which gestures open [TransferContextMenu]'s menu, as the running platform
+/// allows.
+///
+/// A field rather than a `Platform.isAndroid` read inside `build`, for the
+/// same reason every other platform fact in this app arrives through a seam:
+/// a widget test runs on the host, where the answer is always "not Android",
+/// and the gesture it exists for could never be exercised. The default is
+/// still the real platform — this is a test seam, not a setting.
+abstract final class TransferMenuGestures {
+  /// Whether a long press opens the menu.
+  ///
+  /// True on Android, the platform with no right button; everywhere else the
+  /// gesture is left alone, because on a desktop a held press is how a word
+  /// inside the selectable body gets selected.
+  static bool longPressMenu = Platform.isAndroid;
+}
+
+/// Offers what can be done with a Transfer, on a right-click or a long press.
 ///
 /// The answers an *offer* needs — accept and refuse — are buttons in the open,
 /// because a decision behind a menu is a decision nobody finds. These are the
 /// other kind of action: things the user wants once the question is over and
 /// the bytes are somewhere on disk, plus the one thing that is wanted from a
-/// message of any kind at all — taking it off the screen. A right-click keeps
-/// them reachable without putting a toolbar on a message.
+/// message of any kind at all — taking it off the screen. A menu keeps them
+/// reachable without putting a toolbar on a message. A right-click is the
+/// desktop way to ask for it; on Android — the platform with no right button —
+/// a long press opens the same menu, because without it there is no way to
+/// delete a message at all.
 ///
 /// Which of the byte-actions a given Transfer offers is decided by the
 /// predicates above rather than by the caller, so the conversation, the
@@ -400,13 +420,19 @@ class TransferContextMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     // Every message offers at least one thing, because deleting one is
     // something a user can want from any of them — including a message that
-    // never moved a byte. So the right-click is always intercepted, and the
-    // guard that used to stand here — a handler that opened an empty menu would
-    // have swallowed the right-click that selects a name to copy — has no case
-    // left to apply to.
+    // never moved a byte. So the gestures that ask for the menu are always
+    // intercepted, and the guard that used to stand here — a handler that
+    // opened an empty menu would have swallowed the right-click that selects
+    // a name to copy — has no case left to apply to.
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           unawaited(_open(context, details.globalPosition)),
+      // The same menu for a finger, on the platform that has no right button —
+      // see [TransferMenuGestures] for why the answer is a field a test can
+      // set rather than a platform read.
+      onLongPressStart: TransferMenuGestures.longPressMenu
+          ? (details) => unawaited(_open(context, details.globalPosition))
+          : null,
       child: child,
     );
   }

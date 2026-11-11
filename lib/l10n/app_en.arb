@@ -189,7 +189,7 @@
   "menuSendFile": "Send a file",
   "menuSendEmoji": "Send an emoji",
   "emojiRecent": "Recent",
-  "dropToSend": "Let go to send",
+  "dropToAttach": "Let go to attach",
   "trustDevice": "Trust this Device",
   "stopTrustingDevice": "Stop trusting this Device",
   "openSession": "Open a Session",

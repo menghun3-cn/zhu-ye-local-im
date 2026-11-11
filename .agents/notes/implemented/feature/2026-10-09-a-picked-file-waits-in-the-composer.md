@@ -38,17 +38,20 @@ that silently hid the eleventh would send something the user could not see. The
 remove control is a real `IconButton` so it keeps its focus ring, its keyboard
 activation and its semantic label; a hand-rolled tappable glyph loses all three.
 
-**`classifyPaths` becomes the primitive and `classifyDrop` is written over it.**
-The tray has to show the files in the order they were chosen, which the old
-two-list `({images, files})` split threw away. One existence check and one
-`looksLikeImage` call now live in `classifyPaths`, and `classifyDrop` — still
-used by the drop path — groups its answer.
+**`classifyPaths` is the primitive every road in shares.** The tray has to show
+the files in the order they were chosen, which the old two-list
+`({images, files})` split threw away. One existence check and one
+`looksLikeImage` call live in `classifyPaths`; the `classifyDrop` grouping
+built on it is gone — the drop path classifies through `classifyPaths` like
+everything else
+([a drop stages in the composer](2026-11-11-a-drop-stages-in-the-composer.md)).
 
-**A dropped file still sends immediately.** The overlay a drag draws over the
-history says 松手即发送, so a drop is a person deciding to send a thing rather
-than to compose around it, and it is left alone. That is the one asymmetry this
-change introduces, and it is stated in the code and in the tests rather than
-left to be discovered.
+**A dropped file stages too.** The drop used to be the one exception — let go
+and it was sent — but that was reversed on 2026-11-11: the `DropTarget` now
+covers the history *and* the composer, `onDragDone` ends in `_stagePaths`, and
+the overlay reads 松手加入输入框. See
+[a drop stages in the composer](2026-11-11-a-drop-stages-in-the-composer.md)
+for the decision and what it replaced.
 
 ## Alternatives considered
 
@@ -68,9 +71,10 @@ the file is about.
 supposed to sit beside, and it needs somewhere to navigate back from.
 
 **Change the drop path to stage as well.** Defensible — it would make "nothing
-leaves until 发送" a single rule — but the drop overlay already promises
+leaves until 发送" a single rule — but at the time the drop overlay promised
 immediate send in so many words, and the request named the two picker buttons.
-Left as it is, and flagged here.
+Left as it was then; taken later, see
+[a drop stages in the composer](2026-11-11-a-drop-stages-in-the-composer.md).
 
 **Disable 发送 when there is nothing to send.** It would remove a no-op button,
 and it would also make the button appear and disappear as the user types and
