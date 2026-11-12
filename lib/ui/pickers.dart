@@ -17,6 +17,27 @@ const List<String> imageExtensions = [
   'bmp',
 ];
 
+/// The formats a bubble-skin picture may be — [imageExtensions] minus `gif`.
+///
+/// A skin is a still background: a GIF would only ever show its first frame,
+/// which is a picture the user did not pick, so the format is refused at the
+/// dialog rather than silently flattened later.
+const List<String> bubbleSkinImageExtensions = [
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'bmp',
+];
+
+/// The largest picture a bubble skin may be, in bytes.
+///
+/// A skin is decoded at a capped width anyway, so a bigger file
+/// only ever costs disk and load time — the cap is generous enough that no
+/// reasonable picture hits it and tight enough that a mistaken multi-hundred
+/// megabyte pick fails loudly instead of being copied into app data.
+const int bubbleSkinMaxImageBytes = 2 * 1024 * 1024;
+
 /// The picker the composer asks for files and images.
 ///
 /// A class rather than two bare functions because a *native* dialog is the one
@@ -58,6 +79,21 @@ final class SystemPicker implements FilePicker {
 
   @override
   Future<String?> directory() => getDirectoryPath(confirmButtonText: '选择');
+}
+
+/// Whether [path] names a file the bubble-skin picker will accept.
+///
+/// Checked in Dart rather than as a dialog filter for the same reason
+/// [looksLikeImage] exists: the picker is one dialog for everything, and
+/// what a choice *means* is decided after it — here, "this is a picture a
+/// bubble can wear". A GIF is refused even though [imageExtensions] takes
+/// it: a skin is a still background, and a GIF would only ever show its
+/// first frame.
+bool looksLikeBubbleSkinImage(String path) {
+  final dot = path.lastIndexOf('.');
+  if (dot < 0) return false;
+  final extension = path.substring(dot + 1).toLowerCase();
+  return bubbleSkinImageExtensions.contains(extension);
 }
 
 /// Which picker the composer uses.

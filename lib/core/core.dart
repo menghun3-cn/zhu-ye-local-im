@@ -31,6 +31,7 @@ export 'identity/owner_group.dart';
 export 'identity/owner_identity.dart';
 export 'identity/pairing_secret.dart';
 export 'pairing/pairing_service.dart';
+export 'profile/bubble_skin.dart';
 export 'profile/device_profile.dart';
 export 'profile/profile_location.dart';
 export 'profile/profile_store.dart';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'bubble_paint.dart';
 import 'theme.dart';
 
 /// A round avatar with an initial in it.
@@ -114,18 +115,30 @@ class Avatar extends StatelessWidget {
 /// and the hairline only crisps the boundary. An outgoing bubble sits in its own
 /// green and needs no line at all.
 class MessageBubbleShape extends StatelessWidget {
-  /// Wraps [child] in a bubble of [colour], tucked towards the avatar when
-  /// [outgoing] is false and away from it when [outgoing] is true.
+  /// Wraps [child] in a bubble painted with [paint], tucked towards the
+  /// avatar when [outgoing] is false and away from it when [outgoing] is true.
   const MessageBubbleShape({
     super.key,
-    required this.colour,
+    required this.paint,
     required this.outgoing,
     required this.child,
     this.maxWidth,
   });
 
-  /// The bubble's fill.
-  final Color colour;
+  /// What the bubble is painted with — fill, ink and scrim.
+  ///
+  /// The fill is a [BoxDecoration] without a corner radius: which corner
+  /// tucks is this widget's decision, made from [outgoing], so the radius is
+  /// merged in here rather than asked of the caller.
+  final BubblePaint paint;
+
+  /// The fill's solid colour, when it has one — null for a gradient or an
+  /// image fill.
+  ///
+  /// Kept as a getter rather than removed because the tests that pin "the
+  /// outgoing bubble is the theme's green" read it; for every fill that is a
+  /// plain colour it answers what `paint.decoration.color` does.
+  Color? get colour => paint.decoration.color;
 
   /// Which side the tucked corner is on.
   final bool outgoing;
@@ -156,6 +169,17 @@ class MessageBubbleShape extends StatelessWidget {
       bottomRight: round,
     );
 
+    // The padding sits inside the scrim rather than outside it: a scrim that
+    // stopped at the content's edge would leave a rim of unscrimmed picture
+    // around the words, which is exactly the rim that makes a skin look
+    // unfinished. With no scrim the padding is simply the container's own,
+    // as it always was.
+    Widget content = Padding(padding: WeChat.bubblePadding, child: child);
+    final scrim = paint.scrim;
+    if (scrim != null) {
+      content = ColoredBox(color: scrim, child: content);
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,18 +194,8 @@ class MessageBubbleShape extends StatelessWidget {
               maxWidth: maxWidth ?? double.infinity,
             ),
             child: Container(
-              padding: WeChat.bubblePadding,
-              decoration: BoxDecoration(
-                color: colour,
-                borderRadius: radius,
-                border: outgoing
-                    ? null
-                    : Border.all(
-                        color: WeChatColors.of(context).divider,
-                        width: 1,
-                      ),
-              ),
-              child: child,
+              decoration: paint.decoration.copyWith(borderRadius: radius),
+              child: content,
             ),
           ),
         ),

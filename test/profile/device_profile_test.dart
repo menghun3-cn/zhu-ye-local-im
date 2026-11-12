@@ -4,6 +4,7 @@ import 'package:local_transfer/core/clipboard/clipboard_capability.dart';
 import 'package:local_transfer/core/host/close_behaviour.dart';
 import 'package:local_transfer/core/identity/fingerprint.dart';
 import 'package:local_transfer/core/identity/owner_group.dart';
+import 'package:local_transfer/core/profile/bubble_skin.dart';
 import 'package:local_transfer/core/profile/device_profile.dart';
 import 'package:local_transfer/core/screenshot/capture_action.dart';
 import 'package:local_transfer/core/update/update_check_interval.dart';
@@ -586,6 +587,86 @@ void main() {
           UpdateCheckInterval.everyThreeDays.duration,
           const Duration(hours: 72),
         );
+      });
+    });
+
+    group('the bubble skins', () {
+      DeviceProfile profileOf() => DeviceProfile(
+        self: _fp('a'),
+        alias: 'Desk',
+        platform: DevicePlatform.windows,
+      );
+
+      final gradient = GradientBubbleSkin(
+        colors: [0xFFA9DDBB, 0xFF4E9A6E],
+        direction: BubbleGradientDirection.vertical,
+        ink: BubbleSkinInk.dark,
+      );
+      final picture = ImageBubbleSkin(
+        source: BubbleSkinImageSource.file,
+        name: '/data/user/0/app/files/bubble_skins/skin-1-a.png',
+        ink: BubbleSkinInk.light,
+      );
+
+      test('start unset on both sides, which is the theme', () {
+        final profile = profileOf();
+        expect(profile.outgoingBubbleSkin, isNull);
+        expect(profile.incomingBubbleSkin, isNull);
+      });
+
+      test('the two sides are independent', () {
+        final profile = profileOf()
+          ..outgoingBubbleSkin = gradient
+          ..incomingBubbleSkin = picture;
+        expect(profile.outgoingBubbleSkin, gradient);
+        expect(profile.incomingBubbleSkin, picture);
+      });
+
+      test('an unset skin is written as absent, not as null', () {
+        expect(profileOf().toJson().containsKey('outgoingBubbleSkin'), isFalse);
+        expect(profileOf().toJson().containsKey('incomingBubbleSkin'), isFalse);
+      });
+
+      test('both skins survive a JSON round trip', () {
+        final profile = profileOf()
+          ..outgoingBubbleSkin = gradient
+          ..incomingBubbleSkin = picture;
+        final restored = DeviceProfile.fromJson(profile.toJson());
+        expect(restored.outgoingBubbleSkin, gradient);
+        expect(restored.incomingBubbleSkin, picture);
+      });
+
+      test('a profile written before the keys existed reads as unset', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.outgoingBubbleSkin, isNull);
+        expect(restored.incomingBubbleSkin, isNull);
+      });
+
+      test('a skin this build cannot decode reads as unset, not as damage', () {
+        // A newer build's fill type, or a hand-edited file: either way the
+        // answer is "the theme's colours", never a profile that will not open.
+        for (final bad in [
+          'gradient',
+          {'kind': 'plasma', 'ink': 'dark'},
+          {
+            'kind': 'gradient',
+            'ink': 'dark',
+            'colors': ['#000000'],
+          },
+        ]) {
+          final restored = DeviceProfile.fromJson({
+            'self': _fp('a').hex,
+            'alias': 'Desk',
+            'platform': 'windows',
+            'outgoingBubbleSkin': bad,
+          });
+          expect(restored.outgoingBubbleSkin, isNull, reason: '$bad');
+          expect(restored.incomingBubbleSkin, isNull);
+        }
       });
     });
 

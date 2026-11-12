@@ -1933,6 +1933,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View details'**
   String get myViewDetails;
+
+  /// No description provided for @settingsBubbles.
+  ///
+  /// In en, this message translates to:
+  /// **'Message bubbles'**
+  String get settingsBubbles;
+
+  /// No description provided for @bubbleSkinMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubbles I send'**
+  String get bubbleSkinMine;
+
+  /// No description provided for @bubbleSkinTheirs.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubbles I receive'**
+  String get bubbleSkinTheirs;
+
+  /// No description provided for @bubbleSkinCurrentDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme colours'**
+  String get bubbleSkinCurrentDefault;
+
+  /// No description provided for @bubbleSkinPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble skin'**
+  String get bubbleSkinPickerTitle;
+
+  /// No description provided for @bubbleSkinSampleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This is what a message looks like'**
+  String get bubbleSkinSampleMessage;
+
+  /// No description provided for @bubbleSkinSectionDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get bubbleSkinSectionDefault;
+
+  /// No description provided for @bubbleSkinSectionGradients.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradients'**
+  String get bubbleSkinSectionGradients;
+
+  /// No description provided for @bubbleSkinSectionPictures.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundled pictures'**
+  String get bubbleSkinSectionPictures;
+
+  /// No description provided for @bubbleSkinCustomGradient.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom gradient'**
+  String get bubbleSkinCustomGradient;
+
+  /// No description provided for @bubbleSkinChoosePicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a picture…'**
+  String get bubbleSkinChoosePicture;
+
+  /// No description provided for @bubbleSkinInkDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark text'**
+  String get bubbleSkinInkDark;
+
+  /// No description provided for @bubbleSkinInkLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light text'**
+  String get bubbleSkinInkLight;
+
+  /// No description provided for @bubbleSkinScrimNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No dimming'**
+  String get bubbleSkinScrimNone;
+
+  /// No description provided for @bubbleSkinScrimLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light dimming'**
+  String get bubbleSkinScrimLight;
+
+  /// No description provided for @bubbleSkinScrimHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'Heavy dimming'**
+  String get bubbleSkinScrimHeavy;
+
+  /// No description provided for @bubbleSkinDirectionHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get bubbleSkinDirectionHorizontal;
+
+  /// No description provided for @bubbleSkinDirectionVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get bubbleSkinDirectionVertical;
+
+  /// No description provided for @bubbleSkinDirectionDiagonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagonal'**
+  String get bubbleSkinDirectionDiagonal;
+
+  /// No description provided for @bubbleSkinAddColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Add colour'**
+  String get bubbleSkinAddColour;
+
+  /// No description provided for @bubbleSkinRemoveColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get bubbleSkinRemoveColour;
+
+  /// No description provided for @bubbleSkinUseThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this skin'**
+  String get bubbleSkinUseThis;
+
+  /// No description provided for @bubbleSkinDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get bubbleSkinDone;
+
+  /// No description provided for @bubbleSkinCustomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get bubbleSkinCustomLabel;
+
+  /// No description provided for @bubbleSkinBadFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'That file cannot be a bubble picture — use PNG, JPG, WebP or BMP.'**
+  String get bubbleSkinBadFormat;
+
+  /// No description provided for @bubbleSkinImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture could not be copied into the app\'s folder, so it was not saved.'**
+  String get bubbleSkinImportFailed;
+
+  /// No description provided for @bubbleSkinImageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture unavailable'**
+  String get bubbleSkinImageUnavailable;
+
+  /// No description provided for @bubbleSkinImageRules.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture is cropped to fill the bubble, so keep the important part near the centre and leave margin around the edges — a bubble is short for a short message and tall for a long one. A width of 512 pixels or more keeps it sharp; anything over about 2 MB gains nothing. Busy backgrounds make the text hard to read — use the dimming options to keep it legible. PNG, JPG, WebP and BMP work; GIF does not. The app keeps its own copy, so moving or deleting the original changes nothing.'**
+  String get bubbleSkinImageRules;
+
+  /// No description provided for @bubbleSkinPresetBamboo.
+  ///
+  /// In en, this message translates to:
+  /// **'Bamboo'**
+  String get bubbleSkinPresetBamboo;
+
+  /// No description provided for @bubbleSkinPresetAurora.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning mist'**
+  String get bubbleSkinPresetAurora;
+
+  /// No description provided for @bubbleSkinPresetSakura.
+  ///
+  /// In en, this message translates to:
+  /// **'Sakura'**
+  String get bubbleSkinPresetSakura;
+
+  /// No description provided for @bubbleSkinPresetHoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Honey'**
+  String get bubbleSkinPresetHoney;
+
+  /// No description provided for @bubbleSkinPresetMeadow.
+  ///
+  /// In en, this message translates to:
+  /// **'Meadow'**
+  String get bubbleSkinPresetMeadow;
+
+  /// No description provided for @bubbleSkinPresetDusk.
+  ///
+  /// In en, this message translates to:
+  /// **'Dusk'**
+  String get bubbleSkinPresetDusk;
+
+  /// No description provided for @bubbleSkinPresetMint.
+  ///
+  /// In en, this message translates to:
+  /// **'Mint'**
+  String get bubbleSkinPresetMint;
+
+  /// No description provided for @bubbleSkinPresetDuskPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Dusk photo'**
+  String get bubbleSkinPresetDuskPhoto;
+
+  /// No description provided for @bubbleSkinPresetOcean.
+  ///
+  /// In en, this message translates to:
+  /// **'Ocean'**
+  String get bubbleSkinPresetOcean;
+
+  /// No description provided for @bubbleSkinPresetGraphite.
+  ///
+  /// In en, this message translates to:
+  /// **'Graphite'**
+  String get bubbleSkinPresetGraphite;
+
+  /// No description provided for @bubbleSkinPresetApricot.
+  ///
+  /// In en, this message translates to:
+  /// **'Apricot'**
+  String get bubbleSkinPresetApricot;
+
+  /// No description provided for @bubbleSkinPresetLilac.
+  ///
+  /// In en, this message translates to:
+  /// **'Lilac'**
+  String get bubbleSkinPresetLilac;
 }
 
 class _AppLocalizationsDelegate
