@@ -33,6 +33,7 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
   FirewallReport? _firewall;
 
   bool _openingFirewall = false;
+  bool _checking = false;
   FirewallOpenResult? _firewallNotice;
 
   @override
@@ -44,19 +45,27 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
   }
 
   Future<void> _runChecks() async {
-    final platform = _controller!.self.platform;
-    final interfaces = await usableInterfaces();
-    final tunnels = await suspectedTunnelInterfaces();
-    final firewall = await probeFirewall(
-      platform: platform,
-      programPath: Platform.resolvedExecutable,
-    );
-    if (!mounted) return;
-    setState(() {
-      _interfaces = interfaces;
-      _tunnelNames = tunnels;
-      _firewall = firewall;
-    });
+    // The probe can take a moment — the firewall query enumerates every
+    // inbound allow rule — so the button that started it has to say so,
+    // or a re-check reads as a dead click.
+    if (mounted) setState(() => _checking = true);
+    try {
+      final platform = _controller!.self.platform;
+      final interfaces = await usableInterfaces();
+      final tunnels = await suspectedTunnelInterfaces();
+      final firewall = await probeFirewall(
+        platform: platform,
+        programPath: Platform.resolvedExecutable,
+      );
+      if (!mounted) return;
+      setState(() {
+        _interfaces = interfaces;
+        _tunnelNames = tunnels;
+        _firewall = firewall;
+      });
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   Future<void> _openFirewall() async {
@@ -122,8 +131,21 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _runChecks,
-                  child: Text(l10n.troubleshootingRecheck),
+                  onPressed: _checking ? null : _runChecks,
+                  child: _checking
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(l10n.troubleshootingChecking),
+                          ],
+                        )
+                      : Text(l10n.troubleshootingRecheck),
                 ),
               ],
             ),
