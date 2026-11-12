@@ -469,6 +469,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cannotOpenFolder => '没能打开那个文件夹。';
 
   @override
+  String get openFile => '打开';
+
+  @override
+  String get cannotOpenFile => '没能打开这个文件。';
+
+  @override
   String get copyImage => '复制图片';
 
   @override

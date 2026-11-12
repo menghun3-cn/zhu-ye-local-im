@@ -19,9 +19,11 @@ import 'package:local_transfer/ui/l10n/generated/app_localizations.dart';
 import 'package:local_transfer/ui/nav_rail.dart';
 import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
+import 'package:local_transfer/ui/open_file.dart';
 import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
+import 'package:local_transfer/ui/system_reveal.dart';
 import 'package:local_transfer/ui/update_check.dart';
 import 'package:local_transfer/ui/update_install.dart';
 import 'package:local_transfer/ui/update_notice.dart';
@@ -1195,6 +1197,45 @@ class ScriptedRevealer implements Revealer {
   @override
   Future<bool> reveal(String path) async {
     revealed.add(path);
+    return answers;
+  }
+}
+
+/// A [FileOpener] that records what it was asked to open.
+///
+/// The same seam argument as [ScriptedRevealer]: the real opener hands the
+/// file to the operating system's shell — a document here, somebody else's
+/// activity on Android — so a test that drove it would open a window on the
+/// machine running the suite.
+///
+/// ```dart
+/// final opener = ScriptedFileOpener.install();
+/// await tester.tap(find.text('report.bin'));
+/// expect(opener.opened.single, landedPath);
+/// ```
+class ScriptedFileOpener implements FileOpener {
+  ScriptedFileOpener._();
+
+  /// Installs a scripted opener in place of the system one.
+  ///
+  /// A test that calls this must also call [OpenResolution.reset] in a
+  /// `tearDown`, for the same reason [ScriptedRevealer.install] insists on it.
+  static ScriptedFileOpener install() {
+    final opener = ScriptedFileOpener._();
+    OpenResolution.opener = opener;
+    return opener;
+  }
+
+  /// Every path the action was asked to open, in order.
+  final List<String> opened = [];
+
+  /// What the next call answers — false stands in for a machine with no
+  /// handler for the file's type, which is what the failure sentence is for.
+  bool answers = true;
+
+  @override
+  Future<bool> open(String path) async {
+    opened.add(path);
     return answers;
   }
 }

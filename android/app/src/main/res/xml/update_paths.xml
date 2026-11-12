@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- The update APKs the updater downloads. -->
     <files-path name="updates" path="update/" />
+    <!-- Everything else under filesDir — received files land in `incoming/`,
+         and the whole directory is exposed rather than one subdirectory at a
+         time so that a destination the user typed works too. -->
+    <files-path name="files" path="." />
+    <!-- Files this app was handed by a picker live in cacheDir. -->
+    <cache-path name="cache" path="." />
+    <!-- And a file the user sent may still be on shared storage. -->
+    <external-path name="external" path="." />
 </paths>

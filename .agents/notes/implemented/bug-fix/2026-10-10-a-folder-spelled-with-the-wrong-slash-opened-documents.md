@@ -56,7 +56,7 @@ The folder is converted where it stops being a Dart string and becomes an
 argument to somebody else's parser — one function, at the one call site:
 
 ```dart
-// lib/ui/reveal.dart
+// lib/ui/system_reveal.dart
 await Process.run('explorer', [explorerArgument(folder)]);
 
 /// The one argument [folder] becomes on `explorer`'s command line.

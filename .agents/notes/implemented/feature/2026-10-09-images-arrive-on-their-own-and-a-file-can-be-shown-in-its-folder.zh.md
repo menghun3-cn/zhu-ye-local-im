@@ -67,10 +67,12 @@ Status: implemented
 启动器都会把整个参数加上引号，配对就断了。而路径里有空格在 Windows 上是常态，所以取的是
 可靠的那一半：目录打开，文件就在里面。
 
-**仅限 Windows，而且它会说出来。** `SystemRevealer` 请求平台自己的外壳（`explorer <目录>`）
-—— 和 `external_links.dart` 打开网址是同一种取舍，而不是为了一次调用去买一个原生启动器
-注册 —— 在别处一律回答 false。于是调用方显示 `cannotOpenFolder`，而不是留下一个什么都不
-做的菜单项。
+**做不到时它会说出来。** `SystemRevealer` 请求平台自己的外壳——Windows 上是
+`explorer <目录>`，Android 上是 runner 的 `files` channel（见
+`2026-11-12-tapping-a-landed-file-opens-it`）——和 `external_links.dart` 打开网址是
+同一种取舍，而不是为了一次调用去买一个原生启动器注册 —— 在别处、或 Android 上没有
+文件管理器肯显示该目录时一律回答 false。于是调用方显示 `cannotOpenFolder`，而不是
+留下一个什么都不做的菜单项。
 
 ## Alternatives considered
 

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
-import 'package:local_transfer/ui/reveal.dart';
+import 'package:local_transfer/ui/system_reveal.dart';
 import 'package:local_transfer/ui/transfer_actions.dart';
 
 import '../support/ui_harness.dart';

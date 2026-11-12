@@ -28,7 +28,7 @@ parent == incoming? true
 在目录不再是一个 Dart 字符串、而变成别人解析器的参数的那一刻做转换——一个函数，一个调用点：
 
 ```dart
-// lib/ui/reveal.dart
+// lib/ui/system_reveal.dart
 await Process.run('explorer', [explorerArgument(folder)]);
 
 /// The one argument [folder] becomes on `explorer`'s command line.

@@ -1801,13 +1801,26 @@ class MessageBubble extends StatelessWidget {
         child: content,
       );
     }
+    // A file this machine holds opens on a tap — the same answer a
+    // double-click gives in a file manager — while everything else about the
+    // bubble is untouched: the buttons inside still win their own gestures,
+    // and the menu below still answers the right-click. A picture that is
+    // here is the exception: it is drawn bare and its tap is the preview,
+    // which is the better answer for pixels than for a name.
+    final tappable = view.localPath != null && !_drawsBareImage
+        ? GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => unawaited(openTransferFile(context, view)),
+            child: content,
+          )
+        : content;
     // A right-click on a message is where "show me that file" and "copy that
     // picture" live, and they are offered by the same widget the Transfers
     // list uses so the two surfaces cannot drift apart.
     return TransferContextMenu(
       view: view,
       onEnterSelection: onEnterSelection,
-      child: content,
+      child: tappable,
     );
   }
 
