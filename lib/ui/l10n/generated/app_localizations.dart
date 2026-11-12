@@ -266,6 +266,12 @@ abstract class AppLocalizations {
   /// **'\"{name}\" is over the size limit for a single file.'**
   String refusalFileTooLarge(String name);
 
+  /// No description provided for @refusalLocalFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is no longer on this machine.'**
+  String refusalLocalFileMissing(String name);
+
   /// No description provided for @kindText.
   ///
   /// In en, this message translates to:
@@ -932,6 +938,42 @@ abstract class AppLocalizations {
   /// **'Failed to create link'**
   String get shareByLinkFailed;
 
+  /// No description provided for @forward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get forward;
+
+  /// No description provided for @multiSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get multiSelect;
+
+  /// No description provided for @forwardTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward to'**
+  String get forwardTo;
+
+  /// No description provided for @noDevicesToForward.
+  ///
+  /// In en, this message translates to:
+  /// **'No Devices to forward to yet.'**
+  String get noDevicesToForward;
+
+  /// No description provided for @selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 selected} other{{count} selected}}'**
+  String selectedCount(int count);
+
+  /// No description provided for @forwardFailedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 message could not be forwarded.} other{{count} messages could not be forwarded.}}'**
+  String forwardFailedCount(int count);
+
   /// No description provided for @clipboardSyncHeader.
   ///
   /// In en, this message translates to:
@@ -1532,6 +1574,142 @@ abstract class AppLocalizations {
   /// **'Close and reopen the application'**
   String get troubleshootingRestartDesc;
 
+  /// No description provided for @troubleshootingStatusOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get troubleshootingStatusOk;
+
+  /// No description provided for @troubleshootingStatusWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get troubleshootingStatusWarning;
+
+  /// No description provided for @troubleshootingStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem found'**
+  String get troubleshootingStatusError;
+
+  /// No description provided for @troubleshootingStatusUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applicable'**
+  String get troubleshootingStatusUnsupported;
+
+  /// No description provided for @troubleshootingChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get troubleshootingChecking;
+
+  /// No description provided for @troubleshootingRecheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-check'**
+  String get troubleshootingRecheck;
+
+  /// No description provided for @troubleshootingNetworkOk.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} network interfaces available'**
+  String troubleshootingNetworkOk(int count);
+
+  /// No description provided for @troubleshootingNetworkNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No usable network interface'**
+  String get troubleshootingNetworkNone;
+
+  /// No description provided for @troubleshootingPortListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Session {session} · Pairing {pairing} · Discovery UDP {discovery}'**
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  );
+
+  /// No description provided for @troubleshootingPortFallbackNote.
+  ///
+  /// In en, this message translates to:
+  /// **'A fallback port still works through Discovery; a direct dial on the well-known port will not.'**
+  String get troubleshootingPortFallbackNote;
+
+  /// No description provided for @troubleshootingFirewallOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbound rules allow this app on the required ports'**
+  String get troubleshootingFirewallOpen;
+
+  /// No description provided for @troubleshootingFirewallBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'No inbound allow rule covers: {missing}'**
+  String troubleshootingFirewallBlocked(String missing);
+
+  /// No description provided for @troubleshootingFirewallUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not determine the firewall state'**
+  String get troubleshootingFirewallUnknown;
+
+  /// No description provided for @troubleshootingFirewallUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Only applies on Windows'**
+  String get troubleshootingFirewallUnsupported;
+
+  /// No description provided for @troubleshootingOpenFirewallPorts.
+  ///
+  /// In en, this message translates to:
+  /// **'Open firewall ports'**
+  String get troubleshootingOpenFirewallPorts;
+
+  /// No description provided for @troubleshootingFirewallNotNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'The required ports are not blocked'**
+  String get troubleshootingFirewallNotNeeded;
+
+  /// No description provided for @troubleshootingOpeningFirewall.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for administrator consent…'**
+  String get troubleshootingOpeningFirewall;
+
+  /// No description provided for @troubleshootingFirewallOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rules added'**
+  String get troubleshootingFirewallOpened;
+
+  /// No description provided for @troubleshootingFirewallCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get troubleshootingFirewallCancelled;
+
+  /// No description provided for @troubleshootingFirewallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the rules — allow the ports manually'**
+  String get troubleshootingFirewallFailed;
+
+  /// No description provided for @troubleshootingVpnNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No VPN or tunnel adapter detected'**
+  String get troubleshootingVpnNone;
+
+  /// No description provided for @troubleshootingVpnFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible VPN or tunnel adapters: {names}'**
+  String troubleshootingVpnFound(String names);
+
   /// No description provided for @railUpdate.
   ///
   /// In en, this message translates to:
@@ -1933,6 +2111,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View details'**
   String get myViewDetails;
+
+  /// No description provided for @settingsBubbles.
+  ///
+  /// In en, this message translates to:
+  /// **'Message bubbles'**
+  String get settingsBubbles;
+
+  /// No description provided for @bubbleSkinMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubbles I send'**
+  String get bubbleSkinMine;
+
+  /// No description provided for @bubbleSkinTheirs.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubbles I receive'**
+  String get bubbleSkinTheirs;
+
+  /// No description provided for @bubbleSkinCurrentDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme colours'**
+  String get bubbleSkinCurrentDefault;
+
+  /// No description provided for @bubbleSkinPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble skin'**
+  String get bubbleSkinPickerTitle;
+
+  /// No description provided for @bubbleSkinSampleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This is what a message looks like'**
+  String get bubbleSkinSampleMessage;
+
+  /// No description provided for @bubbleSkinSectionDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get bubbleSkinSectionDefault;
+
+  /// No description provided for @bubbleSkinSectionGradients.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradients'**
+  String get bubbleSkinSectionGradients;
+
+  /// No description provided for @bubbleSkinSectionPictures.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundled pictures'**
+  String get bubbleSkinSectionPictures;
+
+  /// No description provided for @bubbleSkinCustomGradient.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom gradient'**
+  String get bubbleSkinCustomGradient;
+
+  /// No description provided for @bubbleSkinChoosePicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a picture…'**
+  String get bubbleSkinChoosePicture;
+
+  /// No description provided for @bubbleSkinInkDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark text'**
+  String get bubbleSkinInkDark;
+
+  /// No description provided for @bubbleSkinInkLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light text'**
+  String get bubbleSkinInkLight;
+
+  /// No description provided for @bubbleSkinScrimNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No dimming'**
+  String get bubbleSkinScrimNone;
+
+  /// No description provided for @bubbleSkinScrimLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light dimming'**
+  String get bubbleSkinScrimLight;
+
+  /// No description provided for @bubbleSkinScrimHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'Heavy dimming'**
+  String get bubbleSkinScrimHeavy;
+
+  /// No description provided for @bubbleSkinDirectionHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get bubbleSkinDirectionHorizontal;
+
+  /// No description provided for @bubbleSkinDirectionVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get bubbleSkinDirectionVertical;
+
+  /// No description provided for @bubbleSkinDirectionDiagonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagonal'**
+  String get bubbleSkinDirectionDiagonal;
+
+  /// No description provided for @bubbleSkinAddColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Add colour'**
+  String get bubbleSkinAddColour;
+
+  /// No description provided for @bubbleSkinRemoveColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get bubbleSkinRemoveColour;
+
+  /// No description provided for @bubbleSkinUseThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this skin'**
+  String get bubbleSkinUseThis;
+
+  /// No description provided for @bubbleSkinDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get bubbleSkinDone;
+
+  /// No description provided for @bubbleSkinCustomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get bubbleSkinCustomLabel;
+
+  /// No description provided for @bubbleSkinBadFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'That file cannot be a bubble picture — use PNG, JPG, WebP or BMP.'**
+  String get bubbleSkinBadFormat;
+
+  /// No description provided for @bubbleSkinImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture could not be copied into the app\'s folder, so it was not saved.'**
+  String get bubbleSkinImportFailed;
+
+  /// No description provided for @bubbleSkinImageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture unavailable'**
+  String get bubbleSkinImageUnavailable;
+
+  /// No description provided for @bubbleSkinImageRules.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture is cropped to fill the bubble, so keep the important part near the centre and leave margin around the edges — a bubble is short for a short message and tall for a long one. A width of 512 pixels or more keeps it sharp; anything over about 2 MB gains nothing. Busy backgrounds make the text hard to read — use the dimming options to keep it legible. PNG, JPG, WebP and BMP work; GIF does not. The app keeps its own copy, so moving or deleting the original changes nothing.'**
+  String get bubbleSkinImageRules;
+
+  /// No description provided for @bubbleSkinPresetBamboo.
+  ///
+  /// In en, this message translates to:
+  /// **'Bamboo'**
+  String get bubbleSkinPresetBamboo;
+
+  /// No description provided for @bubbleSkinPresetAurora.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning mist'**
+  String get bubbleSkinPresetAurora;
+
+  /// No description provided for @bubbleSkinPresetSakura.
+  ///
+  /// In en, this message translates to:
+  /// **'Sakura'**
+  String get bubbleSkinPresetSakura;
+
+  /// No description provided for @bubbleSkinPresetHoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Honey'**
+  String get bubbleSkinPresetHoney;
+
+  /// No description provided for @bubbleSkinPresetMeadow.
+  ///
+  /// In en, this message translates to:
+  /// **'Meadow'**
+  String get bubbleSkinPresetMeadow;
+
+  /// No description provided for @bubbleSkinPresetDusk.
+  ///
+  /// In en, this message translates to:
+  /// **'Dusk'**
+  String get bubbleSkinPresetDusk;
+
+  /// No description provided for @bubbleSkinPresetMint.
+  ///
+  /// In en, this message translates to:
+  /// **'Mint'**
+  String get bubbleSkinPresetMint;
+
+  /// No description provided for @bubbleSkinPresetDuskPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Dusk photo'**
+  String get bubbleSkinPresetDuskPhoto;
+
+  /// No description provided for @bubbleSkinPresetOcean.
+  ///
+  /// In en, this message translates to:
+  /// **'Ocean'**
+  String get bubbleSkinPresetOcean;
+
+  /// No description provided for @bubbleSkinPresetGraphite.
+  ///
+  /// In en, this message translates to:
+  /// **'Graphite'**
+  String get bubbleSkinPresetGraphite;
+
+  /// No description provided for @bubbleSkinPresetApricot.
+  ///
+  /// In en, this message translates to:
+  /// **'Apricot'**
+  String get bubbleSkinPresetApricot;
+
+  /// No description provided for @bubbleSkinPresetLilac.
+  ///
+  /// In en, this message translates to:
+  /// **'Lilac'**
+  String get bubbleSkinPresetLilac;
 }
 
 class _AppLocalizationsDelegate

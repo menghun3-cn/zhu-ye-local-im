@@ -48,6 +48,14 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) { HandleHostMethodCall(call, std::move(result)); });
+  firewall_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), kFirewallChannelName,
+          &flutter::StandardMethodCodec::GetInstance());
+  firewall_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) { HandleFirewallMethodCall(call, std::move(result)); });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -65,6 +73,10 @@ void FlutterWindow::OnDestroy() {
   // Before anything else: the notification-area icon refers to this window and
   // has to be gone by the time the window is.
   host_shell_.Detach();
+
+  if (firewall_channel_) {
+    firewall_channel_ = nullptr;
+  }
 
   if (host_channel_) {
     host_channel_ = nullptr;
@@ -132,6 +144,16 @@ void FlutterWindow::HandleHostMethodCall(
     return;
   }
 
+  result->NotImplemented();
+}
+
+void FlutterWindow::HandleFirewallMethodCall(
+    const flutter::MethodCall<flutter::EncodableValue>& call,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  if (call.method_name() == "snapshot") {
+    result->Success(FirewallSnapshot());
+    return;
+  }
   result->NotImplemented();
 }
 

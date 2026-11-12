@@ -92,6 +92,28 @@ String? pinDirectory({
   return directory == null ? null : '$directory/pins';
 }
 
+/// Where this Device keeps the copies of the pictures the user picked as
+/// bubble skins, or null when it has nowhere durable to write.
+///
+/// A subdirectory of the data directory, like [screenshotLibraryDirectory]:
+/// the pictures are the user's, but they are *copies* — the originals stay
+/// wherever the user put them, and only the copy is this Device's to keep.
+/// Storing the picked path instead would break on Android, where a picker
+/// answer is a `content://` URI or a cache file the OS may purge; see
+/// `2026-11-12-bubble-skins-design.md`.
+String? bubbleSkinDirectory({
+  required DevicePlatform platform,
+  required Map<String, String> environment,
+  String? appDataDirectory,
+}) {
+  final directory = _dataDirectory(
+    platform: platform,
+    environment: environment,
+    appDataDirectory: appDataDirectory,
+  );
+  return directory == null ? null : '$directory/bubble_skins';
+}
+
 /// Where a Transfer with no destination chosen yet should land, or null when
 /// the host has no such place.
 ///

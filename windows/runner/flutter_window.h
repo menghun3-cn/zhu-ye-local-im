@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "firewall_probe.h"
 #include "host_shell.h"
 #include "win32_window.h"
 
@@ -32,6 +33,11 @@ class FlutterWindow : public Win32Window {
       const flutter::MethodCall<flutter::EncodableValue>& call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
+  // Answers kFirewallChannelName.
+  void HandleFirewallMethodCall(
+      const flutter::MethodCall<flutter::EncodableValue>& call,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
   // The project to run.
   flutter::DartProject project_;
 
@@ -41,6 +47,10 @@ class FlutterWindow : public Win32Window {
   // The channel Dart reaches the host behaviours through.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       host_channel_;
+
+  // The channel Dart asks the firewall snapshot through.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      firewall_channel_;
 
   // The host behaviours themselves.
   HostShell host_shell_;

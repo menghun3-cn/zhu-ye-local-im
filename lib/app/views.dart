@@ -341,6 +341,31 @@ final class TransferView {
   bool get needsDecision =>
       offer != null && state == TransferState.awaitingDecision;
 
+  /// Whether this message's content can be sent again to another Device.
+  ///
+  /// A forward is a new send of what the message already carries, so the
+  /// question is whether that content is still *here* to send: the words of a
+  /// text or a face are inside the TransferView itself, while a file or a
+  /// picture is forwarded from the copy on this machine — which only a
+  /// single-item send leaves behind as [localPath]. A multi-item send names
+  /// no one path, so half a folder is not the folder and the message is not
+  /// forwardable as a whole.
+  ///
+  /// Anything still in flight is excluded for the same reason a file's path
+  /// is only trusted once it is whole: forwarding bytes that are still
+  /// moving would send a partial file under the full file's name. An unsent
+  /// draft is excluded too — it is owed to the peer it was written for, and
+  /// "forwarding" it would deliver it twice.
+  bool get canForward {
+    if (unsent || !state.isSettled) return false;
+    return switch (kind) {
+      PayloadKind.text || PayloadKind.emoji => text != null && text!.isNotEmpty,
+      PayloadKind.file ||
+      PayloadKind.image => localPath != null && names.length == 1,
+      PayloadKind.clipboard => false,
+    };
+  }
+
   /// How far along the Transfer is, as a fraction in `0..1`.
   double get fraction {
     if (totalBytes <= 0) return 0;
@@ -602,6 +627,9 @@ enum AppRefusal {
 
   /// A folder send holds a file over the per-item size limit.
   fileTooLarge,
+
+  /// A forwarded file's path no longer names anything on this machine.
+  localFileMissing,
 }
 
 /// Raised when the app layer is asked for something its current state does not

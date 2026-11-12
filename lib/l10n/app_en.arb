@@ -65,6 +65,10 @@
   "@refusalFileTooLarge": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "refusalLocalFileMissing": "\"{name}\" is no longer on this machine.",
+  "@refusalLocalFileMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
 
   "kindText": "Text",
   "kindFiles": "Files",
@@ -257,6 +261,18 @@
   "shareByLinkCopied": "Link copied to clipboard",
   "shareByLinkCopy": "Copy",
   "shareByLinkFailed": "Failed to create link",
+  "forward": "Forward",
+  "multiSelect": "Select",
+  "forwardTo": "Forward to",
+  "noDevicesToForward": "No Devices to forward to yet.",
+  "selectedCount": "{count, plural, =1{1 selected} other{{count} selected}}",
+  "@selectedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "forwardFailedCount": "{count, plural, =1{1 message could not be forwarded.} other{{count} messages could not be forwarded.}}",
+  "@forwardFailedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
 
   "clipboardSyncHeader": "Clipboard sync",
   "clipboardWaitingHeader": "Waiting for you",
@@ -372,6 +388,44 @@
   "troubleshootingFirewallDesc": "Allow the app in Windows Firewall settings",
   "troubleshootingRestart": "Restart the app",
   "troubleshootingRestartDesc": "Close and reopen the application",
+  "troubleshootingStatusOk": "OK",
+  "troubleshootingStatusWarning": "Warning",
+  "troubleshootingStatusError": "Problem found",
+  "troubleshootingStatusUnsupported": "Not applicable",
+  "troubleshootingChecking": "Checking…",
+  "troubleshootingRecheck": "Re-check",
+  "troubleshootingNetworkOk": "{count} network interfaces available",
+  "@troubleshootingNetworkOk": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "troubleshootingNetworkNone": "No usable network interface",
+  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery}",
+  "@troubleshootingPortListening": {
+    "placeholders": {
+      "session": { "type": "String" },
+      "pairing": { "type": "String" },
+      "discovery": { "type": "String" }
+    }
+  },
+  "troubleshootingPortFallbackNote": "A fallback port still works through Discovery; a direct dial on the well-known port will not.",
+  "troubleshootingFirewallOpen": "Inbound rules allow this app on the required ports",
+  "troubleshootingFirewallBlocked": "No inbound allow rule covers: {missing}",
+  "@troubleshootingFirewallBlocked": {
+    "placeholders": { "missing": { "type": "String" } }
+  },
+  "troubleshootingFirewallUnknown": "Could not determine the firewall state",
+  "troubleshootingFirewallUnsupported": "Only applies on Windows",
+  "troubleshootingOpenFirewallPorts": "Open firewall ports",
+  "troubleshootingFirewallNotNeeded": "The required ports are not blocked",
+  "troubleshootingOpeningFirewall": "Waiting for administrator consent…",
+  "troubleshootingFirewallOpened": "Firewall rules added",
+  "troubleshootingFirewallCancelled": "Cancelled",
+  "troubleshootingFirewallFailed": "Could not add the rules — allow the ports manually",
+  "troubleshootingVpnNone": "No VPN or tunnel adapter detected",
+  "troubleshootingVpnFound": "Possible VPN or tunnel adapters: {names}",
+  "@troubleshootingVpnFound": {
+    "placeholders": { "names": { "type": "String" } }
+  },
   "railUpdate": "Update",
   "railUpdateRunning": "Updating",
   "railUpdatePercent": "{percent}%",
@@ -463,5 +517,46 @@
   "@myCardAboutSummaryUpdate": {
     "placeholders": { "version": { "type": "String" } }
   },
-  "myViewDetails": "View details"
+  "myViewDetails": "View details",
+
+  "settingsBubbles": "Message bubbles",
+  "bubbleSkinMine": "Bubbles I send",
+  "bubbleSkinTheirs": "Bubbles I receive",
+  "bubbleSkinCurrentDefault": "Theme colours",
+  "bubbleSkinPickerTitle": "Bubble skin",
+  "bubbleSkinSampleMessage": "This is what a message looks like",
+  "bubbleSkinSectionDefault": "Default",
+  "bubbleSkinSectionGradients": "Gradients",
+  "bubbleSkinSectionPictures": "Bundled pictures",
+  "bubbleSkinCustomGradient": "Custom gradient",
+  "bubbleSkinChoosePicture": "Choose a picture…",
+  "bubbleSkinInkDark": "Dark text",
+  "bubbleSkinInkLight": "Light text",
+  "bubbleSkinScrimNone": "No dimming",
+  "bubbleSkinScrimLight": "Light dimming",
+  "bubbleSkinScrimHeavy": "Heavy dimming",
+  "bubbleSkinDirectionHorizontal": "Horizontal",
+  "bubbleSkinDirectionVertical": "Vertical",
+  "bubbleSkinDirectionDiagonal": "Diagonal",
+  "bubbleSkinAddColour": "Add colour",
+  "bubbleSkinRemoveColour": "Remove",
+  "bubbleSkinUseThis": "Use this skin",
+  "bubbleSkinDone": "Done",
+  "bubbleSkinCustomLabel": "Custom",
+  "bubbleSkinBadFormat": "That file cannot be a bubble picture — use PNG, JPG, WebP or BMP.",
+  "bubbleSkinImportFailed": "The picture could not be copied into the app's folder, so it was not saved.",
+  "bubbleSkinImageUnavailable": "Picture unavailable",
+  "bubbleSkinImageRules": "The picture is cropped to fill the bubble, so keep the important part near the centre and leave margin around the edges — a bubble is short for a short message and tall for a long one. A width of 512 pixels or more keeps it sharp; anything over about 2 MB gains nothing. Busy backgrounds make the text hard to read — use the dimming options to keep it legible. PNG, JPG, WebP and BMP work; GIF does not. The app keeps its own copy, so moving or deleting the original changes nothing.",
+  "bubbleSkinPresetBamboo": "Bamboo",
+  "bubbleSkinPresetAurora": "Morning mist",
+  "bubbleSkinPresetSakura": "Sakura",
+  "bubbleSkinPresetHoney": "Honey",
+  "bubbleSkinPresetMeadow": "Meadow",
+  "bubbleSkinPresetDusk": "Dusk",
+  "bubbleSkinPresetMint": "Mint",
+  "bubbleSkinPresetDuskPhoto": "Dusk photo",
+  "bubbleSkinPresetOcean": "Ocean",
+  "bubbleSkinPresetGraphite": "Graphite",
+  "bubbleSkinPresetApricot": "Apricot",
+  "bubbleSkinPresetLilac": "Lilac"
 }

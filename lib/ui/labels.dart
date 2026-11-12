@@ -296,6 +296,7 @@ String describeRefusal(
     AppRefusal.tooManyFiles => l10n.refusalTooManyFiles(subject),
     AppRefusal.filesTooLarge => l10n.refusalFilesTooLarge,
     AppRefusal.fileTooLarge => l10n.refusalFileTooLarge(subject),
+    AppRefusal.localFileMissing => l10n.refusalLocalFileMissing(subject),
   };
 }
 

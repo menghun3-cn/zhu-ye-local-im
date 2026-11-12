@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.50+50
+version: 0.1.51+51
 
 environment:
   sdk: ^3.13.4
@@ -99,6 +99,7 @@ dependencies:
   # HTTP server for link-based file transfer.
   shelf: ^1.4.1
   shelf_static: ^1.1.2
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -131,6 +132,8 @@ flutter:
   # Assets for link transfer web page.
   assets:
     - assets/link_transfer/index.html
+    # The bundled bubble skins the picker offers under 「内置图片」.
+    - assets/bubble_skins/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
