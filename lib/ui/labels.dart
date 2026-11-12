@@ -292,6 +292,10 @@ String describeRefusal(
     AppRefusal.noFreeFileName => l10n.refusalNoFreeFileName(subject),
     AppRefusal.invalidAddress => l10n.refusalInvalidAddress,
     AppRefusal.deviceNotReachable => l10n.refusalDeviceNotReachable(subject),
+    AppRefusal.emptyFolder => l10n.refusalEmptyFolder,
+    AppRefusal.tooManyFiles => l10n.refusalTooManyFiles(subject),
+    AppRefusal.filesTooLarge => l10n.refusalFilesTooLarge,
+    AppRefusal.fileTooLarge => l10n.refusalFileTooLarge(subject),
   };
 }
 

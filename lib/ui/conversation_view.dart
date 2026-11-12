@@ -158,6 +158,13 @@ class _ConversationViewState extends State<ConversationView> {
       guarded(context, () async {
         if (text.isNotEmpty) await controller.sendText(text, to: widget.peer);
         for (final attachment in staged) {
+          if (attachment.isFolder) {
+            await controller.sendFolder(
+              Directory(attachment.path),
+              to: widget.peer,
+            );
+            continue;
+          }
           final file = File(attachment.path);
           await (attachment.isImage
               ? attachment.appOwned
@@ -207,6 +214,18 @@ class _ConversationViewState extends State<ConversationView> {
     _stagePaths([for (final file in chosen) file.path]);
   }
 
+  /// Asks for a folder to send whole.
+  ///
+  /// The same picker seam as [_pickFiles] — `directory()` is the OS's own
+  /// folder chooser — but the answer is staged as a folder, not walked here:
+  /// what is inside it is enumerated when 发送 is pressed, so a folder that
+  /// changed since it was picked sends what is actually there.
+  Future<void> _pickFolder() async {
+    final chosen = await PickerResolution.picker.directory();
+    if (!mounted || chosen == null) return;
+    _stagePaths([chosen]);
+  }
+
   /// Stages whatever the clipboard is holding, and says whether it staged
   /// anything.
   ///
@@ -247,25 +266,41 @@ class _ConversationViewState extends State<ConversationView> {
     return true;
   }
 
-  /// Puts each of [paths] in the composer, pictures as pictures.
+  /// Puts each of [paths] in the composer, pictures as pictures and folders
+  /// as folders.
   ///
   /// Returns how many it staged, which is what tells a paste whether the
-  /// clipboard held anything this app could carry: a folder arrives as a path
-  /// with nothing behind it, and classifying it out is not the same as having
-  /// taken it.
+  /// clipboard held anything this app could carry: a path that names nothing
+  /// at all — a broken link, a file that just left — is classified out, and
+  /// classifying it out is not the same as having taken it.
   int _stagePaths(List<String> paths) {
     // Pasting an image writes a temporary file this app owns; everything else
     // a person chose or dropped is their own file and must never be removed.
     final staged = <StagedAttachment>[];
-    for (final entry in classifyPaths(paths)) {
-      staged.add(
-        StagedAttachment(
-          path: entry.file.path,
-          name: fileNameOf(entry.file.path),
-          isImage: entry.isImage,
-          appOwned: false,
-        ),
-      );
+    for (final path in paths) {
+      // A directory has a path but no bytes of its own; it stages as a folder
+      // rather than falling through to the file check, which would classify
+      // it out the way it always used to.
+      if (Directory(path).existsSync()) {
+        staged.add(
+          StagedAttachment(
+            path: path,
+            name: fileNameOf(path),
+            isImage: false,
+            isFolder: true,
+          ),
+        );
+        continue;
+      }
+      for (final entry in classifyPaths([path])) {
+        staged.add(
+          StagedAttachment(
+            path: entry.file.path,
+            name: fileNameOf(entry.file.path),
+            isImage: entry.isImage,
+          ),
+        );
+      }
     }
     if (staged.isEmpty) return 0;
     setState(() => _staged.addAll(staged));
@@ -455,6 +490,9 @@ class _ConversationViewState extends State<ConversationView> {
                         onAttach: canSend
                             ? () => unawaited(_pickFiles())
                             : null,
+                        onAttachFolder: canSend
+                            ? () => unawaited(_pickFolder())
+                            : null,
                         onEmoji: canSend
                             ? (face) => _insertEmoji(controller, face)
                             : null,
@@ -486,9 +524,11 @@ class StagedAttachment {
     required this.name,
     required this.isImage,
     this.appOwned = false,
+    this.isFolder = false,
   });
 
-  /// Where the bytes are, as the engine will read them.
+  /// Where the bytes are, as the engine will read them — or, for a folder,
+  /// the directory they are read from at send time.
   final String path;
 
   /// What the tray says it is — a file chip's label, a thumbnail's tooltip.
@@ -496,6 +536,13 @@ class StagedAttachment {
 
   /// Whether the far side will draw it as a picture.
   final bool isImage;
+
+  /// Whether this stages a whole directory rather than one file.
+  ///
+  /// A folder is one attachment and one Transfer: its files are enumerated
+  /// when 发送 is pressed, so what the chip shows is what was picked, not a
+  /// snapshot of what was inside it at that moment.
+  final bool isFolder;
 
   /// Whether this is a temporary file the application itself created.
   ///
@@ -529,6 +576,7 @@ class ConversationComposer extends StatefulWidget {
     required this.onSend,
     required this.onPaste,
     required this.onAttach,
+    this.onAttachFolder,
     this.onEmoji,
     this.recentEmojis = const [],
     this.attachments = const [],
@@ -552,6 +600,11 @@ class ConversationComposer extends StatefulWidget {
   /// whether a choice turns out to be a picture or a file is not this control's
   /// to say — see [_pickFiles] and [_stagePaths].
   final VoidCallback? onAttach;
+
+  /// The way in for a whole directory — the same seam as [onAttach], asking
+  /// the OS for a folder rather than for files. Null under the same condition
+  /// [onAttach] is: there is nobody to send to.
+  final VoidCallback? onAttachFolder;
 
   /// Called with the face the user chose from the emoticon picker.
   ///
@@ -781,6 +834,12 @@ class _ConversationComposerState extends State<ConversationComposer> {
                         tooltip: l10n.menuSendFile,
                         icon: Icons.folder_outlined,
                         onPressed: widget.onAttach,
+                      ),
+                      SizedBox(width: WeChat.composerIconGap),
+                      ComposerTool(
+                        tooltip: l10n.menuSendFolder,
+                        icon: Icons.folder_shared_outlined,
+                        onPressed: widget.onAttachFolder,
                       ),
                       const Spacer(),
                       // The send's colour follows what is in the box, and the
@@ -1330,7 +1389,11 @@ class _AttachmentChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_file, size: 16, color: colors.secondaryText),
+          Icon(
+            attachment.isFolder ? Icons.folder_outlined : Icons.attach_file,
+            size: 16,
+            color: colors.secondaryText,
+          ),
           const SizedBox(width: 6),
           // Bounded so that one long name cannot push 发送 off the row; the
           // tooltip keeps the whole of it reachable.

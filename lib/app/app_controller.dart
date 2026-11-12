@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import '../core/core.dart';
+import 'folder_listing.dart';
 import 'views.dart';
 
 export 'views.dart';
@@ -1192,6 +1193,59 @@ final class LocalTransferController {
     return transfer;
   }
 
+  /// Sends every file under [directory] to a peer as one Transfer.
+  ///
+  /// The tree travels inside the items' names — `folder/sub/file.txt` — which
+  /// is the convention [incomingLandingFor] reads back on the far side, so the
+  /// whole folder is one offer, one answer and one landing. Empty folders and
+  /// links produce no items: see [listFolderForSend] for what the walk keeps.
+  ///
+  /// The listing's counts are checked against [TransferLimits.defaults] before
+  /// a single byte is hashed — the same limits the receiver will enforce, so a
+  /// folder that cannot be sent is refused here rather than after the hashing
+  /// pass that reading every file costs.
+  Future<OutgoingTransfer> sendFolder(
+    Directory directory, {
+    Fingerprint? to,
+  }) async {
+    final target = _target(to);
+    final listing = await listFolderForSend(directory);
+    if (listing.entries.isEmpty) {
+      throw AppStateException(AppRefusal.emptyFolder, listing.rootName);
+    }
+    const limits = TransferLimits.defaults;
+    if (listing.entries.length > limits.maxItems) {
+      throw AppStateException(
+        AppRefusal.tooManyFiles,
+        '${listing.entries.length}',
+      );
+    }
+    if (listing.totalBytes > limits.maxTotalBytes) {
+      throw AppStateException(AppRefusal.filesTooLarge);
+    }
+    final items = <OutgoingItem>[];
+    for (final entry in listing.entries) {
+      if (entry.size > limits.maxItemBytes) {
+        throw AppStateException(AppRefusal.fileTooLarge, entry.relativePath);
+      }
+      items.add(
+        OutgoingItem(
+          name: '${listing.rootName}/${entry.relativePath}',
+          // A source that opens its handle per read, not per item: a folder
+          // can name thousands of them, and a held handle would lock every
+          // file for as long as the Offer sat unanswered.
+          source: await ChunkedFileByteSource.open(entry.file),
+          // The relative path is '/'-separated by construction — see
+          // [listFolderForSend] — which is the convention the receiver's
+          // [incomingLandingFor] reads back into directories.
+        ),
+      );
+    }
+    final transfer = await target.engine.sendFiles(items);
+    _track(transfer, target.peer, localPath: directory.path);
+    return transfer;
+  }
+
   /// Accepts everything [transfer] offers, writing file bytes under [directory].
   ///
   /// The bytes are written to a staging name this Device makes up and only
@@ -1221,15 +1275,22 @@ final class LocalTransferController {
         // Only an item with a digest carries a byte stream to write; a text or
         // clipboard item arrives inline and takes no sink.
         if (!item.hasDigest) continue;
-        final staged = stagingPathFor(directory, item.name);
+        // A name with '/' is a path inside the folder being sent — the
+        // convention [incomingLandingFor] keeps inside [directory]. Its
+        // directories are created now because the staging file has to sit
+        // inside them: a rename only works within one volume, and the staged
+        // name is the final name's neighbour by definition.
+        final landing = incomingLandingFor(directory, item.name);
+        await landing.directory.create(recursive: true);
+        final staged = stagingPathFor(landing.directory, landing.name);
         final sink = await FilePayloadSink.open(staged);
         sinks[item.id] = sink;
         landings.add(
           _Landing(
             sink: sink,
             staged: staged,
-            directory: directory,
-            name: item.name,
+            directory: landing.directory,
+            name: landing.name,
           ),
         );
       }
@@ -1239,7 +1300,7 @@ final class LocalTransferController {
       );
       accepted = true;
     } finally {
-      if (!accepted) await _abandonLandings(landings);
+      if (!accepted) await _abandonLandings(landings, directory);
     }
     // `accept` returns once the answer is on the wire, not once the bytes are —
     // those are still to cross, and a path recorded here would name a file that
@@ -1258,10 +1319,10 @@ final class LocalTransferController {
       unawaited(
         transfer.outcome.then((outcome) async {
           if (outcome is TransferCompleted) {
-            final landed = await _publishLandings(landings);
+            final landed = await _publishLandings(landings, directory);
             if (landed != null) _recordLocalPath(transfer, landed);
           } else {
-            await _abandonLandings(landings);
+            await _abandonLandings(landings, directory);
           }
           _notify();
         }),
@@ -1273,8 +1334,12 @@ final class LocalTransferController {
   /// Moves [landings] out of their staging names and into the names they keep.
   ///
   /// Answers the first one's path — the one an image message carries — or null
-  /// when none of them could be moved.
-  Future<String?> _publishLandings(List<_Landing> landings) async {
+  /// when none of them could be moved. [root] is the folder the offer was
+  /// accepted into, which bounds how far the emptied-directory sweep may look.
+  Future<String?> _publishLandings(
+    List<_Landing> landings,
+    Directory root,
+  ) async {
     String? first;
     for (final landing in landings) {
       // A rename needs the handle gone, and awaiting the close is what makes
@@ -1297,14 +1362,57 @@ final class LocalTransferController {
         await _discardStaged(landing.staged);
       }
     }
+    await _pruneEmptiedDirectories(root, landings);
     return first;
   }
 
   /// Closes and deletes everything [landings] staged.
-  Future<void> _abandonLandings(List<_Landing> landings) async {
+  ///
+  /// [root] bounds the emptied-directory sweep the same way it does for
+  /// [_publishLandings]: a failed folder send must not leave the directories
+  /// it created behind, but it must never touch anything above where the
+  /// user said files may land.
+  Future<void> _abandonLandings(List<_Landing> landings, Directory root) async {
     for (final landing in landings) {
       await landing.sink.close();
       await _discardStaged(landing.staged);
+    }
+    await _pruneEmptiedDirectories(root, landings);
+  }
+
+  /// Removes the directories a landing created when nothing ended up inside.
+  ///
+  /// `create(recursive: true)` at accept time makes the whole chain a folder
+  /// send named, and a Transfer that fails — or publishes only some of its
+  /// items — would otherwise leave `a/b/c` standing empty, which reads as "a
+  /// folder arrived" when nothing did. `Directory.delete` refuses a
+  /// non-empty directory, so the sweep is safe to run unconditionally: what
+  /// received a file stays, what did not goes, deepest first so a parent is
+  /// only reached once its own children are gone.
+  Future<void> _pruneEmptiedDirectories(
+    Directory root,
+    List<_Landing> landings,
+  ) async {
+    final candidates = <String>{};
+    for (final landing in landings) {
+      var directory = landing.directory;
+      // Walk up to — but never including — the folder the offer was accepted
+      // into. The separator check is what keeps a sibling whose name merely
+      // shares a prefix (`downloads` vs `downloads-old`) from being touched.
+      while (directory.path != root.path &&
+          directory.path.startsWith('${root.path}${Platform.pathSeparator}')) {
+        candidates.add(directory.path);
+        directory = directory.parent;
+      }
+    }
+    final deepestFirst = candidates.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final path in deepestFirst) {
+      try {
+        await Directory(path).delete();
+      } on Object {
+        // Non-empty, already gone, or not ours to remove: all fine.
+      }
     }
   }
 
@@ -2775,10 +2883,13 @@ final class _Landing {
   /// The file they are being written into.
   final File staged;
 
-  /// The folder that will hold the finished file.
+  /// The folder that will hold the finished file — a subdirectory of the one
+  /// the offer was accepted into when the item's name carried a path, that
+  /// folder itself when it did not.
   final Directory directory;
 
-  /// The peer's name for the item, before sanitising and any numbering.
+  /// The item's name inside [directory], already sanitised; numbering for a
+  /// clash is still decided by [incomingPathFor] when the bytes land.
   final String name;
 }
 

@@ -103,6 +103,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get refusalEmptyFolder => 'That folder has no files to send.';
+
+  @override
+  String refusalTooManyFiles(String count) {
+    return 'That folder holds $count files, more than one transfer can carry.';
+  }
+
+  @override
+  String get refusalFilesTooLarge =>
+      'That folder is too large for one transfer.';
+
+  @override
+  String refusalFileTooLarge(String name) {
+    return '\"$name\" is over the size limit for a single file.';
+  }
+
+  @override
   String get kindText => 'Text';
 
   @override
@@ -354,6 +371,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuSendFile => 'Send a file';
+
+  @override
+  String get menuSendFolder => 'Send a folder';
 
   @override
   String get menuSendEmoji => 'Send an emoji';

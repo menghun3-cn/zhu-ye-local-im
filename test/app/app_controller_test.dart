@@ -758,6 +758,71 @@ void main() {
       );
     });
 
+    test('a folder arrives as its tree, in one Transfer', () async {
+      // The whole of what a folder send promises: one offer, the directories
+      // rebuilt under the name the sender gave the root, and every byte
+      // verified exactly as a single file's would be.
+      final home = tempDirectory('local-transfer-folder-out-');
+      final folder = Directory('${home.path}${Platform.pathSeparator}trip');
+      File('${folder.path}${Platform.pathSeparator}notes.txt')
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('flat');
+      final nested = File(
+        '${folder.path}${Platform.pathSeparator}photos${Platform.pathSeparator}beach.jpg',
+      )..parent.createSync(recursive: true);
+      nested.writeAsStringSync('pixels');
+      // An empty directory travels as nothing: the wire has no way to say
+      // "this is a directory", so it is the files' names that carry the tree.
+      Directory('${folder.path}${Platform.pathSeparator}empty')
+          .createSync(recursive: true);
+
+      final sent = await alice.controller.sendFolder(folder);
+
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the folder',
+      );
+      final offer = bob.offers.single;
+      expect(offer.kind, PayloadKind.file);
+      expect(
+        offer.items.map((item) => item.name),
+        containsAll(['trip/notes.txt', 'trip/photos/beach.jpg']),
+      );
+      expect(offer.items, hasLength(2));
+
+      final incoming = tempDirectory('local-transfer-folder-in-');
+      await bob.controller.acceptInto(offer, incoming);
+      await until(
+        () =>
+            offer.state == TransferState.completed &&
+            sent.state == TransferState.completed &&
+            File(
+              '${incoming.path}${Platform.pathSeparator}trip${Platform.pathSeparator}photos${Platform.pathSeparator}beach.jpg',
+            ).existsSync(),
+        description: 'both sides to settle and the tree to land',
+      );
+
+      final landed = File(
+        '${incoming.path}${Platform.pathSeparator}trip${Platform.pathSeparator}notes.txt',
+      );
+      expect(landed.readAsStringSync(), 'flat');
+      // Nothing staged is left behind, and the empty source directory never
+      // became an empty directory on the far side.
+      expect(
+        Directory(
+          '${incoming.path}${Platform.pathSeparator}trip${Platform.pathSeparator}empty',
+        ).existsSync(),
+        isFalse,
+      );
+      expect(
+        incoming
+            .listSync(recursive: true)
+            .whereType<File>()
+            .map((file) => fileNameOf(file.path)),
+        isNot(contains(endsWith('.part'))),
+      );
+    });
+
     test('a receive that dies leaves no file, and frees its name', () async {
       // Writing straight to the final name made a dead Transfer look like a
       // received file: an empty "report.pdf" nobody could open, and — worse —

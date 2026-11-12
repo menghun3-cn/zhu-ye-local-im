@@ -110,6 +110,79 @@ void main() {
     });
   });
 
+  // A folder send arrives as item names that are paths — `a/b/c.txt` — and
+  // this is where those segments become directories on this Device's disk.
+  // The invariant is the same one the flat name keeps: whatever the peer
+  // sent, the answer is a place inside the folder the user picked.
+  group('incomingLandingFor', () {
+    late Directory directory;
+
+    setUp(() {
+      directory = Directory.systemTemp.createTempSync('local-transfer-land-');
+    });
+
+    tearDown(() {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+    });
+
+    /// Whether [path] sits inside [directory], separator-aware.
+    bool inside(Directory root, String path) =>
+        path == root.path ||
+        path.startsWith('${root.path}${Platform.pathSeparator}');
+
+    test('a plain name lands in the root, as it always has', () {
+      final landing = incomingLandingFor(directory, 'notes.txt');
+      expect(landing.directory.path, directory.path);
+      expect(landing.name, 'notes.txt');
+    });
+
+    test('a path name becomes directories under the root', () {
+      final landing = incomingLandingFor(directory, 'photos/2024/beach.jpg');
+      expect(
+        landing.directory.path,
+        endsWith('photos${Platform.pathSeparator}2024'),
+      );
+      expect(landing.name, 'beach.jpg');
+      expect(
+        inside(directory, landing.directory.path),
+        isTrue,
+        reason: '${landing.directory.path} escaped ${directory.path}',
+      );
+    });
+
+    test('a traversal attempt stays inside, segment by segment', () {
+      final landing = incomingLandingFor(directory, '../../etc/passwd');
+      expect(
+        inside(directory, landing.directory.path),
+        isTrue,
+        reason: '${landing.directory.path} escaped ${directory.path}',
+      );
+      // `..` sanitises to `received`, so the climb becomes directories named
+      // for what they are not.
+      expect(landing.name, 'passwd');
+    });
+
+    test('empty and dot segments carry no name and are dropped', () {
+      final landing = incomingLandingFor(directory, 'a//b/./c.txt');
+      expect(landing.directory.path, endsWith('a${Platform.pathSeparator}b'));
+      expect(landing.name, 'c.txt');
+    });
+
+    test('a name that is all separators still lands a file', () {
+      final landing = incomingLandingFor(directory, '/');
+      expect(landing.directory.path, directory.path);
+      expect(landing.name, isNotEmpty);
+    });
+
+    test('a backslash inside a segment is not a separator', () {
+      // The wire convention is '/'; a '\' arrives inside a segment and is
+      // sanitised like any other character Windows refuses in a name.
+      final landing = incomingLandingFor(directory, r'a\b/c.txt');
+      expect(landing.directory.path, endsWith('a_b'));
+      expect(landing.name, 'c.txt');
+    });
+  });
+
   // The name a file wears while its bytes are crossing. It exists so that a
   // Transfer that dies takes nothing with it: no empty file under a name that
   // looks received, and no occupied name for the next attempt to number around.
