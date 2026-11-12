@@ -173,6 +173,7 @@ final class PlatformSeams {
     required this.controlsWindow,
     this.screenshotLibraryPath,
     this.pinPath,
+    this.bubbleSkinDirectory,
   });
 
   /// Where this Device's identity is kept, or an in-memory stand-in.
@@ -238,6 +239,10 @@ final class PlatformSeams {
 
   /// Where the pinned images' PNGs and index live.
   final String? pinPath;
+
+  /// Where copies of user-picked bubble-skin pictures live, or null when this
+  /// Device has nowhere durable to write — the same rule as [profilePath].
+  final String? bubbleSkinDirectory;
 }
 
 /// The platform this binary is running on.
@@ -350,6 +355,11 @@ Future<PlatformSeams> openPlatformSeams({
       appDataDirectory: dataDirectory,
     ),
     pinPath: pinDirectory(
+      platform: running,
+      environment: host,
+      appDataDirectory: dataDirectory,
+    ),
+    bubbleSkinDirectory: bubbleSkinDirectory(
       platform: running,
       environment: host,
       appDataDirectory: dataDirectory,

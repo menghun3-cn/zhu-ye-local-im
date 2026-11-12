@@ -911,6 +911,90 @@ class AppLocalizationsEn extends AppLocalizations {
   String get troubleshootingRestartDesc => 'Close and reopen the application';
 
   @override
+  String get troubleshootingStatusOk => 'OK';
+
+  @override
+  String get troubleshootingStatusWarning => 'Warning';
+
+  @override
+  String get troubleshootingStatusError => 'Problem found';
+
+  @override
+  String get troubleshootingStatusUnsupported => 'Not applicable';
+
+  @override
+  String get troubleshootingChecking => 'Checking…';
+
+  @override
+  String get troubleshootingRecheck => 'Re-check';
+
+  @override
+  String troubleshootingNetworkOk(int count) {
+    return '$count network interfaces available';
+  }
+
+  @override
+  String get troubleshootingNetworkNone => 'No usable network interface';
+
+  @override
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  ) {
+    return 'Session $session · Pairing $pairing · Discovery UDP $discovery';
+  }
+
+  @override
+  String get troubleshootingPortFallbackNote =>
+      'A fallback port still works through Discovery; a direct dial on the well-known port will not.';
+
+  @override
+  String get troubleshootingFirewallOpen =>
+      'Inbound rules allow this app on the required ports';
+
+  @override
+  String troubleshootingFirewallBlocked(String missing) {
+    return 'No inbound allow rule covers: $missing';
+  }
+
+  @override
+  String get troubleshootingFirewallUnknown =>
+      'Could not determine the firewall state';
+
+  @override
+  String get troubleshootingFirewallUnsupported => 'Only applies on Windows';
+
+  @override
+  String get troubleshootingOpenFirewallPorts => 'Open firewall ports';
+
+  @override
+  String get troubleshootingFirewallNotNeeded =>
+      'The required ports are not blocked';
+
+  @override
+  String get troubleshootingOpeningFirewall =>
+      'Waiting for administrator consent…';
+
+  @override
+  String get troubleshootingFirewallOpened => 'Firewall rules added';
+
+  @override
+  String get troubleshootingFirewallCancelled => 'Cancelled';
+
+  @override
+  String get troubleshootingFirewallFailed =>
+      'Could not add the rules — allow the ports manually';
+
+  @override
+  String get troubleshootingVpnNone => 'No VPN or tunnel adapter detected';
+
+  @override
+  String troubleshootingVpnFound(String names) {
+    return 'Possible VPN or tunnel adapters: $names';
+  }
+
+  @override
   String get railUpdate => 'Update';
 
   @override
@@ -1138,4 +1222,127 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get myViewDetails => 'View details';
+
+  @override
+  String get settingsBubbles => 'Message bubbles';
+
+  @override
+  String get bubbleSkinMine => 'Bubbles I send';
+
+  @override
+  String get bubbleSkinTheirs => 'Bubbles I receive';
+
+  @override
+  String get bubbleSkinCurrentDefault => 'Theme colours';
+
+  @override
+  String get bubbleSkinPickerTitle => 'Bubble skin';
+
+  @override
+  String get bubbleSkinSampleMessage => 'This is what a message looks like';
+
+  @override
+  String get bubbleSkinSectionDefault => 'Default';
+
+  @override
+  String get bubbleSkinSectionGradients => 'Gradients';
+
+  @override
+  String get bubbleSkinSectionPictures => 'Bundled pictures';
+
+  @override
+  String get bubbleSkinCustomGradient => 'Custom gradient';
+
+  @override
+  String get bubbleSkinChoosePicture => 'Choose a picture…';
+
+  @override
+  String get bubbleSkinInkDark => 'Dark text';
+
+  @override
+  String get bubbleSkinInkLight => 'Light text';
+
+  @override
+  String get bubbleSkinScrimNone => 'No dimming';
+
+  @override
+  String get bubbleSkinScrimLight => 'Light dimming';
+
+  @override
+  String get bubbleSkinScrimHeavy => 'Heavy dimming';
+
+  @override
+  String get bubbleSkinDirectionHorizontal => 'Horizontal';
+
+  @override
+  String get bubbleSkinDirectionVertical => 'Vertical';
+
+  @override
+  String get bubbleSkinDirectionDiagonal => 'Diagonal';
+
+  @override
+  String get bubbleSkinAddColour => 'Add colour';
+
+  @override
+  String get bubbleSkinRemoveColour => 'Remove';
+
+  @override
+  String get bubbleSkinUseThis => 'Use this skin';
+
+  @override
+  String get bubbleSkinDone => 'Done';
+
+  @override
+  String get bubbleSkinCustomLabel => 'Custom';
+
+  @override
+  String get bubbleSkinBadFormat =>
+      'That file cannot be a bubble picture — use PNG, JPG, WebP or BMP.';
+
+  @override
+  String get bubbleSkinImportFailed =>
+      'The picture could not be copied into the app\'s folder, so it was not saved.';
+
+  @override
+  String get bubbleSkinImageUnavailable => 'Picture unavailable';
+
+  @override
+  String get bubbleSkinImageRules =>
+      'The picture is cropped to fill the bubble, so keep the important part near the centre and leave margin around the edges — a bubble is short for a short message and tall for a long one. A width of 512 pixels or more keeps it sharp; anything over about 2 MB gains nothing. Busy backgrounds make the text hard to read — use the dimming options to keep it legible. PNG, JPG, WebP and BMP work; GIF does not. The app keeps its own copy, so moving or deleting the original changes nothing.';
+
+  @override
+  String get bubbleSkinPresetBamboo => 'Bamboo';
+
+  @override
+  String get bubbleSkinPresetAurora => 'Morning mist';
+
+  @override
+  String get bubbleSkinPresetSakura => 'Sakura';
+
+  @override
+  String get bubbleSkinPresetHoney => 'Honey';
+
+  @override
+  String get bubbleSkinPresetMeadow => 'Meadow';
+
+  @override
+  String get bubbleSkinPresetDusk => 'Dusk';
+
+  @override
+  String get bubbleSkinPresetMint => 'Mint';
+
+  @override
+  String get bubbleSkinPresetDuskPhoto => 'Dusk photo';
+
+  @override
+  String get bubbleSkinPresetOcean => 'Ocean';
+
+  @override
+  String get bubbleSkinPresetGraphite => 'Graphite';
+
+  @override
+  String get bubbleSkinPresetApricot => 'Apricot';
+
+  @override
+  String get bubbleSkinPresetLilac => 'Lilac';
 }

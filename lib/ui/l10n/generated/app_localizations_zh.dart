@@ -858,6 +858,85 @@ class AppLocalizationsZh extends AppLocalizations {
   String get troubleshootingRestartDesc => '关闭并重新打开应用程序';
 
   @override
+  String get troubleshootingStatusOk => '正常';
+
+  @override
+  String get troubleshootingStatusWarning => '警告';
+
+  @override
+  String get troubleshootingStatusError => '发现问题';
+
+  @override
+  String get troubleshootingStatusUnsupported => '不适用';
+
+  @override
+  String get troubleshootingChecking => '检查中…';
+
+  @override
+  String get troubleshootingRecheck => '重新检查';
+
+  @override
+  String troubleshootingNetworkOk(int count) {
+    return '检测到 $count 个网络接口';
+  }
+
+  @override
+  String get troubleshootingNetworkNone => '未检测到可用的网络接口';
+
+  @override
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  ) {
+    return '会话 $session · 配对 $pairing · 发现 UDP $discovery';
+  }
+
+  @override
+  String get troubleshootingPortFallbackNote =>
+      '备用端口仍可通过发现功能正常工作；直接按默认端口拨号将无法连通。';
+
+  @override
+  String get troubleshootingFirewallOpen => '入站规则已放行本应用所需端口';
+
+  @override
+  String troubleshootingFirewallBlocked(String missing) {
+    return '没有覆盖以下端口的入站放行规则：$missing';
+  }
+
+  @override
+  String get troubleshootingFirewallUnknown => '无法确定防火墙状态';
+
+  @override
+  String get troubleshootingFirewallUnsupported => '仅 Windows 需要此检查';
+
+  @override
+  String get troubleshootingOpenFirewallPorts => '放开防火墙端口';
+
+  @override
+  String get troubleshootingFirewallNotNeeded => '所需端口未被阻止';
+
+  @override
+  String get troubleshootingOpeningFirewall => '等待管理员授权…';
+
+  @override
+  String get troubleshootingFirewallOpened => '已添加防火墙规则';
+
+  @override
+  String get troubleshootingFirewallCancelled => '已取消';
+
+  @override
+  String get troubleshootingFirewallFailed => '无法添加规则，请手动放行端口';
+
+  @override
+  String get troubleshootingVpnNone => '未检测到 VPN 或虚拟网卡';
+
+  @override
+  String troubleshootingVpnFound(String names) {
+    return '检测到疑似 VPN 或虚拟网卡：$names';
+  }
+
+  @override
   String get railUpdate => '更新';
 
   @override
@@ -1076,4 +1155,125 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get myViewDetails => '查看详情';
+
+  @override
+  String get settingsBubbles => '消息气泡';
+
+  @override
+  String get bubbleSkinMine => '我发出的气泡';
+
+  @override
+  String get bubbleSkinTheirs => '我收到的气泡';
+
+  @override
+  String get bubbleSkinCurrentDefault => '主题配色';
+
+  @override
+  String get bubbleSkinPickerTitle => '气泡皮肤';
+
+  @override
+  String get bubbleSkinSampleMessage => '这是一条消息的样子';
+
+  @override
+  String get bubbleSkinSectionDefault => '默认';
+
+  @override
+  String get bubbleSkinSectionGradients => '渐变';
+
+  @override
+  String get bubbleSkinSectionPictures => '内置图片';
+
+  @override
+  String get bubbleSkinCustomGradient => '自定义渐变';
+
+  @override
+  String get bubbleSkinChoosePicture => '从文件选择图片…';
+
+  @override
+  String get bubbleSkinInkDark => '深色文字';
+
+  @override
+  String get bubbleSkinInkLight => '浅色文字';
+
+  @override
+  String get bubbleSkinScrimNone => '不压暗';
+
+  @override
+  String get bubbleSkinScrimLight => '轻度压暗';
+
+  @override
+  String get bubbleSkinScrimHeavy => '重度压暗';
+
+  @override
+  String get bubbleSkinDirectionHorizontal => '水平';
+
+  @override
+  String get bubbleSkinDirectionVertical => '垂直';
+
+  @override
+  String get bubbleSkinDirectionDiagonal => '对角线';
+
+  @override
+  String get bubbleSkinAddColour => '添加颜色';
+
+  @override
+  String get bubbleSkinRemoveColour => '删除颜色';
+
+  @override
+  String get bubbleSkinUseThis => '使用此皮肤';
+
+  @override
+  String get bubbleSkinDone => '完成';
+
+  @override
+  String get bubbleSkinCustomLabel => '自定义';
+
+  @override
+  String get bubbleSkinBadFormat => '这个文件不能当气泡图片 —— 请用 PNG、JPG、WebP 或 BMP。';
+
+  @override
+  String get bubbleSkinImportFailed => '图片没能复制进应用目录，因此没有保存。';
+
+  @override
+  String get bubbleSkinImageUnavailable => '图片不可用';
+
+  @override
+  String get bubbleSkinImageRules =>
+      '图片会按居中裁剪填满气泡，所以重要内容请放在画面中央、四周留出余量——短消息的气泡矮，长消息的气泡高。宽度 512 像素以上才够清晰；超过约 2 MB 没有收益。复杂背景会让文字难读，可以用压暗选项保证可读性。支持 PNG、JPG、WebP、BMP，不支持 GIF。应用会保存自己的副本，移动或删除原图都不影响。';
+
+  @override
+  String get bubbleSkinPresetBamboo => '竹青';
+
+  @override
+  String get bubbleSkinPresetAurora => '晨雾';
+
+  @override
+  String get bubbleSkinPresetSakura => '樱粉';
+
+  @override
+  String get bubbleSkinPresetHoney => '蜜糖';
+
+  @override
+  String get bubbleSkinPresetMeadow => '午后';
+
+  @override
+  String get bubbleSkinPresetDusk => '暮色';
+
+  @override
+  String get bubbleSkinPresetMint => '薄荷';
+
+  @override
+  String get bubbleSkinPresetDuskPhoto => '暮色照片';
+
+  @override
+  String get bubbleSkinPresetOcean => '海洋';
+
+  @override
+  String get bubbleSkinPresetGraphite => '石墨';
+
+  @override
+  String get bubbleSkinPresetApricot => '杏橙';
+
+  @override
+  String get bubbleSkinPresetLilac => '丁香';
 }

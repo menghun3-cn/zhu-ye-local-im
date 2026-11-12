@@ -174,6 +174,7 @@ Future<TestDevice> startDevice(
   Future<Socket> Function(String host, int port)? dialSocket,
   Future<ByteTransport> Function(String host, int port)? pairDialTransport,
   Future<DiscoveredPeer?> Function(String host)? addressProbe,
+  DateTime Function()? clock,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -202,6 +203,7 @@ Future<TestDevice> startDevice(
     dialSocket: dialSocket,
     pairingDialTransport: pairDialTransport,
     addressProbe: addressProbe,
+    clock: clock,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -439,6 +441,146 @@ void main() {
       expect(solo.controller.isServing, isFalse);
       expect(solo.controller.sessions, isEmpty);
     });
+  });
+
+  group('the bubble skins', () {
+    final gradient = GradientBubbleSkin(
+      colors: [0xFFA9DDBB, 0xFF4E9A6E],
+      direction: BubbleGradientDirection.vertical,
+      ink: BubbleSkinInk.dark,
+    );
+
+    test('start unset, and each side keeps its own choice', () async {
+      final hub = MemoryBeaconHub();
+      final solo = await startDevice(hub.a, 'Solo');
+
+      expect(solo.controller.outgoingBubbleSkin, isNull);
+      expect(solo.controller.incomingBubbleSkin, isNull);
+
+      await solo.controller.setBubbleSkin(outgoing: true, skin: gradient);
+      expect(solo.controller.outgoingBubbleSkin, gradient);
+      expect(solo.controller.incomingBubbleSkin, isNull);
+
+      await solo.controller.setBubbleSkin(outgoing: false, skin: gradient);
+      expect(solo.controller.incomingBubbleSkin, gradient);
+
+      await solo.controller.setBubbleSkin(outgoing: true, skin: null);
+      expect(solo.controller.outgoingBubbleSkin, isNull);
+      expect(solo.controller.incomingBubbleSkin, gradient);
+    });
+
+    test('a choice survives a restart over the same profile store', () async {
+      final hub = MemoryBeaconHub();
+      final store = MemoryProfileStore();
+      final first = await startDevice(hub.a, 'Solo', store: store);
+      await first.controller.setBubbleSkin(outgoing: true, skin: gradient);
+      await first.controller.close();
+
+      // A second Device over the same store is a restart, as far as the
+      // profile is concerned: what was chosen has to still be there.
+      final second = await startDevice(hub.a, 'Solo', store: store);
+      expect(second.controller.outgoingBubbleSkin, gradient);
+      expect(second.controller.incomingBubbleSkin, isNull);
+    });
+
+    test(
+      'importBubbleSkinImage copies the pick into the skin directory',
+      () async {
+        final hub = MemoryBeaconHub();
+        final directory = await Directory.systemTemp.createTemp(
+          'bubble-skins-test-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final clipboard = MemorySystemClipboard();
+        final controller = LocalTransferController(
+          store: MemoryProfileStore(),
+          beaconTransport: hub.a,
+          clipboard: clipboard,
+          alias: 'Solo',
+          bubbleSkinDirectory: directory.path,
+        );
+        await controller.start();
+        addTearDown(controller.close);
+
+        final picked = File('${directory.path}/picked.png')
+          ..writeAsBytesSync(const [1, 2, 3, 4]);
+        // The pick lives outside the skin directory, the way a real picker's
+        // answer does: what is stored must be the copy, not this path.
+        final stored = await controller.importBubbleSkinImage(picked.path);
+
+        expect(stored, isNotNull);
+        expect(stored, isNot(picked.path));
+        expect(stored, startsWith(directory.path));
+        expect(stored, endsWith('.png'));
+        expect(File(stored!).readAsBytesSync(), [1, 2, 3, 4]);
+      },
+    );
+
+    test('importBubbleSkinImage keeps the picked extension', () async {
+      final hub = MemoryBeaconHub();
+      final directory = await Directory.systemTemp.createTemp(
+        'bubble-skins-test-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final controller = LocalTransferController(
+        store: MemoryProfileStore(),
+        beaconTransport: hub.a,
+        clipboard: MemorySystemClipboard(),
+        alias: 'Solo',
+        bubbleSkinDirectory: directory.path,
+      );
+      await controller.start();
+      addTearDown(controller.close);
+
+      final picked = File('${directory.path}/photo.WEBP')
+        ..writeAsBytesSync(const [9, 9]);
+      final stored = await controller.importBubbleSkinImage(picked.path);
+      expect(stored, endsWith('.webp'));
+    });
+
+    test(
+      'importBubbleSkinImage answers null with nowhere to put the copy',
+      () async {
+        final hub = MemoryBeaconHub();
+        final solo = await startDevice(hub.a, 'Solo');
+        // No bubbleSkinDirectory was handed in: the honest answer is "cannot",
+        // not a path in a directory that does not exist.
+        final picked = File('${Directory.systemTemp.path}/pick.png')
+          ..writeAsBytesSync(const [1]);
+        addTearDown(() => picked.delete());
+        expect(
+          await solo.controller.importBubbleSkinImage(picked.path),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'importBubbleSkinImage answers null for a pick that is gone',
+      () async {
+        final hub = MemoryBeaconHub();
+        final directory = await Directory.systemTemp.createTemp(
+          'bubble-skins-test-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final controller = LocalTransferController(
+          store: MemoryProfileStore(),
+          beaconTransport: hub.a,
+          clipboard: MemorySystemClipboard(),
+          alias: 'Solo',
+          bubbleSkinDirectory: directory.path,
+        );
+        await controller.start();
+        addTearDown(controller.close);
+
+        expect(
+          await controller.importBubbleSkinImage(
+            '${directory.path}/never-existed.png',
+          ),
+          isNull,
+        );
+      },
+    );
   });
 
   group('automatically connecting two Devices', () {
@@ -2480,9 +2622,11 @@ void main() {
     /// Three Devices on one beacon hub: Alice and Bob paired first, then
     /// Carol paired to Alice — which puts all three in the one Owner Group,
     /// so Discovery opens Sessions across the hub without a dial.
-    Future<(TestDevice, TestDevice, TestDevice)> trio() async {
+    Future<(TestDevice, TestDevice, TestDevice)> trio({
+      DateTime Function()? clock,
+    }) async {
       final hub = MemoryBeaconHub();
-      final alice = await startDevice(hub.a, 'Alice');
+      final alice = await startDevice(hub.a, 'Alice', clock: clock);
       final bob = await startDevice(hub.b, 'Bob');
       await pairUp(alice, bob);
       // Carol joins only once the pair is up: a third Device beaconing as a
@@ -2560,16 +2704,33 @@ void main() {
     test(
       'a batch forwards in the order given and counts what failed',
       () async {
-        final (alice, bob, carol) = await trio();
+        // A clock that steps a second per reading: `transfers` breaks an
+        // `at` tie by id, and ids are random, so two sends inside the same
+        // millisecond would otherwise order themselves by chance.
+        var tick = 0;
+        final (alice, bob, carol) = await trio(
+          clock: () => DateTime.fromMillisecondsSinceEpoch(
+            1700000000000 + tick++ * 1000,
+          ),
+        );
         await alice.controller.sendText('first', to: bob.fingerprint);
         await alice.controller.sendText('second', to: bob.fingerprint);
         await until(
           () =>
               bob.controller.transfers
-                  .where((view) => view.state.isSettled)
-                  .length >=
-              2,
-          description: 'Bob to receive both originals',
+                      .where((view) => view.state.isSettled)
+                      .length >=
+                  2 &&
+              alice.controller.transfers
+                      .where(
+                        (view) =>
+                            (view.text == 'first' || view.text == 'second') &&
+                            view.direction == TransferDirection.outgoing &&
+                            view.state.isSettled,
+                      )
+                      .length >=
+                  2,
+          description: 'both ends to settle the originals',
         );
         // The order is the caller's: the controller sends what it is handed,
         // so the test hands the views over newest-first on purpose.
@@ -2627,10 +2788,17 @@ void main() {
         await pairUp(alice, bob);
         await alice.controller.sendText('hello bob', to: bob.fingerprint);
         await until(
-          () => bob.controller.transfers.any(
-            (view) => view.text == 'hello bob' && view.state.isSettled,
-          ),
-          description: 'Bob to receive the original',
+          () =>
+              bob.controller.transfers.any(
+                (view) => view.text == 'hello bob' && view.state.isSettled,
+              ) &&
+              alice.controller.transfers.any(
+                (view) =>
+                    view.text == 'hello bob' &&
+                    view.direction == TransferDirection.outgoing &&
+                    view.state.isSettled,
+              ),
+          description: 'both ends to settle the original',
         );
         await pairDirectly(carol, alice);
 

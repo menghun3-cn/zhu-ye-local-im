@@ -19,6 +19,7 @@ import 'pasted_image.dart';
 import 'pickers.dart';
 import 'transfer_actions.dart';
 import 'wechat/bubble.dart';
+import 'wechat/bubble_paint.dart';
 import 'wechat/composer_tool.dart';
 import 'wechat/image_bubble.dart';
 import 'wechat/theme.dart';
@@ -1682,7 +1683,17 @@ class MessageBubble extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     final outgoing = view.direction == TransferDirection.outgoing;
-    final background = outgoing ? colors.bubbleOut : colors.bubbleIn;
+    // What this bubble is painted with: the user's skin for this side when
+    // the message is one a skin may dress (text and emoji — a file or an
+    // image still on the wire keeps the theme, because its bubble is a
+    // transfer's receipt, not a message's skin), and the theme's own colours
+    // otherwise. Resolved once here so the fill and every word inside it
+    // agree on the same ink.
+    final paint = bubblePaintFor(
+      colors: colors,
+      outgoing: outgoing,
+      skin: _skinFor(outgoing),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: WeChat.messageGap),
@@ -1706,7 +1717,7 @@ class MessageBubble extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                _bubble(context, background),
+                _bubble(context, paint),
                 // A conversation is not a transfer: for a message that *is* its
                 // own content the "kind · state" line would read
                 // "text · completed", which is transfer bookkeeping the user
@@ -1766,7 +1777,8 @@ class MessageBubble extends StatelessWidget {
   /// the tap-a-tick a selection asks for. While picking, the menu steps down
   /// entirely — its lines (delete, copy, reveal) are actions on *this*
   /// conversation, and a selection is a different question.
-  Widget _bubble(BuildContext context, Color background) {
+  Widget _bubble(BuildContext context, BubblePaint paint) {
+    final l10n = AppLocalizations.of(context);
     // The bubble is skipped only for a picture this machine holds. See
     // [_drawsBareImage]: a picture with no bytes here yet keeps the bubble,
     // because the progress bar and the two answers need somewhere to be.
@@ -1775,10 +1787,10 @@ class MessageBubble extends StatelessWidget {
         : _withUnsentMarker(
             context,
             MessageBubbleShape(
-              colour: background,
+              paint: paint,
               outgoing: view.direction == TransferDirection.outgoing,
               maxWidth: bubbleMaxWidth,
-              child: _contents(context, AppLocalizations.of(context)),
+              child: _contents(context, l10n, paint),
             ),
           );
     if (selecting) {
@@ -1888,9 +1900,30 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// The skin this bubble may wear, or null when it keeps the theme's colours.
+  ///
+  /// Two conditions, and both are about the *message* rather than the paint:
+  /// a skin dresses a bubble whose content is the message itself — text and
+  /// emoji — while a file or an image still on the wire keeps the theme
+  /// because that bubble is a transfer's receipt (progress bar, answers),
+  /// not a message's skin. And the side picks the profile's own slot:
+  /// [outgoing] reads `outgoingBubbleSkin`, anything else
+  /// `incomingBubbleSkin`.
+  BubbleSkin? _skinFor(bool outgoing) {
+    final kind = view.kind;
+    if (kind != PayloadKind.text && kind != PayloadKind.emoji) return null;
+    return outgoing
+        ? controller.outgoingBubbleSkin
+        : controller.incomingBubbleSkin;
+  }
+
   /// Everything inside the bubble: the message, its progress, and the answers
   /// an offer needs.
-  Widget _contents(BuildContext context, AppLocalizations l10n) {
+  Widget _contents(
+    BuildContext context,
+    AppLocalizations l10n,
+    BubblePaint paint,
+  ) {
     final colors = WeChatColors.of(context);
     // A bar belongs under a *file* — an item with bytes still moving across
     // the wire. A text or a face has no bytes on the wire: its body was inside
@@ -1912,7 +1945,7 @@ class MessageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _body(l10n, contentWidth, colors),
+        _body(l10n, contentWidth, colors, paint.ink),
         if (showsProgress)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -1922,16 +1955,16 @@ class MessageBubble extends StatelessWidget {
                 value: view.fraction,
                 minHeight: 3,
                 // The track is the bubble's own ink, thinned — not a palette
-                // grey. It has to read on four fills (`bubbleIn` and `bubbleOut`
-                // in each theme) and no single fixed colour does: the received
-                // bubble *is* `surfaceSunken` in the light palette, so a track
-                // in that colour would vanish inside one, and `divider` is only
-                // about ΔRGB 8 off it — and within a step of `bubbleIn` on the
-                // dark page, where that bug already existed silently. Derived
-                // from the ink, the track is a fixed *distance* from whatever
-                // the bubble is, in every combination.
-                backgroundColor: _bubbleInk(colors)
-                    .withValues(alpha: WeChat.progressTrackAlpha),
+                // grey. It has to read on every fill a bubble can wear (the
+                // theme's four, a gradient, a picture) and no single fixed
+                // colour does: the received bubble *is* `surfaceSunken` in
+                // the light palette, so a track in that colour would vanish
+                // inside one. Derived from the resolved ink, the track is a
+                // fixed *distance* from whatever the bubble is, in every
+                // combination.
+                backgroundColor: paint.ink.withValues(
+                  alpha: WeChat.progressTrackAlpha,
+                ),
               ),
             ),
           ),
@@ -1948,6 +1981,7 @@ class MessageBubble extends StatelessWidget {
               label: l10n.cancelSend,
               onPressed: () => unawaited(cancelSend(context, view)),
               primary: false,
+              ink: paint.ink,
             ),
           ),
         if (view.needsDecision)
@@ -1960,6 +1994,7 @@ class MessageBubble extends StatelessWidget {
                   label: l10n.refuse,
                   onPressed: () => rejectOffer(context, controller, view),
                   primary: false,
+                  ink: paint.ink,
                 ),
                 const SizedBox(width: 8),
                 _BubbleAction(
@@ -1973,6 +2008,7 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ),
                   primary: true,
+                  ink: paint.ink,
                 ),
               ],
             ),
@@ -2049,17 +2085,6 @@ class MessageBubble extends StatelessWidget {
   /// Whether this message is a single emoji face, drawn large like a sticker.
   bool get _isEmoji => view.kind == PayloadKind.emoji;
 
-  /// The ink inside this bubble.
-  ///
-  /// Two near-blacks rather than one. An outgoing bubble is a pale green, and
-  /// text on a tinted fill wants that tint's own dark — a neutral black on
-  /// green reads faintly blue. A received bubble is white, so it takes the
-  /// plain near-black.
-  Color _bubbleInk(WeChatColors colors) =>
-      view.direction == TransferDirection.outgoing
-      ? colors.bubbleOutText
-      : colors.bubbleText;
-
   /// What the message actually says: its words, or the files it carries.
   ///
   /// A picture never arrives here. One this machine holds is drawn by
@@ -2087,6 +2112,7 @@ class MessageBubble extends StatelessWidget {
     AppLocalizations l10n,
     double? contentWidth,
     WeChatColors colors,
+    Color ink,
   ) {
     if (_isEmoji) {
       final text = view.text;
@@ -2110,17 +2136,17 @@ class MessageBubble extends StatelessWidget {
         style: TextStyle(
           fontSize: WeChat.fontSizeBody,
           height: WeChat.lineHeightBody,
-          color: _bubbleInk(colors),
+          color: ink,
         ),
       );
     }
-    if (view.kind == PayloadKind.image) return _image(contentWidth, colors);
+    if (view.kind == PayloadKind.image) return _image(contentWidth, ink);
     final lines = <Widget>[
       for (final name in view.names)
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(iconForKind(view.kind), size: 18, color: _bubbleInk(colors)),
+            Icon(iconForKind(view.kind), size: 18, color: ink),
             const SizedBox(width: 6),
             Flexible(
               child: Tooltip(
@@ -2132,7 +2158,7 @@ class MessageBubble extends StatelessWidget {
                   style: TextStyle(
                     fontSize: WeChat.fontSizeBody,
                     height: WeChat.lineHeightBody,
-                    color: _bubbleInk(colors),
+                    color: ink,
                   ),
                 ),
               ),
@@ -2181,14 +2207,14 @@ class MessageBubble extends StatelessWidget {
   /// A path that no longer reads is not a third case: that is a picture whose
   /// bytes are here, drawn by [_bareImage], and [ImageBubble] falls back to the
   /// name itself when the decode fails.
-  Widget _image(double? contentWidth, WeChatColors colors) {
+  Widget _image(double? contentWidth, Color ink) {
     final name = view.names.isEmpty ? '' : view.names.first;
     return SizedBox(
       width: contentWidth,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.image_outlined, size: 18, color: _bubbleInk(colors)),
+          Icon(Icons.image_outlined, size: 18, color: ink),
           const SizedBox(width: 6),
           Flexible(
             child: Tooltip(
@@ -2200,7 +2226,7 @@ class MessageBubble extends StatelessWidget {
                 style: TextStyle(
                   fontSize: WeChat.fontSizeBody,
                   height: WeChat.lineHeightBody,
-                  color: _bubbleInk(colors),
+                  color: ink,
                 ),
               ),
             ),
@@ -2260,10 +2286,18 @@ class _BubbleAction extends StatelessWidget {
     required this.label,
     required this.onPressed,
     required this.primary,
+    required this.ink,
   });
 
   final String label;
   final VoidCallback onPressed;
+
+  /// The bubble's resolved ink — what the outlined variant's label is drawn
+  /// in. It used to read `colors.bubbleText`, which is the *received* side's
+  /// ink: correct on an incoming bubble by coincidence and wrong on an
+  /// outgoing one, where the fill is the pale green and the near-black reads
+  /// faintly blue — the same reason `bubbleOutText` exists as its own token.
+  final Color ink;
 
   /// Filled in the brand colour when it is the answer the user most likely
   /// wants, outlined otherwise.
@@ -2278,7 +2312,7 @@ class _BubbleAction extends StatelessWidget {
       ),
       // Inside an incoming bubble this sits on the bubble and inside an
       // outgoing one on the bubble green; the outlined variant is drawn in
-      // `divider`, which reads as a hairline against both.
+      // the bubble's own ink, which reads as a hairline against either.
       //
       // The filled variant is a *button*, so it wears the action green
       // (`brandStrong`) and the ink defined for it — white on the deep
@@ -2287,7 +2321,7 @@ class _BubbleAction extends StatelessWidget {
       // fill colour for the progress bar and the selected dot, and white on it
       // is 2.4:1, which is why the design never puts white text on it.
       foregroundColor: WidgetStatePropertyAll(
-        primary ? colors.onBrandStrong : colors.bubbleText,
+        primary ? colors.onBrandStrong : ink,
       ),
       side: primary
           ? null
