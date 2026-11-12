@@ -22,6 +22,7 @@ export 'emoji/emoji.dart';
 export 'history/conversation_reading.dart';
 export 'history/message_record.dart';
 export 'history/message_store.dart';
+export 'history/unsent_message.dart';
 export 'host/close_behaviour.dart';
 export 'host/host_shell.dart';
 export 'identity/device_descriptor.dart';

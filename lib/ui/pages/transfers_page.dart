@@ -33,7 +33,9 @@ class TransfersPage extends StatelessWidget {
     // place answering for one thing.
     final transfers = [
       for (final view in controller.transfers)
-        if (view.kind == PayloadKind.file) view,
+        // An unsent draft is filtered with the texts: it never moved, so it
+        // is not a transfer — its resend lives in the conversation.
+        if (view.kind == PayloadKind.file && !view.unsent) view,
     ];
     if (transfers.isEmpty) {
       return Padding(

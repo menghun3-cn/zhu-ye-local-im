@@ -794,6 +794,36 @@ abstract class AppLocalizations {
   /// **'Cancel sending'**
   String get cancelSend;
 
+  /// No description provided for @messageUnsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get messageUnsent;
+
+  /// No description provided for @messageUnsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent — tap to resend'**
+  String get messageUnsentHint;
+
+  /// No description provided for @resendMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend this message?'**
+  String get resendMessageTitle;
+
+  /// No description provided for @resendMessageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It was not delivered. Resend it now?'**
+  String get resendMessageBody;
+
+  /// No description provided for @resend.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend'**
+  String get resend;
+
   /// No description provided for @whereShouldFilesLand.
   ///
   /// In en, this message translates to:

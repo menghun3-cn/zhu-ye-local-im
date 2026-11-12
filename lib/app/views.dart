@@ -218,6 +218,7 @@ final class TransferView {
     this.appOwned = false,
     this.settledAt,
     this.send,
+    this.unsent = false,
   });
 
   /// The Transfer's id, unique within the Session it belongs to.
@@ -316,6 +317,17 @@ final class TransferView {
   /// would be a no-op anyway; handing out null is what keeps a settled
   /// message from drawing a button for it.
   final OutgoingTransfer? send;
+
+  /// Whether this message was never sent: the peer had no Session when the
+  /// user tried, so it is a draft owed to them rather than a Transfer that
+  /// ran.
+  ///
+  /// Always outgoing, always settled as far as [state] is concerned (there
+  /// is nothing in flight to report), and the one flag that tells a
+  /// conversation to draw the resend marker instead of treating the message
+  /// as delivered or failed on the wire. See `LocalTransferController`'s
+  /// unsent list.
+  final bool unsent;
 
   /// What names this message for as long as this Device keeps it.
   ///

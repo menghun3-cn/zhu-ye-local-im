@@ -156,7 +156,16 @@ class _ConversationViewState extends State<ConversationView> {
     if (text.isEmpty && staged.isEmpty) return;
     unawaited(
       guarded(context, () async {
-        if (text.isNotEmpty) await controller.sendText(text, to: widget.peer);
+        if (text.isNotEmpty) {
+          await _sendOrQueue(
+            () => controller.sendText(text, to: widget.peer),
+            () => controller.queueUnsentMessage(
+              peer: widget.peer,
+              kind: PayloadKind.text,
+              text: text,
+            ),
+          );
+        }
         for (final attachment in staged) {
           if (attachment.isFolder) {
             await controller.sendFolder(
@@ -166,17 +175,49 @@ class _ConversationViewState extends State<ConversationView> {
             continue;
           }
           final file = File(attachment.path);
-          await (attachment.isImage
-              ? attachment.appOwned
-                    ? controller.sendAppOwnedImage(file, to: widget.peer)
-                    : controller.sendImage(file, to: widget.peer)
-              : controller.sendFile(file, to: widget.peer));
+          await _sendOrQueue(
+            () => attachment.isImage
+                ? attachment.appOwned
+                      ? controller.sendAppOwnedImage(file, to: widget.peer)
+                      : controller.sendImage(file, to: widget.peer)
+                : controller.sendFile(file, to: widget.peer),
+            () => controller.queueUnsentMessage(
+              peer: widget.peer,
+              kind: attachment.isImage ? PayloadKind.image : PayloadKind.file,
+              file: file,
+              appOwned: attachment.appOwned,
+            ),
+          );
         }
         _message.clear();
         if (!mounted) return;
         setState(() => _staged.clear());
       }),
     );
+  }
+
+  /// Sends, or — when the peer has no Session to send on — keeps the message
+  /// as an unsent draft the conversation can resend later.
+  ///
+  /// The two refusals are the whole of "offline" as far as a send is
+  /// concerned: [AppRefusal.noSessionOpen] when this peer is named and has
+  /// no Session, [AppRefusal.noPeerConnected] when nothing is connected at
+  /// all. Every other refusal — several peers and none named, an offer
+  /// already answered — is a real error and still reaches [guarded] as a
+  /// toast, because queueing it would hide a bug behind a draft.
+  Future<void> _sendOrQueue(
+    Future<OutgoingTransfer> Function() send,
+    Future<void> Function() queue,
+  ) async {
+    try {
+      await send();
+    } on AppStateException catch (error) {
+      if (error.refusal != AppRefusal.noSessionOpen &&
+          error.refusal != AppRefusal.noPeerConnected) {
+        rethrow;
+      }
+      await queue();
+    }
   }
 
   /// Puts [face] into the composer, and remembers it as recent.
@@ -1526,11 +1567,14 @@ class MessageBubble extends StatelessWidget {
                   // answers need somewhere to be.
                   child: _drawsBareImage
                       ? _bareImage(context)
-                      : MessageBubbleShape(
-                          colour: background,
-                          outgoing: outgoing,
-                          maxWidth: bubbleMaxWidth,
-                          child: _contents(context, l10n),
+                      : _withUnsentMarker(
+                          context,
+                          MessageBubbleShape(
+                            colour: background,
+                            outgoing: outgoing,
+                            maxWidth: bubbleMaxWidth,
+                            child: _contents(context, l10n),
+                          ),
                         ),
                 ),
                 // A conversation is not a transfer: for a message that *is* its
@@ -1578,7 +1622,36 @@ class MessageBubble extends StatelessWidget {
   /// has to show instead, and that is a transfer's business — which is what a
   /// bubble looks like.
   bool get _drawsBareImage =>
-      view.kind == PayloadKind.image && view.localPath != null;
+      view.kind == PayloadKind.image &&
+      view.localPath != null &&
+      // An unsent picture keeps its bubble even though its bytes are here:
+      // the bubble is where the resend marker lives, and a bare image has
+      // nowhere to put it.
+      !view.unsent;
+
+  /// The bubble, with the resend marker beside it when the message is a
+  /// draft the peer never received.
+  ///
+  /// The marker sits to the **left** of the bubble — the side the message
+  /// came from is already spoken for by the avatar, and a status mark reads
+  /// as belonging to the words rather than to the sender. Anything else
+  /// draws the bubble alone, exactly as it always did.
+  Widget _withUnsentMarker(BuildContext context, Widget bubble) {
+    if (!view.unsent) return bubble;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _UnsentMarker(
+          tooltip: AppLocalizations.of(context).messageUnsentHint,
+          onTap: () =>
+              unawaited(resendUnsentMessage(context, controller, view)),
+        ),
+        const SizedBox(width: 6),
+        Flexible(child: bubble),
+      ],
+    );
+  }
 
   /// A picture that is here, drawn as a picture.
   ///
@@ -1943,6 +2016,42 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The red circle-and-exclamation an unsent message wears.
+///
+/// It is the draft's whole status — there is no receipt line saying "failed",
+/// because nothing was ever offered and nothing broke — and its tap is the
+/// resend offer: a dialog asks, and only 重发 sends.
+class _UnsentMarker extends StatelessWidget {
+  const _UnsentMarker({required this.tooltip, required this.onTap});
+
+  /// What the marker says on hover.
+  final String tooltip;
+
+  /// Opens the resend dialog.
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          // A little room around the glyph so the tap is not a 18-pixel
+          // needle; the marker is small but it is the only way to resend.
+          padding: const EdgeInsets.all(3),
+          child: Icon(
+            Icons.error_outline,
+            size: 18,
+            color: WeChatColors.of(context).danger,
+          ),
+        ),
       ),
     );
   }

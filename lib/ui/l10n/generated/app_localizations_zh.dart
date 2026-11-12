@@ -437,6 +437,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cancelSend => '取消发送';
 
   @override
+  String get messageUnsent => '未发送';
+
+  @override
+  String get messageUnsentHint => '未发送，点击重发';
+
+  @override
+  String get resendMessageTitle => '重发这条消息？';
+
+  @override
+  String get resendMessageBody => '这条消息没有送达，现在重发吗？';
+
+  @override
+  String get resend => '重发';
+
+  @override
   String get whereShouldFilesLand => '这些文件保存到哪个文件夹？';
 
   @override
