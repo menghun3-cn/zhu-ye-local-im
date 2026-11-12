@@ -242,6 +242,30 @@ abstract class AppLocalizations {
   /// **'No Device answered at {address}.'**
   String refusalDeviceNotReachable(String address);
 
+  /// No description provided for @refusalEmptyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder has no files to send.'**
+  String get refusalEmptyFolder;
+
+  /// No description provided for @refusalTooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder holds {count} files, more than one transfer can carry.'**
+  String refusalTooManyFiles(String count);
+
+  /// No description provided for @refusalFilesTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder is too large for one transfer.'**
+  String get refusalFilesTooLarge;
+
+  /// No description provided for @refusalFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is over the size limit for a single file.'**
+  String refusalFileTooLarge(String name);
+
   /// No description provided for @kindText.
   ///
   /// In en, this message translates to:
@@ -643,6 +667,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send a file'**
   String get menuSendFile;
+
+  /// No description provided for @menuSendFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a folder'**
+  String get menuSendFolder;
 
   /// No description provided for @menuSendEmoji.
   ///

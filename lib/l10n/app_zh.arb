@@ -28,6 +28,10 @@
   "refusalNoFreeFileName": "在那个文件夹里已经找不到 \"{name}\" 可用的名字了。",
   "refusalInvalidAddress": "请输入 IP 地址。",
   "refusalDeviceNotReachable": "在 {address} 没有设备应答。",
+  "refusalEmptyFolder": "那个文件夹里没有可发送的文件。",
+  "refusalTooManyFiles": "那个文件夹里有 {count} 个文件，超过一次传输能携带的数量。",
+  "refusalFilesTooLarge": "那个文件夹太大，一次传输带不下。",
+  "refusalFileTooLarge": "\"{name}\" 超过单个文件的大小上限。",
 
   "kindText": "文本",
   "kindFiles": "文件",
@@ -106,6 +110,7 @@
   "presenceOffline": "离线",
   "presenceOfflineWithLastSeen": "离线 · {when}",
   "menuSendFile": "发送文件",
+  "menuSendFolder": "发送文件夹",
   "menuSendEmoji": "发送表情",
   "emojiRecent": "最近使用",
   "dropToAttach": "松手加入输入框",

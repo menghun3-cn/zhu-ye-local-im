@@ -13,4 +13,5 @@ library;
 
 export 'app_controller.dart';
 export 'app_version.dart';
+export 'folder_listing.dart';
 export 'views.dart';
