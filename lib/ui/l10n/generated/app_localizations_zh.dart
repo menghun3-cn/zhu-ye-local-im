@@ -877,6 +877,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get troubleshootingOpenFirewallPorts => '放开防火墙端口';
 
   @override
+  String get troubleshootingFirewallNotNeeded => '所需端口未被阻止';
+
+  @override
   String get troubleshootingOpeningFirewall => '等待管理员授权…';
 
   @override

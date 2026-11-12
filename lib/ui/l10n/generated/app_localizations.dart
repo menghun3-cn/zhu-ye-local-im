@@ -1626,6 +1626,12 @@ abstract class AppLocalizations {
   /// **'Open firewall ports'**
   String get troubleshootingOpenFirewallPorts;
 
+  /// No description provided for @troubleshootingFirewallNotNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'The required ports are not blocked'**
+  String get troubleshootingFirewallNotNeeded;
+
   /// No description provided for @troubleshootingOpeningFirewall.
   ///
   /// In en, this message translates to:
