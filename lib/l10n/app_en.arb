@@ -372,6 +372,43 @@
   "troubleshootingFirewallDesc": "Allow the app in Windows Firewall settings",
   "troubleshootingRestart": "Restart the app",
   "troubleshootingRestartDesc": "Close and reopen the application",
+  "troubleshootingStatusOk": "OK",
+  "troubleshootingStatusWarning": "Warning",
+  "troubleshootingStatusError": "Problem found",
+  "troubleshootingStatusUnsupported": "Not applicable",
+  "troubleshootingChecking": "Checking…",
+  "troubleshootingRecheck": "Re-check",
+  "troubleshootingNetworkOk": "{count} network interfaces available",
+  "@troubleshootingNetworkOk": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "troubleshootingNetworkNone": "No usable network interface",
+  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery}",
+  "@troubleshootingPortListening": {
+    "placeholders": {
+      "session": { "type": "String" },
+      "pairing": { "type": "String" },
+      "discovery": { "type": "String" }
+    }
+  },
+  "troubleshootingPortFallbackNote": "A fallback port still works through Discovery; a direct dial on the well-known port will not.",
+  "troubleshootingFirewallOpen": "Inbound rules allow this app on the required ports",
+  "troubleshootingFirewallBlocked": "No inbound allow rule covers: {missing}",
+  "@troubleshootingFirewallBlocked": {
+    "placeholders": { "missing": { "type": "String" } }
+  },
+  "troubleshootingFirewallUnknown": "Could not determine the firewall state",
+  "troubleshootingFirewallUnsupported": "Only applies on Windows",
+  "troubleshootingOpenFirewallPorts": "Open firewall ports",
+  "troubleshootingOpeningFirewall": "Waiting for administrator consent…",
+  "troubleshootingFirewallOpened": "Firewall rules added",
+  "troubleshootingFirewallCancelled": "Cancelled",
+  "troubleshootingFirewallFailed": "Could not add the rules — allow the ports manually",
+  "troubleshootingVpnNone": "No VPN or tunnel adapter detected",
+  "troubleshootingVpnFound": "Possible VPN or tunnel adapters: {names}",
+  "@troubleshootingVpnFound": {
+    "placeholders": { "names": { "type": "String" } }
+  },
   "railUpdate": "Update",
   "railUpdateRunning": "Updating",
   "railUpdatePercent": "{percent}%",

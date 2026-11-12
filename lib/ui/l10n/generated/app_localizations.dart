@@ -1532,6 +1532,136 @@ abstract class AppLocalizations {
   /// **'Close and reopen the application'**
   String get troubleshootingRestartDesc;
 
+  /// No description provided for @troubleshootingStatusOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get troubleshootingStatusOk;
+
+  /// No description provided for @troubleshootingStatusWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get troubleshootingStatusWarning;
+
+  /// No description provided for @troubleshootingStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem found'**
+  String get troubleshootingStatusError;
+
+  /// No description provided for @troubleshootingStatusUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applicable'**
+  String get troubleshootingStatusUnsupported;
+
+  /// No description provided for @troubleshootingChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get troubleshootingChecking;
+
+  /// No description provided for @troubleshootingRecheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-check'**
+  String get troubleshootingRecheck;
+
+  /// No description provided for @troubleshootingNetworkOk.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} network interfaces available'**
+  String troubleshootingNetworkOk(int count);
+
+  /// No description provided for @troubleshootingNetworkNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No usable network interface'**
+  String get troubleshootingNetworkNone;
+
+  /// No description provided for @troubleshootingPortListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Session {session} · Pairing {pairing} · Discovery UDP {discovery}'**
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  );
+
+  /// No description provided for @troubleshootingPortFallbackNote.
+  ///
+  /// In en, this message translates to:
+  /// **'A fallback port still works through Discovery; a direct dial on the well-known port will not.'**
+  String get troubleshootingPortFallbackNote;
+
+  /// No description provided for @troubleshootingFirewallOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbound rules allow this app on the required ports'**
+  String get troubleshootingFirewallOpen;
+
+  /// No description provided for @troubleshootingFirewallBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'No inbound allow rule covers: {missing}'**
+  String troubleshootingFirewallBlocked(String missing);
+
+  /// No description provided for @troubleshootingFirewallUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not determine the firewall state'**
+  String get troubleshootingFirewallUnknown;
+
+  /// No description provided for @troubleshootingFirewallUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Only applies on Windows'**
+  String get troubleshootingFirewallUnsupported;
+
+  /// No description provided for @troubleshootingOpenFirewallPorts.
+  ///
+  /// In en, this message translates to:
+  /// **'Open firewall ports'**
+  String get troubleshootingOpenFirewallPorts;
+
+  /// No description provided for @troubleshootingOpeningFirewall.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for administrator consent…'**
+  String get troubleshootingOpeningFirewall;
+
+  /// No description provided for @troubleshootingFirewallOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rules added'**
+  String get troubleshootingFirewallOpened;
+
+  /// No description provided for @troubleshootingFirewallCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get troubleshootingFirewallCancelled;
+
+  /// No description provided for @troubleshootingFirewallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the rules — allow the ports manually'**
+  String get troubleshootingFirewallFailed;
+
+  /// No description provided for @troubleshootingVpnNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No VPN or tunnel adapter detected'**
+  String get troubleshootingVpnNone;
+
+  /// No description provided for @troubleshootingVpnFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible VPN or tunnel adapters: {names}'**
+  String troubleshootingVpnFound(String names);
+
   /// No description provided for @railUpdate.
   ///
   /// In en, this message translates to:
