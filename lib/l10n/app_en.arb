@@ -65,6 +65,10 @@
   "@refusalFileTooLarge": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "refusalLocalFileMissing": "\"{name}\" is no longer on this machine.",
+  "@refusalLocalFileMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
 
   "kindText": "Text",
   "kindFiles": "Files",
@@ -257,6 +261,18 @@
   "shareByLinkCopied": "Link copied to clipboard",
   "shareByLinkCopy": "Copy",
   "shareByLinkFailed": "Failed to create link",
+  "forward": "Forward",
+  "multiSelect": "Select",
+  "forwardTo": "Forward to",
+  "noDevicesToForward": "No Devices to forward to yet.",
+  "selectedCount": "{count, plural, =1{1 selected} other{{count} selected}}",
+  "@selectedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "forwardFailedCount": "{count, plural, =1{1 message could not be forwarded.} other{{count} messages could not be forwarded.}}",
+  "@forwardFailedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
 
   "clipboardSyncHeader": "Clipboard sync",
   "clipboardWaitingHeader": "Waiting for you",

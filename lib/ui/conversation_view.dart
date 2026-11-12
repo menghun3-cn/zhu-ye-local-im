@@ -12,6 +12,7 @@ import 'clipboard_paste.dart';
 import 'controller_scope.dart';
 import 'emoji_picker.dart';
 import 'feedback.dart';
+import 'forward.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'labels.dart';
 import 'pasted_image.dart';
@@ -92,6 +93,20 @@ class _ConversationViewState extends State<ConversationView> {
   /// exactly that.
   String? _selectedText;
 
+  /// Whether the conversation is picking messages to forward.
+  ///
+  /// Entered from a message's 多选 line and left by 取消 or by a completed
+  /// forward; while it is on, bubbles carry a tick and the composer is off —
+  /// a message being picked is not one being written.
+  bool _selecting = false;
+
+  /// The messages ticked for forwarding, by [TransferView.handle].
+  ///
+  /// A handle rather than the view itself: the list rebuilds on every
+  /// Transfer update, and a view object held across one would be a stale
+  /// copy of a message that may have just settled.
+  final Set<String> _forwardChecked = {};
+
   /// Files and pictures chosen for the next message, in the order they were
   /// chosen. Nothing here has been offered to the peer yet: picking a file is
   /// not sending one, and a message is read in the order it was composed, so
@@ -111,6 +126,10 @@ class _ConversationViewState extends State<ConversationView> {
       // was made in either, and a stale one would let a copy on the new
       // conversation's menu put the old conversation's words on the clipboard.
       _selectedText = null;
+      // A selection cannot cross into another conversation either: the ticks
+      // name messages of the peer being left.
+      _selecting = false;
+      _forwardChecked.clear();
     }
   }
 
@@ -218,6 +237,99 @@ class _ConversationViewState extends State<ConversationView> {
       }
       await queue();
     }
+  }
+
+  /// Opens message selection with [view] already ticked.
+  ///
+  /// The message the 多选 line was chosen on is the one the user was pointing
+  /// at, so it starts checked rather than making them find it again.
+  void _enterSelection(TransferView view) {
+    if (!view.canForward) return;
+    setState(() {
+      _selecting = true;
+      _forwardChecked.add(view.handle);
+    });
+  }
+
+  /// Leaves message selection, ticks and all.
+  void _exitSelection() {
+    if (!_selecting) return;
+    setState(() {
+      _selecting = false;
+      _forwardChecked.clear();
+    });
+  }
+
+  /// Ticks or unticks [view] for forwarding.
+  void _toggleForwardCheck(TransferView view) {
+    // A message that cannot be forwarded gets no tick rather than a tick that
+    // silently does nothing at 发送 time.
+    if (!view.canForward) return;
+    setState(() {
+      if (!_forwardChecked.remove(view.handle)) {
+        _forwardChecked.add(view.handle);
+      }
+    });
+  }
+
+  /// Forwards everything ticked to the Device the user picks.
+  ///
+  /// Sent oldest-first — the order the messages were said in is the order they
+  /// arrive in the target's conversation — and the selection closes only when
+  /// a target was actually picked: backing out of the dialog keeps the ticks,
+  /// because the picking was the work, not the sending.
+  void _forwardSelected(LocalTransferController controller) {
+    final selected = [
+      for (final view in _messagesOf(controller))
+        if (_forwardChecked.contains(view.handle)) view,
+    ];
+    selected.sort((a, b) {
+      final byTime = a.at.compareTo(b.at);
+      return byTime != 0 ? byTime : a.id.compareTo(b.id);
+    });
+    unawaited(
+      forwardToPickedDevice(context, controller, selected).then((sent) {
+        if (sent && mounted) _exitSelection();
+      }),
+    );
+  }
+
+  /// The bar a selection mode replaces the composer with.
+  ///
+  /// Count, the one action and the way out — the same three things every
+  /// pick-messages surface answers, kept to one row because the conversation
+  /// is the thing being picked *from* and nothing else about it changes.
+  Widget _selectionBar(
+    BuildContext context,
+    AppLocalizations l10n,
+    LocalTransferController controller,
+  ) {
+    final colors = WeChatColors.of(context);
+    return Container(
+      height: 48,
+      color: colors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Text(
+            l10n.selectedCount(_forwardChecked.length),
+            style: TextStyle(
+              fontSize: WeChat.fontSizeBody,
+              color: colors.bubbleText,
+            ),
+          ),
+          const Spacer(),
+          TextButton(onPressed: _exitSelection, child: Text(l10n.cancel)),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _forwardChecked.isEmpty
+                ? null
+                : () => _forwardSelected(controller),
+            child: Text(l10n.forward),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Puts [face] into the composer, and remembers it as recent.
@@ -459,23 +571,30 @@ class _ConversationViewState extends State<ConversationView> {
                   reverse: true,
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
-                  itemBuilder: (context, index) => MessageBubble(
-                    view: messages[index],
-                    controller: controller,
-                    defaultIncomingDirectory: widget.defaultIncomingDirectory,
-                    // The cap every bubble in this conversation is drawn to.
-                    bubbleMaxWidth: bubbleMaxWidth,
-                    // A Device with no name is named by its address, and by
-                    // the last number of it inside the avatar — see
-                    // `PeerView.avatarLabel`. With no peer in the list at all
-                    // there is only the Fingerprint, which is stable and its
-                    // own, so the avatar is still the same one every time.
-                    peerName: peer?.displayName ?? widget.peer.short(),
-                    peerLabel: peer?.avatarLabel,
-                    peerSeed: widget.peer.hex,
-                    selfName: self.displayName,
-                    selfSeed: self.fingerprint.hex,
-                  ),
+                  itemBuilder: (context, index) {
+                    final view = messages[index];
+                    return MessageBubble(
+                      view: view,
+                      controller: controller,
+                      defaultIncomingDirectory: widget.defaultIncomingDirectory,
+                      // The cap every bubble in this conversation is drawn to.
+                      bubbleMaxWidth: bubbleMaxWidth,
+                      // A Device with no name is named by its address, and by
+                      // the last number of it inside the avatar — see
+                      // `PeerView.avatarLabel`. With no peer in the list at all
+                      // there is only the Fingerprint, which is stable and its
+                      // own, so the avatar is still the same one every time.
+                      peerName: peer?.displayName ?? widget.peer.short(),
+                      peerLabel: peer?.avatarLabel,
+                      peerSeed: widget.peer.hex,
+                      selfName: self.displayName,
+                      selfSeed: self.fingerprint.hex,
+                      selecting: _selecting,
+                      checked: _forwardChecked.contains(view.handle),
+                      onToggleSelect: () => _toggleForwardCheck(view),
+                      onEnterSelection: () => _enterSelection(view),
+                    );
+                  },
                 ),
               );
       },
@@ -489,6 +608,10 @@ class _ConversationViewState extends State<ConversationView> {
       child: Column(
         children: [
           if (widget.header != null) widget.header!,
+          // While messages are being picked for forwarding the composer is
+          // replaced by the bar that counts them: a box still taking input
+          // under a selection would read as two things happening at once.
+          if (_selecting) _selectionBar(context, l10n, controller),
           Expanded(
             // The drop target covers the history *and* the composer: a file
             // dragged anywhere onto the conversation is staged into the box,
@@ -497,8 +620,10 @@ class _ConversationViewState extends State<ConversationView> {
             // somewhere a message is written.
             child: DropTarget(
               // Only registered when there is a peer: a target that accepted a
-              // drop it could not send would swallow the file silently.
-              enable: canSend,
+              // drop it could not send would swallow the file silently. A
+              // selection in progress takes no drops either — a staged file
+              // has no message to be picked.
+              enable: canSend && !_selecting,
               onDragEntered: (_) => setState(() => _dropping = true),
               onDragExited: (_) => setState(() => _dropping = false),
               onDragDone: (detail) {
@@ -521,25 +646,27 @@ class _ConversationViewState extends State<ConversationView> {
                           child: history,
                         ),
                       ),
-                      const Divider(height: 1),
-                      ConversationComposer(
-                        message: _message,
-                        attachments: _staged,
-                        onRemoveAttachment: _removeStaged,
-                        onSend: () => _sendMessage(controller),
-                        onPaste: () => _pasteIntoComposer(controller),
-                        onAttach: canSend
-                            ? () => unawaited(_pickFiles())
-                            : null,
-                        onAttachFolder: canSend
-                            ? () => unawaited(_pickFolder())
-                            : null,
-                        onEmoji: canSend
-                            ? (face) => _insertEmoji(controller, face)
-                            : null,
-                        recentEmojis: controller.recentEmojis,
-                        autoFocus: widget.autoFocusComposer,
-                      ),
+                      if (!_selecting) ...[
+                        const Divider(height: 1),
+                        ConversationComposer(
+                          message: _message,
+                          attachments: _staged,
+                          onRemoveAttachment: _removeStaged,
+                          onSend: () => _sendMessage(controller),
+                          onPaste: () => _pasteIntoComposer(controller),
+                          onAttach: canSend
+                              ? () => unawaited(_pickFiles())
+                              : null,
+                          onAttachFolder: canSend
+                              ? () => unawaited(_pickFolder())
+                              : null,
+                          onEmoji: canSend
+                              ? (face) => _insertEmoji(controller, face)
+                              : null,
+                          recentEmojis: controller.recentEmojis,
+                          autoFocus: widget.autoFocusComposer,
+                        ),
+                      ],
                     ],
                   ),
                   if (_dropping) _dropOverlay(),
@@ -1495,6 +1622,10 @@ class MessageBubble extends StatelessWidget {
     required this.selfName,
     required this.selfSeed,
     required this.bubbleMaxWidth,
+    this.selecting = false,
+    this.checked = false,
+    this.onToggleSelect,
+    this.onEnterSelection,
   });
 
   /// The Transfer this bubble is for.
@@ -1530,6 +1661,22 @@ class MessageBubble extends StatelessWidget {
   /// inner width rather than on the chat.
   final double bubbleMaxWidth;
 
+  /// Whether the conversation is picking messages to forward.
+  ///
+  /// While it is, the bubble's own gestures stand down — a tap ticks the
+  /// message rather than opening a picture, and the context menu is not
+  /// offered — because the conversation, not the message, is what a tap means.
+  final bool selecting;
+
+  /// Whether this message is ticked for forwarding.
+  final bool checked;
+
+  /// Ticks or unticks this message; null where ticking is meaningless.
+  final VoidCallback? onToggleSelect;
+
+  /// Called when 多选 is chosen on this message's menu, if it is offered.
+  final VoidCallback? onEnterSelection;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1545,6 +1692,10 @@ class MessageBubble extends StatelessWidget {
             : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The tick sits on the side away from the avatar — the avatar says
+          // who said it, the tick says it is picked — so it leads an incoming
+          // row and trails an outgoing one.
+          if (selecting && view.canForward && !outgoing) _forwardCheck(),
           if (!outgoing) ...[
             Avatar(name: peerName, seed: peerSeed, label: peerLabel),
             const SizedBox(width: WeChat.bubbleAvatarGap),
@@ -1555,28 +1706,7 @@ class MessageBubble extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                // A right-click on a message is where "show me that file" and
-                // "copy that picture" live, and they are offered by the same
-                // widget the Transfers list uses so the two surfaces cannot
-                // drift apart.
-                TransferContextMenu(
-                  view: view,
-                  // The bubble is skipped only for a picture this machine
-                  // holds. See [_drawsBareImage]: a picture with no bytes here
-                  // yet keeps the bubble, because the progress bar and the two
-                  // answers need somewhere to be.
-                  child: _drawsBareImage
-                      ? _bareImage(context)
-                      : _withUnsentMarker(
-                          context,
-                          MessageBubbleShape(
-                            colour: background,
-                            outgoing: outgoing,
-                            maxWidth: bubbleMaxWidth,
-                            child: _contents(context, l10n),
-                          ),
-                        ),
-                ),
+                _bubble(context, background),
                 // A conversation is not a transfer: for a message that *is* its
                 // own content the "kind · state" line would read
                 // "text · completed", which is transfer bookkeeping the user
@@ -1608,8 +1738,64 @@ class MessageBubble extends StatelessWidget {
             const SizedBox(width: WeChat.bubbleAvatarGap),
             Avatar(name: selfName, seed: selfSeed),
           ],
+          if (selecting && view.canForward && outgoing) _forwardCheck(),
         ],
       ),
+    );
+  }
+
+  /// The tick a message wears while the conversation is picking forwards.
+  Widget _forwardCheck() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Checkbox(
+        value: checked,
+        // Null rather than a no-op for a message that cannot be forwarded —
+        // though the row never draws the tick for one, so this is only ever
+        // reached with a working toggle.
+        onChanged: onToggleSelect == null ? null : (_) => onToggleSelect!(),
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  /// The message itself, wrapped in whichever surface the moment calls for.
+  ///
+  /// Two surfaces, never both: the context menu a right-click asks for, and
+  /// the tap-a-tick a selection asks for. While picking, the menu steps down
+  /// entirely — its lines (delete, copy, reveal) are actions on *this*
+  /// conversation, and a selection is a different question.
+  Widget _bubble(BuildContext context, Color background) {
+    // The bubble is skipped only for a picture this machine holds. See
+    // [_drawsBareImage]: a picture with no bytes here yet keeps the bubble,
+    // because the progress bar and the two answers need somewhere to be.
+    final content = _drawsBareImage
+        ? _bareImage(context, interactive: !selecting)
+        : _withUnsentMarker(
+            context,
+            MessageBubbleShape(
+              colour: background,
+              outgoing: view.direction == TransferDirection.outgoing,
+              maxWidth: bubbleMaxWidth,
+              child: _contents(context, AppLocalizations.of(context)),
+            ),
+          );
+    if (selecting) {
+      if (!view.canForward || onToggleSelect == null) return content;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onToggleSelect,
+        child: content,
+      );
+    }
+    // A right-click on a message is where "show me that file" and "copy that
+    // picture" live, and they are offered by the same widget the Transfers
+    // list uses so the two surfaces cannot drift apart.
+    return TransferContextMenu(
+      view: view,
+      onEnterSelection: onEnterSelection,
+      child: content,
     );
   }
 
@@ -1664,7 +1850,9 @@ class MessageBubble extends StatelessWidget {
   /// by the time this is drawn. It is bounded by the thumbnail's own bound, so
   /// that a bar drawn under a wide screenshot cannot outrun the picture it is
   /// a bar for.
-  Widget _bareImage(BuildContext context) {
+  /// [interactive] is false while the conversation is picking messages: a tap
+  /// that opened the picture would be a tap that did not tick it.
+  Widget _bareImage(BuildContext context, {bool interactive = true}) {
     final colors = WeChatColors.of(context);
     // Non-null by [_drawsBareImage], which is what decides this is called.
     final path = view.localPath!;
@@ -1679,8 +1867,10 @@ class MessageBubble extends StatelessWidget {
         ImageBubble(
           path: path,
           name: name,
-          onOpen: () =>
-              unawaited(showImagePreview(context, path: path, name: name)),
+          onOpen: interactive
+              ? () =>
+                    unawaited(showImagePreview(context, path: path, name: name))
+              : null,
         ),
         if (!view.state.isSettled)
           Padding(
