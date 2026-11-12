@@ -930,6 +930,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get troubleshootingOpenFirewallPorts => 'Open firewall ports';
 
   @override
+  String get troubleshootingFirewallNotNeeded =>
+      'The required ports are not blocked';
+
+  @override
   String get troubleshootingOpeningFirewall =>
       'Waiting for administrator consent…';
 

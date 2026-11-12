@@ -400,6 +400,7 @@
   "troubleshootingFirewallUnknown": "Could not determine the firewall state",
   "troubleshootingFirewallUnsupported": "Only applies on Windows",
   "troubleshootingOpenFirewallPorts": "Open firewall ports",
+  "troubleshootingFirewallNotNeeded": "The required ports are not blocked",
   "troubleshootingOpeningFirewall": "Waiting for administrator consent…",
   "troubleshootingFirewallOpened": "Firewall rules added",
   "troubleshootingFirewallCancelled": "Cancelled",

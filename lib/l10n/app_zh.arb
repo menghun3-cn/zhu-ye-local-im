@@ -273,6 +273,7 @@
   "troubleshootingFirewallUnknown": "无法确定防火墙状态",
   "troubleshootingFirewallUnsupported": "仅 Windows 需要此检查",
   "troubleshootingOpenFirewallPorts": "放开防火墙端口",
+  "troubleshootingFirewallNotNeeded": "所需端口未被阻止",
   "troubleshootingOpeningFirewall": "等待管理员授权…",
   "troubleshootingFirewallOpened": "已添加防火墙规则",
   "troubleshootingFirewallCancelled": "已取消",

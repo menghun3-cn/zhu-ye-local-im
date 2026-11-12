@@ -143,10 +143,6 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
               level: _firewallLevel(),
               detail: _firewallDetail(l10n),
             ),
-            if (controller.self.platform == DevicePlatform.windows) ...[
-              const SizedBox(height: 8),
-              _buildFirewallActions(context, l10n),
-            ],
             const SizedBox(height: 8),
             _DiagnosticItem(
               icon: Icons.portable_wifi_off,
@@ -154,6 +150,9 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
               description: l10n.troubleshootingPortCheckDesc,
               level: _portLevel(),
               detail: _portDetail(l10n, controller),
+              trailing: controller.self.platform == DevicePlatform.windows
+                  ? _buildFirewallActions(context, l10n)
+                  : null,
             ),
             const SizedBox(height: 8),
             _DiagnosticItem(
@@ -171,16 +170,24 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
 
   Widget _buildFirewallActions(BuildContext context, AppLocalizations l10n) {
     final colors = WeChatColors.of(context);
+    // The button exists for one situation: the probe found inbound ports with
+    // no covering allow rule. While the ports are open — or the question could
+    // not be answered — there is nothing for it to do, so it stays greyed out
+    // rather than offering an action that would change nothing.
+    final blocked = _firewall?.state == FirewallState.blocked;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        FilledButton.tonalIcon(
-          onPressed: _openingFirewall ? null : _openFirewall,
-          icon: const Icon(Icons.lock_open, size: 18),
-          label: Text(
-            _openingFirewall
-                ? l10n.troubleshootingOpeningFirewall
-                : l10n.troubleshootingOpenFirewallPorts,
+        Tooltip(
+          message: blocked ? '' : l10n.troubleshootingFirewallNotNeeded,
+          child: FilledButton.tonalIcon(
+            onPressed: _openingFirewall || !blocked ? null : _openFirewall,
+            icon: const Icon(Icons.lock_open, size: 18),
+            label: Text(
+              _openingFirewall
+                  ? l10n.troubleshootingOpeningFirewall
+                  : l10n.troubleshootingOpenFirewallPorts,
+            ),
           ),
         ),
         if (_firewallNotice != null) ...[
@@ -338,6 +345,7 @@ class _DiagnosticItem extends StatelessWidget {
     required this.description,
     required this.level,
     required this.detail,
+    this.trailing,
   });
 
   final IconData icon;
@@ -345,6 +353,10 @@ class _DiagnosticItem extends StatelessWidget {
   final String description;
   final CheckStatus level;
   final String detail;
+
+  /// An action offered beside the finding — today only the port check carries
+  /// one, the firewall button that exists for exactly the state it reports.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -395,6 +407,7 @@ class _DiagnosticItem extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
       ],
     );
   }

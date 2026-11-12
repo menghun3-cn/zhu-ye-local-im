@@ -46,7 +46,9 @@ platform:
   program-scoped rules, so judging by port alone would call a firewall that
   blocks this app "open".
 
-The "Open firewall ports" button appears on Windows only. It cannot be
+The "Open firewall ports" button appears on Windows only, beside the port
+check it exists for, and stays disabled until the probe reports `blocked` —
+an open port or an unanswered question leaves it nothing to do. It cannot be
 silent — adding a rule needs an administrator — so one click collects one UAC
 consent and then runs `New-NetFirewallRule` twice, scoped with `-Program` to
 the running executable: TCP `47655,47656` and UDP `47654`. The elevated half
