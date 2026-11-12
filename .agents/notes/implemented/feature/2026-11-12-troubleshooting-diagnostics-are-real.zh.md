@@ -17,8 +17,8 @@ Windows 坚持要 UAC 弹窗的那一处。
 
 ## Decision
 
-四项诊断现在都报告真实状态，判定逻辑放在 `lib/core`，让 `dart test` 覆盖，
-平台侧只剩进程调用：
+四项诊断现在都报告真实状态，判定逻辑放在 `lib/core`，让 `dart test` 覆盖；
+平台侧是防火墙读取走 MethodChannel 快照、写入走一次提权 PowerShell 调用：
 
 * **端口**——对 controller 报告的实际端口（`listenPort`、`pairingPort`）做
   纯函数判定。绑定在默认端口上是 `ok`，退到备用端口是 `warning`（Discovery
@@ -31,14 +31,17 @@ Windows 坚持要 UAC 弹窗的那一处。
   `openvpn`、`ppp`、`vpn` 等）。`tailscale` 故意不在其中：本应用对
   Tailscale 有一等支持，它的适配器是特性而非干扰。结果是带适配器名的
   `warning`，因为名字启发式永远只能是提示。
-* **防火墙**——一次 PowerShell 查询（`Get-NetFirewallRule` 加端口与程序
-  过滤器、当前 `NetworkCategory`、profile 的 `Enabled`），无需提权即可
-  读取，输出 JSON 解析。一个端口只有在同时满足以下条件时才算被覆盖：存在
-  一条已启用的入站允许规则，协议、端口匹配，且规则要么不限定程序、要么
-  限定于 `Platform.resolvedExecutable`，并且其 profile 与当前网络类别
-  匹配。程序作用域是最容易判错的部分：Windows 自己的「允许此应用」弹窗
-  写的正是按程序限定的规则，只看端口会把「其实挡着本应用」的防火墙误判成
-  「已放行」。
+* **防火墙**——Windows runner 在 `cn.hnasct.local_transfer/firewall` 通道
+  上应答 `snapshot` 方法（`windows/runner/firewall_probe.cpp`）：
+  `INetFwPolicy2` 枚举所有已启用的入站允许规则，`INetworkListManager` 报告
+  当前网络类别及其 profile 的防火墙是否启用——与 PowerShell cmdlet 读的是
+  同一个策略存储，但不启动进程，也没有每条规则一次 CIM 往返。Dart 判定
+  解码后的快照：一个端口只有在规则同时匹配协议、端口，且规则要么不限定
+  程序、要么限定于 `Platform.resolvedExecutable`，并且其 profile 与当前
+  网络类别匹配时才算被覆盖；按服务限定的规则永远不算，因为它放行的是服务
+  而不是可执行文件。程序作用域是最容易判错的部分：Windows 自己的「允许此
+  应用」弹窗写的正是按程序限定的规则，只看端口会把「其实挡着本应用」的
+  防火墙误判成「已放行」。
 
 「放开防火墙端口」按钮只在 Windows 显示，位于它所对应的端口检查项旁边，
 并且在探测报告 `blocked` 之前保持禁用——端口已放行或问题无从判定时，
@@ -58,10 +61,15 @@ Windows 坚持要 UAC 弹窗的那一处。
 ## Consequences
 
 * `lib/core/diagnostics/troubleshooting.dart` 是纯 Dart，带两个缝：
-  `ProcessRunner` 负责 PowerShell 调用，接口枚举负责网络检查。解析与判定
-  逻辑由 `test/diagnostics/troubleshooting_test.dart` 完整覆盖。
-* 探测要枚举所有已启用的入站允许规则，每条规则一次 CIM 查询——规则多的
-  机器上会花一点时间。它每次进页面跑一次、按需再跑，正好是诊断页的节奏。
+  `ProcessRunner` 负责*添加*规则的提权 PowerShell 调用，防火墙
+  MethodChannel 负责探测。通道本身是薄的一半——进 COM、出 map——所有解析
+  与判定逻辑留在 Dart，由 `test/diagnostics/troubleshooting_test.dart` 覆盖；
+  通道的 Dart 侧契约由 `test_flutter/platform/seams_test.dart` 覆盖。
+* 探测是进程内的一次 COM 枚举，重新检查几乎瞬时完成——早期 PowerShell
+  版本每条规则一次 CIM 查询，在规则多的机器上要数秒。它每次进页面跑一次、
+  按需再跑，正好是诊断页的节奏。
+* 在通道出现之前构建的 runner 会抛 `MissingPluginException`，页面报
+  `unknown`——「无法回答」而不是猜一个答案。
 * 防火墙判定的准确度取决于规则数据：第三方防火墙、探测后新增的规则、或
   Windows 防火墙之外的过滤，都会读成「已放行」或「未知」而非确定结论。
   代码里把这条启发式写明了。
@@ -78,14 +86,20 @@ Windows 坚持要 UAC 弹窗的那一处。
 能否连到我」——是关于我们已经知道的监听器，不是关于空闲端口。
 
 **用 `netsh advfirewall` 做探测和修复。** 修复上已否决：`netsh` 不能把规则
-限定到程序，会把端口对机器上所有进程放开。探测上它可行，但 PowerShell
-对象模型直接返回结构化字段（协议、端口表达式、profile、程序），而 `netsh`
-输出需要文本解析，会被本地化和格式变化打破。
+限定到程序，会把端口对机器上所有进程放开。探测上它可行，但输出需要文本
+解析，会被本地化和格式变化打破。
 
-**在 `windows/runner` 里加 MethodChannel 做防火墙操作。** 已否决：现有
-host 通道是为 runner 自己的窗口与托盘事实服务的。调 PowerShell 不需要
-原生代码，逻辑留在可测试的 Dart 里，UAC 边界本来就是操作系统的而不是
-我们的——加通道只是多一块 C++ 表面，没有能力上的收益。
+**对 `FirewallPolicy\FirewallRules` 跑 `reg query`。** 已否决：规则在注册表
+里无需提权就能读到也很快，但 `v2.x|key=value` 格式是实现细节而非契约——
+Windows 更新随时可以改它，而失败模式是一个悄悄的错误判定。
+
+**保留 PowerShell 探测。** 这是第一版的实现，后来被替换：
+`Get-NetFirewallRule` 每条规则都要过一次 CIM，规则多的机器上探测要数秒，
+而进程自己就能回答的读取却要付出启动 shell 的代价。COM 快照读的是同一个
+策略存储，在进程内完成，判定逻辑两种方案下都留在 Dart。
+
+**用 WFP API（`FwpmFilterEnum`）做探测。** 已否决：内核层过滤器枚举多数
+需要提权，会破坏探测赖以成立的「读规则不需要管理员」这一性质。
 
 **拨自己的局域网地址测连通性。** 已否决：经过 Windows 防火墙的回环行为
 不稳定，回环拨号绕过的恰恰是被测的过滤器，而且自拨失败无法区分「防火墙」

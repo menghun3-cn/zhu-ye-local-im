@@ -8,6 +8,7 @@ project(runner LANGUAGES CXX)
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
+  "firewall_probe.cpp"
   "host_shell.cpp"
   "main.cpp"
   "utils.cpp"
@@ -39,6 +40,8 @@ target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "shell32.lib")
 # ITaskbarList3, for the unread overlay on the taskbar button.
 target_link_libraries(${BINARY_NAME} PRIVATE "ole32.lib")
+# SysFreeString, for the BSTRs the firewall COM getters hand back.
+target_link_libraries(${BINARY_NAME} PRIVATE "oleaut32.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

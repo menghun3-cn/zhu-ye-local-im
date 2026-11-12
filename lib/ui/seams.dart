@@ -155,6 +155,50 @@ const String _setUnreadMethod = 'setUnread';
 /// Whether the tray menu offers the screenshot history. Takes a bool.
 const String _setScreenshotEnabledMethod = 'setScreenshotEnabled';
 
+/// The firewall snapshot channel, implemented by
+/// `windows/runner/firewall_probe.cpp`.
+///
+/// One method, `snapshot`, answers the whole picture at once — the current
+/// network's category, whether its firewall profile is enabled, and every
+/// enabled inbound allow rule — because the judgement that consumes it needs
+/// all three to say anything honest.
+const MethodChannel firewallProbeChannel = MethodChannel(
+  'cn.hnasct.local_transfer/firewall',
+);
+
+/// The method [firewallProbeChannel] is asked for.
+const String firewallSnapshotMethod = 'snapshot';
+
+/// Asks the host's firewall store whether this Device's ports are reachable
+/// inbound.
+///
+/// On Windows the answer comes from the runner's COM snapshot — no process is
+/// spawned and nothing needs elevation, because reading firewall rules is not
+/// a privileged operation. Any other platform, and any Windows build whose
+/// runner predates the channel, answers [FirewallState.unsupported] or
+/// [FirewallState.unknown] respectively, and the page shows either quietly.
+Future<FirewallReport> probeHostFirewall({
+  required DevicePlatform platform,
+  required String programPath,
+  MethodChannel channel = firewallProbeChannel,
+}) async {
+  if (platform != DevicePlatform.windows) {
+    return const FirewallReport(FirewallState.unsupported);
+  }
+  final Object? snapshot;
+  try {
+    snapshot = await channel.invokeMethod<Object?>(firewallSnapshotMethod);
+  } on MissingPluginException {
+    // A runner built before the channel existed. "Cannot answer" is the
+    // honest report; pretending the ports are open would be a lie.
+    return const FirewallReport(FirewallState.unknown);
+  } on PlatformException {
+    return const FirewallReport(FirewallState.unknown);
+  }
+  return firewallReportFromSnapshot(snapshot, programPath: programPath) ??
+      const FirewallReport(FirewallState.unknown);
+}
+
 /// Everything the application needs from the platform it runs on.
 final class PlatformSeams {
   const PlatformSeams({

@@ -7,6 +7,7 @@ import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../seams.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -53,7 +54,7 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
       final platform = _controller!.self.platform;
       final interfaces = await usableInterfaces();
       final tunnels = await suspectedTunnelInterfaces();
-      final firewall = await probeFirewall(
+      final firewall = await probeHostFirewall(
         platform: platform,
         programPath: Platform.resolvedExecutable,
       );
