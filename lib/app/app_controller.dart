@@ -1411,6 +1411,107 @@ final class LocalTransferController {
     }
   }
 
+  /// Sends [view]'s content to [to] as a new message of its own kind.
+  ///
+  /// This is forwarding: the message stays in its own conversation and a copy
+  /// of what it carries goes out under a new Transfer — the same doors a
+  /// fresh send takes, so a forwarded text is a text, a forwarded picture is
+  /// still drawn as a picture on the far side, and a pasted image keeps its
+  /// app-owned mark so deleting it can still take the temporary file away.
+  ///
+  /// What may be forwarded is decided by [TransferView.canForward]; a caller
+  /// that skipped the check fails loudly here rather than quietly sending
+  /// nothing. A file whose path has gone missing since is refused with
+  /// [AppRefusal.localFileMissing] before anything is offered — queueing a
+  /// draft for bytes that are not there would only move the failure to the
+  /// resend.
+  ///
+  /// A peer with no Session does not refuse the forward: the content is kept
+  /// as an unsent draft owed to [to], exactly as a message typed while they
+  /// were away would be (see [queueUnsentMessage]).
+  Future<void> forwardMessage(
+    TransferView view, {
+    required Fingerprint to,
+  }) async {
+    if (!view.canForward) {
+      throw StateError('this message cannot be forwarded');
+    }
+    final path = view.localPath;
+    if (path != null && !File(path).existsSync()) {
+      throw AppStateException(
+        AppRefusal.localFileMissing,
+        view.names.isEmpty ? path : view.names.first,
+      );
+    }
+    try {
+      await _deliverForwarded(view, to);
+    } on AppStateException catch (error) {
+      if (error.refusal != AppRefusal.noSessionOpen &&
+          error.refusal != AppRefusal.noPeerConnected) {
+        rethrow;
+      }
+      await _queueForwarded(view, to);
+    }
+  }
+
+  /// Forwards each message in [views] to [to], one Transfer per message, in
+  /// the order given.
+  ///
+  /// Every message is attempted even when an earlier one fails: a forwarded
+  /// batch is a list of independent sends, and one file that has been moved
+  /// since must not take the rest of the selection down with it. Returns how
+  /// many could not be sent; the rest are already on their way, or queued as
+  /// drafts for a peer that is away.
+  Future<int> forwardMessages(
+    List<TransferView> views, {
+    required Fingerprint to,
+  }) async {
+    var failed = 0;
+    for (final view in views) {
+      try {
+        await forwardMessage(view, to: to);
+      } on Object {
+        failed += 1;
+      }
+    }
+    return failed;
+  }
+
+  /// The send a forward is, through the same doors a fresh send takes.
+  Future<void> _deliverForwarded(TransferView view, Fingerprint to) async {
+    switch (view.kind) {
+      case PayloadKind.text:
+        await sendText(view.text!, to: to);
+      case PayloadKind.emoji:
+        await sendEmoji(view.text!, to: to);
+      case PayloadKind.file:
+        await sendFile(File(view.localPath!), to: to);
+      case PayloadKind.image:
+        final file = File(view.localPath!);
+        if (view.appOwned) {
+          await sendAppOwnedImage(file, to: to);
+        } else {
+          await sendImage(file, to: to);
+        }
+      case PayloadKind.clipboard:
+        // Mirrored content is never a message and never forwarded; reaching
+        // here is a bug, and a loud one.
+        throw StateError('clipboard content is never forwarded');
+    }
+  }
+
+  /// The draft a forward is owed when [to] has no Session to carry it.
+  Future<void> _queueForwarded(TransferView view, Fingerprint to) {
+    final path = view.localPath;
+    return queueUnsentMessage(
+      peer: to,
+      kind: view.kind,
+      text: view.text,
+      file: path == null ? null : File(path),
+      appOwned: view.appOwned,
+    );
+  }
+
   /// A draft id, minted the way a Transfer id is.
   String _newUnsentId() {
     final bytes = Uint8List(12);

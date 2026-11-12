@@ -266,6 +266,12 @@ abstract class AppLocalizations {
   /// **'\"{name}\" is over the size limit for a single file.'**
   String refusalFileTooLarge(String name);
 
+  /// No description provided for @refusalLocalFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is no longer on this machine.'**
+  String refusalLocalFileMissing(String name);
+
   /// No description provided for @kindText.
   ///
   /// In en, this message translates to:
@@ -931,6 +937,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to create link'**
   String get shareByLinkFailed;
+
+  /// No description provided for @forward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get forward;
+
+  /// No description provided for @multiSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get multiSelect;
+
+  /// No description provided for @forwardTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward to'**
+  String get forwardTo;
+
+  /// No description provided for @noDevicesToForward.
+  ///
+  /// In en, this message translates to:
+  /// **'No Devices to forward to yet.'**
+  String get noDevicesToForward;
+
+  /// No description provided for @selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 selected} other{{count} selected}}'**
+  String selectedCount(int count);
+
+  /// No description provided for @forwardFailedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 message could not be forwarded.} other{{count} messages could not be forwarded.}}'**
+  String forwardFailedCount(int count);
 
   /// No description provided for @clipboardSyncHeader.
   ///

@@ -116,6 +116,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String refusalLocalFileMissing(String name) {
+    return '\"$name\" 已不在这台设备上。';
+  }
+
+  @override
   String get kindText => '文本';
 
   @override
@@ -504,6 +509,38 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shareByLinkFailed => '创建链接失败';
+
+  @override
+  String get forward => '转发';
+
+  @override
+  String get multiSelect => '多选';
+
+  @override
+  String get forwardTo => '转发给';
+
+  @override
+  String get noDevicesToForward => '暂无可转发的设备。';
+
+  @override
+  String selectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已选 $count 条',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String forwardFailedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 条消息未能转发。',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get clipboardSyncHeader => '剪贴板同步';

@@ -11,6 +11,7 @@ import 'clipboard_paste.dart';
 import 'controller_scope.dart';
 import 'dialogs.dart';
 import 'feedback.dart';
+import 'forward.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'reveal.dart';
 import 'top_toast.dart';
@@ -476,6 +477,7 @@ class TransferContextMenu extends StatelessWidget {
     super.key,
     required this.view,
     required this.child,
+    this.onEnterSelection,
   });
 
   /// The Transfer being pointed at.
@@ -483,6 +485,15 @@ class TransferContextMenu extends StatelessWidget {
 
   /// What is drawn, and what the pointer has to be over.
   final Widget child;
+
+  /// Called when 多选 is chosen, or null where selecting makes no sense.
+  ///
+  /// Only a conversation can select — the Transfers list shows one message
+  /// at a time with no batch to build — so the line appears only where the
+  /// surface hands this in, the same way [MessageSelection] is absent there.
+  /// The callback receives nothing: which message started the selection is
+  /// the surface's own bookkeeping.
+  final VoidCallback? onEnterSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -517,6 +528,11 @@ class TransferContextMenu extends StatelessWidget {
     final cancel = canCancelTransfer(view);
     final withdraw = canWithdrawTransfer(view);
     final canShare = canShareByLink(view);
+    // Forwarding and selecting are offered only where the message's content
+    // is still here to send — the same predicate the controller enforces, so
+    // the menu never offers a line that would fail on the tap.
+    final forward = view.canForward;
+    final select = forward && onEnterSelection != null;
     // The controller is read here for the same reason, and `ControllerScope.of`
     // throws rather than returning null when the scope above is gone — which is
     // why it is asked before the menu opens rather than after a line is chosen.
@@ -597,6 +613,21 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.content_copy_outlined,
             label: l10n.copyText,
           ),
+        // Sending the message somewhere else is the one action here that is
+        // not about *this* conversation: it leaves a copy in another one, so
+        // it sits with the message's own lines rather than with 删除.
+        if (forward)
+          _item(
+            value: _forwardAction,
+            icon: Icons.forward,
+            label: l10n.forward,
+          ),
+        if (select)
+          _item(
+            value: _selectAction,
+            icon: Icons.checklist,
+            label: l10n.multiSelect,
+          ),
         // Last, and unconditional. Everything above reaches for the bytes
         // somewhere on this machine or stops them moving; this is the line that
         // takes the message itself away, and it is the one thing a user can
@@ -624,6 +655,13 @@ class TransferContextMenu extends StatelessWidget {
         await withdrawTransfer(context, controller, view);
       case _shareByLinkAction:
         await shareByLink(context, view);
+      case _forwardAction:
+        // Not awaited: the dialog and the sends that follow it belong to the
+        // picked Device's conversation as much as to this one, and a failure
+        // inside is already counted and toasted by the helper.
+        unawaited(forwardToPickedDevice(context, controller, [view]));
+      case _selectAction:
+        onEnterSelection?.call();
       case _deleteAction:
         await controller.deleteMessage(view);
     }
@@ -676,4 +714,6 @@ const String _copyAction = 'copy';
 const String _withdrawAction = 'withdraw';
 const String _shareByLinkAction = 'share-by-link';
 const String _copyTextAction = 'copy-text';
+const String _forwardAction = 'forward';
+const String _selectAction = 'select';
 const String _deleteAction = 'delete';

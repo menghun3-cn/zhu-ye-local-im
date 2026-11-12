@@ -128,12 +128,31 @@ final class FilePayloadSink implements PayloadSink {
   int _written;
   bool _closed = false;
   Future<void>? _closing;
+  Future<void> _tail = Future<void>.value();
 
   /// Whether [close] has been called.
   bool get isClosed => _closed;
 
   @override
   int get bytesWritten => _written;
+
+  /// Runs [op] after every file operation already queued on this handle.
+  ///
+  /// The handle's own operations are awaited one at a time by the Transfer's
+  /// message queue, but `close` is not always reached through it: a Session
+  /// that dies, or an engine that is closed, fails the Transfer outright while
+  /// the last slice's `writeFrom` may still be in flight. Windows answers a
+  /// `close` issued under a pending operation with "An async operation is
+  /// currently pending", so every handle call — writes included — goes
+  /// through one tail and a close can only ever queue behind them.
+  Future<void> _serialized(Future<void> Function() op) {
+    final run = _tail.then((_) => op());
+    // The tail itself must survive a failed op, or one bad slice would poison
+    // every operation queued after it; the error still reaches [run]'s own
+    // awaiter.
+    _tail = run.then((_) {}, onError: (Object _) {});
+    return run;
+  }
 
   @override
   Future<void> write(int offset, List<int> data) async {
@@ -143,8 +162,10 @@ final class FilePayloadSink implements PayloadSink {
         'held',
       );
     }
-    await _handle.setPosition(offset);
-    await _handle.writeFrom(data);
+    await _serialized(() async {
+      await _handle.setPosition(offset);
+      await _handle.writeFrom(data);
+    });
     _digest.add(data);
     _written = offset + data.length;
   }
@@ -166,7 +187,7 @@ final class FilePayloadSink implements PayloadSink {
 
   Future<void> _closeHandle() async {
     _closed = true;
-    await _handle.close();
+    await _serialized(() => _handle.close());
   }
 
   @override

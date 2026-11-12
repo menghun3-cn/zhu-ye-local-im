@@ -32,6 +32,7 @@
   "refusalTooManyFiles": "那个文件夹里有 {count} 个文件，超过一次传输能携带的数量。",
   "refusalFilesTooLarge": "那个文件夹太大，一次传输带不下。",
   "refusalFileTooLarge": "\"{name}\" 超过单个文件的大小上限。",
+  "refusalLocalFileMissing": "\"{name}\" 已不在这台设备上。",
 
   "kindText": "文本",
   "kindFiles": "文件",
@@ -155,6 +156,12 @@
   "shareByLinkCopied": "链接已复制到剪贴板",
   "shareByLinkCopy": "复制",
   "shareByLinkFailed": "创建链接失败",
+  "forward": "转发",
+  "multiSelect": "多选",
+  "forwardTo": "转发给",
+  "noDevicesToForward": "暂无可转发的设备。",
+  "selectedCount": "{count, plural, other{已选 {count} 条}}",
+  "forwardFailedCount": "{count, plural, other{{count} 条消息未能转发。}}",
 
   "clipboardSyncHeader": "剪贴板同步",
   "clipboardWaitingHeader": "等待你处理",

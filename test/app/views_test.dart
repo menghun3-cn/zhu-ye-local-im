@@ -55,6 +55,112 @@ void main() {
     });
   });
 
+  group('TransferView.canForward', () {
+    TransferView forwardable({
+      PayloadKind kind = PayloadKind.text,
+      String? text,
+      List<String> names = const ['a message'],
+      String? localPath,
+      TransferState state = TransferState.completed,
+      bool unsent = false,
+    }) => TransferView(
+      id: '1',
+      direction: TransferDirection.outgoing,
+      kind: kind,
+      peer: Fingerprint.ofPublicKey(const [1, 2, 3]),
+      at: DateTime.utc(2026, 10, 9, 12),
+      state: state,
+      transferredBytes: 0,
+      totalBytes: 0,
+      names: names,
+      text: text,
+      offer: null,
+      localPath: localPath,
+      unsent: unsent,
+    );
+
+    test('a settled text or face carries its words with it', () {
+      expect(
+        forwardable(kind: PayloadKind.text, text: 'see you at six').canForward,
+        isTrue,
+      );
+      expect(
+        forwardable(kind: PayloadKind.emoji, text: '🙂').canForward,
+        isTrue,
+      );
+    });
+
+    test('a text with no words has nothing to forward', () {
+      expect(forwardable(text: null).canForward, isFalse);
+      expect(forwardable(text: '').canForward, isFalse);
+    });
+
+    test('a single file or picture forwards from its local copy', () {
+      expect(
+        forwardable(
+          kind: PayloadKind.file,
+          names: const ['report.pdf'],
+          localPath: '/tmp/report.pdf',
+        ).canForward,
+        isTrue,
+      );
+      expect(
+        forwardable(
+          kind: PayloadKind.image,
+          names: const ['photo.jpg'],
+          localPath: '/tmp/photo.jpg',
+        ).canForward,
+        isTrue,
+      );
+    });
+
+    test('a file with no path on this machine cannot be forwarded', () {
+      // A multi-item send names no single path, and a file still in flight
+      // has not finished landing: neither has bytes a forward could carry.
+      expect(
+        forwardable(
+          kind: PayloadKind.file,
+          names: const ['a.bin', 'b.bin'],
+          localPath: null,
+        ).canForward,
+        isFalse,
+      );
+      expect(
+        forwardable(
+          kind: PayloadKind.file,
+          names: const ['report.pdf'],
+          localPath: null,
+        ).canForward,
+        isFalse,
+      );
+    });
+
+    test('a message still moving, or never sent, is not forwardable', () {
+      expect(
+        forwardable(
+          text: 'half a sentence',
+          state: TransferState.transferring,
+        ).canForward,
+        isFalse,
+      );
+      expect(
+        forwardable(text: 'a draft', unsent: true).canForward,
+        isFalse,
+        reason: 'a draft is owed to its own peer, not copyable elsewhere',
+      );
+    });
+
+    test('clipboard content is mirrored, never a message to forward', () {
+      expect(
+        forwardable(
+          kind: PayloadKind.clipboard,
+          text: 'copied words',
+        ).canForward,
+        isFalse,
+      );
+    });
+  });
+
   group('PeerView', () {
     PeerView view({
       String? address,

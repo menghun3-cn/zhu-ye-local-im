@@ -174,6 +174,7 @@ Future<TestDevice> startDevice(
   Future<Socket> Function(String host, int port)? dialSocket,
   Future<ByteTransport> Function(String host, int port)? pairDialTransport,
   Future<DiscoveredPeer?> Function(String host)? addressProbe,
+  DateTime Function()? clock,
 }) async {
   final clipboard = MemorySystemClipboard();
   final controller = LocalTransferController(
@@ -202,6 +203,7 @@ Future<TestDevice> startDevice(
     dialSocket: dialSocket,
     pairingDialTransport: pairDialTransport,
     addressProbe: addressProbe,
+    clock: clock,
   );
   await controller.start();
   addTearDown(controller.close);
@@ -2601,6 +2603,321 @@ void main() {
           kind: PayloadKind.text,
         ),
         throwsA(isA<ArgumentError>()),
+      );
+    });
+  });
+
+  group('forwarding', () {
+    /// Waits for a Session held between [a] and [b] specifically.
+    Future<void> sessionBetween(TestDevice a, TestDevice b) => until(
+      () =>
+          a.controller.sessions.any((s) => s.peer == b.fingerprint) &&
+          b.controller.sessions.any((s) => s.peer == a.fingerprint),
+      description:
+          'a Session between ${a.controller.self.alias} and '
+          '${b.controller.self.alias}',
+      timeout: const Duration(seconds: 25),
+    );
+
+    /// Three Devices on one beacon hub: Alice and Bob paired first, then
+    /// Carol paired to Alice — which puts all three in the one Owner Group,
+    /// so Discovery opens Sessions across the hub without a dial.
+    Future<(TestDevice, TestDevice, TestDevice)> trio({
+      DateTime Function()? clock,
+    }) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice', clock: clock);
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+      // Carol joins only once the pair is up: a third Device beaconing as a
+      // stranger while the pair is still pairing is churn the flow does not
+      // need.
+      final carol = await startDevice(hub.join(), 'Carol');
+      await pairDirectly(carol, alice);
+      // Carol joining rotates the group secret, which rebuilds every Session
+      // layer and drops what pairUp opened; the mesh redials on its own.
+      // `connect` waits on "any Session is up", which three Devices make
+      // ambiguous — this waits for the Session *between these two*.
+      await sessionBetween(alice, carol);
+      await sessionBetween(alice, bob);
+      return (alice, bob, carol);
+    }
+
+    /// The settled outgoing Transfer carrying [text] on [device], optionally
+    /// narrowed to the peer it went to — a forwarded copy carries the same
+    /// words, so text alone stops naming one message once a forward has run.
+    TransferView sentText(
+      TestDevice device,
+      String text, {
+      Fingerprint? peer,
+    }) => device.controller.transfers.singleWhere(
+      (view) =>
+          view.text == text &&
+          view.direction == TransferDirection.outgoing &&
+          (peer == null || view.peer == peer),
+    );
+
+    test('a forwarded text arrives as a new message in the target '
+        'conversation', () async {
+      final (alice, bob, carol) = await trio();
+      await alice.controller.sendText('for bob', to: bob.fingerprint);
+      await until(
+        () =>
+            bob.controller.transfers.any(
+              (view) => view.text == 'for bob' && view.state.isSettled,
+            ) &&
+            alice.controller.transfers.any(
+              (view) =>
+                  view.text == 'for bob' &&
+                  view.direction == TransferDirection.outgoing &&
+                  view.state.isSettled,
+            ),
+        description: 'both ends to settle the original',
+      );
+
+      await alice.controller.forwardMessage(
+        sentText(alice, 'for bob'),
+        to: carol.fingerprint,
+      );
+
+      await until(
+        () => carol.controller.transfers.any(
+          (view) =>
+              view.text == 'for bob' &&
+              view.direction == TransferDirection.incoming &&
+              view.state.isSettled,
+        ),
+        description: 'Carol to receive the forwarded copy',
+      );
+      expect(
+        bob.controller.transfers.where((view) => view.text == 'for bob'),
+        hasLength(1),
+        reason: 'a forward adds a message to the target, not to the source',
+      );
+      // And the original is still in Alice's own conversation, untouched.
+      expect(
+        sentText(alice, 'for bob', peer: bob.fingerprint).canForward,
+        isTrue,
+      );
+    });
+
+    test(
+      'a batch forwards in the order given and counts what failed',
+      () async {
+        // A clock that steps a second per reading: `transfers` breaks an
+        // `at` tie by id, and ids are random, so two sends inside the same
+        // millisecond would otherwise order themselves by chance.
+        var tick = 0;
+        final (alice, bob, carol) = await trio(
+          clock: () => DateTime.fromMillisecondsSinceEpoch(
+            1700000000000 + tick++ * 1000,
+          ),
+        );
+        await alice.controller.sendText('first', to: bob.fingerprint);
+        await alice.controller.sendText('second', to: bob.fingerprint);
+        await until(
+          () =>
+              bob.controller.transfers
+                      .where((view) => view.state.isSettled)
+                      .length >=
+                  2 &&
+              alice.controller.transfers
+                      .where(
+                        (view) =>
+                            (view.text == 'first' || view.text == 'second') &&
+                            view.direction == TransferDirection.outgoing &&
+                            view.state.isSettled,
+                      )
+                      .length >=
+                  2,
+          description: 'both ends to settle the originals',
+        );
+        // The order is the caller's: the controller sends what it is handed,
+        // so the test hands the views over newest-first on purpose.
+        final views = alice.controller.transfers
+            .where(
+              (view) =>
+                  (view.text == 'first' || view.text == 'second') &&
+                  view.direction == TransferDirection.outgoing,
+            )
+            .toList();
+        expect(views, hasLength(2));
+
+        final failed = await alice.controller.forwardMessages(
+          views,
+          to: carol.fingerprint,
+        );
+
+        expect(failed, 0);
+        await until(
+          () =>
+              carol.controller.transfers
+                  .where((view) => view.state.isSettled)
+                  .length >=
+              2,
+          description: 'Carol to receive both forwarded messages',
+        );
+        // `transfers` reads newest-first and an outgoing Transfer is stamped
+        // when it is sent, so on Alice's side the last one sent sits first.
+        // (Carol's copies keep the originals' timestamps — arrival order is
+        // not what this asserts.)
+        final sent = alice.controller.transfers
+            .where(
+              (view) => view.peer == carol.fingerprint && view.state.isSettled,
+            )
+            .map((view) => view.text)
+            .toList();
+        expect(
+          sent.indexOf('first'),
+          lessThan(sent.indexOf('second')),
+          reason: 'the batch keeps the order it was handed over in',
+        );
+      },
+    );
+
+    test(
+      'a forward to a peer with no Session becomes an unsent draft',
+      () async {
+        // Alice and Bob share a beacon hub; Carol is paired to Alice over a
+        // direct dial but lives on another beacon network, so no Session can
+        // ever form to her — the state a forward has to survive.
+        final hubA = MemoryBeaconHub();
+        final alice = await startDevice(hubA.a, 'Alice');
+        final bob = await startDevice(hubA.b, 'Bob');
+        final carol = await startDevice(MemoryBeaconHub().a, 'Carol');
+        await pairUp(alice, bob);
+        await alice.controller.sendText('hello bob', to: bob.fingerprint);
+        await until(
+          () =>
+              bob.controller.transfers.any(
+                (view) => view.text == 'hello bob' && view.state.isSettled,
+              ) &&
+              alice.controller.transfers.any(
+                (view) =>
+                    view.text == 'hello bob' &&
+                    view.direction == TransferDirection.outgoing &&
+                    view.state.isSettled,
+              ),
+          description: 'both ends to settle the original',
+        );
+        await pairDirectly(carol, alice);
+
+        await alice.controller.forwardMessage(
+          sentText(alice, 'hello bob'),
+          to: carol.fingerprint,
+        );
+
+        expect(
+          alice.controller.transfers.any(
+            (view) =>
+                view.unsent &&
+                view.peer == carol.fingerprint &&
+                view.text == 'hello bob',
+          ),
+          isTrue,
+          reason: 'with no Session the forward is owed, not lost',
+        );
+        expect(carol.controller.transfers, isEmpty);
+      },
+    );
+
+    test(
+      'a file whose local copy is gone fails the forward and is counted',
+      () async {
+        final (alice, bob, carol) = await trio();
+        final home = tempDirectory('local-transfer-forward-');
+        final source = File('${home.path}${Platform.pathSeparator}out.bin')
+          ..writeAsBytesSync(List<int>.filled(32, 7));
+        await alice.controller.sendFile(source, to: bob.fingerprint);
+        await until(
+          () => bob.offers.isNotEmpty,
+          description: 'Bob to be offered the file',
+        );
+        await bob.controller.acceptInto(
+          bob.offers.single,
+          tempDirectory('local-transfer-forward-in-'),
+        );
+        await until(
+          () => alice.controller.transfers.any(
+            (view) =>
+                view.kind == PayloadKind.file &&
+                view.direction == TransferDirection.outgoing &&
+                view.state.isSettled,
+          ),
+          description: 'the outgoing file Transfer to settle',
+        );
+        final view = alice.controller.transfers.singleWhere(
+          (view) =>
+              view.kind == PayloadKind.file &&
+              view.direction == TransferDirection.outgoing,
+        );
+        expect(view.canForward, isTrue);
+
+        // The file the message points at is gone: the forward cannot carry
+        // bytes that are not there, and says so by counting the failure.
+        source.deleteSync();
+        final failed = await alice.controller.forwardMessages([
+          view,
+        ], to: carol.fingerprint);
+
+        expect(failed, 1);
+        expect(carol.controller.transfers, isEmpty);
+        await expectLater(
+          alice.controller.forwardMessage(view, to: carol.fingerprint),
+          throwsA(
+            isA<AppStateException>().having(
+              (error) => error.refusal,
+              'refusal',
+              AppRefusal.localFileMissing,
+            ),
+          ),
+        );
+      },
+    );
+
+    test('a file that is still here forwards as a file offer', () async {
+      final (alice, bob, carol) = await trio();
+      final home = tempDirectory('local-transfer-forward-');
+      final source = File('${home.path}${Platform.pathSeparator}keep.bin')
+        ..writeAsBytesSync(List<int>.filled(48, 9));
+      await alice.controller.sendFile(source, to: bob.fingerprint);
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await bob.controller.acceptInto(
+        bob.offers.single,
+        tempDirectory('local-transfer-forward-in-'),
+      );
+      await until(
+        () => alice.controller.transfers.any(
+          (view) =>
+              view.kind == PayloadKind.file &&
+              view.direction == TransferDirection.outgoing &&
+              view.state.isSettled,
+        ),
+        description: 'the outgoing file Transfer to settle',
+      );
+      final view = alice.controller.transfers.singleWhere(
+        (view) =>
+            view.kind == PayloadKind.file &&
+            view.direction == TransferDirection.outgoing,
+      );
+
+      await alice.controller.forwardMessage(view, to: carol.fingerprint);
+
+      await until(
+        () => carol.offers.isNotEmpty,
+        description: 'Carol to be offered the forwarded file',
+      );
+      expect(carol.offers.single.kind, PayloadKind.file);
+      expect(carol.offers.single.items.map((item) => item.name), ['keep.bin']);
+      await carol.controller.reject(carol.offers.single);
+      await until(
+        () => alice.controller.transfers.every(
+          (candidate) => candidate.state.isSettled,
+        ),
+        description: "Alice's Transfers to settle after Carol's refusal",
       );
     });
   });

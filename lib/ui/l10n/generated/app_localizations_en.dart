@@ -120,6 +120,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String refusalLocalFileMissing(String name) {
+    return '\"$name\" is no longer on this machine.';
+  }
+
+  @override
   String get kindText => 'Text';
 
   @override
@@ -522,6 +527,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareByLinkFailed => 'Failed to create link';
+
+  @override
+  String get forward => 'Forward';
+
+  @override
+  String get multiSelect => 'Select';
+
+  @override
+  String get forwardTo => 'Forward to';
+
+  @override
+  String get noDevicesToForward => 'No Devices to forward to yet.';
+
+  @override
+  String selectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String forwardFailedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count messages could not be forwarded.',
+      one: '1 message could not be forwarded.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get clipboardSyncHeader => 'Clipboard sync';
