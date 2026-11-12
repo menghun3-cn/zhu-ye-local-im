@@ -434,6 +434,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelSend => 'Cancel sending';
 
   @override
+  String get messageUnsent => 'Not sent';
+
+  @override
+  String get messageUnsentHint => 'Not sent — tap to resend';
+
+  @override
+  String get resendMessageTitle => 'Resend this message?';
+
+  @override
+  String get resendMessageBody => 'It was not delivered. Resend it now?';
+
+  @override
+  String get resend => 'Resend';
+
+  @override
   String get whereShouldFilesLand => 'Where should these files land?';
 
   @override

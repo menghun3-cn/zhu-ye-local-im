@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import '../core/core.dart';
 import 'views.dart';
@@ -223,6 +226,21 @@ final class LocalTransferController {
   final Map<String, _WiredSession> _wired = {};
   final List<_Tracked> _transfers = [];
   final List<MessageRecord> _history = [];
+
+  /// Messages the user tried to send while the peer had no Session.
+  ///
+  /// A third list beside the live Transfers and the remembered history,
+  /// because a draft is neither: it never reached the wire, so there is no
+  /// Transfer to track, and it has not happened yet, so it is not history.
+  /// What it shares with history is persistence — the conversation file
+  /// keeps it under its own key, so a draft survives a restart the way a
+  /// sent message does.
+  final List<UnsentMessage> _unsent = [];
+
+  /// Mints draft ids. Random rather than sequential for the same reason a
+  /// Transfer id is: two Devices queueing at the same moment must not pick
+  /// the same name for different messages.
+  final math.Random _unsentIds = math.Random.secure();
 
   /// What the user has read of the conversation, and where they were last.
   ///
@@ -469,6 +487,7 @@ final class LocalTransferController {
     final views = <TransferView>[
       for (final record in _history)
         if (!live.containsKey(record.handle)) _viewOfRecord(record),
+      for (final message in _unsent) _viewOfUnsent(message),
       ...live.values,
     ];
     views.sort(_newestFirst);
@@ -1192,6 +1211,128 @@ final class LocalTransferController {
     return transfer;
   }
 
+  /// Keeps a message the peer could not be sent, as a draft owed to them.
+  ///
+  /// Called by the surface that tried to send and was refused with
+  /// [AppRefusal.noSessionOpen] or [AppRefusal.noPeerConnected] — the two
+  /// answers "there is no Session to carry this" comes back as. The words
+  /// are kept exactly as they would have been offered: the conversation
+  /// draws the draft with a resend marker, [resendMessage] delivers it once
+  /// a Session exists again, and the conversation file keeps it across a
+  /// restart.
+  ///
+  /// [kind] is what the message carries: [PayloadKind.text] or
+  /// [PayloadKind.emoji] with [text] as the body, [PayloadKind.file] or
+  /// [PayloadKind.image] with [file] as the source. [appOwned] marks the
+  /// one file this app may take away again — the temporary image a paste
+  /// writes — so that deleting the draft can delete it without ever
+  /// guessing which paths are safe. Clipboard content is refused outright:
+  /// mirroring has no composer and no send to fail.
+  Future<void> queueUnsentMessage({
+    required Fingerprint peer,
+    required PayloadKind kind,
+    String? text,
+    File? file,
+    bool appOwned = false,
+  }) async {
+    final carriesFile = kind == PayloadKind.file || kind == PayloadKind.image;
+    if (kind == PayloadKind.clipboard ||
+        (carriesFile ? file == null : text == null || text.isEmpty)) {
+      throw ArgumentError.value(
+        kind,
+        'kind',
+        'an unsent message needs a body or a file, and never clipboard content',
+      );
+    }
+    final message = UnsentMessage(
+      peer: peer,
+      id: _newUnsentId(),
+      kind: kind,
+      at: _clock(),
+      names: carriesFile ? [fileNameOf(file!.path)] : [kind.wireName],
+      totalBytes: carriesFile
+          ? await file!.length()
+          : utf8.encode(text!).length,
+      text: carriesFile ? null : text,
+      localPath: carriesFile ? file!.path : null,
+      appOwned: appOwned,
+    );
+    _unsent.add(message);
+    // Bounded the way the history is: a draft list that grows without limit
+    // is a file that eventually costs more to keep than it is worth.
+    if (_unsent.length > maxRememberedMessages) {
+      _unsent.removeRange(0, _unsent.length - maxRememberedMessages);
+    }
+    _notify();
+    await _persistHistory();
+  }
+
+  /// Sends a queued draft again, this time as a real Transfer.
+  ///
+  /// The draft leaves the unsent list before the send is attempted. A send
+  /// that succeeds replaces it with an ordinary outgoing Transfer — a new
+  /// message at the newest end of the conversation, not the draft's old
+  /// place, because the draft's id named the attempt and the Transfer's
+  /// names the delivery. A send that fails for *any* reason — the peer is
+  /// still offline, the file has been moved — puts the draft back, so
+  /// nothing the user wrote is silently lost, and the failure is rethrown
+  /// for the caller to say out loud.
+  Future<void> resendMessage(TransferView view) async {
+    if (!view.unsent) {
+      throw StateError('only an unsent message can be resent');
+    }
+    final handle = view.handle;
+    final index = _unsent.indexWhere((message) => message.handle == handle);
+    if (index < 0) {
+      throw StateError('the unsent message is no longer queued');
+    }
+    final message = _unsent.removeAt(index);
+    _notify();
+    try {
+      await _deliverUnsent(message);
+    } on Object {
+      // Appended rather than reinserted at [index]: the conversation sorts
+      // by `at`, so position in the list was never the order on screen.
+      _unsent.add(message);
+      _notify();
+      await _persistHistory();
+      rethrow;
+    }
+    await _persistHistory();
+  }
+
+  /// The send a draft is owed, through the same doors a fresh send takes.
+  Future<void> _deliverUnsent(UnsentMessage message) async {
+    switch (message.kind) {
+      case PayloadKind.text:
+        await sendText(message.text!, to: message.peer);
+      case PayloadKind.emoji:
+        await sendEmoji(message.text!, to: message.peer);
+      case PayloadKind.file:
+        await sendFile(File(message.localPath!), to: message.peer);
+      case PayloadKind.image:
+        final file = File(message.localPath!);
+        if (message.appOwned) {
+          await sendAppOwnedImage(file, to: message.peer);
+        } else {
+          await sendImage(file, to: message.peer);
+        }
+      case PayloadKind.clipboard:
+        // Refused at the door and at the decoder both; reaching here is a
+        // bug, and a loud one.
+        throw StateError('clipboard content is never queued');
+    }
+  }
+
+  /// A draft id, minted the way a Transfer id is.
+  String _newUnsentId() {
+    final bytes = Uint8List(12);
+    for (var index = 0; index < bytes.length; index++) {
+      bytes[index] = _unsentIds.nextInt(256);
+    }
+    return toHex(bytes);
+  }
+
   /// Accepts everything [transfer] offers, writing file bytes under [directory].
   ///
   /// The bytes are written to a staging name this Device makes up and only
@@ -1375,9 +1516,20 @@ final class LocalTransferController {
     }
     _transfers.removeWhere((tracked) => _handleOf(tracked) == handle);
     _history.removeWhere((record) => record.handle == handle);
+    // A draft's app-owned file — the temporary image a paste wrote — is this
+    // app's to take away once the draft is gone; a picked file is not.
+    String? appOwnedDraftPath;
+    _unsent.removeWhere((message) {
+      if (message.handle != handle) return false;
+      if (message.appOwned) appOwnedDraftPath = message.localPath;
+      return true;
+    });
     _pruneReading();
     _notify();
     await _persistHistory();
+    if (appOwnedDraftPath != null) {
+      await _deleteAppOwnedFile(appOwnedDraftPath!);
+    }
   }
 
   /// Withdraws a message that was sent within the allowed time window.
@@ -1421,6 +1573,7 @@ final class LocalTransferController {
     _history.removeWhere(
       (record) => record.peer == peer && record.kind != PayloadKind.clipboard,
     );
+    _unsent.removeWhere((message) => message.peer == peer);
     _reading.forget(peer);
     _notify();
     await _persistHistory();
@@ -1471,10 +1624,16 @@ final class LocalTransferController {
       for (final record in _history)
         if (record.peer == peer && record.appOwned && record.localPath != null)
           record.localPath!,
+      for (final message in _unsent)
+        if (message.peer == peer &&
+            message.appOwned &&
+            message.localPath != null)
+          message.localPath!,
     };
     _history.removeWhere(
       (record) => record.peer == peer && record.kind != PayloadKind.clipboard,
     );
+    _unsent.removeWhere((message) => message.peer == peer);
     _reading.forget(peer);
 
     final local = _local;
@@ -2535,12 +2694,16 @@ final class LocalTransferController {
       _history
         ..clear()
         ..addAll(fixed);
+      _unsent
+        ..clear()
+        ..addAll(remembered.unsent);
       _reading = remembered.reading;
       if (fixed.length != remembered.messages.length) {
         await _persistHistory();
       }
     } on Object catch (error) {
       _history.clear();
+      _unsent.clear();
       _reading = ConversationReading();
       _notice('the conversation could not be read back: $error');
     }
@@ -2632,11 +2795,15 @@ final class LocalTransferController {
     final store = _messages;
     if (store == null) return;
     try {
-      if (_history.isEmpty && _reading.isEmpty) {
+      if (_history.isEmpty && _reading.isEmpty && _unsent.isEmpty) {
         await store.remove();
       } else {
         await saveConversation(
-          StoredConversation(messages: _history, reading: _reading),
+          StoredConversation(
+            messages: _history,
+            reading: _reading,
+            unsent: _unsent,
+          ),
           store,
         );
       }
@@ -2665,6 +2832,33 @@ final class LocalTransferController {
       localPath: tracked.localPath,
     );
   }
+
+  /// A queued draft, as a UI renders it.
+  ///
+  /// Drawn as an outgoing message that ended in [TransferState.failed] —
+  /// the settled state that keeps a progress bar and a cancel button from
+  /// appearing for something that never moved — with [TransferView.unsent]
+  /// set so a conversation knows the marker it wears is a resend offer
+  /// rather than a report of a broken send. Everything else is the draft
+  /// itself: what was written, when it was tried, and where its bytes are.
+  TransferView _viewOfUnsent(UnsentMessage message) => TransferView(
+    id: message.id,
+    direction: TransferDirection.outgoing,
+    kind: message.kind,
+    peer: message.peer,
+    at: message.at,
+    settledAt: null,
+    state: TransferState.failed,
+    transferredBytes: 0,
+    totalBytes: message.totalBytes,
+    names: message.names,
+    text: message.text,
+    localPath: message.localPath,
+    appOwned: message.appOwned,
+    offer: null,
+    send: null,
+    unsent: true,
+  );
 
   /// A remembered message, as a UI renders it.
   ///

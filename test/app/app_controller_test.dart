@@ -2175,4 +2175,228 @@ void main() {
       },
     );
   });
+
+  group('unsent messages', () {
+    /// Two paired Devices on separate beacon networks, so neither can ever
+    /// discover the other: paired, known to each other, and with no Session —
+    /// which is exactly the state a send is refused in.
+    Future<(TestDevice, TestDevice)> pairedButOffline() async {
+      final alice = await startDevice(MemoryBeaconHub().a, 'Alice');
+      final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+      await pairDirectly(alice, bob);
+      return (alice, bob);
+    }
+
+    TransferView theDraft(TestDevice device) =>
+        device.controller.transfers.singleWhere((view) => view.unsent);
+
+    test(
+      'a message queued with no Session is a marked draft, not lost',
+      () async {
+        final (alice, bob) = await pairedButOffline();
+
+        await alice.controller.queueUnsentMessage(
+          peer: bob.fingerprint,
+          kind: PayloadKind.text,
+          text: 'are you there?',
+        );
+
+        final draft = theDraft(alice);
+        expect(draft.text, 'are you there?');
+        expect(draft.direction, TransferDirection.outgoing);
+        expect(draft.peer, bob.fingerprint);
+        expect(draft.kind, PayloadKind.text);
+        expect(
+          draft.state.isSettled,
+          isTrue,
+          reason: 'a draft is not in flight; nothing may draw a progress bar',
+        );
+        expect(draft.send, isNull);
+        expect(draft.offer, isNull);
+        // And nothing reached Bob: a draft is owed, not delivered.
+        expect(bob.controller.transfers, isEmpty);
+      },
+    );
+
+    test('a resend while the peer is still offline keeps the draft', () async {
+      final (alice, bob) = await pairedButOffline();
+      await alice.controller.queueUnsentMessage(
+        peer: bob.fingerprint,
+        kind: PayloadKind.text,
+        text: 'still here?',
+      );
+      final draft = theDraft(alice);
+
+      await expectLater(
+        alice.controller.resendMessage(draft),
+        throwsA(isA<AppStateException>()),
+      );
+
+      expect(theDraft(alice).text, 'still here?');
+      expect(bob.controller.transfers, isEmpty);
+    });
+
+    test('a resend once the Session is up delivers the draft', () async {
+      final (alice, bob) = await pairedButOffline();
+      await alice.controller.queueUnsentMessage(
+        peer: bob.fingerprint,
+        kind: PayloadKind.text,
+        text: 'now you can hear me',
+      );
+      final draft = theDraft(alice);
+
+      await alice.controller.connectTo(
+        address: InternetAddress.loopbackIPv4.address,
+        port: bob.controller.listenPort,
+      );
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up on both Devices',
+      );
+
+      await alice.controller.resendMessage(draft);
+
+      await until(
+        () =>
+            bob.controller.transfers.isNotEmpty &&
+            bob.controller.transfers.single.state.isSettled,
+        description: 'Bob to receive the resent text',
+      );
+      expect(bob.controller.transfers.single.text, 'now you can hear me');
+      expect(
+        alice.controller.transfers.where((view) => view.unsent),
+        isEmpty,
+        reason: 'the draft was delivered; only the Transfer remains',
+      );
+      expect(
+        alice.controller.transfers.any(
+          (view) => view.text == 'now you can hear me',
+        ),
+        isTrue,
+      );
+    });
+
+    test('a queued file resends through the file road', () async {
+      final (alice, bob) = await pairedButOffline();
+      final home = tempDirectory('local-transfer-unsent-');
+      final source = File('${home.path}${Platform.pathSeparator}payload.bin')
+        ..writeAsBytesSync(List<int>.filled(64, 3));
+
+      await alice.controller.queueUnsentMessage(
+        peer: bob.fingerprint,
+        kind: PayloadKind.file,
+        file: source,
+      );
+      final draft = theDraft(alice);
+      expect(draft.names, ['payload.bin']);
+      expect(draft.localPath, source.path);
+
+      await alice.controller.connectTo(
+        address: InternetAddress.loopbackIPv4.address,
+        port: bob.controller.listenPort,
+      );
+      await until(
+        () =>
+            alice.controller.sessions.isNotEmpty &&
+            bob.controller.sessions.isNotEmpty,
+        description: 'the Session to come up on both Devices',
+      );
+      await alice.controller.resendMessage(draft);
+
+      await until(
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      expect(bob.offers.single.kind, PayloadKind.file);
+      await bob.controller.reject(bob.offers.single);
+      // Bob's refusal has to reach Alice before this test lets go: the
+      // outgoing Transfer keeps the source file open until it settles, and
+      // the temp-directory teardown cannot delete a file that is still held.
+      await until(
+        () => alice.controller.transfers.every((view) => view.state.isSettled),
+        description: "Alice's outgoing file Transfer to settle",
+      );
+    });
+
+    test('a draft survives a restart through the message store', () async {
+      final kept = MemoryMessageStore();
+      final alice = await startDevice(
+        MemoryBeaconHub().a,
+        'Alice',
+        messageStore: kept,
+      );
+      final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+      await pairDirectly(alice, bob);
+      await alice.controller.queueUnsentMessage(
+        peer: bob.fingerprint,
+        kind: PayloadKind.text,
+        text: 'remember me',
+      );
+
+      // The restart: same store, same Device, new process as far as the
+      // conversation is concerned.
+      await alice.controller.close();
+      final restarted = await startDevice(
+        MemoryBeaconHub().a,
+        'Alice',
+        messageStore: kept,
+      );
+
+      final draft = restarted.controller.transfers.singleWhere(
+        (view) => view.unsent,
+      );
+      expect(draft.text, 'remember me');
+      expect(draft.peer, bob.fingerprint);
+    });
+
+    test('deleting a draft takes it off the screen and the disk', () async {
+      final kept = MemoryMessageStore();
+      final alice = await startDevice(
+        MemoryBeaconHub().a,
+        'Alice',
+        messageStore: kept,
+      );
+      final bob = await startDevice(MemoryBeaconHub().a, 'Bob');
+      await pairDirectly(alice, bob);
+      await alice.controller.queueUnsentMessage(
+        peer: bob.fingerprint,
+        kind: PayloadKind.text,
+        text: 'never mind',
+      );
+      final draft = theDraft(alice);
+
+      await alice.controller.deleteMessage(draft);
+
+      expect(alice.controller.transfers, isEmpty);
+      expect((await loadConversation(kept)).unsent, isEmpty);
+    });
+
+    test('a draft is refused where a send is not a draft', () async {
+      final (alice, bob) = await pairedButOffline();
+      await expectLater(
+        alice.controller.queueUnsentMessage(
+          peer: bob.fingerprint,
+          kind: PayloadKind.clipboard,
+          text: 'not a thing that can be queued',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      await expectLater(
+        alice.controller.queueUnsentMessage(
+          peer: bob.fingerprint,
+          kind: PayloadKind.file,
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      await expectLater(
+        alice.controller.queueUnsentMessage(
+          peer: bob.fingerprint,
+          kind: PayloadKind.text,
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+  });
 }

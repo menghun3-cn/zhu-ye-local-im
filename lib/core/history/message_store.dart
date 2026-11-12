@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'conversation_reading.dart';
 import 'message_record.dart';
+import 'unsent_message.dart';
 
 /// How many messages this Device keeps, across every conversation.
 ///
@@ -205,14 +206,23 @@ final class FileMessageStore implements MessageStore {
 /// message just arrived, and a reading state with no messages says nothing at
 /// all. They travel in one envelope and one `save`.
 final class StoredConversation {
-  /// Pairs [messages] with [reading].
-  const StoredConversation({required this.messages, required this.reading});
+  /// Pairs [messages] with [reading] and [unsent].
+  const StoredConversation({
+    required this.messages,
+    required this.reading,
+    this.unsent = const [],
+  });
 
   /// Every remembered message, oldest first.
   final List<MessageRecord> messages;
 
   /// What the user has read of them.
   final ConversationReading reading;
+
+  /// Messages that could not be sent because the peer had no Session, oldest
+  /// first. They are owed rather than remembered: each is still waiting for a
+  /// resend the user may never ask for.
+  final List<UnsentMessage> unsent;
 
   /// Nothing remembered at all — a Device that has never exchanged anything.
   static final StoredConversation empty = StoredConversation(
@@ -247,7 +257,17 @@ Future<StoredConversation> loadConversation(MessageStore store) async {
   final reading = rawReading == null
       ? ConversationReading()
       : ConversationReading.fromJson(_object(rawReading, 'reading'));
-  return StoredConversation(messages: messages, reading: reading);
+  final rawUnsent = json['unsent'];
+  final unsent = <UnsentMessage>[
+    if (rawUnsent != null)
+      for (final entry in _list(rawUnsent, 'unsent'))
+        UnsentMessage.fromJson(_object(entry, 'unsent')),
+  ];
+  return StoredConversation(
+    messages: messages,
+    reading: reading,
+    unsent: unsent,
+  );
 }
 
 /// Persists [conversation], oldest message first, through [store].
@@ -271,6 +291,7 @@ Future<void> saveConversation(
     'version': 1,
     'messages': [for (final message in conversation.messages) message.toJson()],
     'reading': conversation.reading.toJson(),
+    'unsent': [for (final message in conversation.unsent) message.toJson()],
   });
 }
 
@@ -302,4 +323,11 @@ Map<String, Object?> _object(Object? value, String key) {
     throw FormatException('"$key" must be an object');
   }
   return value.cast<String, Object?>();
+}
+
+List<Object?> _list(Object? value, String key) {
+  if (value is! List) {
+    throw FormatException('"$key" must be a list');
+  }
+  return value;
 }

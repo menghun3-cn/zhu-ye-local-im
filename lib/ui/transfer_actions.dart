@@ -199,6 +199,74 @@ Future<void> shareByLink(BuildContext context, TransferView view) async {
   }
 }
 
+/// Asks whether [view]'s unsent message should go again, and sends it if so.
+///
+/// The marker on an unsent bubble is the whole interface: a tap opens this,
+/// 重发 delivers the draft as a real Transfer through
+/// [LocalTransferController.resendMessage], and 取消 leaves it exactly as it
+/// was — still owed, still marked. A resend that fails (the peer is still
+/// offline, the file has been moved) is said out loud by [guarded] rather
+/// than swallowed: the draft goes back on screen either way.
+Future<void> resendUnsentMessage(
+  BuildContext context,
+  LocalTransferController controller,
+  TransferView view,
+) async {
+  if (!view.unsent) return;
+  final l10n = AppLocalizations.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(l10n.resendMessageTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_previewOf(view)),
+          const SizedBox(height: 8),
+          Text(
+            l10n.resendMessageBody,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: Text(l10n.resend),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  if (!context.mounted) {
+    // The bubble is gone but the draft is not: the resend is the controller's
+    // to finish, and a failure here leaves the draft marked for the next
+    // open rather than losing it silently.
+    unawaited(controller.resendMessage(view).catchError((Object _) {}));
+    return;
+  }
+  await guarded(context, () => controller.resendMessage(view));
+}
+
+/// What the resend dialog shows of the message: its words, or the name of
+/// the file it carries — the same two answers the bubble itself gives.
+String _previewOf(TransferView view) {
+  final raw = switch (view.kind) {
+    PayloadKind.text || PayloadKind.emoji => view.text ?? '',
+    _ => view.names.isEmpty ? '' : view.names.first,
+  };
+  const limit = 120;
+  return raw.length <= limit ? raw : '${raw.substring(0, limit)}…';
+}
+
 /// Whether [view] names a file on this machine whose folder can be opened.
 ///
 /// True for a file this Device received, for one it sent, and for an image
