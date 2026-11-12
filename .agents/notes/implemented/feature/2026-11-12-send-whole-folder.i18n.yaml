@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-12-send-whole-folder.md
+#   git hash-object 2026-11-12-send-whole-folder.zh.md
+2026-11-12-send-whole-folder.md: e86ee781ae82f06bcd1c8a8fca0b1470920dbf5a
+2026-11-12-send-whole-folder.zh.md: b3d752981241c5a3f53615b3d7f1032355680d52

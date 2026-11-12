@@ -242,6 +242,30 @@ abstract class AppLocalizations {
   /// **'No Device answered at {address}.'**
   String refusalDeviceNotReachable(String address);
 
+  /// No description provided for @refusalEmptyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder has no files to send.'**
+  String get refusalEmptyFolder;
+
+  /// No description provided for @refusalTooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder holds {count} files, more than one transfer can carry.'**
+  String refusalTooManyFiles(String count);
+
+  /// No description provided for @refusalFilesTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That folder is too large for one transfer.'**
+  String get refusalFilesTooLarge;
+
+  /// No description provided for @refusalFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is over the size limit for a single file.'**
+  String refusalFileTooLarge(String name);
+
   /// No description provided for @kindText.
   ///
   /// In en, this message translates to:
@@ -644,6 +668,12 @@ abstract class AppLocalizations {
   /// **'Send a file'**
   String get menuSendFile;
 
+  /// No description provided for @menuSendFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a folder'**
+  String get menuSendFolder;
+
   /// No description provided for @menuSendEmoji.
   ///
   /// In en, this message translates to:
@@ -763,6 +793,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel sending'**
   String get cancelSend;
+
+  /// No description provided for @messageUnsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get messageUnsent;
+
+  /// No description provided for @messageUnsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent — tap to resend'**
+  String get messageUnsentHint;
+
+  /// No description provided for @resendMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend this message?'**
+  String get resendMessageTitle;
+
+  /// No description provided for @resendMessageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It was not delivered. Resend it now?'**
+  String get resendMessageBody;
+
+  /// No description provided for @resend.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend'**
+  String get resend;
 
   /// No description provided for @whereShouldFilesLand.
   ///

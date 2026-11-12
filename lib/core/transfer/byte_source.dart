@@ -103,6 +103,62 @@ final class FileByteSource implements ByteSource {
   String toString() => 'FileByteSource(${file.path}, $length bytes)';
 }
 
+/// A [ByteSource] over a file that opens and closes its handle per read.
+///
+/// For the many-items case: a folder send can name thousands of items, and a
+/// source that held a handle from the hashing pass until the Transfer settled
+/// would keep every one of those files locked for as long as the Offer sat
+/// unanswered — on Windows, long enough that the user could not so much as
+/// move the folder they just sent. Reading through a fresh handle per call
+/// costs a syscall per chunk and holds nothing between them, which is the
+/// right trade when the item count is unbounded but the chunk size is not.
+final class ChunkedFileByteSource implements ByteSource {
+  ChunkedFileByteSource._(this.file, this.length);
+
+  /// Stats [file] and fixes its length for the life of the source.
+  ///
+  /// The stat is the whole of what is checked up front: a path that is not a
+  /// regular file is refused here, and a file that disappears afterwards fails
+  /// on its first read instead — the same failure a [FileByteSource] would
+  /// report, one step later.
+  static Future<ChunkedFileByteSource> open(File file) async {
+    final stat = await file.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw FileSystemException('not a regular file', file.path);
+    }
+    return ChunkedFileByteSource._(file, stat.size);
+  }
+
+  /// The file being read.
+  final File file;
+
+  @override
+  final int length;
+
+  @override
+  Future<Uint8List> read(int offset, int count) async {
+    if (offset < 0 || count < 0 || offset + count > length) {
+      throw RangeError(
+        'a read of $count bytes at $offset is outside 0..$length',
+      );
+    }
+    final handle = await file.open();
+    try {
+      await handle.setPosition(offset);
+      return Uint8List.fromList(await handle.read(count));
+    } finally {
+      await handle.close();
+    }
+  }
+
+  /// Nothing is held, so there is nothing to release.
+  @override
+  Future<void> close() async {}
+
+  @override
+  String toString() => 'ChunkedFileByteSource(${file.path}, $length bytes)';
+}
+
 /// SHA-256 of a whole [source], as lowercase hex.
 ///
 /// Read before the Offer goes out: a digest in an Offer is a promise about

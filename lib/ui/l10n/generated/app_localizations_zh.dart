@@ -100,6 +100,22 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get refusalEmptyFolder => '那个文件夹里没有可发送的文件。';
+
+  @override
+  String refusalTooManyFiles(String count) {
+    return '那个文件夹里有 $count 个文件，超过一次传输能携带的数量。';
+  }
+
+  @override
+  String get refusalFilesTooLarge => '那个文件夹太大，一次传输带不下。';
+
+  @override
+  String refusalFileTooLarge(String name) {
+    return '\"$name\" 超过单个文件的大小上限。';
+  }
+
+  @override
   String get kindText => '文本';
 
   @override
@@ -345,6 +361,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get menuSendFile => '发送文件';
 
   @override
+  String get menuSendFolder => '发送文件夹';
+
+  @override
   String get menuSendEmoji => '发送表情';
 
   @override
@@ -416,6 +435,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cancelSend => '取消发送';
+
+  @override
+  String get messageUnsent => '未发送';
+
+  @override
+  String get messageUnsentHint => '未发送，点击重发';
+
+  @override
+  String get resendMessageTitle => '重发这条消息？';
+
+  @override
+  String get resendMessageBody => '这条消息没有送达，现在重发吗？';
+
+  @override
+  String get resend => '重发';
 
   @override
   String get whereShouldFilesLand => '这些文件保存到哪个文件夹？';

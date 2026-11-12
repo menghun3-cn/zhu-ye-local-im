@@ -1,0 +1,8 @@
+﻿# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-12-an-offline-send-waits-as-a-draft.md
+#   git hash-object 2026-11-12-an-offline-send-waits-as-a-draft.zh.md
+2026-11-12-an-offline-send-waits-as-a-draft.md: 73119a6144390906ebce9e961949a87159ed2969
+2026-11-12-an-offline-send-waits-as-a-draft.zh.md: 9af7df14ff50a347b2f81a7868bad289c9337a57

@@ -997,7 +997,9 @@ class _ConversationTile extends StatelessWidget {
       );
     }
     return Text(
-      labelForState(latest.state, l10n),
+      // A draft is not a failed send — nothing was ever offered — so it gets
+      // its own word rather than the state label a broken Transfer earns.
+      latest.unsent ? l10n.messageUnsent : labelForState(latest.state, l10n),
       style: TextStyle(
         fontSize: WeChat.fontSizeMeta,
         color: colors.secondaryText,

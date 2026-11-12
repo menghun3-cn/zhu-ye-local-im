@@ -55,6 +55,16 @@
   "@refusalDeviceNotReachable": {
     "placeholders": { "address": { "type": "String" } }
   },
+  "refusalEmptyFolder": "That folder has no files to send.",
+  "refusalTooManyFiles": "That folder holds {count} files, more than one transfer can carry.",
+  "@refusalTooManyFiles": {
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "refusalFilesTooLarge": "That folder is too large for one transfer.",
+  "refusalFileTooLarge": "\"{name}\" is over the size limit for a single file.",
+  "@refusalFileTooLarge": {
+    "placeholders": { "name": { "type": "String" } }
+  },
 
   "kindText": "Text",
   "kindFiles": "Files",
@@ -187,6 +197,7 @@
     "placeholders": { "when": { "type": "String" } }
   },
   "menuSendFile": "Send a file",
+  "menuSendFolder": "Send a folder",
   "menuSendEmoji": "Send an emoji",
   "emojiRecent": "Recent",
   "dropToAttach": "Let go to attach",
@@ -223,6 +234,11 @@
   "accept": "Accept",
   "refuse": "Refuse",
   "cancelSend": "Cancel sending",
+  "messageUnsent": "Not sent",
+  "messageUnsentHint": "Not sent — tap to resend",
+  "resendMessageTitle": "Resend this message?",
+  "resendMessageBody": "It was not delivered. Resend it now?",
+  "resend": "Resend",
   "whereShouldFilesLand": "Where should these files land?",
   "whereShouldThisArrive": "Where should this arrive?",
   "openContainingFolder": "Open containing folder",

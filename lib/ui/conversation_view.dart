@@ -156,20 +156,68 @@ class _ConversationViewState extends State<ConversationView> {
     if (text.isEmpty && staged.isEmpty) return;
     unawaited(
       guarded(context, () async {
-        if (text.isNotEmpty) await controller.sendText(text, to: widget.peer);
+        if (text.isNotEmpty) {
+          await _sendOrQueue(
+            () => controller.sendText(text, to: widget.peer),
+            () => controller.queueUnsentMessage(
+              peer: widget.peer,
+              kind: PayloadKind.text,
+              text: text,
+            ),
+          );
+        }
         for (final attachment in staged) {
+          if (attachment.isFolder) {
+            await controller.sendFolder(
+              Directory(attachment.path),
+              to: widget.peer,
+            );
+            continue;
+          }
           final file = File(attachment.path);
-          await (attachment.isImage
-              ? attachment.appOwned
-                    ? controller.sendAppOwnedImage(file, to: widget.peer)
-                    : controller.sendImage(file, to: widget.peer)
-              : controller.sendFile(file, to: widget.peer));
+          await _sendOrQueue(
+            () => attachment.isImage
+                ? attachment.appOwned
+                      ? controller.sendAppOwnedImage(file, to: widget.peer)
+                      : controller.sendImage(file, to: widget.peer)
+                : controller.sendFile(file, to: widget.peer),
+            () => controller.queueUnsentMessage(
+              peer: widget.peer,
+              kind: attachment.isImage ? PayloadKind.image : PayloadKind.file,
+              file: file,
+              appOwned: attachment.appOwned,
+            ),
+          );
         }
         _message.clear();
         if (!mounted) return;
         setState(() => _staged.clear());
       }),
     );
+  }
+
+  /// Sends, or — when the peer has no Session to send on — keeps the message
+  /// as an unsent draft the conversation can resend later.
+  ///
+  /// The two refusals are the whole of "offline" as far as a send is
+  /// concerned: [AppRefusal.noSessionOpen] when this peer is named and has
+  /// no Session, [AppRefusal.noPeerConnected] when nothing is connected at
+  /// all. Every other refusal — several peers and none named, an offer
+  /// already answered — is a real error and still reaches [guarded] as a
+  /// toast, because queueing it would hide a bug behind a draft.
+  Future<void> _sendOrQueue(
+    Future<OutgoingTransfer> Function() send,
+    Future<void> Function() queue,
+  ) async {
+    try {
+      await send();
+    } on AppStateException catch (error) {
+      if (error.refusal != AppRefusal.noSessionOpen &&
+          error.refusal != AppRefusal.noPeerConnected) {
+        rethrow;
+      }
+      await queue();
+    }
   }
 
   /// Puts [face] into the composer, and remembers it as recent.
@@ -205,6 +253,18 @@ class _ConversationViewState extends State<ConversationView> {
     final chosen = await PickerResolution.picker.files();
     if (!mounted || chosen.isEmpty) return;
     _stagePaths([for (final file in chosen) file.path]);
+  }
+
+  /// Asks for a folder to send whole.
+  ///
+  /// The same picker seam as [_pickFiles] — `directory()` is the OS's own
+  /// folder chooser — but the answer is staged as a folder, not walked here:
+  /// what is inside it is enumerated when 发送 is pressed, so a folder that
+  /// changed since it was picked sends what is actually there.
+  Future<void> _pickFolder() async {
+    final chosen = await PickerResolution.picker.directory();
+    if (!mounted || chosen == null) return;
+    _stagePaths([chosen]);
   }
 
   /// Stages whatever the clipboard is holding, and says whether it staged
@@ -247,25 +307,41 @@ class _ConversationViewState extends State<ConversationView> {
     return true;
   }
 
-  /// Puts each of [paths] in the composer, pictures as pictures.
+  /// Puts each of [paths] in the composer, pictures as pictures and folders
+  /// as folders.
   ///
   /// Returns how many it staged, which is what tells a paste whether the
-  /// clipboard held anything this app could carry: a folder arrives as a path
-  /// with nothing behind it, and classifying it out is not the same as having
-  /// taken it.
+  /// clipboard held anything this app could carry: a path that names nothing
+  /// at all — a broken link, a file that just left — is classified out, and
+  /// classifying it out is not the same as having taken it.
   int _stagePaths(List<String> paths) {
     // Pasting an image writes a temporary file this app owns; everything else
     // a person chose or dropped is their own file and must never be removed.
     final staged = <StagedAttachment>[];
-    for (final entry in classifyPaths(paths)) {
-      staged.add(
-        StagedAttachment(
-          path: entry.file.path,
-          name: fileNameOf(entry.file.path),
-          isImage: entry.isImage,
-          appOwned: false,
-        ),
-      );
+    for (final path in paths) {
+      // A directory has a path but no bytes of its own; it stages as a folder
+      // rather than falling through to the file check, which would classify
+      // it out the way it always used to.
+      if (Directory(path).existsSync()) {
+        staged.add(
+          StagedAttachment(
+            path: path,
+            name: fileNameOf(path),
+            isImage: false,
+            isFolder: true,
+          ),
+        );
+        continue;
+      }
+      for (final entry in classifyPaths([path])) {
+        staged.add(
+          StagedAttachment(
+            path: entry.file.path,
+            name: fileNameOf(entry.file.path),
+            isImage: entry.isImage,
+          ),
+        );
+      }
     }
     if (staged.isEmpty) return 0;
     setState(() => _staged.addAll(staged));
@@ -455,6 +531,9 @@ class _ConversationViewState extends State<ConversationView> {
                         onAttach: canSend
                             ? () => unawaited(_pickFiles())
                             : null,
+                        onAttachFolder: canSend
+                            ? () => unawaited(_pickFolder())
+                            : null,
                         onEmoji: canSend
                             ? (face) => _insertEmoji(controller, face)
                             : null,
@@ -486,9 +565,11 @@ class StagedAttachment {
     required this.name,
     required this.isImage,
     this.appOwned = false,
+    this.isFolder = false,
   });
 
-  /// Where the bytes are, as the engine will read them.
+  /// Where the bytes are, as the engine will read them — or, for a folder,
+  /// the directory they are read from at send time.
   final String path;
 
   /// What the tray says it is — a file chip's label, a thumbnail's tooltip.
@@ -496,6 +577,13 @@ class StagedAttachment {
 
   /// Whether the far side will draw it as a picture.
   final bool isImage;
+
+  /// Whether this stages a whole directory rather than one file.
+  ///
+  /// A folder is one attachment and one Transfer: its files are enumerated
+  /// when 发送 is pressed, so what the chip shows is what was picked, not a
+  /// snapshot of what was inside it at that moment.
+  final bool isFolder;
 
   /// Whether this is a temporary file the application itself created.
   ///
@@ -529,6 +617,7 @@ class ConversationComposer extends StatefulWidget {
     required this.onSend,
     required this.onPaste,
     required this.onAttach,
+    this.onAttachFolder,
     this.onEmoji,
     this.recentEmojis = const [],
     this.attachments = const [],
@@ -552,6 +641,11 @@ class ConversationComposer extends StatefulWidget {
   /// whether a choice turns out to be a picture or a file is not this control's
   /// to say — see [_pickFiles] and [_stagePaths].
   final VoidCallback? onAttach;
+
+  /// The way in for a whole directory — the same seam as [onAttach], asking
+  /// the OS for a folder rather than for files. Null under the same condition
+  /// [onAttach] is: there is nobody to send to.
+  final VoidCallback? onAttachFolder;
 
   /// Called with the face the user chose from the emoticon picker.
   ///
@@ -781,6 +875,12 @@ class _ConversationComposerState extends State<ConversationComposer> {
                         tooltip: l10n.menuSendFile,
                         icon: Icons.folder_outlined,
                         onPressed: widget.onAttach,
+                      ),
+                      SizedBox(width: WeChat.composerIconGap),
+                      ComposerTool(
+                        tooltip: l10n.menuSendFolder,
+                        icon: Icons.folder_shared_outlined,
+                        onPressed: widget.onAttachFolder,
                       ),
                       const Spacer(),
                       // The send's colour follows what is in the box, and the
@@ -1330,7 +1430,11 @@ class _AttachmentChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_file, size: 16, color: colors.secondaryText),
+          Icon(
+            attachment.isFolder ? Icons.folder_outlined : Icons.attach_file,
+            size: 16,
+            color: colors.secondaryText,
+          ),
           const SizedBox(width: 6),
           // Bounded so that one long name cannot push 发送 off the row; the
           // tooltip keeps the whole of it reachable.
@@ -1463,11 +1567,14 @@ class MessageBubble extends StatelessWidget {
                   // answers need somewhere to be.
                   child: _drawsBareImage
                       ? _bareImage(context)
-                      : MessageBubbleShape(
-                          colour: background,
-                          outgoing: outgoing,
-                          maxWidth: bubbleMaxWidth,
-                          child: _contents(context, l10n),
+                      : _withUnsentMarker(
+                          context,
+                          MessageBubbleShape(
+                            colour: background,
+                            outgoing: outgoing,
+                            maxWidth: bubbleMaxWidth,
+                            child: _contents(context, l10n),
+                          ),
                         ),
                 ),
                 // A conversation is not a transfer: for a message that *is* its
@@ -1515,7 +1622,36 @@ class MessageBubble extends StatelessWidget {
   /// has to show instead, and that is a transfer's business — which is what a
   /// bubble looks like.
   bool get _drawsBareImage =>
-      view.kind == PayloadKind.image && view.localPath != null;
+      view.kind == PayloadKind.image &&
+      view.localPath != null &&
+      // An unsent picture keeps its bubble even though its bytes are here:
+      // the bubble is where the resend marker lives, and a bare image has
+      // nowhere to put it.
+      !view.unsent;
+
+  /// The bubble, with the resend marker beside it when the message is a
+  /// draft the peer never received.
+  ///
+  /// The marker sits to the **left** of the bubble — the side the message
+  /// came from is already spoken for by the avatar, and a status mark reads
+  /// as belonging to the words rather than to the sender. Anything else
+  /// draws the bubble alone, exactly as it always did.
+  Widget _withUnsentMarker(BuildContext context, Widget bubble) {
+    if (!view.unsent) return bubble;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _UnsentMarker(
+          tooltip: AppLocalizations.of(context).messageUnsentHint,
+          onTap: () =>
+              unawaited(resendUnsentMessage(context, controller, view)),
+        ),
+        const SizedBox(width: 6),
+        Flexible(child: bubble),
+      ],
+    );
+  }
 
   /// A picture that is here, drawn as a picture.
   ///
@@ -1880,6 +2016,42 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The red circle-and-exclamation an unsent message wears.
+///
+/// It is the draft's whole status — there is no receipt line saying "failed",
+/// because nothing was ever offered and nothing broke — and its tap is the
+/// resend offer: a dialog asks, and only 重发 sends.
+class _UnsentMarker extends StatelessWidget {
+  const _UnsentMarker({required this.tooltip, required this.onTap});
+
+  /// What the marker says on hover.
+  final String tooltip;
+
+  /// Opens the resend dialog.
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          // A little room around the glyph so the tap is not a 18-pixel
+          // needle; the marker is small but it is the only way to resend.
+          padding: const EdgeInsets.all(3),
+          child: Icon(
+            Icons.error_outline,
+            size: 18,
+            color: WeChatColors.of(context).danger,
+          ),
+        ),
       ),
     );
   }

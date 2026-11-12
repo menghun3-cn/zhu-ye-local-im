@@ -218,6 +218,7 @@ final class TransferView {
     this.appOwned = false,
     this.settledAt,
     this.send,
+    this.unsent = false,
   });
 
   /// The Transfer's id, unique within the Session it belongs to.
@@ -316,6 +317,17 @@ final class TransferView {
   /// would be a no-op anyway; handing out null is what keeps a settled
   /// message from drawing a button for it.
   final OutgoingTransfer? send;
+
+  /// Whether this message was never sent: the peer had no Session when the
+  /// user tried, so it is a draft owed to them rather than a Transfer that
+  /// ran.
+  ///
+  /// Always outgoing, always settled as far as [state] is concerned (there
+  /// is nothing in flight to report), and the one flag that tells a
+  /// conversation to draw the resend marker instead of treating the message
+  /// as delivered or failed on the wire. See `LocalTransferController`'s
+  /// unsent list.
+  final bool unsent;
 
   /// What names this message for as long as this Device keeps it.
   ///
@@ -457,6 +469,46 @@ File incomingPathFor(Directory directory, String name) {
   throw AppStateException(AppRefusal.noFreeFileName, safe);
 }
 
+/// Where a received item finally lands: the directory it sits in and its bare
+/// name inside it.
+///
+/// A peer's item name is untrusted input, and a folder send makes it a path:
+/// the sender encodes a file's place in the tree as `/`-separated segments
+/// (`photos/2024/beach.jpg`), and this is where those segments become a place
+/// on this Device's disk. The rules are the same ones [sanitiseIncomingName]
+/// already keeps — every segment is sanitised on its own, so no segment can
+/// carry a separator, a control character or a trailing dot — which means no
+/// combination of segments can address anything outside [root]. A `..`
+/// segment sanitises to `received`, exactly as a bare `..` name does: it stays
+/// inside the tree under a name that says nothing.
+///
+/// A name with no `/` is an ordinary file name and lands directly in [root],
+/// the same answer [incomingPathFor] has always given. Empty and `.` segments
+/// are dropped rather than sanitised, because they carry no name at all —
+/// `a//b` and `a/./b` are the same path, and honouring the difference would
+/// only let a peer mint directories that differ by nothing.
+({Directory directory, String name}) incomingLandingFor(
+  Directory root,
+  String raw,
+) {
+  if (!raw.contains('/')) {
+    return (directory: root, name: sanitiseIncomingName(raw));
+  }
+  final segments = <String>[];
+  for (final part in raw.split('/')) {
+    if (part.isEmpty || part == '.') continue;
+    segments.add(sanitiseIncomingName(part));
+  }
+  if (segments.isEmpty) {
+    return (directory: root, name: 'received');
+  }
+  var directory = root;
+  for (final segment in segments.sublist(0, segments.length - 1)) {
+    directory = Directory('${directory.path}${Platform.pathSeparator}$segment');
+  }
+  return (directory: directory, name: segments.last);
+}
+
 /// A path inside [directory] for bytes that are still on their way.
 ///
 /// A Transfer writes here, not to its final name, and is renamed once every byte
@@ -538,6 +590,18 @@ enum AppRefusal {
 
   /// No Device answered the unicast probe at the address given.
   deviceNotReachable,
+
+  /// A folder send was attempted on a folder with no files in it.
+  emptyFolder,
+
+  /// A folder send named more files than one Offer may carry.
+  tooManyFiles,
+
+  /// A folder send totals more bytes than one Offer may carry.
+  filesTooLarge,
+
+  /// A folder send holds a file over the per-item size limit.
+  fileTooLarge,
 }
 
 /// Raised when the app layer is asked for something its current state does not
