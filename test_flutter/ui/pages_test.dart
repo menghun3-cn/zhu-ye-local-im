@@ -2562,6 +2562,29 @@ void main() {
       // Carol's endpoint is on the header, not Bob's: the window opens where
       // the user left off rather than where they first were. Both test Devices
       // use loopback, so their Session ports distinguish the two endpoints.
+      //
+      // The port is read inside the wait, not before it: a third Device
+      // joining the group rotates the secret, every Session layer rebuilds,
+      // and a rebuilt manager listens on a *new* ephemeral port — so the
+      // advertised port and the port a still-open handshake remembers can
+      // legitimately differ until the redial lands. Waiting for the header to
+      // name the port Discovery currently advertises is waiting for exactly
+      // the convergence the product itself guarantees.
+      await pumpUntil(tester, () {
+        final carolPort = alice.controller.peers
+            .firstWhere((peer) => peer.fingerprint == carol.fingerprint)
+            .sessionPort;
+        if (carolPort == null) return false;
+        return windowA
+            .within(
+              find.descendant(
+                of: find.byType(ConversationView),
+                matching: find.text(l10n.onPort(carolPort)),
+              ),
+            )
+            .evaluate()
+            .isNotEmpty;
+      }, description: "Carol's advertised endpoint on the conversation header");
       final carolView = alice.controller.peers.firstWhere(
         (peer) => peer.fingerprint == carol.fingerprint,
       );
@@ -2570,17 +2593,7 @@ void main() {
       );
       expect(carolView.address, isNotNull, reason: 'Discovery placed it');
       expect(bobView.address, isNotNull, reason: 'Discovery placed it');
-      expect(carolView.sessionPort, isNotNull);
       expect(bobView.sessionPort, isNotNull);
-      expect(
-        windowA.within(
-          find.descendant(
-            of: find.byType(ConversationView),
-            matching: find.text(l10n.onPort(carolView.sessionPort!)),
-          ),
-        ),
-        findsWidgets,
-      );
       expect(
         windowA.within(
           find.descendant(

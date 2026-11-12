@@ -715,17 +715,34 @@ Future<void> pairDevices(
           guest.controller.sessions.isNotEmpty,
       'both Devices to serve and connect automatically',
     );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    expect(
-      host.controller.sessions,
-      isNotEmpty,
-      reason: 'the automatically opened Session must stay open',
-    );
-    expect(
-      guest.controller.sessions,
-      isNotEmpty,
-      reason: 'the automatically opened Session must stay open',
-    );
+    // The Sessions have to *stay* up, not merely have been up once. A Device
+    // joining the Owner Group rotates the group secret, and every member
+    // rebuilds its session layer for the new one — which drops every Session
+    // it holds and redials. In a test with a third Device on the hub that
+    // bounce can land inside any fixed settle delay, so the check is a
+    // continuous window instead: both Sessions must have been up without a
+    // gap for this long. Two Devices never rotate after pairing, so for them
+    // this costs the same half-second the old fixed delay did.
+    final watch = Stopwatch()..start();
+    var lastGap = DateTime.now();
+    while (true) {
+      final up =
+          host.controller.sessions.isNotEmpty &&
+          guest.controller.sessions.isNotEmpty;
+      final now = DateTime.now();
+      if (!up) {
+        lastGap = now;
+      } else if (now.difference(lastGap) >= const Duration(milliseconds: 300)) {
+        break;
+      }
+      if (watch.elapsed > const Duration(seconds: 20)) {
+        fail(
+          'the Session between ${host.alias} and ${guest.alias} did not '
+          'stay open for 300ms',
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
   });
   await tester.pump();
 }
