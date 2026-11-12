@@ -19,8 +19,8 @@ and it is the one place where Windows insists on a UAC prompt.
 ## Decision
 
 All four diagnostics now report real state, computed in `lib/core` so `dart
-test` covers the judgement and only the process-spawning is left to the
-platform:
+test` covers the judgement; the platform side is a MethodChannel snapshot
+for the firewall read and one elevated PowerShell call for the write:
 
 * **Ports** — pure functions over the ports the controller reports
   (`listenPort`, `pairingPort`). Serving on the well-known port is `ok`,
@@ -36,15 +36,20 @@ platform:
   marker: this app has a first-class Tailscale path, so its adapter is a
   feature. The result is a `warning` naming the adapters, because a name
   heuristic can only ever be a hint.
-* **Firewall** — a PowerShell query (`Get-NetFirewallRule` + port and
-  application filters, current `NetworkCategory`, profile `Enabled`) read
-  without elevation, parsed as JSON. A port counts as covered only when an
-  enabled inbound allow rule matches protocol, port *and* applies to this
-  process — either unscoped or scoped to `Platform.resolvedExecutable` — on a
-  profile that matches the current network category. Program scoping is the
-  part that is easy to get wrong: Windows' own "allow this app" prompt writes
-  program-scoped rules, so judging by port alone would call a firewall that
-  blocks this app "open".
+* **Firewall** — the Windows runner answers a `snapshot` method on the
+  `cn.hnasct.local_transfer/firewall` channel (`windows/runner/
+  firewall_probe.cpp`): `INetFwPolicy2` enumerates every enabled inbound
+  allow rule and `INetworkListManager` reports the current network category
+  and whether its profile's firewall is enabled — the same policy store the
+  PowerShell cmdlets read, with no process spawned and no per-rule CIM round
+  trip. Dart judges the decoded snapshot: a port counts as covered only when
+  a rule matches protocol, port *and* applies to this process — either
+  unscoped or scoped to `Platform.resolvedExecutable` — on a profile that
+  matches the current network category, and a service-scoped rule never
+  counts because it admits a service, not an executable. Program scoping is
+  the part that is easy to get wrong: Windows' own "allow this app" prompt
+  writes program-scoped rules, so judging by port alone would call a
+  firewall that blocks this app "open".
 
 The "Open firewall ports" button appears on Windows only, beside the port
 check it exists for, and stays disabled until the probe reports `blocked` —
@@ -67,13 +72,17 @@ half-translated.
 ## Consequences
 
 * `lib/core/diagnostics/troubleshooting.dart` is plain Dart with two seams:
-  `ProcessRunner` for the PowerShell calls and the enumerable interfaces for
-  the network checks. The parsing and verdict logic is fully covered by
-  `test/diagnostics/troubleshooting_test.dart`.
-* The probe enumerates every enabled inbound allow rule, which is a CIM query
-  per rule — on a machine with hundreds of rules it takes a moment. It runs
-  once per page visit and again on demand, which is the right cadence for a
-  diagnostics screen.
+  `ProcessRunner` for the elevated PowerShell call that *adds* rules, and the
+  firewall MethodChannel for the probe. The channel itself is the thin half —
+  COM in, a map out — while all parsing and verdict logic stays in Dart,
+  covered by `test/diagnostics/troubleshooting_test.dart`; the channel's
+  Dart-facing contract is covered by `test_flutter/platform/seams_test.dart`.
+* The probe is one in-process COM enumeration, so re-checking is effectively
+  instant — the earlier PowerShell version paid a CIM query per rule and
+  took seconds on rule-heavy machines. It runs once per page visit and again
+  on demand, which is the right cadence for a diagnostics screen.
+* A runner built before the channel existed answers `MissingPluginException`,
+  which the page reports as `unknown` — "cannot answer" rather than a guess.
 * The firewall judgement is only as good as the rule data: a third-party
   firewall, a rule added after the probe, or traffic filtered outside Windows
   Firewall all read as "open" or "unknown" rather than as certainty. The
@@ -94,16 +103,24 @@ already know about, not about free ports.
 
 **`netsh advfirewall` for the probe and the fix.** Rejected for the fix:
 `netsh` cannot scope a rule to a program, so it would open the ports to every
-process on the machine. For the probe it was viable but the PowerShell object
-model returns structured fields (protocol, port spec, profile, program)
-directly, where `netsh` output would need a text parser that breaks on
-localization and formatting changes.
+process on the machine. For the probe it was viable but its output would need
+a text parser that breaks on localization and formatting changes.
 
-**A MethodChannel into `windows/runner` for the firewall work.** Rejected:
-the existing host channel exists for window and tray facts the runner owns.
-Spawning PowerShell needs no native code, keeps the logic in testable Dart,
-and the UAC boundary is the operating system's, not ours — a channel would
-add a C++ surface for no capability gain.
+**`reg query` on `FirewallPolicy\FirewallRules`.** Rejected: the rules are
+readable there without elevation and fast, but the `v2.x|key=value` format
+is an implementation detail rather than a contract — a Windows update is
+free to change it, and the failure mode is a silently wrong verdict.
+
+**Keeping the PowerShell probe.** This is what the first version shipped,
+and it was replaced: `Get-NetFirewallRule` resolves each rule through CIM,
+so the probe took seconds on machines with hundreds of rules, and spawning
+a shell for a read the process could answer itself was the expensive half
+of the design. The COM snapshot reads the same store the cmdlets do, in
+process, and the judgement stayed in Dart either way.
+
+**The WFP API (`FwpmFilterEnum`) for the probe.** Rejected: kernel-level
+filter enumeration mostly requires elevation, which would break the
+"reading rules needs no administrator" property the probe relies on.
 
 **Checking reachability by dialling our own LAN address.** Rejected:
 hairpin behaviour through Windows Firewall is inconsistent, a loopback dial

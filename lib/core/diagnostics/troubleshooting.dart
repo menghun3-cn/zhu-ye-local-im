@@ -141,13 +141,14 @@ final class FirewallReport {
   final List<String> missing;
 }
 
-/// One inbound allow rule, as the probe script reports it.
+/// One inbound allow rule, as the platform's firewall store reports it.
 final class FirewallRule {
   const FirewallRule({
     required this.protocol,
     required this.localPort,
     required this.profile,
     required this.program,
+    this.service = '',
   });
 
   /// `TCP`, `UDP`, `Any`, or a protocol number.
@@ -161,6 +162,12 @@ final class FirewallRule {
 
   /// The Program filter, or empty when the rule applies to every program.
   final String program;
+
+  /// The Service filter, or empty when the rule is not scoped to a service.
+  ///
+  /// A service-scoped rule admits one Windows service, not an ordinary
+  /// executable, so it can never cover this app.
+  final String service;
 }
 
 /// The (protocol, port) pairs a peer needs to reach this Device.
@@ -209,10 +216,14 @@ bool ruleCovers(
   final ruleProto = rule.protocol.toUpperCase();
   final protoMatches =
       ruleProto == 'ANY' ||
+      // COM reports "any protocol" as 0 or 256 depending on the rule's age.
+      ruleProto == '0' ||
+      ruleProto == '256' ||
       ruleProto == protocol ||
       (protocol == 'TCP' && ruleProto == '6') ||
       (protocol == 'UDP' && ruleProto == '17');
   if (!protoMatches || !portSpecCovers(rule.localPort, port)) return false;
+  if (rule.service.trim().isNotEmpty) return false;
   final ruleProgram = rule.program.trim();
   if (ruleProgram.isEmpty ||
       ruleProgram.toUpperCase() == 'ANY' ||
@@ -268,30 +279,30 @@ FirewallReport evaluateFirewallRules({
   );
 }
 
-/// Parses the JSON the probe script prints.
+/// Judges a firewall snapshot against [requiredInboundPorts].
 ///
-/// Returns null on anything unexpected — a truncated stream, an error record
-/// where the object should be, a rule missing a field — because the caller's
-/// answer to "I could not understand this" is `unknown`, not a guess.
-FirewallReport? firewallReportFromJson(
-  String stdout, {
+/// The snapshot is the decoded map the Windows runner's firewall channel
+/// answers with: `category` (the current network's profile name), `enabled`
+/// (whether that profile's firewall is on), and `rules` — each an inbound
+/// allow rule carrying `proto`, `port`, `prof`, `prog` and `svc`.
+///
+/// Pure, so the parsing decisions — which are the part that can be wrong — are
+/// exercised without a runner anywhere near them. Returns null on anything
+/// unexpected, because the caller's answer to "I could not understand this" is
+/// `unknown`, not a guess.
+FirewallReport? firewallReportFromSnapshot(
+  Object? snapshot, {
   required String programPath,
 }) {
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(stdout);
-  } on FormatException {
-    return null;
-  }
-  if (decoded is! Map<String, Object?>) return null;
-  final category = decoded['category'];
-  final enabled = decoded['enabled'];
-  final rawRules = decoded['rules'];
+  if (snapshot is! Map) return null;
+  final category = snapshot['category'];
+  final enabled = snapshot['enabled'];
+  final rawRules = snapshot['rules'];
   if (rawRules != null && rawRules is! List) return null;
   final rules = <FirewallRule>[
     if (rawRules is List)
       for (final entry in rawRules)
-        if (entry is Map<String, Object?> &&
+        if (entry is Map &&
             entry['proto'] is String &&
             entry['port'] is String &&
             entry['prof'] is String)
@@ -300,6 +311,7 @@ FirewallReport? firewallReportFromJson(
             localPort: entry['port'] as String,
             profile: entry['prof'] as String,
             program: entry['prog'] is String ? entry['prog'] as String : '',
+            service: entry['svc'] is String ? entry['svc'] as String : '',
           ),
   ];
   return evaluateFirewallRules(
@@ -323,60 +335,6 @@ List<int> _utf16LittleEndian(String text) {
     bytes.add(unit >> 8);
   }
   return bytes;
-}
-
-/// The PowerShell the probe runs.
-///
-/// Reading firewall rules needs no elevation — only changing them does — so
-/// this is an ordinary `powershell -Command`. The output is one compressed
-/// JSON object: the current network category (which decides which profile a
-/// rule has to match), whether that profile's firewall is enabled at all, and
-/// every enabled inbound allow rule with the three fields the judgement needs.
-const String firewallProbeScript = r'''
-$cat = (Get-NetConnectionProfile -ErrorAction SilentlyContinue | Select-Object -First 1).NetworkCategory
-$profileName = 'Public'
-if ("$cat" -eq 'Private') { $profileName = 'Private' }
-elseif ("$cat" -eq 'DomainAuthenticated') { $profileName = 'Domain' }
-$enabled = $null
-$fw = Get-NetFirewallProfile -Name $profileName -ErrorAction SilentlyContinue
-if ($fw) { $enabled = [bool]$fw.Enabled }
-$rules = @()
-Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True -ErrorAction SilentlyContinue | ForEach-Object {
-  $f = $_ | Get-NetFirewallPortFilter
-  $a = $_ | Get-NetFirewallApplicationFilter
-  $rules += [pscustomobject]@{ proto = "$($f.Protocol)"; port = "$($f.LocalPort)"; prof = "$($_.Profile)"; prog = "$($a.Program)" }
-}
-[pscustomobject]@{ category = "$cat"; enabled = $enabled; rules = $rules } | ConvertTo-Json -Compress -Depth 4
-''';
-
-/// Asks Windows Firewall whether this Device's ports are reachable inbound.
-///
-/// [programPath] is this process's own executable — the path the rules the
-/// "allow this app" prompt writes are scoped to, and the path the rules this
-/// feature adds are scoped to. On a platform without a Windows Firewall the
-/// answer is [FirewallState.unsupported] without running anything.
-Future<FirewallReport> probeFirewall({
-  required DevicePlatform platform,
-  required String programPath,
-  ProcessRunner? run,
-}) async {
-  if (platform != DevicePlatform.windows) {
-    return const FirewallReport(FirewallState.unsupported);
-  }
-  final ProcessOutput result;
-  try {
-    result = await (run ?? DiagnosticsResolution.runner)('powershell', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      firewallProbeScript,
-    ]);
-  } on Object {
-    return const FirewallReport(FirewallState.unknown);
-  }
-  if (result.exitCode != 0) return const FirewallReport(FirewallState.unknown);
-  return firewallReportFromJson(result.stdout, programPath: programPath) ??
-      const FirewallReport(FirewallState.unknown);
 }
 
 /// The non-loopback IPv4 interfaces this machine currently has.

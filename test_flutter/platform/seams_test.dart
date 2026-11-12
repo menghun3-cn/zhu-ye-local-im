@@ -307,4 +307,92 @@ void main() {
       expect(second.profile.alias, 'Desk');
     });
   });
+
+  group('the firewall probe', () {
+    const program = r'C:\Apps\LocalTransfer\LocalTransfer.exe';
+
+    void registerFirewallChannel(Object? answer, {Object? failure}) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannel(firewallProbeChannel.name), (
+            call,
+          ) async {
+            if (failure != null) throw failure;
+            return answer;
+          });
+    }
+
+    void registerNoFirewallChannel() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            MethodChannel(firewallProbeChannel.name),
+            null,
+          );
+    }
+
+    test('unsupported platforms never touch the channel', () async {
+      var called = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannel(firewallProbeChannel.name), (
+            call,
+          ) async {
+            called = true;
+            return null;
+          });
+
+      final report = await probeHostFirewall(
+        platform: DevicePlatform.android,
+        programPath: program,
+      );
+
+      expect(report.state, FirewallState.unsupported);
+      expect(called, isFalse);
+    });
+
+    test('judges the snapshot the runner answers with', () async {
+      registerFirewallChannel({
+        'category': 'Private',
+        'enabled': true,
+        'rules': const [
+          {
+            'proto': '6',
+            'port': '47655,47656',
+            'prof': 'Private',
+            'prog': program,
+          },
+          {'proto': '17', 'port': '47654', 'prof': 'Private', 'prog': program},
+        ],
+      });
+
+      final report = await probeHostFirewall(
+        platform: DevicePlatform.windows,
+        programPath: program,
+      );
+
+      expect(report.state, FirewallState.open);
+    });
+
+    test('a missing channel is unknown, not open', () async {
+      // A runner built before the channel existed cannot say whether the
+      // ports are reachable; answering "open" would be the dangerous lie.
+      registerNoFirewallChannel();
+
+      final report = await probeHostFirewall(
+        platform: DevicePlatform.windows,
+        programPath: program,
+      );
+
+      expect(report.state, FirewallState.unknown);
+    });
+
+    test('a channel error is unknown too', () async {
+      registerFirewallChannel(null, failure: PlatformException(code: 'x'));
+
+      final report = await probeHostFirewall(
+        platform: DevicePlatform.windows,
+        programPath: program,
+      );
+
+      expect(report.state, FirewallState.unknown);
+    });
+  });
 }

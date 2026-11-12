@@ -119,21 +119,21 @@ void main() {
     });
   });
 
-  group('firewallReportFromJson', () {
+  group('firewallReportFromSnapshot', () {
     const program = r'C:\Apps\LocalTransfer\LocalTransfer.exe';
 
-    String payload({
+    Map<String, Object?> payload({
       String category = 'Private',
       bool? enabled = true,
       List<Map<String, String>>? rules,
-    }) => jsonEncode({
+    }) => {
       'category': category,
       'enabled': enabled,
       'rules': rules ?? const [],
-    });
+    };
 
     test('a disabled firewall reads open whatever the rules say', () {
-      final report = firewallReportFromJson(
+      final report = firewallReportFromSnapshot(
         payload(enabled: false),
         programPath: program,
       );
@@ -141,7 +141,7 @@ void main() {
     });
 
     test('full coverage reads open', () {
-      final report = firewallReportFromJson(
+      final report = firewallReportFromSnapshot(
         payload(
           rules: const [
             {'proto': 'TCP', 'port': '47655,47656', 'prof': 'Any', 'prog': ''},
@@ -155,7 +155,7 @@ void main() {
     });
 
     test('missing coverage names the ports', () {
-      final report = firewallReportFromJson(
+      final report = firewallReportFromSnapshot(
         payload(
           rules: const [
             {'proto': 'TCP', 'port': '47655', 'prof': 'Any', 'prog': ''},
@@ -168,7 +168,7 @@ void main() {
     });
 
     test('a rule for another program does not count', () {
-      final report = firewallReportFromJson(
+      final report = firewallReportFromSnapshot(
         payload(
           rules: [
             for (final (proto, port) in requiredInboundPorts)
@@ -186,8 +186,28 @@ void main() {
       expect(report.missing, hasLength(3));
     });
 
+    test('a service-scoped rule does not count', () {
+      final report = firewallReportFromSnapshot(
+        payload(
+          rules: [
+            for (final (proto, port) in requiredInboundPorts)
+              {
+                'proto': proto,
+                'port': '$port',
+                'prof': 'Any',
+                'prog': '',
+                'svc': 'SomeService',
+              },
+          ],
+        ),
+        programPath: program,
+      );
+      expect(report!.state, FirewallState.blocked);
+      expect(report.missing, hasLength(3));
+    });
+
     test('a rule on the wrong profile does not count', () {
-      final report = firewallReportFromJson(
+      final report = firewallReportFromSnapshot(
         payload(
           category: 'Public',
           rules: const [
@@ -205,59 +225,38 @@ void main() {
       expect(report!.state, FirewallState.blocked);
     });
 
-    test('unparseable output is null, not a guess', () {
-      expect(firewallReportFromJson('not json', programPath: program), isNull);
+    test('COM-shaped values parse: numeric protocol and 47655 style ports', () {
+      final report = firewallReportFromSnapshot(
+        payload(
+          rules: const [
+            {
+              'proto': '6',
+              'port': '47655,47656',
+              'prof': 'Private',
+              'prog': program,
+            },
+            {
+              'proto': '17',
+              'port': '47654',
+              'prof': 'Private',
+              'prog': program,
+            },
+          ],
+        ),
+        programPath: program,
+      );
+      expect(report!.state, FirewallState.open);
+    });
+
+    test('malformed snapshots are null, not a guess', () {
       expect(
-        firewallReportFromJson('{"rules": "oops"}', programPath: program),
+        firewallReportFromSnapshot('not a map', programPath: program),
         isNull,
       );
-    });
-  });
-
-  group('probeFirewall', () {
-    test('unsupported platforms never run a process', () async {
-      var called = false;
-      final report = await probeFirewall(
-        platform: DevicePlatform.android,
-        programPath: 'x',
-        run: (exe, args) async {
-          called = true;
-          return out(0, '{}');
-        },
+      expect(
+        firewallReportFromSnapshot({'rules': 'oops'}, programPath: program),
+        isNull,
       );
-      expect(report.state, FirewallState.unsupported);
-      expect(called, isFalse);
-    });
-
-    test('parses the probe output', () async {
-      final report = await probeFirewall(
-        platform: DevicePlatform.windows,
-        programPath: 'x',
-        run: (exe, args) async => out(
-          0,
-          jsonEncode({
-            'category': 'Private',
-            'enabled': true,
-            'rules': const [],
-          }),
-        ),
-      );
-      expect(report.state, FirewallState.blocked);
-    });
-
-    test('a failed or throwing query is unknown', () async {
-      final failed = await probeFirewall(
-        platform: DevicePlatform.windows,
-        programPath: 'x',
-        run: (exe, args) async => out(1, ''),
-      );
-      expect(failed.state, FirewallState.unknown);
-      final thrown = await probeFirewall(
-        platform: DevicePlatform.windows,
-        programPath: 'x',
-        run: (exe, args) async => throw StateError('no powershell'),
-      );
-      expect(thrown.state, FirewallState.unknown);
     });
   });
 
