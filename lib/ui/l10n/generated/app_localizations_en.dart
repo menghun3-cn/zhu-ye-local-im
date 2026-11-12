@@ -872,6 +872,86 @@ class AppLocalizationsEn extends AppLocalizations {
   String get troubleshootingRestartDesc => 'Close and reopen the application';
 
   @override
+  String get troubleshootingStatusOk => 'OK';
+
+  @override
+  String get troubleshootingStatusWarning => 'Warning';
+
+  @override
+  String get troubleshootingStatusError => 'Problem found';
+
+  @override
+  String get troubleshootingStatusUnsupported => 'Not applicable';
+
+  @override
+  String get troubleshootingChecking => 'Checking…';
+
+  @override
+  String get troubleshootingRecheck => 'Re-check';
+
+  @override
+  String troubleshootingNetworkOk(int count) {
+    return '$count network interfaces available';
+  }
+
+  @override
+  String get troubleshootingNetworkNone => 'No usable network interface';
+
+  @override
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  ) {
+    return 'Session $session · Pairing $pairing · Discovery UDP $discovery';
+  }
+
+  @override
+  String get troubleshootingPortFallbackNote =>
+      'A fallback port still works through Discovery; a direct dial on the well-known port will not.';
+
+  @override
+  String get troubleshootingFirewallOpen =>
+      'Inbound rules allow this app on the required ports';
+
+  @override
+  String troubleshootingFirewallBlocked(String missing) {
+    return 'No inbound allow rule covers: $missing';
+  }
+
+  @override
+  String get troubleshootingFirewallUnknown =>
+      'Could not determine the firewall state';
+
+  @override
+  String get troubleshootingFirewallUnsupported => 'Only applies on Windows';
+
+  @override
+  String get troubleshootingOpenFirewallPorts => 'Open firewall ports';
+
+  @override
+  String get troubleshootingOpeningFirewall =>
+      'Waiting for administrator consent…';
+
+  @override
+  String get troubleshootingFirewallOpened => 'Firewall rules added';
+
+  @override
+  String get troubleshootingFirewallCancelled => 'Cancelled';
+
+  @override
+  String get troubleshootingFirewallFailed =>
+      'Could not add the rules — allow the ports manually';
+
+  @override
+  String get troubleshootingVpnNone => 'No VPN or tunnel adapter detected';
+
+  @override
+  String troubleshootingVpnFound(String names) {
+    return 'Possible VPN or tunnel adapters: $names';
+  }
+
+  @override
   String get railUpdate => 'Update';
 
   @override

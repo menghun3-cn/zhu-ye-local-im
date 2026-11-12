@@ -12,6 +12,7 @@ export 'clipboard/clipboard_entry.dart';
 export 'clipboard/clipboard_mirror.dart';
 export 'clipboard/polling_clipboard_watcher.dart';
 export 'clipboard/system_clipboard.dart';
+export 'diagnostics/troubleshooting.dart';
 export 'discovery/beacon.dart';
 export 'discovery/beacon_transport.dart';
 export 'discovery/discovery_service.dart';

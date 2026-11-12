@@ -821,6 +821,82 @@ class AppLocalizationsZh extends AppLocalizations {
   String get troubleshootingRestartDesc => '关闭并重新打开应用程序';
 
   @override
+  String get troubleshootingStatusOk => '正常';
+
+  @override
+  String get troubleshootingStatusWarning => '警告';
+
+  @override
+  String get troubleshootingStatusError => '发现问题';
+
+  @override
+  String get troubleshootingStatusUnsupported => '不适用';
+
+  @override
+  String get troubleshootingChecking => '检查中…';
+
+  @override
+  String get troubleshootingRecheck => '重新检查';
+
+  @override
+  String troubleshootingNetworkOk(int count) {
+    return '检测到 $count 个网络接口';
+  }
+
+  @override
+  String get troubleshootingNetworkNone => '未检测到可用的网络接口';
+
+  @override
+  String troubleshootingPortListening(
+    String session,
+    String pairing,
+    String discovery,
+  ) {
+    return '会话 $session · 配对 $pairing · 发现 UDP $discovery';
+  }
+
+  @override
+  String get troubleshootingPortFallbackNote =>
+      '备用端口仍可通过发现功能正常工作；直接按默认端口拨号将无法连通。';
+
+  @override
+  String get troubleshootingFirewallOpen => '入站规则已放行本应用所需端口';
+
+  @override
+  String troubleshootingFirewallBlocked(String missing) {
+    return '没有覆盖以下端口的入站放行规则：$missing';
+  }
+
+  @override
+  String get troubleshootingFirewallUnknown => '无法确定防火墙状态';
+
+  @override
+  String get troubleshootingFirewallUnsupported => '仅 Windows 需要此检查';
+
+  @override
+  String get troubleshootingOpenFirewallPorts => '放开防火墙端口';
+
+  @override
+  String get troubleshootingOpeningFirewall => '等待管理员授权…';
+
+  @override
+  String get troubleshootingFirewallOpened => '已添加防火墙规则';
+
+  @override
+  String get troubleshootingFirewallCancelled => '已取消';
+
+  @override
+  String get troubleshootingFirewallFailed => '无法添加规则，请手动放行端口';
+
+  @override
+  String get troubleshootingVpnNone => '未检测到 VPN 或虚拟网卡';
+
+  @override
+  String troubleshootingVpnFound(String names) {
+    return '检测到疑似 VPN 或虚拟网卡：$names';
+  }
+
+  @override
   String get railUpdate => '更新';
 
   @override
