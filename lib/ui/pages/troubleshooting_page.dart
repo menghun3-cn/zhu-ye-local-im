@@ -182,6 +182,21 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
           message: blocked ? '' : l10n.troubleshootingFirewallNotNeeded,
           child: FilledButton.tonalIcon(
             onPressed: _openingFirewall || !blocked ? null : _openFirewall,
+            // The theme pins the filled style to the brand colour for *every*
+            // state, so a disabled button would still look pressable. Only the
+            // disabled colours are overridden here; enabled keeps the theme.
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.disabled)
+                    ? colors.surfaceSunken
+                    : null,
+              ),
+              foregroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.disabled)
+                    ? colors.disabledText
+                    : null,
+              ),
+            ),
             icon: const Icon(Icons.lock_open, size: 18),
             label: Text(
               _openingFirewall
