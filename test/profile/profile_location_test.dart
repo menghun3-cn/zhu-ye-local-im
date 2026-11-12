@@ -120,4 +120,44 @@ void main() {
       );
     });
   });
+
+  group('bubbleSkinDirectory', () {
+    test('is a subdirectory of the data directory on Windows', () {
+      expect(
+        bubbleSkinDirectory(
+          platform: DevicePlatform.windows,
+          environment: windowsEnvironment,
+        ),
+        r'C:\Users\owner\AppData\Roaming/LocalTransfer/bubble_skins',
+      );
+    });
+
+    test('is a subdirectory of the handed-over directory on Android', () {
+      expect(
+        bubbleSkinDirectory(
+          platform: DevicePlatform.android,
+          environment: const {},
+          appDataDirectory: '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files',
+        ),
+        '/data/user/0/io.menghun3_cn.zhu_ye_local_im/files/bubble_skins',
+      );
+    });
+
+    test('answers null when the host has nowhere durable to write', () {
+      expect(
+        bubbleSkinDirectory(
+          platform: DevicePlatform.android,
+          environment: const {},
+        ),
+        isNull,
+      );
+      expect(
+        bubbleSkinDirectory(
+          platform: DevicePlatform.other,
+          environment: const {},
+        ),
+        isNull,
+      );
+    });
+  });
 }

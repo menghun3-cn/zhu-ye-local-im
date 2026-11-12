@@ -1,6 +1,7 @@
 import '../clipboard/clipboard_capability.dart';
 import '../emoji/emoji_table.dart';
 import '../emoji/recent_emoji_store.dart';
+import 'bubble_skin.dart';
 import '../host/close_behaviour.dart';
 import '../identity/device_descriptor.dart';
 import '../identity/fingerprint.dart';
@@ -164,6 +165,8 @@ final class DeviceProfile {
     this.screenshotEnabled = true,
     this.screenshotHotkey = defaultScreenshotHotkey,
     Map<CaptureAction, String>? captureKeys,
+    this.outgoingBubbleSkin,
+    this.incomingBubbleSkin,
   }) : alias = DeviceProfile._sanitise(alias),
        group = group ?? OwnerGroup(self: self),
        captureKeys = {...defaultCaptureKeys, ...?captureKeys},
@@ -250,6 +253,21 @@ final class DeviceProfile {
   /// string here. [defaultScreenshotHotkey] is what an untouched profile
   /// resolves to.
   String screenshotHotkey;
+
+  /// The bubble skin for messages this Device sends, or null for the theme's
+  /// own colours.
+  ///
+  /// User data rather than a palette: a gradient or an image the user picked,
+  /// kept here beside the other preferences and applied only to this
+  /// installation — it is never announced and never synced. See
+  /// [BubbleSkin] for the two fills a bubble can wear.
+  BubbleSkin? outgoingBubbleSkin;
+
+  /// The bubble skin for messages this Device receives, or null for the
+  /// theme's own colours. Independent of [outgoingBubbleSkin]: the two sides
+  /// of a conversation are styled separately because they are read
+  /// separately.
+  BubbleSkin? incomingBubbleSkin;
 
   /// The key bindings inside the capture overlay, one per [CaptureAction].
   ///
@@ -417,6 +435,10 @@ final class DeviceProfile {
       for (final action in CaptureAction.values)
         action.wireName: captureKey(action),
     },
+    if (outgoingBubbleSkin != null)
+      'outgoingBubbleSkin': outgoingBubbleSkin!.toJson(),
+    if (incomingBubbleSkin != null)
+      'incomingBubbleSkin': incomingBubbleSkin!.toJson(),
     'known': [for (final device in knownDevices) device.toJson()],
     'recentEmojis': recentEmojis,
   };
@@ -486,6 +508,8 @@ final class DeviceProfile {
           : false,
       screenshotHotkey: _screenshotHotkey(json['screenshotHotkey']),
       captureKeys: _captureKeys(json['captureKeys']),
+      outgoingBubbleSkin: BubbleSkin.fromJson(json['outgoingBubbleSkin']),
+      incomingBubbleSkin: BubbleSkin.fromJson(json['incomingBubbleSkin']),
     );
   }
 

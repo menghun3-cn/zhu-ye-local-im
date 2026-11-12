@@ -441,6 +441,146 @@ void main() {
     });
   });
 
+  group('the bubble skins', () {
+    final gradient = GradientBubbleSkin(
+      colors: [0xFFA9DDBB, 0xFF4E9A6E],
+      direction: BubbleGradientDirection.vertical,
+      ink: BubbleSkinInk.dark,
+    );
+
+    test('start unset, and each side keeps its own choice', () async {
+      final hub = MemoryBeaconHub();
+      final solo = await startDevice(hub.a, 'Solo');
+
+      expect(solo.controller.outgoingBubbleSkin, isNull);
+      expect(solo.controller.incomingBubbleSkin, isNull);
+
+      await solo.controller.setBubbleSkin(outgoing: true, skin: gradient);
+      expect(solo.controller.outgoingBubbleSkin, gradient);
+      expect(solo.controller.incomingBubbleSkin, isNull);
+
+      await solo.controller.setBubbleSkin(outgoing: false, skin: gradient);
+      expect(solo.controller.incomingBubbleSkin, gradient);
+
+      await solo.controller.setBubbleSkin(outgoing: true, skin: null);
+      expect(solo.controller.outgoingBubbleSkin, isNull);
+      expect(solo.controller.incomingBubbleSkin, gradient);
+    });
+
+    test('a choice survives a restart over the same profile store', () async {
+      final hub = MemoryBeaconHub();
+      final store = MemoryProfileStore();
+      final first = await startDevice(hub.a, 'Solo', store: store);
+      await first.controller.setBubbleSkin(outgoing: true, skin: gradient);
+      await first.controller.close();
+
+      // A second Device over the same store is a restart, as far as the
+      // profile is concerned: what was chosen has to still be there.
+      final second = await startDevice(hub.a, 'Solo', store: store);
+      expect(second.controller.outgoingBubbleSkin, gradient);
+      expect(second.controller.incomingBubbleSkin, isNull);
+    });
+
+    test(
+      'importBubbleSkinImage copies the pick into the skin directory',
+      () async {
+        final hub = MemoryBeaconHub();
+        final directory = await Directory.systemTemp.createTemp(
+          'bubble-skins-test-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final clipboard = MemorySystemClipboard();
+        final controller = LocalTransferController(
+          store: MemoryProfileStore(),
+          beaconTransport: hub.a,
+          clipboard: clipboard,
+          alias: 'Solo',
+          bubbleSkinDirectory: directory.path,
+        );
+        await controller.start();
+        addTearDown(controller.close);
+
+        final picked = File('${directory.path}/picked.png')
+          ..writeAsBytesSync(const [1, 2, 3, 4]);
+        // The pick lives outside the skin directory, the way a real picker's
+        // answer does: what is stored must be the copy, not this path.
+        final stored = await controller.importBubbleSkinImage(picked.path);
+
+        expect(stored, isNotNull);
+        expect(stored, isNot(picked.path));
+        expect(stored, startsWith(directory.path));
+        expect(stored, endsWith('.png'));
+        expect(File(stored!).readAsBytesSync(), [1, 2, 3, 4]);
+      },
+    );
+
+    test('importBubbleSkinImage keeps the picked extension', () async {
+      final hub = MemoryBeaconHub();
+      final directory = await Directory.systemTemp.createTemp(
+        'bubble-skins-test-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final controller = LocalTransferController(
+        store: MemoryProfileStore(),
+        beaconTransport: hub.a,
+        clipboard: MemorySystemClipboard(),
+        alias: 'Solo',
+        bubbleSkinDirectory: directory.path,
+      );
+      await controller.start();
+      addTearDown(controller.close);
+
+      final picked = File('${directory.path}/photo.WEBP')
+        ..writeAsBytesSync(const [9, 9]);
+      final stored = await controller.importBubbleSkinImage(picked.path);
+      expect(stored, endsWith('.webp'));
+    });
+
+    test(
+      'importBubbleSkinImage answers null with nowhere to put the copy',
+      () async {
+        final hub = MemoryBeaconHub();
+        final solo = await startDevice(hub.a, 'Solo');
+        // No bubbleSkinDirectory was handed in: the honest answer is "cannot",
+        // not a path in a directory that does not exist.
+        final picked = File('${Directory.systemTemp.path}/pick.png')
+          ..writeAsBytesSync(const [1]);
+        addTearDown(() => picked.delete());
+        expect(
+          await solo.controller.importBubbleSkinImage(picked.path),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'importBubbleSkinImage answers null for a pick that is gone',
+      () async {
+        final hub = MemoryBeaconHub();
+        final directory = await Directory.systemTemp.createTemp(
+          'bubble-skins-test-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final controller = LocalTransferController(
+          store: MemoryProfileStore(),
+          beaconTransport: hub.a,
+          clipboard: MemorySystemClipboard(),
+          alias: 'Solo',
+          bubbleSkinDirectory: directory.path,
+        );
+        await controller.start();
+        addTearDown(controller.close);
+
+        expect(
+          await controller.importBubbleSkinImage(
+            '${directory.path}/never-existed.png',
+          ),
+          isNull,
+        );
+      },
+    );
+  });
+
   group('automatically connecting two Devices', () {
     test('discovery puts them in one group and starts them serving', () async {
       final hub = MemoryBeaconHub();

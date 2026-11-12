@@ -11,6 +11,7 @@ import '../pickers.dart';
 import '../seams.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
+import 'bubble_skin_picker.dart';
 
 InputDecoration _pathDecoration({
   required WeChatColors colors,
@@ -246,6 +247,48 @@ class SettingsPage extends StatelessWidget {
                   controller: controller,
                   platformDefault: seams.defaultIncomingDirectory,
                 ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        SectionHeader(title: l10n.settingsBubbles),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(WeChat.cardPadding),
+            child: Column(
+              children: [
+                for (final outgoing in [true, false])
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      outgoing
+                          ? Icons.north_east_outlined
+                          : Icons.south_west_outlined,
+                      size: 20,
+                    ),
+                    title: Text(
+                      outgoing ? l10n.bubbleSkinMine : l10n.bubbleSkinTheirs,
+                    ),
+                    subtitle: Text(
+                      bubbleSkinLabel(
+                        l10n,
+                        outgoing
+                            ? controller.outgoingBubbleSkin
+                            : controller.incomingBubbleSkin,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => unawaited(
+                      showDialog<void>(
+                        context: context,
+                        builder: (context) => BubbleSkinPicker(
+                          outgoing: outgoing,
+                          controller: controller,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

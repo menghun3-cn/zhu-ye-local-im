@@ -99,6 +99,7 @@ final class LocalTransferController {
     this.pairingDialTransport,
     this.addressProbe,
     TailscaleDirectory? tailscaleDirectory,
+    String? bubbleSkinDirectory,
   }) : // A named parameter cannot be a private field, so each of these is
        // assigned here. The lint that asks for an initializing formal cannot be
        // satisfied when the field is private and the parameter is named.
@@ -124,6 +125,8 @@ final class LocalTransferController {
        _hostShell = hostShell,
        // ignore: prefer_initializing_formals
        _tailscale = tailscaleDirectory ?? TailscaleDirectory(),
+       // ignore: prefer_initializing_formals
+       _bubbleSkinDirectory = bubbleSkinDirectory,
        _clock = clock ?? DateTime.now;
 
   final ProfileStore _store;
@@ -210,6 +213,16 @@ final class LocalTransferController {
   /// Only a test replaces it: production reads tailscaled's local API, which
   /// a test link cannot and should not model.
   final TailscaleDirectory _tailscale;
+
+  /// Where copies of user-picked bubble-skin pictures are kept, or null when
+  /// this Device has nowhere durable to write.
+  ///
+  /// Injected rather than looked up for the same reason
+  /// [_defaultIncomingDirectory] is: where that is depends on the platform,
+  /// and `lib/app` may not ask a platform anything. Null means image skins
+  /// cannot be adopted — the picker seam still offers them, and the import
+  /// below answers null so the surface can say why nothing was saved.
+  final String? _bubbleSkinDirectory;
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -857,6 +870,79 @@ final class LocalTransferController {
     await _hostShell?.setCloseToTray(value == CloseBehaviour.minimiseToTray);
     await _persist();
     _notify();
+  }
+
+  /// The bubble skin for messages this Device sends, or null for the theme's
+  /// own colours.
+  BubbleSkin? get outgoingBubbleSkin => _local?.profile.outgoingBubbleSkin;
+
+  /// The bubble skin for messages this Device receives, or null for the
+  /// theme's own colours.
+  BubbleSkin? get incomingBubbleSkin => _local?.profile.incomingBubbleSkin;
+
+  /// Sets the bubble skin for one side of the conversation, and persists it.
+  ///
+  /// [outgoing] picks which side: true is what this Device sends, false what
+  /// it receives. A null [skin] restores the theme's own colours. Gradient
+  /// and bundled-image skins pass straight through; a *file* image skin must
+  /// come through [importBubbleSkinImage] first, so that what is stored is
+  /// the app's own copy rather than the picker path — this setter does not
+  /// re-check that, because the profile is also where an older build's skin
+  /// is read back from and refusing it there would lose the user's choice.
+  Future<void> setBubbleSkin({
+    required bool outgoing,
+    required BubbleSkin? skin,
+  }) async {
+    final local = _requireLocal();
+    if (outgoing) {
+      if (local.profile.outgoingBubbleSkin == skin) return;
+      local.profile.outgoingBubbleSkin = skin;
+    } else {
+      if (local.profile.incomingBubbleSkin == skin) return;
+      local.profile.incomingBubbleSkin = skin;
+    }
+    await _persist();
+    _notify();
+  }
+
+  /// Copies [sourcePath] — a picture the user just picked — into this
+  /// Device's bubble-skin directory and answers the stored path, or null
+  /// when there is nowhere to put it or the copy failed.
+  ///
+  /// The copy is the whole point: a picker answer is a path into somebody
+  /// else's directory (on Android, often a `content://` URI surfaced as a
+  /// cache file the OS may purge at any time), and a skin that silently
+  /// reverts because its picture moved is worse than one that was never
+  /// offered. What the profile stores is the copy's path, which this Device
+  /// owns.
+  Future<String?> importBubbleSkinImage(String sourcePath) async {
+    final directory = _bubbleSkinDirectory;
+    if (directory == null) return null;
+    final source = File(sourcePath);
+    if (!source.existsSync()) return null;
+    try {
+      await Directory(directory).create(recursive: true);
+      // A timestamp-plus-random name: two picks in the same second must not
+      // overwrite each other, and a name the user can recognise in the
+      // directory is a name that reads like a cache entry — which it is.
+      final stamp = _clock().millisecondsSinceEpoch;
+      final suffix = _unsentIds.nextInt(1 << 32).toRadixString(16);
+      final extension = _extensionOf(sourcePath);
+      final target = '$directory/skin-$stamp-$suffix$extension';
+      await source.copy(target);
+      return target;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The file extension [path] ends with, dot included, lower-cased — or the
+  /// empty string when it has none. The copy keeps the picked format because
+  /// the decoder reads it back by the same bytes.
+  static String _extensionOf(String path) {
+    final dot = path.lastIndexOf('.');
+    if (dot < 0 || dot == path.length - 1) return '';
+    return path.substring(dot).toLowerCase();
   }
 
   /// How often this Device asks GitHub whether a newer build has been
