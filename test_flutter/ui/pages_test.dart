@@ -15,8 +15,9 @@ import 'package:local_transfer/ui/pages/conversations_page.dart';
 import 'package:local_transfer/ui/pages/devices_page.dart';
 import 'package:local_transfer/ui/pages/settings_page.dart';
 import 'package:local_transfer/ui/pages/transfers_page.dart';
+import 'package:local_transfer/ui/open_file.dart';
 import 'package:local_transfer/ui/pickers.dart';
-import 'package:local_transfer/ui/reveal.dart';
+import 'package:local_transfer/ui/system_reveal.dart';
 import 'package:local_transfer/ui/wechat/bubble.dart';
 import 'package:local_transfer/ui/wechat/image_bubble.dart';
 import 'package:local_transfer/ui/wechat/theme.dart';
@@ -3541,6 +3542,113 @@ void main() {
 
       await shutdown(tester, [alice, bob]);
     });
+  });
+
+  group('opening a landed file', () {
+    testWidgets(
+      'a completed file opens from its bubble, its menu and its card',
+      (tester) async {
+        // The real opener hands the file to the operating system's shell, so
+        // the seam stands in for it: what is under test is that each surface
+        // asks for the file that landed, not that this machine can open one.
+        final opener = ScriptedFileOpener.install();
+        addTearDown(OpenResolution.reset);
+        final hub = MemoryBeaconHub();
+        final alice = await startUiDevice(tester, hub.a, 'Alice');
+        final bob = await startUiDevice(tester, hub.b, 'Bob');
+        await pairDevices(tester, alice, bob);
+        await connectDevices(tester, alice, bob);
+
+        final home = tempDirectory('local-transfer-open-out-');
+        final source = File('${home.path}${Platform.pathSeparator}report.bin');
+        source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+        final inbox = tempDirectory('local-transfer-open-in-');
+
+        await offerFile(tester, alice, source);
+        await pumpUntil(
+          tester,
+          () => bob.offers.isNotEmpty,
+          description: 'Bob to be offered the file',
+        );
+        await tester.runAsync(
+          () => bob.controller.acceptInto(bob.offers.single, inbox),
+        );
+        await pumpUntil(
+          tester,
+          () => bob.controller.transfers.any((view) => view.localPath != null),
+          description: 'the file to land on Bob',
+        );
+        final landed = bob.controller.transfers.single.localPath;
+        expect(landed, isNotNull);
+
+        // The bubble itself: a tap on the file opens it, the way a
+        // double-click does in a file manager.
+        await pumpWindow(tester, bob);
+        await openTab(tester, l10n.tabConversation, window: windowA);
+        await pumpUntil(
+          tester,
+          () => conversationListed(windowA, 'Alice'),
+          description: 'the conversation to be listed',
+        );
+        await openConversation(tester, windowA, name: 'Alice');
+        await pumpUntil(
+          tester,
+          () => onConversation(
+            windowA,
+            find.text('report.bin'),
+          ).evaluate().isNotEmpty,
+          description: 'the landed file to be a message',
+        );
+        await tester.tap(onConversation(windowA, find.text('report.bin')));
+        await pumpUntil(
+          tester,
+          () => opener.opened.isNotEmpty,
+          description: 'the bubble tap to open the file',
+        );
+        expect(opener.opened.single, landed);
+
+        // And the same answer stays in the context menu, beside the folder.
+        await rightClick(
+          tester,
+          onConversation(windowA, find.text('report.bin')),
+        );
+        await pumpUntil(
+          tester,
+          () => windowA.within(find.text(l10n.openFile)).evaluate().isNotEmpty,
+          description: 'the context menu to offer opening the file',
+        );
+        await tester.tap(windowA.within(find.text(l10n.openFile)));
+        await pumpUntil(
+          tester,
+          () => opener.opened.length == 2,
+          description: 'the menu line to open the file',
+        );
+        expect(opener.opened.last, landed);
+
+        // The Transfers card carries it too, next to the folder action.
+        await openTab(tester, l10n.tabTransfers, window: windowA);
+        await pumpUntil(
+          tester,
+          () => onPage(
+            windowA,
+            TransfersPage,
+            find.byTooltip(l10n.openFile),
+          ).evaluate().isNotEmpty,
+          description: 'the card to offer opening the file',
+        );
+        await tester.tap(
+          onPage(windowA, TransfersPage, find.byTooltip(l10n.openFile)),
+        );
+        await pumpUntil(
+          tester,
+          () => opener.opened.length == 3,
+          description: 'the card action to open the file',
+        );
+        expect(opener.opened.last, landed);
+
+        await shutdown(tester, [alice, bob]);
+      },
+    );
   });
 
   group('a picture on a conversation', () {

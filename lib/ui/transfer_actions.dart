@@ -13,7 +13,8 @@ import 'dialogs.dart';
 import 'feedback.dart';
 import 'forward.dart';
 import 'l10n/generated/app_localizations.dart';
-import 'reveal.dart';
+import 'open_file.dart';
+import 'system_reveal.dart';
 import 'top_toast.dart';
 
 /// What can be done with a Transfer, in one place.
@@ -276,6 +277,14 @@ String _previewOf(TransferView view) {
 /// and false for text, which is not a file at all.
 bool canRevealTransfer(TransferView view) => view.localPath != null;
 
+/// Whether [view] names a file on this machine that can be opened.
+///
+/// The same predicate as [canRevealTransfer] — a path on this machine is what
+/// both answers need — and offered beside it rather than instead of it:
+/// "open it" and "show me where it is" are the two questions a received file
+/// gets asked, and a platform that can only answer one still owes the other.
+bool canOpenTransferFile(TransferView view) => view.localPath != null;
+
 /// Shows [view]'s file in this machine's file manager.
 ///
 /// A failure is said out loud rather than raised: a platform with no file
@@ -292,6 +301,26 @@ Future<void> revealTransfer(BuildContext context, TransferView view) async {
   if (await RevealResolution.revealer.reveal(path)) return;
   if (overlay == null) return;
   await TopToast.showIn(overlay, l10n.cannotOpenFolder);
+}
+
+/// Opens [view]'s file with this machine's default handler for its type.
+///
+/// On Windows that is whatever the file is associated with; on Android it is
+/// the system's "open with", which is also how a received APK reaches the
+/// package installer. A failure is said out loud for the same reason a failed
+/// reveal is: a file that has been moved or deleted, and a type nothing on
+/// the machine claims, are both ordinary — and "nothing happened" is not
+/// something a user can act on.
+Future<void> openTransferFile(BuildContext context, TransferView view) async {
+  final path = view.localPath;
+  if (path == null) return;
+  final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  // Through the seam, so a widget test can assert the path it was handed
+  // without a document or an activity opening on the test machine.
+  if (await OpenResolution.opener.open(path)) return;
+  if (overlay == null) return;
+  await TopToast.showIn(overlay, l10n.cannotOpenFile);
 }
 
 /// Whether [view] is a picture whose bytes are on this machine and can
@@ -523,6 +552,7 @@ class TransferContextMenu extends StatelessWidget {
     // the time one of these is chosen, and the list must not change under the
     // menu the user is looking at either.
     final reveal = canRevealTransfer(view);
+    final openFile = canOpenTransferFile(view);
     final copyImage = canCopyImage(view);
     final copyText = canCopyText(view);
     final cancel = canCancelTransfer(view);
@@ -596,6 +626,12 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.folder_open_outlined,
             label: l10n.openContainingFolder,
           ),
+        if (openFile)
+          _item(
+            value: _openFileAction,
+            icon: Icons.file_open_outlined,
+            label: l10n.openFile,
+          ),
         if (copyImage)
           _item(
             value: _copyAction,
@@ -647,6 +683,8 @@ class TransferContextMenu extends StatelessWidget {
         await cancelSend(context, view);
       case _revealAction:
         await revealTransfer(context, view);
+      case _openFileAction:
+        await openTransferFile(context, view);
       case _copyAction:
         await copyTransferImage(context, view);
       case _copyTextAction:
@@ -710,6 +748,7 @@ class TransferContextMenu extends StatelessWidget {
 const String _copySelectionAction = 'copy-selection';
 const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
+const String _openFileAction = 'open-file';
 const String _copyAction = 'copy';
 const String _withdrawAction = 'withdraw';
 const String _shareByLinkAction = 'share-by-link';

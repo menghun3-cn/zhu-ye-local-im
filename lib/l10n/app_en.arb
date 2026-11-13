@@ -247,6 +247,8 @@
   "whereShouldThisArrive": "Where should this arrive?",
   "openContainingFolder": "Open containing folder",
   "cannotOpenFolder": "Could not open that folder.",
+  "openFile": "Open",
+  "cannotOpenFile": "Could not open that file.",
   "copyImage": "Copy image",
   "cannotCopyImage": "Could not copy that image.",
   "copyText": "Copy text",

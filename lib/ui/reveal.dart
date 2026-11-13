@@ -6,43 +6,18 @@ import 'dart:io';
 /// `FilePicker` is one: opening the folder hands over to the operating system's
 /// shell, which runs outside Flutter's event loop. A widget test that drove the
 /// real thing would launch an Explorer window on the machine running the suite —
-/// a side effect with no bearing on what the test asserts. `RevealResolution` is
-/// the substitution point: production leaves the field alone and gets
-/// [SystemRevealer], and a test sets it, drives the flow through a stand-in, and
-/// clears it again in a `tearDown`.
+/// a side effect with no bearing on what the test asserts. `RevealResolution`
+/// (in `system_reveal.dart`, beside the platform channel it needs on Android)
+/// is the substitution point: production leaves the field alone and gets
+/// `SystemRevealer`, and a test sets it, drives the flow through a stand-in,
+/// and clears it again in a `tearDown`.
+///
+/// This file stays free of Flutter imports on purpose: `test/ui/reveal_test.dart`
+/// runs under plain `dart test`, which cannot load `dart:ui`.
 abstract interface class Revealer {
   /// Shows [path] to the user in this machine's file manager, and answers
   /// whether it managed to.
   Future<bool> reveal(String path);
-}
-
-/// The real revealer: the platform's own shell.
-///
-/// The application ships no launcher plugin — that is a *native* registration
-/// bought for one call — so the platform's own shell is asked instead, the same
-/// way `external_links.dart` asks it to open a web address. Windows only, and
-/// for the same reason it is Windows only there: `explorer` is that platform's
-/// file manager, and the two platforms this build is aimed at are Windows and an
-/// unverified Android. Anywhere else this answers false and the caller says so
-/// rather than leaving a menu item that does nothing.
-final class SystemRevealer implements Revealer {
-  const SystemRevealer();
-
-  @override
-  Future<bool> reveal(String path) async {
-    if (!Platform.isWindows) return false;
-    final folder = folderOf(path);
-    if (folder == null) return false;
-    try {
-      // The shell, not a themed window: this hands over to the same Explorer the
-      // user already has open, which is the whole point of showing them where
-      // the file went.
-      await Process.run('explorer', [explorerArgument(folder)]);
-      return true;
-    } on Object {
-      return false;
-    }
-  }
 }
 
 /// The one argument [folder] becomes on `explorer`'s command line.
@@ -68,20 +43,6 @@ final class SystemRevealer implements Revealer {
 /// the rest of the app uses, because `\` is not a fact about the folder, it is a
 /// fact about Explorer.
 String explorerArgument(String folder) => folder.replaceAll('/', r'\');
-
-/// Which revealer the surfaces use.
-///
-/// A single mutable field rather than a parameter threaded through the widget
-/// tree, for the same reason the composer's `PickerResolution` is one: the
-/// action is offered by more than one surface, and a test-only argument on all
-/// of them would put the seam in the application's vocabulary.
-abstract final class RevealResolution {
-  /// The revealer in force. Set by a test; never by the application.
-  static Revealer revealer = const SystemRevealer();
-
-  /// Restores [SystemRevealer]. Called from a `tearDown`.
-  static void reset() => revealer = const SystemRevealer();
-}
 
 /// The folder [path] names a file inside, or null when it names no folder.
 ///
