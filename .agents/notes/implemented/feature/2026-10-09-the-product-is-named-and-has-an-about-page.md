@@ -80,10 +80,12 @@ what the plugin would have bought, without a native dependency.
 
 **Use `url_launcher` to open the download page.** Same trade: a native
 registration for one call. `openInBrowser` asks the platform's own shell
-(`cmd /c start "" <url>`) on Windows instead, and refuses anything that is not an
-`https` address on `github.com` before it goes near a shell — the address
-normally comes from a GitHub response, but a shell is a shell, and the check is
-what stops a crafted one being read as further commands.
+instead — `cmd /c start` at the time, `rundll32 url.dll,FileProtocolHandler`
+since message links made the address peer-written text — and refuses anything
+that is not an http(s) address before it goes near a shell; the host whitelist
+this paragraph once described was widened when links moved into messages, as
+[2026-11-13-addresses-in-a-message-are-clickable-links](2026-11-13-addresses-in-a-message-are-clickable-links.md)
+records.
 
 **Auto-download and install the newer build.** The largest version of the
 request, and rejected: writing and launching an installer is a native,

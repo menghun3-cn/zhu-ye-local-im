@@ -60,3 +60,4 @@ export 'transfer/transfer_limits.dart';
 export 'transport/byte_transport.dart';
 export 'update/update_check_interval.dart';
 export 'util/crockford_base32.dart';
+export 'util/message_links.dart';

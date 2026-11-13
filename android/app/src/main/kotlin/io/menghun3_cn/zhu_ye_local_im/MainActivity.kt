@@ -48,6 +48,15 @@ class MainActivity : FlutterActivity() {
         }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
+            "cn.hnasct.local_transfer/browser",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openUrl" -> openUrl(call, result)
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
             "cn.hnasct.local_transfer/update",
         ).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -100,6 +109,39 @@ class MainActivity : FlutterActivity() {
             result.success(true)
         } catch (error: Exception) {
             result.error("open_failed", error.message, path)
+        }
+    }
+
+    /**
+     * Hands a web address to whatever browser the user has.
+     *
+     * The address comes out of a received message, so it is checked here as
+     * well as on the Dart side: only http and https with a real host are
+     * offered to `ACTION_VIEW`, and anything else answers false rather than
+     * firing an intent at a scheme the system would have to guess about.
+     */
+    private fun openUrl(call: MethodCall, result: MethodChannel.Result) {
+        val raw = call.argument<String>("url")
+        val uri = raw?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (uri == null ||
+            (uri.scheme != "http" && uri.scheme != "https") ||
+            uri.host.isNullOrEmpty()
+        ) {
+            result.success(false)
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (packageManager.queryIntentActivities(intent, 0).isEmpty()) {
+                result.success(false)
+                return
+            }
+            startActivity(intent)
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("open_failed", error.message, raw)
         }
     }
 

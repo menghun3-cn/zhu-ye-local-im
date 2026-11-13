@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-13-addresses-in-a-message-are-clickable-links.md
+#   git hash-object 2026-11-13-addresses-in-a-message-are-clickable-links.zh.md
+2026-11-13-addresses-in-a-message-are-clickable-links.md: c1b607944ad1bca6602119cda2588948f4fc8e27
+2026-11-13-addresses-in-a-message-are-clickable-links.zh.md: f09652146477f03d98c34eb4c63c8f140083f06e

@@ -1,39 +1,47 @@
 import 'dart:io';
 
+import 'android_browser.dart';
+
 /// Opens a web page in whatever browser the machine has, and says whether it
 /// managed to.
 ///
 /// The application ships no launcher plugin — `url_launcher` is a *native*
-/// registration bought for one call — so the platform's own shell is asked
-/// instead. Windows only: `cmd /c start` is that platform's "open this with its
-/// default handler", and the two platforms this build is aimed at are Windows
-/// and an unverified Android. Anywhere else this answers false, and the caller
-/// leaves the address on screen to be copied by hand.
+/// registration bought for a call the platform's own shell already answers —
+/// so each platform is asked directly instead. Windows hands the address to
+/// `rundll32`'s `url.dll,FileProtocolHandler`, which is `start`'s "open this
+/// with its default handler" without a command shell in between: an address
+/// now comes out of a *message*, and `&` in a query string is not a command
+/// separator to hand to `cmd`. Android asks its own runner's channel, which
+/// fires an `ACTION_VIEW` intent. Anywhere else this answers false, and the
+/// caller leaves the address on screen to be copied by hand.
 ///
-/// [url] is checked before it goes anywhere near a shell, and only https links
-/// to github.com pass. The address normally comes out of a GitHub response, but
-/// a shell is a shell: the check is what keeps a crafted one from being read as
-/// further commands.
+/// [url] is checked before it goes anywhere near a shell or an intent, and
+/// only http and https addresses pass. The address normally comes out of a
+/// GitHub response or a received message — the second is peer-written text,
+/// which is why the check is a scheme whitelist rather than a host one.
 Future<bool> openInBrowser(String url) async {
-  if (!isOpenableLink(url) || !Platform.isWindows) return false;
-  try {
-    // The empty argument is the window title `start` expects before whatever it
-    // is being asked to open; without it a quoted address would be taken as the
-    // title and nothing would open.
-    await Process.run('cmd', ['/c', 'start', '', url]);
-    return true;
-  } on Object {
-    return false;
+  if (!isOpenableLink(url)) return false;
+  if (Platform.isWindows) {
+    try {
+      await Process.run('rundll32', ['url.dll,FileProtocolHandler', url]);
+      return true;
+    } on Object {
+      return false;
+    }
   }
+  if (Platform.isAndroid) return openAndroidLink(url);
+  return false;
 }
 
-/// Whether [url] is an https address on github.com, and so safe to hand to a
-/// shell.
+/// Whether [url] is an http or https address a browser can be handed.
 bool isOpenableLink(String url) {
   final uri = Uri.tryParse(url);
-  if (uri == null || uri.scheme != 'https') return false;
-  final host = uri.host;
-  return host == 'github.com' || host.endsWith('.github.com');
+  if (uri == null || uri.host.isEmpty) return false;
+  final scheme = uri.scheme.toLowerCase();
+  if (scheme != 'http' && scheme != 'https') return false;
+  // A space or a control character would split the address somewhere between
+  // here and the browser; a URI never legitimately carries one.
+  return !url.contains(RegExp(r'[\x00-\x20]'));
 }
 
 /// The browser this Device opens a web address with.
@@ -66,9 +74,9 @@ final class SystemLinkOpener implements LinkOpener {
 ///
 /// A single mutable field rather than a parameter threaded through the widget
 /// tree, for the same reason `RevealResolution` is one: a download link is
-/// offered by more than one surface — the About card and the rail's update
-/// entry — and a test-only argument on both would put the seam in the
-/// application's vocabulary.
+/// offered by more than one surface — the About card, the rail's update
+/// entry, and now every URL inside a message — and a test-only argument on
+/// all of them would put the seam in the application's vocabulary.
 abstract final class LinkResolution {
   /// The opener in force. Set by a test; never by the application.
   static LinkOpener opener = const SystemLinkOpener();
