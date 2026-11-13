@@ -87,11 +87,13 @@ quotes the whole of it, which breaks the pairing. A space in a path is the
 ordinary case on Windows, so the reliable half is taken: the folder opens, and
 the file is in it.
 
-**Windows only, and it says so.** `SystemRevealer` asks the platform's own shell
-(`explorer <folder>`) — the same trade `external_links.dart` makes to open a web
-address, rather than buying a native launcher registration for one call — and
-answers false anywhere else. The caller shows `cannotOpenFolder` rather than
-leaving a menu item that does nothing.
+**It says so when it cannot.** `SystemRevealer` asks the platform's own shell —
+`explorer <folder>` on Windows, the runner's `files` channel on Android (see
+`2026-11-12-tapping-a-landed-file-opens-it`) — the same trade
+`external_links.dart` makes to open a web address, rather than buying a native
+launcher registration for one call — and answers false anywhere else, or where
+Android has no file manager that will show the folder. The caller shows
+`cannotOpenFolder` rather than leaving a menu item that does nothing.
 
 ## Alternatives considered
 

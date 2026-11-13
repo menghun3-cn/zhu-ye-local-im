@@ -4,18 +4,21 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 /**
  * The application's own platform channel.
  *
- * This project ships no plugins, so the one Android fact Dart cannot read for
- * itself — where this app may keep files — is answered here. The channel
- * answers that and nothing else: it is a door, and it opens onto one string.
+ * This project ships no plugins, so the Android facts Dart cannot answer for
+ * itself come through the channels registered here: where this app may keep
+ * files, what the system's installers and handlers can be handed, and nothing
+ * else — each is a door onto one question.
  *
  * The Dart side treats a missing answer as "nowhere to write" and runs with
  * its identity in memory, so a platform that has not implemented this channel
@@ -35,6 +38,16 @@ class MainActivity : FlutterActivity() {
         }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
+            "cn.hnasct.local_transfer/files",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openFile" -> openPath(call, result, directory = false)
+                "openFolder" -> openPath(call, result, directory = true)
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
             "cn.hnasct.local_transfer/update",
         ).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -42,6 +55,64 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /**
+     * Hands a file — or the folder holding it — to Android's own handlers.
+     *
+     * Both go through the FileProvider because another application may be
+     * handed a `content://` URI with a read grant and nothing else: a
+     * `file://` path is one Android refuses to open for us. A file is offered
+     * as its real MIME type, so an APK reaches the package installer and a
+     * document reaches whatever application claims it; a folder is offered as
+     * `resource/folder` for the file managers that understand it — and for
+     * the ones that do not, and for the app's private directories none of
+     * them can browse, the answer is simply false.
+     */
+    private fun openPath(call: MethodCall, result: MethodChannel.Result, directory: Boolean) {
+        val path = call.argument<String>("path")
+        if (path.isNullOrBlank()) {
+            result.error("bad_arguments", "openFile/openFolder expect a path", null)
+            return
+        }
+        val target = File(path)
+        val usable = if (directory) target.isDirectory else target.isFile
+        if (!usable) {
+            result.error("missing_path", "nothing to open at $path", path)
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.update_file_provider",
+                target,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, if (directory) "resource/folder" else mimeOf(target))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (packageManager.queryIntentActivities(intent, 0).isEmpty()) {
+                result.success(false)
+                return
+            }
+            startActivity(intent)
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("open_failed", error.message, path)
+        }
+    }
+
+    /**
+     * The MIME type [file] is offered under. `MimeTypeMap` knows the common
+     * ones; the APK type is named here because it is the one this app most
+     * expects to be opened — a received update is exactly that file.
+     */
+    private fun mimeOf(file: File): String {
+        val extension = file.extension.lowercase()
+        if (extension == "apk") return "application/vnd.android.package-archive"
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            ?: "*/*"
     }
 
     /**
