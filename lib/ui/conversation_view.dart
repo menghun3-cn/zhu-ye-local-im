@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +12,7 @@ import '../core/core.dart';
 import 'clipboard_paste.dart';
 import 'controller_scope.dart';
 import 'emoji_picker.dart';
+import 'external_links.dart';
 import 'feedback.dart';
 import 'forward.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -2144,13 +2146,14 @@ class MessageBubble extends StatelessWidget {
     }
     final text = view.text;
     if (view.kind == PayloadKind.text && text != null) {
-      return Text(
-        text,
+      return _LinkifiedText(
+        text: text,
         style: TextStyle(
           fontSize: WeChat.fontSizeBody,
           height: WeChat.lineHeightBody,
           color: ink,
         ),
+        linkColor: colors.brandStrong,
       );
     }
     if (view.kind == PayloadKind.image) return _image(contentWidth, ink);
@@ -2359,5 +2362,122 @@ class _BubbleAction extends StatelessWidget {
       ),
     );
     return TextButton(onPressed: onPressed, style: style, child: Text(label));
+  }
+}
+
+/// A message's words, with the web addresses in them drawn as links.
+///
+/// A plain [Text] cannot answer a tap on *part* of itself, so the text is
+/// built as spans: everything [messageLinks] does not claim is ordinary ink,
+/// and each address gets the underline and the theme's link colour plus a
+/// [TapGestureRecognizer] that hands it to [LinkResolution]. The
+/// [SelectionArea] around the conversation still selects across the whole
+/// message — a drag is not a tap, so the two gestures do not fight, and a
+/// copied range still carries the address's own characters.
+///
+/// Stateful for one reason: a span's recognizer is a gesture arena entrant
+/// that must be disposed, and the spans are rebuilt whenever the text or the
+/// paint changes — both of which are facts this widget owns rather than
+/// arguments a [StatelessWidget] could honour.
+class _LinkifiedText extends StatefulWidget {
+  const _LinkifiedText({
+    required this.text,
+    required this.style,
+    required this.linkColor,
+  });
+
+  /// The message's words.
+  final String text;
+
+  /// The style every span inherits — size, height and the bubble's ink.
+  final TextStyle style;
+
+  /// What an address is drawn in.
+  final Color linkColor;
+
+  @override
+  State<_LinkifiedText> createState() => _LinkifiedTextState();
+}
+
+class _LinkifiedTextState extends State<_LinkifiedText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+  late TextSpan _root;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuild();
+  }
+
+  @override
+  void didUpdateWidget(_LinkifiedText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text ||
+        oldWidget.style != widget.style ||
+        oldWidget.linkColor != widget.linkColor) {
+      _rebuild();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    super.dispose();
+  }
+
+  void _rebuild() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+    final text = widget.text;
+    final links = messageLinks(text);
+    if (links.isEmpty) {
+      _root = TextSpan(text: text, style: widget.style);
+      return;
+    }
+    final linkStyle = widget.style.merge(
+      TextStyle(color: widget.linkColor, decoration: TextDecoration.underline),
+    );
+    final children = <InlineSpan>[];
+    var cursor = 0;
+    for (final link in links) {
+      if (link.start > cursor) {
+        children.add(
+          TextSpan(
+            text: text.substring(cursor, link.start),
+            style: widget.style,
+          ),
+        );
+      }
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => unawaited(LinkResolution.opener.open(link.url));
+      _recognizers.add(recognizer);
+      children.add(
+        TextSpan(
+          text: text.substring(link.start, link.end),
+          style: linkStyle,
+          recognizer: recognizer,
+        ),
+      );
+      cursor = link.end;
+    }
+    if (cursor < text.length) {
+      children.add(TextSpan(text: text.substring(cursor), style: widget.style));
+    }
+    _root = TextSpan(style: widget.style, children: children);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // No address in the message: the ordinary [Text], exactly as before
+    // links existed — same widget type, so nothing that finds or selects
+    // text has to know the difference.
+    if (_root.children == null) {
+      return Text(widget.text, style: widget.style);
+    }
+    return Text.rich(_root);
   }
 }

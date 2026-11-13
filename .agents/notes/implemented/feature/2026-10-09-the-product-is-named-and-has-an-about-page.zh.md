@@ -56,9 +56,10 @@ Windows 窗口标题、以及 `windows/runner/Runner.rc` 里可执行文件的 `
 `pubspec.yaml`，两者一漂移就让构建失败 —— 这恰好就是那个插件能买到的一切，还不带原生依赖。
 
 **用 `url_launcher` 打开下载页。** 同一个取舍：为一个调用买一个原生注册。`openInBrowser`
-改问 Windows 自己的 shell（`cmd /c start "" <url>`），并且在地址靠近 shell 之前，拒绝一切
-不是 `github.com` 上 `https` 地址的东西 —— 地址通常来自 GitHub 的响应，但 shell 就是 shell，
-这道检查正是用来拦住一个被构造出来的地址被读成后续命令的。
+改问平台自己的 shell——当时是 `cmd /c start`，自从链接进入消息、地址变成对端写的文本后
+改为 `rundll32 url.dll,FileProtocolHandler`——并且在地址靠近 shell 之前，拒绝一切不是
+http(s) 地址的东西；本段当初描述的 host 白名单在链接进入消息时被放宽，记录见
+[2026-11-13-addresses-in-a-message-are-clickable-links](2026-11-13-addresses-in-a-message-are-clickable-links.zh.md)。
 
 **自动下载并安装新版本。** 这是要求最大的那种版本，被否掉了：写一个安装器并启动它，是一项
 原生的、平台相关的、安全敏感的能力，而这个程序没有签名方案。关于页把链接交给用户；安装，仍然
