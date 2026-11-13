@@ -17,6 +17,7 @@ import 'package:test/test.dart';
 /// rot the moment somebody tidied a constant.
 const String _seamsPath = 'lib/ui/seams.dart';
 const String _androidInstallerPath = 'lib/ui/android_package_installer.dart';
+const String _androidBrowserPath = 'lib/ui/android_browser.dart';
 const String _kotlinPath =
     'android/app/src/main/kotlin/io/menghun3_cn/zhu_ye_local_im/MainActivity.kt';
 const String _manifestPath = 'android/app/src/main/AndroidManifest.xml';
@@ -226,6 +227,44 @@ void main() {
       expect(paths, contains('path="update/"'));
       expect(kotlin, contains('canRequestPackageInstalls()'));
       expect(kotlin, contains('Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES'));
+    });
+  });
+
+  group('the Android browser bridge', () {
+    test('Dart and Kotlin name the same channel and method', () {
+      final dart = _read(_androidBrowserPath);
+      final kotlin = _read(_kotlinPath);
+      final channel = _capture(
+        dart,
+        RegExp(r"androidBrowserChannel\s*=\s*MethodChannel\(\s*'([^']+)'"),
+        'the Android browser channel',
+      );
+      final method = _capture(
+        dart,
+        RegExp(r"openUrlMethod\s*=\s*'([^']+)'"),
+        'the Android open-url method',
+      );
+
+      expect(channel, 'cn.hnasct.local_transfer/browser');
+      expect(kotlin, contains('"$channel"'));
+      expect(kotlin, contains('"$method"'));
+    });
+
+    test('the intent is restricted to web schemes a browser answers', () {
+      // The address comes out of a received message — peer-written text — so
+      // the Kotlin side re-checks what Dart already checked: an ACTION_VIEW
+      // fired at `file:` or `intent:` would be the app lending its own
+      // identity to somebody else's scheme.
+      final kotlin = _read(_kotlinPath);
+      final manifest = _read(_manifestPath);
+
+      expect(kotlin, contains('Intent.ACTION_VIEW'));
+      expect(kotlin, contains('uri.scheme != "http"'));
+      expect(kotlin, contains('uri.scheme != "https"'));
+      // Package visibility on Android 11+ hides browsers from
+      // queryIntentActivities unless the schemes are declared.
+      expect(manifest, contains('android.intent.action.VIEW'));
+      expect(manifest, contains('android:scheme="https"'));
     });
   });
 }
