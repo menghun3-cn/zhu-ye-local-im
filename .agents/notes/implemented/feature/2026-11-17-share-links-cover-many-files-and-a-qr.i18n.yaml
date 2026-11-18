@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-17-share-links-cover-many-files-and-a-qr.md
+#   git hash-object 2026-11-17-share-links-cover-many-files-and-a-qr.zh.md
+2026-11-17-share-links-cover-many-files-and-a-qr.md: bebd10cb955756bbdc96d8b7a5245ca159648f0f
+2026-11-17-share-links-cover-many-files-and-a-qr.zh.md: 5e721ffe8980e94d524f92c19b1d6a6b946025e5

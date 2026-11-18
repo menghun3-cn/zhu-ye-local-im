@@ -84,4 +84,111 @@ void main() {
     );
     expect(response.statusCode, HttpStatus.notFound);
   });
+
+  group('share links', () {
+    /// The `/f/` URL for file [index] of the share [link] points at.
+    Uri shareFileUri(String link, int index) {
+      final token = Uri.parse(link).pathSegments.last;
+      return Uri.parse('http://127.0.0.1:${server.actualPort}/f/$token/$index');
+    }
+
+    test('serves a page listing every file in the share', () async {
+      final first = File('${tempDir.path}${Platform.pathSeparator}a.txt')
+        ..writeAsStringSync('aaa');
+      final second = File('${tempDir.path}${Platform.pathSeparator}报告.pdf')
+        ..writeAsStringSync('bbb');
+      final link = await server.createShare([
+        (path: first.path, name: 'a.txt'),
+        (path: second.path, name: '报告.pdf'),
+      ]);
+      expect(link, isNotNull);
+      expect(Uri.parse(link!).path, startsWith('/s/'));
+
+      final response = await get(localUri(link));
+      expect(response.statusCode, HttpStatus.ok);
+      final body = await response.transform(utf8.decoder).join();
+      expect(body, contains('a.txt'));
+      expect(body, contains('报告.pdf'));
+      expect(body, contains('/f/'));
+    });
+
+    test('downloads each file by its index in the share', () async {
+      final first = File('${tempDir.path}${Platform.pathSeparator}one.bin')
+        ..writeAsBytesSync([1, 2, 3]);
+      final second = File('${tempDir.path}${Platform.pathSeparator}two.bin')
+        ..writeAsBytesSync([4, 5, 6]);
+      final link = await server.createShare([
+        (path: first.path, name: 'one.bin'),
+        (path: second.path, name: '报告 final.pdf'),
+      ]);
+      expect(link, isNotNull);
+
+      final response = await get(shareFileUri(link!, 1));
+      expect(response.statusCode, HttpStatus.ok);
+      expect(
+        response.headers.value('content-disposition'),
+        contains('attachment'),
+      );
+      expect(
+        response.headers.value('content-disposition'),
+        contains("filename*=UTF-8''"),
+      );
+      expect(await response.expand((chunk) => chunk).toList(), [4, 5, 6]);
+    });
+
+    test('filters out paths that name nothing', () async {
+      final file = File('${tempDir.path}${Platform.pathSeparator}real.txt')
+        ..writeAsStringSync('x');
+      // A directory has a path but nothing the share page can serve.
+      final link = await server.createShare([
+        (path: tempDir.path, name: 'a-folder'),
+        (path: file.path, name: 'real.txt'),
+        (
+          path: '${tempDir.path}${Platform.pathSeparator}gone.txt',
+          name: 'gone',
+        ),
+      ]);
+      expect(link, isNotNull);
+
+      final response = await get(localUri(link!));
+      final body = await response.transform(utf8.decoder).join();
+      expect(body, contains('real.txt'));
+      expect(body, isNot(contains('a-folder')));
+      expect(body, isNot(contains('gone.txt')));
+    });
+
+    test('answers null when nothing shareable was handed in', () async {
+      expect(
+        await server.createShare([(path: tempDir.path, name: 'a-folder')]),
+        isNull,
+      );
+      expect(await server.createShare(const []), isNull);
+    });
+
+    test('answers 404 for an unknown share token or index', () async {
+      final file = File('${tempDir.path}${Platform.pathSeparator}a.txt')
+        ..writeAsStringSync('x');
+      final link = await server.createShare([(path: file.path, name: 'a.txt')]);
+      expect(link, isNotNull);
+
+      expect(
+        (await get(Uri.parse('http://127.0.0.1:${server.actualPort}/s/nope')))
+            .statusCode,
+        HttpStatus.notFound,
+      );
+      // The share has exactly one file: index 1 is out of range, and a
+      // non-numeric tail is not an index at all.
+      expect(
+        (await get(shareFileUri(link!, 1))).statusCode,
+        HttpStatus.notFound,
+      );
+      final token = Uri.parse(link).pathSegments.last;
+      expect(
+        (await get(
+          Uri.parse('http://127.0.0.1:${server.actualPort}/f/$token/abc'),
+        )).statusCode,
+        HttpStatus.notFound,
+      );
+    });
+  });
 }
