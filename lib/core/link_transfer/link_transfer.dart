@@ -50,6 +50,20 @@ class LinkTransfer {
       peerAddresses: peerAddresses,
     );
   }
+
+  /// Creates one share link covering several files.
+  ///
+  /// [files] are `(path, name)` pairs in the order the sender chose them.
+  /// The returned URL opens a list page where each file downloads on its
+  /// own; paths that name nothing are filtered out, and an empty remainder
+  /// yields null. See [LinkTransferServer.createShare].
+  Future<String?> createShare(
+    List<({String path, String name})> files, {
+    List<String> peerAddresses = const [],
+  }) async {
+    if (!_server.isRunning) return null;
+    return _server.createShare(files, peerAddresses: peerAddresses);
+  }
 }
 
 /// Flattens discovered peers into the address hints a share link prefers:

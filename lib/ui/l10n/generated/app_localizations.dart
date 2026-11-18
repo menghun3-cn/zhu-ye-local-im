@@ -950,6 +950,42 @@ abstract class AppLocalizations {
   /// **'Failed to create link'**
   String get shareByLinkFailed;
 
+  /// No description provided for @shareByLinkCopyQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy QR code'**
+  String get shareByLinkCopyQr;
+
+  /// No description provided for @shareByLinkCopiedQr.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code copied to clipboard'**
+  String get shareByLinkCopiedQr;
+
+  /// No description provided for @shareByLinkCopyQrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the QR code.'**
+  String get shareByLinkCopyQrFailed;
+
+  /// No description provided for @shareByLinkNoFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No files to share.'**
+  String get shareByLinkNoFiles;
+
+  /// No description provided for @shareByLinkDropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Release to create a share link'**
+  String get shareByLinkDropHint;
+
+  /// No description provided for @shareByLinkFileCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String shareByLinkFileCount(int count);
+
   /// No description provided for @forward.
   ///
   /// In en, this message translates to:
@@ -1481,7 +1517,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareByLinkEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No shared links yet. Click the button above to select files and generate links.'**
+  /// **'No shared links yet. Click the button above to select files, or drop files here.'**
   String get shareByLinkEmpty;
 
   /// No description provided for @troubleshootingTitle.

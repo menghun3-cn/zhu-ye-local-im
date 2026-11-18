@@ -517,6 +517,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareByLinkFailed => '创建链接失败';
 
   @override
+  String get shareByLinkCopyQr => '复制二维码';
+
+  @override
+  String get shareByLinkCopiedQr => '二维码已复制到剪贴板';
+
+  @override
+  String get shareByLinkCopyQrFailed => '无法复制二维码。';
+
+  @override
+  String get shareByLinkNoFiles => '没有可分享的文件。';
+
+  @override
+  String get shareByLinkDropHint => '松开生成分享链接';
+
+  @override
+  String shareByLinkFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get forward => '转发';
 
   @override
@@ -810,7 +835,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get myCardShareByLinkSummary => '无需安装即可下载文件';
 
   @override
-  String get shareByLinkEmpty => '还没有分享的链接。点击上方按钮选择文件生成链接。';
+  String get shareByLinkEmpty => '还没有分享的链接。点击上方按钮选择文件，或把文件直接拖到这里。';
 
   @override
   String get troubleshootingTitle => '故障排查';
