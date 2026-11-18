@@ -535,6 +535,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareByLinkFailed => 'Failed to create link';
 
   @override
+  String get shareByLinkCopyQr => 'Copy QR code';
+
+  @override
+  String get shareByLinkCopiedQr => 'QR code copied to clipboard';
+
+  @override
+  String get shareByLinkCopyQrFailed => 'Could not copy the QR code.';
+
+  @override
+  String get shareByLinkNoFiles => 'No files to share.';
+
+  @override
+  String get shareByLinkDropHint => 'Release to create a share link';
+
+  @override
+  String shareByLinkFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get forward => 'Forward';
 
   @override
@@ -857,7 +883,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareByLinkEmpty =>
-      'No shared links yet. Click the button above to select files and generate links.';
+      'No shared links yet. Click the button above to select files, or drop files here.';
 
   @override
   String get troubleshootingTitle => 'Troubleshooting';
