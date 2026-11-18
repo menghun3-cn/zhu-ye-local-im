@@ -321,6 +321,7 @@ Set<String> distinguishingFragments(String subject) {
   // translated release note is not reported as missing its commit.
   const translated = <String, String>{
     'address': '地址',
+    'addresses': '地址',
     'asking': '确认',
     'automatically': '自动',
     'bubble': '气泡',
@@ -328,6 +329,7 @@ Set<String> distinguishingFragments(String subject) {
     'busy': '忙碌',
     'card': '卡片',
     'check': '检查',
+    'clickable': '点击',
     'close': '关闭',
     'colours': '颜色',
     'connect': '连接',
@@ -352,6 +354,7 @@ Set<String> distinguishingFragments(String subject) {
     'incoming': '接收',
     'lands': '落盘',
     'link': '链接',
+    'links': '链接',
     'long-press': '长按',
     'low-frequency': '低频',
     'navigation': '导航',
