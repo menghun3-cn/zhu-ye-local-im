@@ -14,6 +14,51 @@ import 'wechat/theme.dart';
 /// *and* takes the one the running theme actually chose, which a colour read
 /// off the scheme by role would leave to Material's judgement.
 
+/// The header shown above a sub-page, with a back button.
+///
+/// Shared by the My page's card sub-pages and the Transfers page's share
+/// sub-view: both are "a surface inside a surface" and owe the same way out.
+class SubPageHeader extends StatelessWidget {
+  /// Titles a sub-page and offers the way back to its parent.
+  const SubPageHeader({super.key, required this.title, required this.onBack});
+
+  /// The sub-page's name.
+  final String title;
+
+  /// Returns to the parent surface.
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colors.pageBackground,
+        border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: onBack,
+            tooltip: 'Back',
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: colors.bubbleText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// A titled divider between the groups of a page, with an optional action.
 class SectionHeader extends StatelessWidget {
   /// Titles a group of content.

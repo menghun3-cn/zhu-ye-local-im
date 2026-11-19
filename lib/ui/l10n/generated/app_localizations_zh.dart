@@ -532,6 +532,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareByLinkDropHint => '松开生成分享链接';
 
   @override
+  String get shareByLinkQrEnlarge => '点击放大二维码';
+
+  @override
   String shareByLinkFileCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -827,12 +830,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get myCardTroubleshootingSummary => '网络诊断和常见解决方案';
-
-  @override
-  String get myCardShareByLink => '链接分享';
-
-  @override
-  String get myCardShareByLinkSummary => '无需安装即可下载文件';
 
   @override
   String get shareByLinkEmpty => '还没有分享的链接。点击上方按钮选择文件，或把文件直接拖到这里。';
@@ -1161,6 +1158,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get myCardScreenshotSummaryDisabled => '已关闭';
+
+  @override
+  String get screenshotHotkeyUnavailable => '该快捷键不可用或已被占用';
 
   @override
   String get myCardSettings => '设置';

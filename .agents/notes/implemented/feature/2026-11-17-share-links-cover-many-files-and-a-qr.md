@@ -34,7 +34,7 @@ page, plus a QR code encoding the same link, on one card.
   anywhere on the page — not only on the empty state — go through the same
   `_sharePaths` road the picker does. Paths are filtered by
   `File.existsSync()` up front: a dropped folder is skipped, and a drop that
-  yields nothing gets the "no files to share" snackbar rather than silence
+  yields nothing gets the "no files to share" toast rather than silence
   or a bogus failure.
 - **The card** shows the file count, the names, the link as `SelectableText`,
   and an 84 px `QrImageView`. Three actions: copy link (unchanged), copy QR,
@@ -76,7 +76,7 @@ a chat client can paste.
 
 ## Consequences
 
-- Dropping files on 我的 → 链接分享 creates a share immediately — no picker,
+- Dropping files on 传输 → 通过链接分享 creates a share immediately — no picker,
   no staging step — and the card that appears carries both the link and the
   code for it.
 - A recipient on the same LAN opens `/s/<token>` in any browser and sees a
@@ -88,7 +88,7 @@ a chat client can paste.
   it the card reports the failure sentence rather than claiming success.
 - The share page is English-only, matching the existing `/` index; a
   Chinese-first recipient page is a possible follow-up, not a regression.
-- There is no cap on files per share, same as the picker never had one.
+- There is no cap on files per share, same as the picker never had one. The surface itself later moved under 传输 — see [share link under transfers](2026-11-19-share-link-under-transfers.md).
 
 ## Testing
 
@@ -99,5 +99,5 @@ a chat client can paste.
   unknown tokens and out-of-range indexes answer 404.
 - `test_flutter/ui/share_by_link_page_test.dart` drives the real page: the
   picker and a `DropDoneDetails` drop each produce one card with a
-  `QrImageView`, a folder-only drop produces the no-files snackbar, and the
+  `QrImageView`, a folder-only drop produces the no-files toast, and the
   copy-QR button puts PNG-magic bytes on the scripted clipboard.
