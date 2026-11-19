@@ -980,6 +980,12 @@ abstract class AppLocalizations {
   /// **'Release to create a share link'**
   String get shareByLinkDropHint;
 
+  /// No description provided for @shareByLinkQrEnlarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to enlarge the QR code'**
+  String get shareByLinkQrEnlarge;
+
   /// No description provided for @shareByLinkFileCount.
   ///
   /// In en, this message translates to:
@@ -1501,18 +1507,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Network diagnostics and common solutions'**
   String get myCardTroubleshootingSummary;
-
-  /// No description provided for @myCardShareByLink.
-  ///
-  /// In en, this message translates to:
-  /// **'Share by Link'**
-  String get myCardShareByLink;
-
-  /// No description provided for @myCardShareByLinkSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Download files without installing the app'**
-  String get myCardShareByLinkSummary;
 
   /// No description provided for @shareByLinkEmpty.
   ///
@@ -2117,6 +2111,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get myCardScreenshotSummaryDisabled;
+
+  /// No description provided for @screenshotHotkeyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'That shortcut is unavailable or already taken'**
+  String get screenshotHotkeyUnavailable;
 
   /// No description provided for @myCardSettings.
   ///

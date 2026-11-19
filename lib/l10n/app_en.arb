@@ -268,6 +268,7 @@
   "shareByLinkCopyQrFailed": "Could not copy the QR code.",
   "shareByLinkNoFiles": "No files to share.",
   "shareByLinkDropHint": "Release to create a share link",
+  "shareByLinkQrEnlarge": "Tap to enlarge the QR code",
   "shareByLinkFileCount": "{count, plural, =1{1 file} other{{count} files}}",
   "@shareByLinkFileCount": {
     "placeholders": { "count": { "type": "int" } }
@@ -379,8 +380,6 @@
   "updateFailureInstaller": "The system installer did not open. Try again, or open the download page and install the APK by hand.",
   "myCardTroubleshooting": "Troubleshooting",
   "myCardTroubleshootingSummary": "Network diagnostics and common solutions",
-  "myCardShareByLink": "Share by Link",
-  "myCardShareByLinkSummary": "Download files without installing the app",
   "shareByLinkEmpty": "No shared links yet. Click the button above to select files, or drop files here.",
   "troubleshootingTitle": "Troubleshooting",
   "troubleshootingDiagnostics": "Diagnostics",
@@ -516,6 +515,7 @@
   "myCardScreenshot": "Screenshot",
   "myCardScreenshotSummaryEnabled": "On · global hotkey active",
   "myCardScreenshotSummaryDisabled": "Off",
+  "screenshotHotkeyUnavailable": "That shortcut is unavailable or already taken",
   "myCardSettings": "Settings",
   "myCardSettingsSummary": "Receive folder configured",
   "myCardSettingsSummaryUnset": "Receive folder not set",

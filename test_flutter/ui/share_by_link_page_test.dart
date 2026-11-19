@@ -13,10 +13,11 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../support/ui_harness.dart';
 
-/// Opens 我的 → 链接分享, the surface these tests are about.
+/// Opens 传输 → 通过链接分享, the surface these tests are about.
 Future<void> openShareByLinkPage(WidgetTester tester) async {
-  await openTab(tester, l10n.tabMy, window: windowA);
-  await openMyCard(tester, l10n.myCardShareByLink, window: windowA);
+  await openTab(tester, l10n.tabTransfers, window: windowA);
+  await tester.tap(windowA.within(find.text(l10n.shareByLinkTitle)));
+  await settleRoute(tester);
 }
 
 /// Real files for the share to point at — the page checks they exist.
@@ -136,8 +137,8 @@ void main() {
 
       await pumpUntil(
         tester,
-        // The snackbar lives in the Scaffold's overlay, outside the page's
-        // own subtree — `onPage` would never see it.
+        // The toast lives in the window's overlay, outside the page's own
+        // subtree — `onPage` would never see it.
         () => windowA
             .within(find.text(l10n.shareByLinkNoFiles))
             .evaluate()
@@ -152,6 +153,55 @@ void main() {
         ),
         findsNothing,
         reason: 'a folder is not a file the share page can serve',
+      );
+
+      await stopLinkTransfer(tester);
+      await shutdown(tester, [device]);
+    });
+
+    testWidgets('tapping the QR code opens it large in a dialog', (
+      tester,
+    ) async {
+      final picker = ScriptedPicker.install();
+      addTearDown(PickerResolution.reset);
+      final dir = tempDirectory('share-by-link-qr-zoom-');
+      final file = shareableFile(dir, 'report.pdf', [1]);
+      picker.willOffer([file.path]);
+
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+      await openShareByLinkPage(tester);
+
+      await tapButton(tester, l10n.shareByLink, window: windowA);
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ShareByLinkPage,
+          find.byType(QrImageView),
+        ).evaluate().isNotEmpty,
+        description: 'the share card with its QR code',
+      );
+
+      await tester.tap(
+        onPage(windowA, ShareByLinkPage, find.byType(QrImageView)),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.byType(AlertDialog)).evaluate().isNotEmpty,
+        description: 'the enlarged QR dialog',
+      );
+
+      final dialogQr = tester.widgetList<QrImageView>(
+        find.descendant(
+          of: windowA.within(find.byType(AlertDialog)),
+          matching: find.byType(QrImageView),
+        ),
+      );
+      expect(
+        dialogQr.single.size,
+        greaterThan(200),
+        reason: 'the dialog draws the code big enough to screenshot',
       );
 
       await stopLinkTransfer(tester);
