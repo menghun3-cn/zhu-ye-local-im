@@ -550,6 +550,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareByLinkDropHint => 'Release to create a share link';
 
   @override
+  String get shareByLinkQrEnlarge => 'Tap to enlarge the QR code';
+
+  @override
   String shareByLinkFileCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -873,13 +876,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get myCardTroubleshootingSummary =>
       'Network diagnostics and common solutions';
-
-  @override
-  String get myCardShareByLink => 'Share by Link';
-
-  @override
-  String get myCardShareByLinkSummary =>
-      'Download files without installing the app';
 
   @override
   String get shareByLinkEmpty =>
@@ -1229,6 +1225,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get myCardScreenshotSummaryDisabled => 'Off';
+
+  @override
+  String get screenshotHotkeyUnavailable =>
+      'That shortcut is unavailable or already taken';
 
   @override
   String get myCardSettings => 'Settings';

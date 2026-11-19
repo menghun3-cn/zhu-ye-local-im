@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import '../../app/app_controller.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../screenshot/capture_key_names.dart';
 import '../screenshot/screenshot_service.dart';
+import '../top_toast.dart';
 
 /// The "截图" sub-page under 我的: the feature's on/off switch, the global
 /// hotkey that summons the capture overlay, and every key binding that
@@ -151,8 +153,10 @@ class _OverlayKeyRow extends StatelessWidget {
       await controller.setScreenshotCaptureKey(action, accelerator);
     } on ArgumentError {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('该快捷键不可用或已被占用')));
+        await TopToast.show(
+          context,
+          AppLocalizations.of(context).screenshotHotkeyUnavailable,
+        );
       }
     }
   }

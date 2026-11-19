@@ -403,7 +403,14 @@ void main() {
         description: 'the row to name the Device on the other end',
       );
       expect(
-        onPage(windowA, TransfersPage, find.textContaining(l10n.kindFiles)),
+        onPage(
+          windowA,
+          TransfersPage,
+          find.descendant(
+            of: find.byType(ListView),
+            matching: find.textContaining(l10n.kindFiles),
+          ),
+        ),
         findsOneWidget,
       );
       expect(

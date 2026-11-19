@@ -14,7 +14,6 @@ import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'screenshot_page.dart';
 import 'settings_page.dart';
-import 'share_by_link_page.dart';
 import 'troubleshooting_page.dart';
 
 /// Which sub-page is shown.
@@ -24,46 +23,7 @@ enum _SubPage {
   screenshot,
   settings,
   troubleshooting,
-  shareByLink,
   about,
-}
-
-/// The header shown above each sub-page, with a back button.
-class _SubPageHeader extends StatelessWidget {
-  const _SubPageHeader({required this.title, required this.onBack});
-
-  final String title;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = WeChatColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: colors.pageBackground,
-        border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: onBack,
-            tooltip: 'Back',
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: colors.bubbleText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// One card in the "My" page, representing a low-frequency surface.
@@ -153,14 +113,14 @@ class MyPage extends StatefulWidget {
   /// The update the shell is carrying out, when there is one.
   ///
   /// Handed to the About card, which is where an install's progress, its
-  /// question and its failure are shown. The session outlives this page — it
-  /// is owned by the shell — so a download that is under way when the user
+  /// question and its failure are shown. The session outlives this page �?it
+  /// is owned by the shell �?so a download that is under way when the user
   /// backs out to the card list is still there when they return.
   final UpdateInstallSession? installSession;
 
   /// How many times the rail's update entry has asked for the About card.
   ///
-  /// The session owns the install itself — the press reaches it directly — so
+  /// The session owns the install itself �?the press reaches it directly �?so
   /// all this page owes a request is the sub-page the card lives on: a press
   /// that landed on the card list would have started a download the user
   /// cannot see. A counter rather than a flag, so that every press is a
@@ -188,7 +148,7 @@ class _MyPageState extends State<MyPage> {
   /// Reports that the About card's own check has reached [busy].
   ///
   /// This is called by the About card. The install's phases are not reported
-  /// here — the shell hears those from the session directly, which is what
+  /// here �?the shell hears those from the session directly, which is what
   /// lets the download survive this page never being built at all.
   void _setUpdateLocked(bool busy) => _reportBusy(busy);
 
@@ -279,13 +239,6 @@ class _MyPageState extends State<MyPage> {
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
-          icon: Icons.link,
-          title: l10n.myCardShareByLink,
-          summary: l10n.myCardShareByLinkSummary,
-          onTap: () => _openSubPage(_SubPage.shareByLink),
-        ),
-        const SizedBox(height: WeChat.sectionGap),
-        _MyCard(
           icon: Icons.announcement,
           title: l10n.myCardAbout,
           summary: _aboutSummary(widget.update, l10n),
@@ -305,7 +258,7 @@ class _MyPageState extends State<MyPage> {
     final page = switch (_currentSubPage) {
       _SubPage.devices => Column(
         children: [
-          _SubPageHeader(title: l10n.tabDevices, onBack: _closeSubPage),
+          SubPageHeader(title: l10n.tabDevices, onBack: _closeSubPage),
           Expanded(
             child: DevicesPage(
               defaultIncomingDirectory: incoming,
@@ -317,40 +270,34 @@ class _MyPageState extends State<MyPage> {
       ),
       _SubPage.clipboard => Column(
         children: [
-          _SubPageHeader(title: l10n.tabClipboard, onBack: _closeSubPage),
+          SubPageHeader(title: l10n.tabClipboard, onBack: _closeSubPage),
           const Expanded(child: ClipboardPage()),
         ],
       ),
       _SubPage.screenshot => Column(
         children: [
-          _SubPageHeader(title: l10n.myCardScreenshot, onBack: _closeSubPage),
+          SubPageHeader(title: l10n.myCardScreenshot, onBack: _closeSubPage),
           const Expanded(child: ScreenshotPage()),
         ],
       ),
       _SubPage.settings => Column(
         children: [
-          _SubPageHeader(title: l10n.tabSettings, onBack: _closeSubPage),
+          SubPageHeader(title: l10n.tabSettings, onBack: _closeSubPage),
           Expanded(child: SettingsPage(seams: widget.seams)),
         ],
       ),
       _SubPage.troubleshooting => Column(
         children: [
-          _SubPageHeader(
+          SubPageHeader(
             title: l10n.troubleshootingTitle,
             onBack: _closeSubPage,
           ),
           const Expanded(child: TroubleshootingPage()),
         ],
       ),
-      _SubPage.shareByLink => Column(
-        children: [
-          _SubPageHeader(title: l10n.myCardShareByLink, onBack: _closeSubPage),
-          const Expanded(child: ShareByLinkPage()),
-        ],
-      ),
       _SubPage.about => Column(
         children: [
-          _SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
+          SubPageHeader(title: l10n.tabAbout, onBack: _closeSubPage),
           Expanded(
             child: AboutPage(
               session: widget.installSession,

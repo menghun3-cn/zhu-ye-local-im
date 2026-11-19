@@ -14,6 +14,7 @@ import '../clipboard_paste.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../pickers.dart';
+import '../top_toast.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -97,16 +98,13 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
 
       if (link == null) {
         final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l10n.shareByLinkNoFiles)));
+        await TopToast.show(context, l10n.shareByLinkNoFiles);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       final l10n = AppLocalizations.of(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${l10n.shareByLinkFailed}: $e')));
+      await TopToast.show(context, '${l10n.shareByLinkFailed}: $e');
     }
   }
 
@@ -115,8 +113,7 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l10n.shareByLinkCopied)));
+    await TopToast.show(context, l10n.shareByLinkCopied);
   }
 
   /// Copies [share]'s QR code to the clipboard as an image.
@@ -143,17 +140,13 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
         bytes.buffer.asUint8List(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            copied ? l10n.shareByLinkCopiedQr : l10n.shareByLinkCopyQrFailed,
-          ),
-        ),
+      await TopToast.show(
+        context,
+        copied ? l10n.shareByLinkCopiedQr : l10n.shareByLinkCopyQrFailed,
       );
     } on Object {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.shareByLinkCopyQrFailed)));
+      await TopToast.show(context, l10n.shareByLinkCopyQrFailed);
     }
   }
 
@@ -310,6 +303,55 @@ class _ShareCard extends StatelessWidget {
   final VoidCallback onCopyQr;
   final VoidCallback onRemove;
 
+  /// Opens the QR code large enough to screenshot or show across a room.
+  ///
+  /// The card's QR is 84 pixels — scannable at arm's length and useless as a
+  /// picture. The dialog renders the same link at a size a phone camera (or a
+  /// screenshot) can actually use, with the copy action one tap away.
+  void _showQrDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 280,
+              height: 280,
+              color: Colors.white,
+              padding: const EdgeInsets.all(12),
+              child: QrImageView(
+                data: share.link,
+                size: 256,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    onCopyQr();
+                  },
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: Text(l10n.shareByLinkCopyQr),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(l10n.close),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -397,18 +439,28 @@ class _ShareCard extends StatelessWidget {
             const SizedBox(width: 12),
             // The QR encodes the same link the text above carries — scanning
             // it opens the identical page, for a recipient whose chat client
-            // turns a QR into a tap but mangles a pasted URL.
-            RepaintBoundary(
-              key: share.qrKey,
-              child: Container(
-                width: 84,
-                height: 84,
-                color: Colors.white,
-                padding: const EdgeInsets.all(6),
-                child: QrImageView(
-                  data: share.link,
-                  size: 72,
-                  backgroundColor: Colors.white,
+            // turns a QR into a tap but mangles a pasted URL. Tapping it
+            // opens the same code large, for a screenshot or a second screen.
+            Tooltip(
+              message: l10n.shareByLinkQrEnlarge,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => _showQrDialog(context),
+                  child: RepaintBoundary(
+                    key: share.qrKey,
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(6),
+                      child: QrImageView(
+                        data: share.link,
+                        size: 72,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

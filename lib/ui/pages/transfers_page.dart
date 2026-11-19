@@ -10,9 +10,12 @@ import '../labels.dart';
 import '../transfer_actions.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
+import 'share_by_link_page.dart';
 
-/// Everything this Device has sent or been offered, newest first.
-class TransfersPage extends StatelessWidget {
+/// Everything this Device has sent or been offered, newest first — plus the
+/// share-by-link surface, which is a way of *sending* without a peer and so
+/// belongs on this tab rather than among the low-frequency pages.
+class TransfersPage extends StatefulWidget {
   /// Builds the Transfers surface, offering [defaultIncomingDirectory] as the
   /// folder a received file lands in.
   const TransfersPage({super.key, required this.defaultIncomingDirectory});
@@ -21,8 +24,34 @@ class TransfersPage extends StatelessWidget {
   final String? defaultIncomingDirectory;
 
   @override
+  State<TransfersPage> createState() => _TransfersPageState();
+}
+
+class _TransfersPageState extends State<TransfersPage> {
+  /// Whether the share-by-link sub-view is open.
+  ///
+  /// A flag rather than a route: the surface lives in the shell's
+  /// `IndexedStack`, so leaving the tab already preserves the page — and
+  /// keeping the share list inside it means backing out does not throw the
+  /// links away either.
+  bool _sharing = false;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
+    if (_sharing) {
+      return Column(
+        children: [
+          SubPageHeader(
+            title: l10n.shareByLinkTitle,
+            onBack: () => setState(() => _sharing = false),
+          ),
+          const Expanded(child: ShareByLinkPage()),
+        ],
+      );
+    }
+
     final controller = ControllerScope.of(context);
     // Only files are listed here. A text message is a conversation, not a
     // transfer — it lives in the conversation it was said in, where the answer
@@ -37,30 +66,100 @@ class TransfersPage extends StatelessWidget {
         // is not a transfer — its resend lives in the conversation.
         if (view.kind == PayloadKind.file && !view.unsent) view,
     ];
-    if (transfers.isEmpty) {
-      return Padding(
-        padding: WeChat.pagePadding,
-        child: HintText(l10n.transfersEmptyHint),
-      );
-    }
-    return ListView.builder(
-      padding: WeChat.pagePadding,
-      itemCount: transfers.length,
-      itemBuilder: (context, index) {
-        final view = transfers[index];
-        // The card is what a right-click points at, so the actions a settled
-        // file offers belong around it — and a card that is still waiting for
-        // an answer gets the widget's own promise that nothing was intercepted.
-        return TransferContextMenu(
-          view: view,
-          child: _TransferCard(
-            view: view,
-            controller: controller,
-            peerName: _nameOf(controller, view.peer),
-            defaultIncomingDirectory: defaultIncomingDirectory,
+
+    return Column(
+      children: [
+        Padding(
+          padding: WeChat.pagePadding,
+          child: _ShareByLinkEntry(
+            onTap: () => setState(() => _sharing = true),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: transfers.isEmpty
+              ? Padding(
+                  padding: WeChat.pagePadding,
+                  child: HintText(l10n.transfersEmptyHint),
+                )
+              : ListView.builder(
+                  padding: WeChat.pagePadding,
+                  itemCount: transfers.length,
+                  itemBuilder: (context, index) {
+                    final view = transfers[index];
+                    // The card is what a right-click points at, so the actions
+                    // a settled file offers belong around it — and a card that
+                    // is still waiting for an answer gets the widget's own
+                    // promise that nothing was intercepted.
+                    return TransferContextMenu(
+                      view: view,
+                      child: _TransferCard(
+                        view: view,
+                        controller: controller,
+                        peerName: _nameOf(controller, view.peer),
+                        defaultIncomingDirectory:
+                            widget.defaultIncomingDirectory,
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The way into the share-by-link sub-view, drawn as one card.
+///
+/// Same shape as the My page's cards — icon, title, one line of what it does
+/// — because it is the same kind of thing: an entry into a surface, not a
+/// control that does the work itself.
+class _ShareByLinkEntry extends StatelessWidget {
+  const _ShareByLinkEntry({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(WeChat.controlRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(WeChat.cardPadding),
+          child: Row(
+            children: [
+              Icon(Icons.link, size: 24, color: colors.bubbleText),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.shareByLinkTitle,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizePreview,
+                        fontWeight: FontWeight.w600,
+                        color: colors.bubbleText,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.shareByLinkDesc,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizeMeta,
+                        color: colors.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: colors.secondaryText),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
