@@ -101,10 +101,17 @@ bind probe can never distinguish "our listener" from "a squatter", and the
 question the page answers — "can peers reach me" — is about the listeners we
 already know about, not about free ports.
 
-**`netsh advfirewall` for the probe and the fix.** Rejected for the fix:
-`netsh` cannot scope a rule to a program, so it would open the ports to every
-process on the machine. For the probe it was viable but its output would need
-a text parser that breaks on localization and formatting changes.
+**`netsh advfirewall` for the probe and the fix.** Rejected for the fix at
+the time on a claim that turned out to be wrong: `netsh` *can* scope a rule
+to a program — its `program=` parameter does exactly that, and the
+installer's firewall step
+([2026-11-20-firewall-exception-at-install-and-startup](2026-11-20-firewall-exception-at-install-and-startup.md))
+uses it. The runtime write stayed PowerShell because the elevated command
+had to survive `Start-Process -ArgumentList` quoting, which
+`-EncodedCommand` solves outright, and because the remove-then-add script
+already existed there with a test seam. For the probe, netsh output would
+still need a text parser that breaks on localization and formatting
+changes.
 
 **`reg query` on `FirewallPolicy\FirewallRules`.** Rejected: the rules are
 readable there without elevation and fast, but the `v2.x|key=value` format

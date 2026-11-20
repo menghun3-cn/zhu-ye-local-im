@@ -1765,6 +1765,30 @@ abstract class AppLocalizations {
   /// **'Could not add the rules — allow the ports manually'**
   String get troubleshootingFirewallFailed;
 
+  /// No description provided for @firewallOfferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows Firewall is blocking connections'**
+  String get firewallOfferTitle;
+
+  /// No description provided for @firewallOfferBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No inbound allow rule covers: {missing}. Other devices will not be able to discover or reach this PC. Open the ports now? (One administrator consent is required.)'**
+  String firewallOfferBody(String missing);
+
+  /// No description provided for @firewallOfferAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow incoming connections'**
+  String get firewallOfferAllow;
+
+  /// No description provided for @firewallOfferLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get firewallOfferLater;
+
   /// No description provided for @troubleshootingVpnNone.
   ///
   /// In en, this message translates to:

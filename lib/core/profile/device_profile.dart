@@ -142,6 +142,11 @@ final class KnownDevice {
 ///   whether the app's default may still apply. A Device minted before the
 ///   default flipped reads as decided-once, so an existing install is never
 ///   switched on behind the user's back;
+/// * `firewallCheckDone` — whether the one-time startup firewall offer has
+///   run its course: the check either found the ports open (or the question
+///   did not apply) or the user answered the dialog. False is "not yet
+///   settled", which a probe that could not answer leaves in place so the
+///   next launch asks again;
 /// * `known` — every Device met, favorited or not, for redial without
 ///   Discovery.
 ///
@@ -161,6 +166,7 @@ final class DeviceProfile {
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
     this.autostartPreference,
+    this.firewallCheckDone = false,
     this.updateCheckInterval = UpdateCheckInterval.hourly,
     this.screenshotEnabled = true,
     this.screenshotHotkey = defaultScreenshotHotkey,
@@ -222,6 +228,14 @@ final class DeviceProfile {
   /// user's later "off" is not overwritten by it. See
   /// `2026-11-09-windows-autostart-defaults-on.md`.
   bool? autostartPreference;
+
+  /// Whether the startup firewall offer has been settled — see the class doc.
+  ///
+  /// Written by the app layer once the offer is answered or rendered
+  /// unnecessary, and read at startup to decide whether the check runs at
+  /// all. Persisted like the other preferences: the offer is once per
+  /// install, not once per process.
+  bool firewallCheckDone;
 
   /// How often this Device asks GitHub whether a newer build has been
   /// published.
@@ -428,6 +442,7 @@ final class DeviceProfile {
     if (incomingDirectory != null) 'incomingDirectory': incomingDirectory,
     'closeBehaviour': closeBehaviour.wireName,
     if (autostartPreference != null) 'autostartPreference': autostartPreference,
+    'firewallCheckDone': firewallCheckDone,
     'updateCheckInterval': updateCheckInterval.wireName,
     'screenshotEnabled': screenshotEnabled,
     'screenshotHotkey': screenshotHotkey,
@@ -502,6 +517,9 @@ final class DeviceProfile {
       autostartPreference: json['autostartPreference'] is bool
           ? json['autostartPreference'] as bool
           : null,
+      firewallCheckDone: json['firewallCheckDone'] is bool
+          ? json['firewallCheckDone'] as bool
+          : false,
       updateCheckInterval: _updateCheckInterval(json['updateCheckInterval']),
       screenshotEnabled: json['screenshotEnabled'] is bool
           ? json['screenshotEnabled'] as bool

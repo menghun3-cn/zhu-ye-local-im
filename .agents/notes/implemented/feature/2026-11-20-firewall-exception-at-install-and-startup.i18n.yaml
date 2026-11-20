@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-20-firewall-exception-at-install-and-startup.md
+#   git hash-object 2026-11-20-firewall-exception-at-install-and-startup.zh.md
+2026-11-20-firewall-exception-at-install-and-startup.md: 5c97b08934272bd7756780e089089ff8f22e458d
+2026-11-20-firewall-exception-at-install-and-startup.zh.md: b3f52df47f1dbe1b7c2dc3cb63cc9307e3e23d4b

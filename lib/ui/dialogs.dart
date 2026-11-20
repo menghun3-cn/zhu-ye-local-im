@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../app/app.dart';
 import '../core/core.dart';
+import '../core/link_transfer/link_transfer.dart';
 import 'feedback.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'pickers.dart';
+import 'seams.dart';
+import 'top_toast.dart';
 
 /// The dialogs the surfaces open.
 ///
@@ -372,6 +375,127 @@ class _ConnectByAddressDialogState extends State<_ConnectByAddressDialog> {
         FilledButton(
           onPressed: _busy ? null : () => unawaited(_connect()),
           child: Text(l10n.connect),
+        ),
+      ],
+    );
+  }
+}
+
+// -------------------------------------------------------- firewall offer
+
+/// Offers to open the firewall ports once, at startup, when they are blocked.
+///
+/// Called by the shell after the first frame. The probe runs first and only a
+/// [FirewallState.blocked] verdict opens the dialog: an open or inapplicable
+/// answer settles the check without a word, and an unanswerable one is left
+/// unsettled so the next launch asks again. Platforms without a firewall to
+/// ask about, and Devices whose profile says the offer already ran, return
+/// before anything is probed.
+Future<void> offerFirewallIfBlocked(
+  BuildContext context,
+  LocalTransferController controller,
+) async {
+  if (controller.self.platform != DevicePlatform.windows ||
+      controller.firewallCheckDone) {
+    return;
+  }
+  final report = await probeHostFirewall(
+    platform: controller.self.platform,
+    programPath: Platform.resolvedExecutable,
+    // The same answer the troubleshooting page gives: the bound port while
+    // the server runs — a dynamic fallback is the port the links name — and
+    // the preferred one while it has not started.
+    linkPort: LinkTransfer.instance.port ?? defaultLinkTransferPort,
+  );
+  if (!context.mounted) return;
+  switch (report.state) {
+    case FirewallState.blocked:
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _FirewallOfferDialog(
+          controller: controller,
+          missing: report.missing,
+        ),
+      );
+    case FirewallState.open:
+    case FirewallState.unsupported:
+      await controller.markFirewallCheckDone();
+    case FirewallState.unknown:
+      // Could not answer: the profile stays unsettled so the next launch
+      // probes again rather than the offer never being made.
+      break;
+  }
+}
+
+/// The one-time offer itself.
+///
+/// 「暂不」 and a completed 「允许」 both settle the check — the offer is once
+/// per install, and a user who wants it later still has the troubleshooting
+/// page. The outcome of the UAC half is reported as a toast after the dialog
+/// closes, the same words the troubleshooting page uses for the same results.
+class _FirewallOfferDialog extends StatefulWidget {
+  const _FirewallOfferDialog({required this.controller, required this.missing});
+
+  final LocalTransferController controller;
+
+  /// The ports no covering inbound allow rule was found for, spelled
+  /// `TCP 47655` — shown so the user knows what is being let in.
+  final List<String> missing;
+
+  @override
+  State<_FirewallOfferDialog> createState() => _FirewallOfferDialogState();
+}
+
+class _FirewallOfferDialogState extends State<_FirewallOfferDialog> {
+  bool _busy = false;
+
+  Future<void> _decline() async {
+    await widget.controller.markFirewallCheckDone();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _allow() async {
+    final l10n = AppLocalizations.of(context);
+    // Taken before the awaits, for the same reason `guarded` takes it: the
+    // dialog may be gone by the time the elevated half answers.
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    setState(() => _busy = true);
+    final result = await openFirewallPorts(
+      platform: widget.controller.self.platform,
+      programPath: Platform.resolvedExecutable,
+      // Only the bound port, like the troubleshooting page: the script always
+      // writes the preferred 47657 too.
+      linkPort: LinkTransfer.instance.port,
+    );
+    await widget.controller.markFirewallCheckDone();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (overlay == null || result == FirewallOpenResult.unsupported) return;
+    await TopToast.showIn(overlay, switch (result) {
+      FirewallOpenResult.opened => l10n.troubleshootingFirewallOpened,
+      FirewallOpenResult.cancelled => l10n.troubleshootingFirewallCancelled,
+      _ => l10n.troubleshootingFirewallFailed,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.firewallOfferTitle),
+      content: Text(l10n.firewallOfferBody(widget.missing.join(', '))),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => unawaited(_decline()),
+          child: Text(l10n.firewallOfferLater),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : () => unawaited(_allow()),
+          child: Text(
+            _busy
+                ? l10n.troubleshootingOpeningFirewall
+                : l10n.firewallOfferAllow,
+          ),
         ),
       ],
     );

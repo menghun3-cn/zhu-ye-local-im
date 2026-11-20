@@ -442,6 +442,13 @@
   "troubleshootingFirewallOpened": "Firewall rules added",
   "troubleshootingFirewallCancelled": "Cancelled",
   "troubleshootingFirewallFailed": "Could not add the rules — allow the ports manually",
+  "firewallOfferTitle": "Windows Firewall is blocking connections",
+  "firewallOfferBody": "No inbound allow rule covers: {missing}. Other devices will not be able to discover or reach this PC. Open the ports now? (One administrator consent is required.)",
+  "@firewallOfferBody": {
+    "placeholders": { "missing": { "type": "String" } }
+  },
+  "firewallOfferAllow": "Allow incoming connections",
+  "firewallOfferLater": "Not now",
   "troubleshootingVpnNone": "No VPN or tunnel adapter detected",
   "troubleshootingVpnFound": "Possible VPN or tunnel adapters: {names}",
   "@troubleshootingVpnFound": {

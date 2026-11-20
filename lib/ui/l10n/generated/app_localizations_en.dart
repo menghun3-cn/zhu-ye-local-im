@@ -1032,6 +1032,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not add the rules — allow the ports manually';
 
   @override
+  String get firewallOfferTitle => 'Windows Firewall is blocking connections';
+
+  @override
+  String firewallOfferBody(String missing) {
+    return 'No inbound allow rule covers: $missing. Other devices will not be able to discover or reach this PC. Open the ports now? (One administrator consent is required.)';
+  }
+
+  @override
+  String get firewallOfferAllow => 'Allow incoming connections';
+
+  @override
+  String get firewallOfferLater => 'Not now';
+
+  @override
   String get troubleshootingVpnNone => 'No VPN or tunnel adapter detected';
 
   @override

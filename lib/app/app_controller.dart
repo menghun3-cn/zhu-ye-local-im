@@ -1073,6 +1073,26 @@ final class LocalTransferController {
     _notify();
   }
 
+  /// Whether the startup firewall offer has been settled.
+  ///
+  /// See [DeviceProfile.firewallCheckDone]: the offer is once per install,
+  /// and this is the persisted record of that. The shell asks before it
+  /// probes, so a Device that already answered never pays for the check.
+  bool get firewallCheckDone => _local?.profile.firewallCheckDone ?? false;
+
+  /// Records that the startup firewall offer has run its course.
+  ///
+  /// Called for every settled outcome — ports open, the question not
+  /// applicable, or the user answering the dialog either way — and *not*
+  /// called when the probe could not answer, so an unanswerable check is
+  /// retried on the next launch rather than silently never offered.
+  Future<void> markFirewallCheckDone() async {
+    final local = _requireLocal();
+    if (local.profile.firewallCheckDone) return;
+    local.profile.firewallCheckDone = true;
+    await _persist();
+  }
+
   /// Sets whether [peer] may share the clipboard with this Device, and
   /// persists it.
   ///
