@@ -565,6 +565,10 @@ class _UpdateEntry extends StatelessWidget {
           // glyph over two characters.
           style: TextButton.styleFrom(
             foregroundColor: colors.brandStrong,
+            // `foregroundColor` alone would stay the action green while the
+            // entry is locked mid-download — a press that cannot happen must
+            // not keep the colour of one that can.
+            disabledForegroundColor: colors.disabledText,
             // As tall as a comfortable target: the width comes from the rail,
             // as it does for every other entry.
             minimumSize: const Size(0, 52),

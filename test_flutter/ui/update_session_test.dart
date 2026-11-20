@@ -251,6 +251,57 @@ void main() {
       );
     });
 
+    testWidgets('greys the update button while its download runs', (
+      tester,
+    ) async {
+      ScriptedUpdateChecker.install(available);
+      final running = Completer<UpdatePrepareResult>();
+      final installer = ScriptedUpdateInstaller.replace(
+        supported: true,
+        // Determinate, so the progress bar is still and the tree can settle —
+        // an indeterminate one animates for as long as the download is held.
+        progress: const [
+          UpdateInstallProgress(
+            UpdateInstallStage.downloading,
+            received: 1,
+            total: 2,
+          ),
+        ],
+        hold: running,
+      );
+      final session = UpdateInstallSession();
+      addTearDown(session.dispose);
+      await show(tester, session);
+      await press(tester, l10n.aboutCheckForUpdates);
+      await press(tester, l10n.aboutUpdate);
+
+      // The press was accepted and the download is moving, so the button has
+      // to read "busy" rather than "press me again": no callback, and the
+      // disabled pair of colours instead of the brand green a live button
+      // wears. A disabled button that keeps the enabled colours is the bug
+      // this pins — it looks exactly like the press never landed.
+      final finder = find.widgetWithText(FilledButton, l10n.aboutUpdate);
+      expect(tester.widget<FilledButton>(finder).onPressed, isNull);
+
+      final style = FilledButtonTheme.of(tester.element(finder)).style;
+      final colors = WeChatColors.light;
+      expect(
+        style?.backgroundColor?.resolve(const {WidgetState.disabled}),
+        colors.surfaceSunken,
+      );
+      expect(
+        style?.foregroundColor?.resolve(const {WidgetState.disabled}),
+        colors.disabledText,
+      );
+
+      running.complete(const UpdatePrepareResult.ready(prepared));
+      await pumpUntil(
+        tester,
+        () => installer.applied.isNotEmpty,
+        description: 'the finished download to be applied',
+      );
+    });
+
     testWidgets('offers a package a restart found, without a question', (
       tester,
     ) async {
