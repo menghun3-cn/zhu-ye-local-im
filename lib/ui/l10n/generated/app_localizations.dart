@@ -2179,6 +2179,18 @@ abstract class AppLocalizations {
   /// **'Version {version} · Update available'**
   String myCardAboutSummaryUpdate(String version);
 
+  /// No description provided for @myCardFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback or suggestions'**
+  String get myCardFeedback;
+
+  /// No description provided for @myCardFeedbackSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the QQ group page'**
+  String get myCardFeedbackSummary;
+
   /// No description provided for @myViewDetails.
   ///
   /// In en, this message translates to:

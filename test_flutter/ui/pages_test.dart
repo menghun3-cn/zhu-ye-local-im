@@ -724,6 +724,22 @@ void main() {
     });
   });
 
+  group('the My surface', () {
+    testWidgets('opens the QQ feedback group in the browser', (tester) async {
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      // Tall, because the feedback card is the second-to-last entry on the
+      // card list and a lazy list has not built what is below the fold.
+      await pumpWindow(tester, device, size: tallWindow);
+      await openTab(tester, l10n.tabMy, window: windowA);
+      final links = ScriptedLinkOpener.install();
+
+      await openMyCard(tester, l10n.myCardFeedback, window: windowA);
+
+      expect(links.opened, ['https://qm.qq.com/q/rpttgcx0MC']);
+      await shutdown(tester, [device]);
+    });
+  });
+
   group('the Settings surface', () {
     testWidgets('reports where things go without repeating the Devices card', (
       tester,
