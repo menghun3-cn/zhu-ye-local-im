@@ -177,9 +177,13 @@ const String firewallSnapshotMethod = 'snapshot';
 /// a privileged operation. Any other platform, and any Windows build whose
 /// runner predates the channel, answers [FirewallState.unsupported] or
 /// [FirewallState.unknown] respectively, and the page shows either quietly.
+/// [linkPort] is the port link-share downloads are judged on — the bound port
+/// while the server runs, the preferred one while it has not started — so a
+/// dynamic fallback is checked exactly like the well-known ports.
 Future<FirewallReport> probeHostFirewall({
   required DevicePlatform platform,
   required String programPath,
+  int? linkPort,
   MethodChannel channel = firewallProbeChannel,
 }) async {
   if (platform != DevicePlatform.windows) {
@@ -195,7 +199,11 @@ Future<FirewallReport> probeHostFirewall({
   } on PlatformException {
     return const FirewallReport(FirewallState.unknown);
   }
-  return firewallReportFromSnapshot(snapshot, programPath: programPath) ??
+  return firewallReportFromSnapshot(
+        snapshot,
+        programPath: programPath,
+        linkPort: linkPort,
+      ) ??
       const FirewallReport(FirewallState.unknown);
 }
 

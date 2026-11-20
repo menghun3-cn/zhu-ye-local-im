@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:local_transfer/core/core.dart';
+import 'package:local_transfer/core/link_transfer/link_transfer.dart';
 import 'package:test/test.dart';
 
 ProcessOutput out(int exitCode, [String stdout = '']) =>
@@ -21,6 +22,12 @@ void main() {
       expect(pairingPortLevel(defaultPairingPort), CheckStatus.ok);
       expect(pairingPortLevel(51234), CheckStatus.warning);
       expect(pairingPortLevel(null), CheckStatus.warning);
+    });
+
+    test('link sharing binds lazily: absent is ok, fallback warns', () {
+      expect(linkPortLevel(null), CheckStatus.ok);
+      expect(linkPortLevel(defaultLinkTransferPort), CheckStatus.ok);
+      expect(linkPortLevel(51234), CheckStatus.warning);
     });
   });
 
@@ -248,6 +255,41 @@ void main() {
       expect(report!.state, FirewallState.open);
     });
 
+    test('the link port joins the required set when one is judged', () {
+      Map<String, Object?> covered() => payload(
+        rules: const [
+          {
+            'proto': 'TCP',
+            'port': '47655,47656,18080',
+            'prof': 'Any',
+            'prog': '',
+          },
+          {'proto': 'UDP', 'port': '47654', 'prof': 'Any', 'prog': ''},
+        ],
+      );
+
+      // The preferred port covered: open.
+      expect(
+        firewallReportFromSnapshot(
+          covered(),
+          programPath: program,
+          linkPort: defaultLinkTransferPort,
+        )!.state,
+        FirewallState.open,
+      );
+
+      // A dynamic fallback the rules do not name: blocked, and the missing
+      // list says which port — not 18080, which the links are not using.
+      final dynamicReport = firewallReportFromSnapshot(
+        covered(),
+        programPath: program,
+        linkPort: 51234,
+      )!;
+      expect(dynamicReport.state, FirewallState.blocked);
+      expect(dynamicReport.missing, contains('TCP 51234'));
+      expect(dynamicReport.missing, isNot(contains('TCP 18080')));
+    });
+
     test('malformed snapshots are null, not a guess', () {
       expect(
         firewallReportFromSnapshot('not a map', programPath: program),
@@ -315,5 +357,29 @@ void main() {
         expect(inner, contains('47654'));
       },
     );
+
+    test('the elevated script carries the bound link port beside the preferred one', () async {
+      String? captured;
+      await openFirewallPorts(
+        platform: DevicePlatform.windows,
+        programPath: r'C:\Apps\LocalTransfer\LocalTransfer.exe',
+        linkPort: 51234,
+        run: (exe, args) async {
+          captured = args.last;
+          return out(0, '');
+        },
+      );
+      final encoded = RegExp(r"-EncodedCommand','([^']+)'")
+          .firstMatch(captured!)!
+          .group(1)!;
+      final bytes = base64Decode(encoded);
+      final inner = String.fromCharCodes([
+        for (var i = 0; i + 1 < bytes.length; i += 2)
+          bytes[i] | bytes[i + 1] << 8,
+      ]);
+      // 18080 is always there — next run may take it — and the dynamic
+      // port the links currently name is added beside it.
+      expect(inner, contains('-LocalPort \'18080,47655,47656,51234\''));
+    });
   });
 }

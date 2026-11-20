@@ -411,15 +411,24 @@
     "placeholders": { "count": { "type": "int" } }
   },
   "troubleshootingNetworkNone": "No usable network interface",
-  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery}",
+  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery} · Link TCP {link}",
   "@troubleshootingPortListening": {
     "placeholders": {
       "session": { "type": "String" },
       "pairing": { "type": "String" },
-      "discovery": { "type": "String" }
+      "discovery": { "type": "String" },
+      "link": { "type": "String" }
     }
   },
   "troubleshootingPortFallbackNote": "A fallback port still works through Discovery; a direct dial on the well-known port will not.",
+  "troubleshootingLinkPortFallback": "Link shares are on fallback TCP {port}; make sure the firewall allows it.",
+  "@troubleshootingLinkPortFallback": {
+    "placeholders": { "port": { "type": "String" } }
+  },
+  "troubleshootingLinkPortIdle": "Link sharing has not started yet; the next share will try TCP {port}.",
+  "@troubleshootingLinkPortIdle": {
+    "placeholders": { "port": { "type": "String" } }
+  },
   "troubleshootingFirewallOpen": "Inbound rules allow this app on the required ports",
   "troubleshootingFirewallBlocked": "No inbound allow rule covers: {missing}",
   "@troubleshootingFirewallBlocked": {

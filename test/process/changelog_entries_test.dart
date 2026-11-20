@@ -375,6 +375,7 @@ Set<String> distinguishingFragments(String subject) {
     'secret': '密钥',
     'settings': '设置',
     'share': '分享',
+    'share-by-link': '链接分享',
     'share-link': '链接分享',
     'skin': '皮肤',
     'skins': '皮肤',

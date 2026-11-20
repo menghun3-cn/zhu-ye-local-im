@@ -1679,11 +1679,12 @@ abstract class AppLocalizations {
   /// No description provided for @troubleshootingPortListening.
   ///
   /// In en, this message translates to:
-  /// **'Session {session} · Pairing {pairing} · Discovery UDP {discovery}'**
+  /// **'Session {session} · Pairing {pairing} · Discovery UDP {discovery} · Link TCP {link}'**
   String troubleshootingPortListening(
     String session,
     String pairing,
     String discovery,
+    String link,
   );
 
   /// No description provided for @troubleshootingPortFallbackNote.
@@ -1691,6 +1692,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A fallback port still works through Discovery; a direct dial on the well-known port will not.'**
   String get troubleshootingPortFallbackNote;
+
+  /// No description provided for @troubleshootingLinkPortFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Link shares are on fallback TCP {port}; make sure the firewall allows it.'**
+  String troubleshootingLinkPortFallback(String port);
+
+  /// No description provided for @troubleshootingLinkPortIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Link sharing has not started yet; the next share will try TCP {port}.'**
+  String troubleshootingLinkPortIdle(String port);
 
   /// No description provided for @troubleshootingFirewallOpen.
   ///
