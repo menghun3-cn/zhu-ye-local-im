@@ -622,11 +622,20 @@ class _ConversationViewState extends State<ConversationView> {
             // releases it. The header stays outside — it is chrome, not
             // somewhere a message is written.
             child: DropTarget(
-              // Only registered when there is a peer: a target that accepted a
-              // drop it could not send would swallow the file silently. A
-              // selection in progress takes no drops either — a staged file
-              // has no message to be picked.
-              enable: canSend && !_selecting,
+              // The plugin's target is global and coordinate-based: it cannot
+              // tell that this view is covered, so a mounted-but-hidden one
+              // would still fire. `Visibility.of` answers the IndexedStack
+              // case — a tab that is not selected — and `isCurrentOf` the
+              // route case — a pushed `ConversationPage` or a dialog over
+              // the shell. And only registered when there is a peer: a target
+              // that accepted a drop it could not send would swallow the file
+              // silently. A selection in progress takes no drops either — a
+              // staged file has no message to be picked.
+              enable:
+                  canSend &&
+                  !_selecting &&
+                  Visibility.of(context) &&
+                  (ModalRoute.isCurrentOf(context) ?? true),
               onDragEntered: (_) => setState(() => _dropping = true),
               onDragExited: (_) => setState(() => _dropping = false),
               onDragDone: (detail) {
