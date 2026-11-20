@@ -1523,6 +1523,11 @@ class _AttachmentTile extends StatelessWidget {
             tooltip: removeTooltip,
             icon: const Icon(Icons.close, size: 12),
             color: Colors.white,
+            // `color` is the enabled ink; without this the disabled × falls
+            // back to the theme's on-surface grey — near-black on the scrim
+            // circle, which reads as a missing glyph rather than a disabled
+            // one.
+            disabledColor: Colors.white38,
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints.tightFor(

@@ -469,6 +469,11 @@ class _Toolbar extends StatelessWidget {
               onPressed: canCapture ? onCopy : null,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF07C160),
+                // The overlay is always dark, so the disabled pair is the
+                // dark-surface version of the same idea: a washed-out fill
+                // and a faint label, not the brand green a live 完成 wears.
+                disabledBackgroundColor: Colors.white24,
+                disabledForegroundColor: Colors.white38,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
               ),
               child: _hinted(
@@ -479,7 +484,10 @@ class _Toolbar extends StatelessWidget {
             const SizedBox(width: 6),
             TextButton(
               onPressed: canCapture ? onPin : null,
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white38,
+              ),
               child: _hinted(
                 const Text('钉图', style: TextStyle(fontSize: 13)),
                 _hint(CaptureAction.pin),

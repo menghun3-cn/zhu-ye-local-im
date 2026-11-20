@@ -1169,14 +1169,24 @@ class WeChat {
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
+          // Disabled is checked first for the same reason the filled and
+          // text pairs above resolve per state: the clipboard page shows a
+          // mode this platform cannot honour as a *disabled* segment, and a
+          // segment that cannot be picked must not keep the ink of one that
+          // can — `bubbleText` on `surface` reads exactly like selectable.
           foregroundColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected)
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.disabledText
+                : states.contains(WidgetState.selected)
                 ? colors.brandStrong
                 : colors.bubbleText,
           ),
           backgroundColor: WidgetStateProperty.resolveWith(
-            (states) =>
-                states.contains(WidgetState.selected) ? colors.surface : null,
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.surfaceSunken
+                : states.contains(WidgetState.selected)
+                ? colors.surface
+                : null,
           ),
           side: WidgetStatePropertyAll(BorderSide(color: colors.divider)),
           shape: const WidgetStatePropertyAll(
