@@ -3,7 +3,7 @@ import 'dart:io';
 import '../discovery/peer_registry.dart';
 import 'link_server.dart';
 
-export 'link_server.dart' show defaultLinkTransferPort;
+export 'link_server.dart' show ActiveShare, defaultLinkTransferPort;
 
 /// Link-based file transfer service.
 ///
@@ -22,6 +22,14 @@ class LinkTransfer {
 
   /// The actual port the server is listening on.
   int? get port => _server.actualPort;
+
+  /// The shares the server is currently holding — the sender's own list,
+  /// which outlives the page that created each entry.
+  List<ActiveShare> get shares => _server.activeShares();
+
+  /// Revokes the share [token] names. See
+  /// [LinkTransferServer.revokeShare].
+  bool revokeShare(String token) => _server.revokeShare(token);
 
   /// Starts the link transfer server.
   Future<void> start() async {
