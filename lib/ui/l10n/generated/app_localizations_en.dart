@@ -1270,6 +1270,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get myCardFeedback => 'Feedback or suggestions';
+
+  @override
+  String get myCardFeedbackSummary => 'Open the QQ group page';
+
+  @override
   String get myViewDetails => 'View details';
 
   @override

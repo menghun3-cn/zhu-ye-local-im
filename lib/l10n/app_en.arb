@@ -539,6 +539,8 @@
   "@myCardAboutSummaryUpdate": {
     "placeholders": { "version": { "type": "String" } }
   },
+  "myCardFeedback": "Feedback or suggestions",
+  "myCardFeedbackSummary": "Open the QQ group page",
   "myViewDetails": "View details",
 
   "settingsBubbles": "Message bubbles",

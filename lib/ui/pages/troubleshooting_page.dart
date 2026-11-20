@@ -83,7 +83,7 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
     final result = await openFirewallPorts(
       platform: platform,
       programPath: Platform.resolvedExecutable,
-      // Only the bound port: the script always adds the preferred 18080 too,
+      // Only the bound port: the script always adds the preferred 47657 too,
       // so a fallback port gets its own rule entry without duplicating it.
       linkPort: LinkTransfer.instance.port,
     );

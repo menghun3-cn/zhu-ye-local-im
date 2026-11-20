@@ -19,14 +19,15 @@ A navigation that does not say which is which makes the user scan six items to f
 **Two surfaces on the rail, one aggregator page for the rest.** The navigation now shows three entries:
 - Conversations (high-frequency, kept)
 - Transfers (high-frequency, kept)
-- My (new, aggregates Devices, Clipboard, Settings, About)
+- My (new, aggregates the low-frequency surfaces and outward destinations)
 
-The "My" page is a card-based list, each card representing one of the four low-frequency surfaces. Every card shows:
+The "My" page is a card-based list, each card representing a low-frequency surface or an outward destination. Every card shows:
 - The surface's icon and title
 - A short summary of the most useful information (e.g., "Known devices: 3" for Devices, "v0.1.2" for About)
-- A "View details" button that opens the full surface as a new route
 
-The full surfaces (DevicesPage, ClipboardPage, SettingsPage, AboutPage) are unchanged except that they are now reached by pushing a route from "My", rather than by switching the rail selection. The rail's `pinnedCount` drops from 2 to 0 because there are only three entries now.
+Tapping a card opens the full surface as a new route, or hands an outward address to the browser.
+
+The full surfaces are unchanged except that they are now reached by pushing a route from "My", rather than by switching the rail selection. The rail's `pinnedCount` drops from 2 to 0 because there are only three entries now.
 
 The split follows actual usage: a user opens the app to talk or to transfer, and everything else is a detour. Putting the detours in one place lets the navigation be lean while still keeping everything reachable.
 
@@ -44,10 +45,10 @@ The split follows actual usage: a user opens the app to talk or to transfer, and
 
 ## Consequences
 
-- `lib/ui/pages/my_page.dart` is new. It builds four cards, each pointing to one of the four low-frequency pages.
-- `lib/ui/home_shell.dart` now builds three surfaces instead of six. The `surfaces` list drops Devices, Clipboard, Settings, and About; those pages are now children of `MyPage`.
+- `lib/ui/pages/my_page.dart` is new. It builds cards for the low-frequency surfaces and outward destinations.
+- `lib/ui/home_shell.dart` now builds three surfaces instead of six. The `surfaces` list drops the low-frequency pages; those pages are now children of `MyPage`.
 - `lib/ui/nav_rail.dart` changes `pinnedCount` from 2 to 0, because there is no need to pin anything with only three entries.
 - The bottom bar also drops from six to three entries.
-- Four localisation keys are added: `tabMy`, `myPageTitle`, and the four card titles/summaries.
+- The page's strings live in the ARB files under `tabMy`, `myPageTitle`, and the card titles/summaries.
 - Two widget tests are added: one for `MyPage` and one to verify the new navigation structure in the shell.
 - The "My" page follows the existing card pattern (from SettingsPage) for visual consistency.

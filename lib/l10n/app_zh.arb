@@ -368,6 +368,8 @@
   "myCardAbout": "关于",
   "myCardAboutSummary": "版本 {version}",
   "myCardAboutSummaryUpdate": "版本 {version} · 有新版本",
+  "myCardFeedback": "反馈问题或建议",
+  "myCardFeedbackSummary": "打开 QQ 交流群页面",
   "myViewDetails": "查看详情",
 
   "settingsBubbles": "消息气泡",

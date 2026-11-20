@@ -1202,6 +1202,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get myCardFeedback => '反馈问题或建议';
+
+  @override
+  String get myCardFeedbackSummary => '打开 QQ 交流群页面';
+
+  @override
   String get myViewDetails => '查看详情';
 
   @override

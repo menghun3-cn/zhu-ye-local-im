@@ -289,7 +289,7 @@ Finder _buttonShowing(Finder scope, String label) => find.descendant(
 
 /// Opens the card titled [label] on the My page.
 ///
-/// The My page shows four cards, each tappable as a whole — there is no
+/// The My page shows cards, each tappable as a whole — there is no
 /// separate "view details" button; the card's [InkWell] is the way in. This
 /// helper taps the card's title, which is inside it.
 Future<void> openMyCard(
