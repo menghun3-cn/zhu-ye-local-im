@@ -346,6 +346,7 @@ Set<String> distinguishingFragments(String subject) {
     'downloads': '下载',
     'draft': '草稿',
     'drafts': '草稿',
+    'drop': '拖放',
     'finished': '完成',
     'firewall': '防火墙',
     'folder': '文件夹',
@@ -370,10 +371,12 @@ Set<String> distinguishingFragments(String subject) {
     'resend': '重发',
     'resendable': '重发',
     'rules': '规则',
+    'screens': '移动端',
     'screenshot': '截图',
     'screenshots': '截图',
     'secret': '密钥',
     'settings': '设置',
+    'site': '官网',
     'share': '分享',
     'share-by-link': '链接分享',
     'share-link': '链接分享',
@@ -382,6 +385,7 @@ Set<String> distinguishingFragments(String subject) {
     'slice': '分片',
     'troubleshooting': '排查',
     'unicast': '单播',
+    'website': '官网',
   };
 
   // Latin words of four letters or more. Short words are excluded because
