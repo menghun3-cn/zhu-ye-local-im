@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../core/core.dart';
+import '../../core/link_transfer/link_transfer.dart';
 import '../controller_scope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
@@ -57,6 +58,10 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
       final firewall = await probeHostFirewall(
         platform: platform,
         programPath: Platform.resolvedExecutable,
+        // The bound port while the server runs — a dynamic fallback is the
+        // port the links actually name — and the preferred one while it has
+        // not started, which is what the next share will try first.
+        linkPort: LinkTransfer.instance.port ?? defaultLinkTransferPort,
       );
       if (!mounted) return;
       setState(() {
@@ -78,6 +83,9 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
     final result = await openFirewallPorts(
       platform: platform,
       programPath: Platform.resolvedExecutable,
+      // Only the bound port: the script always adds the preferred 18080 too,
+      // so a fallback port gets its own rule entry without duplicating it.
+      linkPort: LinkTransfer.instance.port,
     );
     // Whether the rules went in or not, what is on the page has to be asked
     // again: a success means the probe should now read "open", and a cancel
@@ -332,10 +340,13 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
     if (controller == null) return CheckStatus.checking;
     final session = sessionPortLevel(controller.listenPort);
     final pairing = pairingPortLevel(controller.pairingPort);
+    final link = linkPortLevel(LinkTransfer.instance.port);
     if (session == CheckStatus.error || pairing == CheckStatus.error) {
       return CheckStatus.error;
     }
-    if (session == CheckStatus.warning || pairing == CheckStatus.warning) {
+    if (session == CheckStatus.warning ||
+        pairing == CheckStatus.warning ||
+        link == CheckStatus.warning) {
       return CheckStatus.warning;
     }
     return CheckStatus.ok;
@@ -346,19 +357,26 @@ class _TroubleshootingPageState extends State<TroubleshootingPage> {
     LocalTransferController controller,
   ) {
     String label(int? port) => port?.toString() ?? '—';
+    final linkPort = LinkTransfer.instance.port;
     final detail = l10n.troubleshootingPortListening(
       label(controller.listenPort),
       label(controller.pairingPort),
       '$discoveryPort',
+      label(linkPort),
     );
-    final fallback =
+    final sessionFallback =
         (controller.listenPort != null &&
             controller.listenPort != defaultSessionPort) ||
         (controller.pairingPort != null &&
             controller.pairingPort != defaultPairingPort);
-    return fallback
-        ? '$detail — ${l10n.troubleshootingPortFallbackNote}'
-        : detail;
+    final notes = [
+      if (sessionFallback) l10n.troubleshootingPortFallbackNote,
+      if (linkPort != null && linkPort != defaultLinkTransferPort)
+        l10n.troubleshootingLinkPortFallback('$linkPort'),
+      if (linkPort == null)
+        l10n.troubleshootingLinkPortIdle('$defaultLinkTransferPort'),
+    ];
+    return notes.isEmpty ? detail : '$detail — ${notes.join(' ')}';
   }
 
   CheckStatus _vpnLevel() {

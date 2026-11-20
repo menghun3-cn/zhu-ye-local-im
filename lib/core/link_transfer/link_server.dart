@@ -4,12 +4,20 @@ import 'dart:io';
 
 import 'share_address.dart';
 
+/// The port link-share downloads prefer to listen on.
+///
+/// A preference, not a requirement: when the operating system refuses it the
+/// server falls back to any free port and the generated links name that one
+/// instead, which is why diagnostics must read [LinkTransferServer.actualPort]
+/// rather than assume this value.
+const int defaultLinkTransferPort = 18080;
+
 /// Temporary HTTP server for link-based file transfer.
 ///
 /// Serves a simple web page that allows recipients to download files
 /// without installing the app. Links expire after 30 minutes.
 class LinkTransferServer {
-  LinkTransferServer({this.preferredPort = 18080});
+  LinkTransferServer({this.preferredPort = defaultLinkTransferPort});
 
   final int preferredPort;
   HttpServer? _server;
