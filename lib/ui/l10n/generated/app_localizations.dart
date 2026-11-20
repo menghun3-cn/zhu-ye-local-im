@@ -1352,6 +1352,18 @@ abstract class AppLocalizations {
   /// **'Open the download page'**
   String get aboutOpenDownload;
 
+  /// No description provided for @aboutWebsite.
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get aboutWebsite;
+
+  /// No description provided for @aboutOpenWebsite.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the website'**
+  String get aboutOpenWebsite;
+
   /// No description provided for @aboutNoRelease.
   ///
   /// In en, this message translates to:
