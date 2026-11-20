@@ -260,7 +260,7 @@ void main() {
         rules: const [
           {
             'proto': 'TCP',
-            'port': '47655,47656,18080',
+            'port': '47655,47656,47657',
             'prof': 'Any',
             'prog': '',
           },
@@ -279,7 +279,7 @@ void main() {
       );
 
       // A dynamic fallback the rules do not name: blocked, and the missing
-      // list says which port — not 18080, which the links are not using.
+      // list says which port — not 47657, which the links are not using.
       final dynamicReport = firewallReportFromSnapshot(
         covered(),
         programPath: program,
@@ -287,7 +287,7 @@ void main() {
       )!;
       expect(dynamicReport.state, FirewallState.blocked);
       expect(dynamicReport.missing, contains('TCP 51234'));
-      expect(dynamicReport.missing, isNot(contains('TCP 18080')));
+      expect(dynamicReport.missing, isNot(contains('TCP 47657')));
     });
 
     test('malformed snapshots are null, not a guess', () {
@@ -377,9 +377,9 @@ void main() {
         for (var i = 0; i + 1 < bytes.length; i += 2)
           bytes[i] | bytes[i + 1] << 8,
       ]);
-      // 18080 is always there — next run may take it — and the dynamic
+      // 47657 is always there — next run may take it — and the dynamic
       // port the links currently name is added beside it.
-      expect(inner, contains('-LocalPort \'18080,47655,47656,51234\''));
+      expect(inner, contains('-LocalPort \'47655,47656,47657,51234\''));
     });
   });
 }

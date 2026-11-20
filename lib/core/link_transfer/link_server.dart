@@ -10,7 +10,7 @@ import 'share_address.dart';
 /// server falls back to any free port and the generated links name that one
 /// instead, which is why diagnostics must read [LinkTransferServer.actualPort]
 /// rather than assume this value.
-const int defaultLinkTransferPort = 18080;
+const int defaultLinkTransferPort = 47657;
 
 /// Temporary HTTP server for link-based file transfer.
 ///
