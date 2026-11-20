@@ -781,6 +781,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutOpenDownload => 'Open the download page';
 
   @override
+  String get aboutWebsite => 'Website';
+
+  @override
+  String get aboutOpenWebsite => 'Open the website';
+
+  @override
   String get aboutNoRelease =>
       'No version has been published yet, so there is nothing to compare this build against.';
 
@@ -969,13 +975,24 @@ class AppLocalizationsEn extends AppLocalizations {
     String session,
     String pairing,
     String discovery,
+    String link,
   ) {
-    return 'Session $session · Pairing $pairing · Discovery UDP $discovery';
+    return 'Session $session · Pairing $pairing · Discovery UDP $discovery · Link TCP $link';
   }
 
   @override
   String get troubleshootingPortFallbackNote =>
       'A fallback port still works through Discovery; a direct dial on the well-known port will not.';
+
+  @override
+  String troubleshootingLinkPortFallback(String port) {
+    return 'Link shares are on fallback TCP $port; make sure the firewall allows it.';
+  }
+
+  @override
+  String troubleshootingLinkPortIdle(String port) {
+    return 'Link sharing has not started yet; the next share will try TCP $port.';
+  }
 
   @override
   String get troubleshootingFirewallOpen =>

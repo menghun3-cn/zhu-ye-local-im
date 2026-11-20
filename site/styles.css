@@ -190,6 +190,22 @@ svg { display: block; }
 .nav-drop__title { font-size: var(--fs-label); font-weight: 600; }
 .nav-drop__desc { font-size: var(--fs-meta); color: var(--text-3); }
 
+/* 窄屏菜单：宽屏下整棵子树都不显示（display:none 在 .nav-menu 上），
+   窄屏媒体查询里才把按钮与面板放出来。面板样式与 .nav-drop__panel 同源。 */
+.nav-menu { display: none; position: relative; }
+.nav-menu__panel {
+  position: absolute; right: 0; top: calc(100% + 10px);
+  min-width: 200px; padding: var(--s2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--sh2);
+}
+.nav-menu__link {
+  display: block; padding: var(--s2) var(--s3); border-radius: var(--r-sm);
+  color: var(--text); font-size: var(--fs-label); font-weight: 600;
+  text-decoration: none !important;
+}
+.nav-menu__link:hover { background: var(--surface-3); }
+
 .theme-toggle {
   width: 34px; height: 34px; flex: none;
   display: grid; place-items: center;
@@ -373,6 +389,9 @@ svg { display: block; }
   .hero__art img { transform: rotateY(-30deg); }
   .block h2 { font-size: 22px; }
   .topbar__nav { display: none; }
+  /* 导航收起后菜单按钮顶到右侧：它是此时唯一的 auto 外边距。
+     按钮复用 .theme-toggle 的方形样式，不需要单独的显示规则。 */
+  .nav-menu { display: block; margin-left: auto; }
   .split { grid-template-columns: 1fr; gap: 0; }
   .split dt { margin-top: var(--s4); }
   .split > div + div { padding-top: var(--s4); }

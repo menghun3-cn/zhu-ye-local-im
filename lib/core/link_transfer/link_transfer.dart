@@ -3,6 +3,8 @@ import 'dart:io';
 import '../discovery/peer_registry.dart';
 import 'link_server.dart';
 
+export 'link_server.dart' show defaultLinkTransferPort;
+
 /// Link-based file transfer service.
 ///
 /// Provides temporary HTTP download links for files, allowing recipients

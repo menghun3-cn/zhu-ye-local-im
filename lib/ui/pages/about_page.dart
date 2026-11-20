@@ -13,6 +13,12 @@ import '../update_session.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
+/// The project's public site: `site/` deployed to GitHub Pages by
+/// `.github/workflows/pages.yml`. The page names it so a user can read the
+/// same words the website carries — requirements, limits, release notes —
+/// without leaving the app for a search engine.
+const String appWebsiteUrl = 'https://menghun3-cn.github.io/zhu-ye-local-im/';
+
 /// What this build is, and how to get a newer one.
 ///
 /// A surface of its own rather than a section of Settings: it is the one page
@@ -411,6 +417,42 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                     ),
                   ),
+                const SizedBox(height: 8),
+                // The website is not part of the update flow — it is the one
+                // outward address that stays the same however the release
+                // check answers, so it gets its own row rather than joining
+                // the conditional download link above.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      l10n.aboutWebsite,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizePreview,
+                        fontWeight: FontWeight.w600,
+                        color: colors.bubbleText,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          unawaited(LinkResolution.opener.open(appWebsiteUrl)),
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      label: Text(l10n.aboutOpenWebsite),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: SelectableText(
+                    appWebsiteUrl,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizeMeta,
+                      color: colors.secondaryText,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 HintText(canInstall ? installHint : manualHint),
               ],

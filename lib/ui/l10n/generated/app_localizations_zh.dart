@@ -749,6 +749,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutOpenDownload => '打开下载页';
 
   @override
+  String get aboutWebsite => '官网';
+
+  @override
+  String get aboutOpenWebsite => '打开官网';
+
+  @override
   String get aboutNoRelease => '还没有发布过任何版本，暂时无从比较本机这版。';
 
   @override
@@ -916,13 +922,24 @@ class AppLocalizationsZh extends AppLocalizations {
     String session,
     String pairing,
     String discovery,
+    String link,
   ) {
-    return '会话 $session · 配对 $pairing · 发现 UDP $discovery';
+    return '会话 $session · 配对 $pairing · 发现 UDP $discovery · 短链 TCP $link';
   }
 
   @override
   String get troubleshootingPortFallbackNote =>
       '备用端口仍可通过发现功能正常工作；直接按默认端口拨号将无法连通。';
+
+  @override
+  String troubleshootingLinkPortFallback(String port) {
+    return '短链分享当前使用备用端口 TCP $port，请确认防火墙已放行该端口。';
+  }
+
+  @override
+  String troubleshootingLinkPortIdle(String port) {
+    return '短链分享尚未启动，下次分享将尝试 TCP $port。';
+  }
 
   @override
   String get troubleshootingFirewallOpen => '入站规则已放行本应用所需端口';

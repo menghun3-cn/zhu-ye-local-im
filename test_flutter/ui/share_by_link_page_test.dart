@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 import 'package:local_transfer/core/core.dart';
 import 'package:local_transfer/core/link_transfer/link_transfer.dart';
 import 'package:local_transfer/ui/clipboard_paste.dart';
+import 'package:local_transfer/ui/conversation_view.dart';
 import 'package:local_transfer/ui/pages/share_by_link_page.dart';
 import 'package:local_transfer/ui/pickers.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -264,6 +265,68 @@ void main() {
 
       await stopLinkTransfer(tester);
       await shutdown(tester, [device]);
+    });
+
+    testWidgets('a covered conversation takes no drop meant for this page', (
+      tester,
+    ) async {
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+      await pumpWindow(tester, alice);
+
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Bob'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Bob');
+      await openShareByLinkPage(tester);
+
+      // `desktop_drop`'s target is global and coordinate-based: it cannot
+      // tell that the conversation is covered, so `enable` is the only thing
+      // keeping a drop on this page out of the hidden composer. The covered
+      // page is still mounted — the shell's `IndexedStack` keeps every tab —
+      // but `find` skips it by default, so the lookups go in with
+      // `skipOffstage: false`.
+      final coveredConversation = find.descendant(
+        of: find.byType(ConversationView, skipOffstage: false),
+        matching: find.byType(DropTarget, skipOffstage: false),
+        skipOffstage: false,
+      );
+      final sharePage = find.descendant(
+        of: find.byType(ShareByLinkPage, skipOffstage: false),
+        matching: find.byType(DropTarget, skipOffstage: false),
+        skipOffstage: false,
+      );
+
+      expect(coveredConversation, findsOneWidget);
+      expect(
+        tester.widget<DropTarget>(coveredConversation).enable,
+        isFalse,
+        reason: 'the conversation is covered by the share page',
+      );
+      expect(tester.widget<DropTarget>(sharePage).enable, isTrue);
+
+      // The leak runs both ways: the share page stays mounted under the
+      // conversations tab once it has been opened, and must not take a drop
+      // meant for the conversation either.
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      expect(
+        tester.widget<DropTarget>(sharePage).enable,
+        isFalse,
+        reason: 'the share page is covered by the conversations tab',
+      );
+      expect(
+        tester.widget<DropTarget>(coveredConversation).enable,
+        isTrue,
+        reason: 'the conversation is on top again',
+      );
+
+      await shutdown(tester, [alice, bob]);
     });
   });
 }

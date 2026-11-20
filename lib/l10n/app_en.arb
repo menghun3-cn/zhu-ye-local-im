@@ -354,6 +354,8 @@
   },
   "aboutUpdateNotes": "Release notes",
   "aboutOpenDownload": "Open the download page",
+  "aboutWebsite": "Website",
+  "aboutOpenWebsite": "Open the website",
   "aboutNoRelease": "No version has been published yet, so there is nothing to compare this build against.",
   "aboutUnreachable": "The update server could not be reached. Check the network, or download the new version by hand.",
   "aboutHowToUpgrade": "To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device's identity and must not be touched.",
@@ -409,15 +411,24 @@
     "placeholders": { "count": { "type": "int" } }
   },
   "troubleshootingNetworkNone": "No usable network interface",
-  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery}",
+  "troubleshootingPortListening": "Session {session} · Pairing {pairing} · Discovery UDP {discovery} · Link TCP {link}",
   "@troubleshootingPortListening": {
     "placeholders": {
       "session": { "type": "String" },
       "pairing": { "type": "String" },
-      "discovery": { "type": "String" }
+      "discovery": { "type": "String" },
+      "link": { "type": "String" }
     }
   },
   "troubleshootingPortFallbackNote": "A fallback port still works through Discovery; a direct dial on the well-known port will not.",
+  "troubleshootingLinkPortFallback": "Link shares are on fallback TCP {port}; make sure the firewall allows it.",
+  "@troubleshootingLinkPortFallback": {
+    "placeholders": { "port": { "type": "String" } }
+  },
+  "troubleshootingLinkPortIdle": "Link sharing has not started yet; the next share will try TCP {port}.",
+  "@troubleshootingLinkPortIdle": {
+    "placeholders": { "port": { "type": "String" } }
+  },
   "troubleshootingFirewallOpen": "Inbound rules allow this app on the required ports",
   "troubleshootingFirewallBlocked": "No inbound allow rule covers: {missing}",
   "@troubleshootingFirewallBlocked": {

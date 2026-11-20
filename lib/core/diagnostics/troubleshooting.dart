@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../clipboard/clipboard_capability.dart';
 import '../discovery/beacon.dart' as beacon;
+import '../link_transfer/link_server.dart';
 import '../pairing/pairing_service.dart';
 import '../session/link_manager.dart';
 
@@ -114,6 +115,19 @@ CheckStatus pairingPortLevel(int? port) {
   return port == defaultPairingPort ? CheckStatus.ok : CheckStatus.warning;
 }
 
+/// Whether the link-share listener is healthy.
+///
+/// The server binds lazily on the first share, so [null] — never started — is
+/// the ordinary state of a Device that has not shared yet and reads [ok]. A
+/// bound port other than [defaultLinkTransferPort] means the preferred port
+/// was taken and the server fell back to a random one: links still work, but
+/// they name a port a firewall rule written for 18080 alone would not cover,
+/// so it warns like the other fallbacks.
+CheckStatus linkPortLevel(int? port) {
+  if (port == null) return CheckStatus.ok;
+  return port == defaultLinkTransferPort ? CheckStatus.ok : CheckStatus.warning;
+}
+
 /// Whether inbound traffic can reach the ports at all.
 enum FirewallState {
   /// Every needed port is covered by an inbound allow rule for this program.
@@ -176,6 +190,22 @@ const List<(String, int)> requiredInboundPorts = [
   ('TCP', defaultPairingPort),
   ('UDP', beacon.discoveryPort),
 ];
+
+/// [requiredInboundPorts] plus the port link-share downloads are served on.
+///
+/// [linkPort] is the port the caller judged: the bound port while the server
+/// runs — which may be a dynamic fallback — and [defaultLinkTransferPort]
+/// while it has not started, the best available answer because a share that
+/// would discover a different fallback cannot exist yet. A port already in
+/// the base list is not repeated.
+List<(String, int)> requiredInboundPortsFor({int? linkPort}) {
+  final ports = List<(String, int)>.of(requiredInboundPorts);
+  if (linkPort != null &&
+      !ports.any((entry) => entry.$1 == 'TCP' && entry.$2 == linkPort)) {
+    ports.add(('TCP', linkPort));
+  }
+  return ports;
+}
 
 /// Whether [spec] — a Windows LocalPort filter value — covers [port].
 ///
@@ -252,7 +282,7 @@ bool profileApplies(String profileSpec, String? category) {
       profiles.split(',').map((p) => p.trim()).contains(wanted);
 }
 
-/// Judges the rule set against [requiredInboundPorts].
+/// Judges the rule set against [requiredInboundPortsFor].
 ///
 /// Pure, so the parsing decisions — which are the part that can be wrong — are
 /// exercised without PowerShell anywhere near them.
@@ -261,11 +291,12 @@ FirewallReport evaluateFirewallRules({
   required bool? firewallEnabled,
   required List<FirewallRule> rules,
   required String programPath,
+  int? linkPort,
 }) {
   // A disabled firewall blocks nothing, whatever the rules say.
   if (firewallEnabled == false) return const FirewallReport(FirewallState.open);
   final missing = <String>[];
-  for (final (protocol, port) in requiredInboundPorts) {
+  for (final (protocol, port) in requiredInboundPortsFor(linkPort: linkPort)) {
     final covered = rules.any(
       (rule) =>
           profileApplies(rule.profile, category) &&
@@ -279,7 +310,7 @@ FirewallReport evaluateFirewallRules({
   );
 }
 
-/// Judges a firewall snapshot against [requiredInboundPorts].
+/// Judges a firewall snapshot against [requiredInboundPortsFor].
 ///
 /// The snapshot is the decoded map the Windows runner's firewall channel
 /// answers with: `category` (the current network's profile name), `enabled`
@@ -293,6 +324,7 @@ FirewallReport evaluateFirewallRules({
 FirewallReport? firewallReportFromSnapshot(
   Object? snapshot, {
   required String programPath,
+  int? linkPort,
 }) {
   if (snapshot is! Map) return null;
   final category = snapshot['category'];
@@ -319,6 +351,7 @@ FirewallReport? firewallReportFromSnapshot(
     firewallEnabled: enabled is bool ? enabled : null,
     rules: rules,
     programPath: programPath,
+    linkPort: linkPort,
   );
 }
 
@@ -398,14 +431,26 @@ enum FirewallOpenResult { opened, cancelled, failed, unsupported }
 /// rule names are also how [openFirewallPorts] stays idempotent: existing
 /// rules with either name are removed first, so a moved executable updates
 /// the rule instead of accumulating a stale one beside it.
-String firewallOpenScript(String programPath) {
+///
+/// [linkPort] is the port the link-share server is actually bound to, when it
+/// is running. The TCP rule always carries [defaultLinkTransferPort] — a
+/// server that fell back this run may well take the preferred port next time
+/// — and carries [linkPort] as well when it is a different, dynamic one.
+String firewallOpenScript(String programPath, {int? linkPort}) {
   if (programPath.contains("'")) {
     throw ArgumentError('program path may not contain a single quote');
   }
+  final tcpPorts = <int>{
+    defaultSessionPort,
+    defaultPairingPort,
+    defaultLinkTransferPort,
+    ?linkPort,
+  }.toList()..sort();
+  final tcpPortList = tcpPorts.join(',');
   return '''
 Get-NetFirewallRule -DisplayName 'LocalTransfer','LocalTransfer Discovery' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
-New-NetFirewallRule -DisplayName 'LocalTransfer' -Direction Inbound -Action Allow -Program '$programPath' -Protocol TCP -LocalPort '47655,47656' | Out-Null
-New-NetFirewallRule -DisplayName 'LocalTransfer Discovery' -Direction Inbound -Action Allow -Program '$programPath' -Protocol UDP -LocalPort '47654' | Out-Null
+New-NetFirewallRule -DisplayName 'LocalTransfer' -Direction Inbound -Action Allow -Program '$programPath' -Protocol TCP -LocalPort '$tcpPortList' | Out-Null
+New-NetFirewallRule -DisplayName 'LocalTransfer Discovery' -Direction Inbound -Action Allow -Program '$programPath' -Protocol UDP -LocalPort '${beacon.discoveryPort}' | Out-Null
 ''';
 }
 
@@ -422,6 +467,7 @@ New-NetFirewallRule -DisplayName 'LocalTransfer Discovery' -Direction Inbound -A
 Future<FirewallOpenResult> openFirewallPorts({
   required DevicePlatform platform,
   required String programPath,
+  int? linkPort,
   ProcessRunner? run,
 }) async {
   if (platform != DevicePlatform.windows) {
@@ -429,7 +475,7 @@ Future<FirewallOpenResult> openFirewallPorts({
   }
   final String inner;
   try {
-    inner = firewallOpenScript(programPath);
+    inner = firewallOpenScript(programPath, linkPort: linkPort);
   } on ArgumentError {
     return FirewallOpenResult.failed;
   }
