@@ -974,6 +974,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get troubleshootingFirewallFailed => '无法添加规则，请手动放行端口';
 
   @override
+  String get firewallOfferTitle => 'Windows 防火墙正在阻止连接';
+
+  @override
+  String firewallOfferBody(String missing) {
+    return '没有入站放行规则覆盖：$missing。其他设备将无法发现或连接本机。现在放行吗？（需要一次管理员授权）';
+  }
+
+  @override
+  String get firewallOfferAllow => '允许入站连接';
+
+  @override
+  String get firewallOfferLater => '暂不';
+
+  @override
   String get troubleshootingVpnNone => '未检测到 VPN 或虚拟网卡';
 
   @override
