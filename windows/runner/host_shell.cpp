@@ -36,6 +36,14 @@ constexpr const wchar_t kRunValue[] =
     L"\u7af9\u53f6\u5c40\u57df\u7f51\u4f20\u8f93";
 constexpr const wchar_t kLegacyRunValue[] = L"LocalTransfer";
 
+// Where the window's last-known state lives between runs. One key under the
+// product's own hive rather than the Run key's: the Run key is Windows' and
+// holds what it shows the user, while this is ours and holds what the window
+// was. The value is a REG_DWORD, 1 for maximized.
+constexpr const wchar_t kWindowStateKey[] =
+    L"Software\\cn.hnasct.local_transfer";
+constexpr const wchar_t kMaximizedValue[] = L"WindowMaximized";
+
 constexpr const wchar_t kShowExistingMessageName[] =
     L"cn.hnasct.local_transfer.show-existing-instance";
 
@@ -165,6 +173,33 @@ void DeleteAutostartEntry(const wchar_t* name) {
     return;
   }
   ::RegDeleteValueW(key, name);
+  ::RegCloseKey(key);
+}
+
+// The remembered maximized state, or false when there is none -- which is
+// also the answer for a value a newer build wrote in a shape this one does
+// not read. False is the safe default: a window that opens too small is a
+// window the user can drag, and one that opens maximized against their
+// memory of it is a window they have to fix every time.
+bool ReadMaximizedState() {
+  DWORD value = 0;
+  DWORD size = sizeof(value);
+  const LSTATUS result = ::RegGetValueW(
+      HKEY_CURRENT_USER, kWindowStateKey, kMaximizedValue, RRF_RT_REG_DWORD,
+      nullptr, &value, &size);
+  return result == ERROR_SUCCESS && value != 0;
+}
+
+void WriteMaximizedState(bool maximized) {
+  HKEY key = nullptr;
+  if (::RegCreateKeyExW(HKEY_CURRENT_USER, kWindowStateKey, 0, nullptr,
+                        REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key,
+                        nullptr) != ERROR_SUCCESS) {
+    return;
+  }
+  const DWORD value = maximized ? 1 : 0;
+  ::RegSetValueExW(key, kMaximizedValue, 0, REG_DWORD,
+                   reinterpret_cast<const BYTE*>(&value), sizeof(value));
   ::RegCloseKey(key);
 }
 
@@ -348,6 +383,9 @@ bool HostShell::AcquireSingleInstance() {
 
 void HostShell::Attach(HWND window) {
   window_ = window;
+  // Read before anything can write: the first WM_SIZE of a maximized restore
+  // would otherwise record the state it is restoring as a change.
+  maximized_ = ReadMaximizedState();
   // The startup entry's display name changed with the product name; move an
   // entry an older build wrote before Windows reads it as this app.
   MigrateAutostartEntry();
@@ -378,6 +416,18 @@ void HostShell::set_close_to_tray(bool value) {
 void HostShell::set_unread(bool value) {
   unread_ = value;
   ApplyTaskbarOverlay();
+}
+
+bool HostShell::maximized() const {
+  return maximized_;
+}
+
+void HostShell::set_maximized(bool value) {
+  if (maximized_ == value) {
+    return;
+  }
+  maximized_ = value;
+  WriteMaximizedState(value);
 }
 
 bool HostShell::autostart_enabled() const {
