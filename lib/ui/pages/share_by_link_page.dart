@@ -232,6 +232,14 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
         // anywhere on it, not only on the empty state.
         Expanded(
           child: DropTarget(
+            // The plugin's target is global and coordinate-based: it cannot
+            // tell that this page is covered, so a mounted-but-hidden one
+            // would still fire. `Visibility.of` answers the IndexedStack
+            // case — a tab that is not selected — and `isCurrentOf` the
+            // route case — a pushed page or a dialog over the shell.
+            enable:
+                Visibility.of(context) &&
+                (ModalRoute.isCurrentOf(context) ?? true),
             onDragEntered: (_) => setState(() => _dropping = true),
             onDragExited: (_) => setState(() => _dropping = false),
             onDragDone: (detail) {

@@ -116,8 +116,12 @@ thing replaced is the dialog itself.
 
 ### One drop target, and it says what it will do
 
-The history *and* the composer are wrapped in a `DropTarget`, enabled only when
-there is a peer to send to. A drag that enters tints the area and shows a hint;
+The history *and* the composer are wrapped in a `DropTarget`, enabled only
+when the conversation is the surface actually on top and there is a peer to
+send to — `desktop_drop` decides by coordinates alone, so a covered target
+would still fire; see
+[a covered surface still took the dropped file](../bug-fix/2026-11-20-a-covered-surface-still-took-the-dropped-file.md).
+A drag that enters tints the area and shows a hint;
 the drop is staged into the composer's attachment tray exactly like a picked
 or pasted file, and 发送 releases it — see
 [a drop stages in the composer](2026-11-11-a-drop-stages-in-the-composer.md).
