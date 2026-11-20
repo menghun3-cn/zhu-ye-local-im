@@ -150,7 +150,12 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  return ShowWindow(window_handle_,
+                    show_maximized_ ? SW_MAXIMIZE : SW_SHOWNORMAL);
+}
+
+void Win32Window::SetShowMaximized() {
+  show_maximized_ = true;
 }
 
 // static

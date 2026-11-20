@@ -31,6 +31,12 @@ bool FlutterWindow::OnCreate() {
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   host_shell_.Attach(GetHandle());
+  // The window opens the way it was last left: maximized stays maximized.
+  // Asked here, while the window is still invisible, because Show() runs on
+  // the first frame and is the one place the decision can still be made.
+  if (host_shell_.maximized()) {
+    SetShowMaximized();
+  }
   // The tray menu's "screenshot history" entry reaches Dart through the same
   // channel the other host calls use: the menu lives in HostShell, which has
   // no Flutter in it, so the window is the one that translates the command
@@ -194,6 +200,16 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       }
       break;
     }
+    case WM_SIZE:
+      // Only the two states that say something about maximized count:
+      // SIZE_MINIMIZED is a window that is still maximized underneath, and
+      // IsZoomed is asked rather than the wparam so that a restore from the
+      // notification area reports what the window actually is.
+      if (wparam == SIZE_MAXIMIZED || wparam == SIZE_RESTORED) {
+        host_shell_.set_maximized(::IsZoomed(hwnd) == TRUE);
+      }
+      break;
+
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
