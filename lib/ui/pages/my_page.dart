@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../core/core.dart';
 import '../controller_scope.dart';
+import '../external_links.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
 import '../update_notice.dart';
@@ -15,6 +18,8 @@ import 'devices_page.dart';
 import 'screenshot_page.dart';
 import 'settings_page.dart';
 import 'troubleshooting_page.dart';
+
+const String _qqGroupUrl = 'https://qm.qq.com/q/rpttgcx0MC';
 
 /// Which sub-page is shown.
 enum _SubPage {
@@ -89,10 +94,10 @@ class _MyCard extends StatelessWidget {
 
 /// The "My" page, aggregating low-frequency surfaces.
 ///
-/// This page shows four cards, each pointing to one of the four low-frequency
-/// pages: Devices, Clipboard, Settings, and About. Each card displays a short
-/// summary of the most useful information from that surface, and a button to
-/// open the full surface as a new route.
+/// This page shows cards for the low-frequency surfaces and outward
+/// destinations a user reaches for after the main work is done. Surface cards
+/// display a short summary and open a sub-page; the feedback card hands the
+/// QQ group address to the platform's browser instead.
 class MyPage extends StatefulWidget {
   const MyPage({
     super.key,
@@ -236,6 +241,13 @@ class _MyPageState extends State<MyPage> {
           title: l10n.myCardTroubleshooting,
           summary: l10n.myCardTroubleshootingSummary,
           onTap: () => _openSubPage(_SubPage.troubleshooting),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        _MyCard(
+          icon: Icons.chat_bubble_outline,
+          title: l10n.myCardFeedback,
+          summary: l10n.myCardFeedbackSummary,
+          onTap: () => unawaited(LinkResolution.opener.open(_qqGroupUrl)),
         ),
         const SizedBox(height: WeChat.sectionGap),
         _MyCard(
