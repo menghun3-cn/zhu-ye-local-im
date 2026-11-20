@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-20-disabled-buttons-look-disabled.md
+#   git hash-object 2026-11-20-disabled-buttons-look-disabled.zh.md
+2026-11-20-disabled-buttons-look-disabled.md: 0191e149c920175dab1f9263c275050c2b639a91
+2026-11-20-disabled-buttons-look-disabled.zh.md: d4e4a0e07a1ca0e3444f6ab30e2b9b3e9c36b366

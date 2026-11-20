@@ -1196,8 +1196,23 @@ class WeChat {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
-          backgroundColor: WidgetStatePropertyAll(colors.brandStrong),
-          foregroundColor: WidgetStatePropertyAll(colors.onBrandStrong),
+          // Resolved per state rather than pinned for all of them: a
+          // `WidgetStatePropertyAll` would keep the brand green on a disabled
+          // button, and a button that cannot be pressed but still looks like it
+          // can is the update card's "still downloading" press — it reads as a
+          // dead control, not a busy one. Disabled takes the sunken fill and
+          // the faintest text tier, the same pair the design already uses for
+          // "there is nothing to do here".
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.surfaceSunken
+                : colors.brandStrong,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.disabledText
+                : colors.onBrandStrong,
+          ),
           surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           elevation: const WidgetStatePropertyAll(0),
           shape: const WidgetStatePropertyAll(
@@ -1227,8 +1242,14 @@ class WeChat {
       textButtonTheme: TextButtonThemeData(
         style: ButtonStyle(
           // A text button is the "link" of this design: the action green with
-          // no fill, which is how every quiet action is drawn.
-          foregroundColor: WidgetStatePropertyAll(colors.brandStrong),
+          // no fill, which is how every quiet action is drawn. The disabled
+          // state still has to say so — the same reason the filled pair above
+          // resolves per state rather than pinning one colour.
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.disabledText
+                : colors.brandStrong,
+          ),
           shape: const WidgetStatePropertyAll(
             RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
