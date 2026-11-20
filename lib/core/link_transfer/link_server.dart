@@ -110,11 +110,40 @@ class LinkTransferServer {
     if (existing.isEmpty) return null;
 
     final token = _generateToken();
-    _shares[token] = _ShareEntry(files: existing, createdAt: DateTime.now());
-
     final ip = await _getLocalIp(peerAddresses);
-    return 'http://$ip:$actualPort/s/$token';
+    final url = 'http://$ip:$actualPort/s/$token';
+    _shares[token] = _ShareEntry(
+      files: existing,
+      url: url,
+      createdAt: DateTime.now(),
+    );
+    return url;
   }
+
+  /// The shares currently held, oldest first — what the sender's own share
+  /// list redraws from, so the list survives the page that created it.
+  ///
+  /// Expired entries are omitted even before the cleanup timer removes them:
+  /// a card must never offer a link that is already dead.
+  List<ActiveShare> activeShares() {
+    final now = DateTime.now();
+    return [
+      for (final entry in _shares.entries)
+        if (!entry.value.isExpiredAt(now))
+          ActiveShare(
+            token: entry.key,
+            url: entry.value.url,
+            fileNames: [for (final file in entry.value.files) file.name],
+            createdAt: entry.value.createdAt,
+          ),
+    ];
+  }
+
+  /// Revokes the share [token] names: its page and file routes answer
+  /// "expired" from now on. Returns whether a live share was actually
+  /// removed — deleting a card twice, or one whose 30 minutes ran out, is
+  /// not an error.
+  bool revokeShare(String token) => _shares.remove(token) != null;
 
   /// Handles incoming HTTP requests.
   void _handleRequest(HttpRequest request) async {
@@ -617,12 +646,46 @@ class _LinkEntry {
   bool isExpiredAt(DateTime time) => time.isAfter(expiresAt);
 }
 
+/// A share the server is currently holding, described for the sender's own
+/// surface — the link that was handed out, the names it covers, and when it
+/// dies.
+final class ActiveShare {
+  const ActiveShare({
+    required this.token,
+    required this.url,
+    required this.fileNames,
+    required this.createdAt,
+  });
+
+  /// The token the `/s/` and `/f/` routes are keyed on.
+  final String token;
+
+  /// The URL that was handed out. It carries the address chosen when the
+  /// share was created, which is why it is stored rather than rebuilt — a
+  /// later interface change must not rewrite a link already sent.
+  final String url;
+
+  /// The files the share page lists, in the order the sender chose them.
+  final List<String> fileNames;
+
+  final DateTime createdAt;
+
+  DateTime get expiresAt => createdAt.add(const Duration(minutes: 30));
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+}
+
 /// One shared group: the files a single `/s/<token>` page lists, in the
 /// order the sender chose them.
 class _ShareEntry {
-  _ShareEntry({required this.files, required this.createdAt});
+  _ShareEntry({
+    required this.files,
+    required this.url,
+    required this.createdAt,
+  });
 
   final List<({String path, String name})> files;
+  final String url;
   final DateTime createdAt;
 
   DateTime get expiresAt => createdAt.add(const Duration(minutes: 30));

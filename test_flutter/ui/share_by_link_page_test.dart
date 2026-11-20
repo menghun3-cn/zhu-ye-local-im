@@ -267,6 +267,77 @@ void main() {
       await shutdown(tester, [device]);
     });
 
+    testWidgets('a share survives backing out, and deleting revokes it', (
+      tester,
+    ) async {
+      final dir = tempDirectory('share-by-link-persist-');
+      final file = shareableFile(dir, 'notes.txt', [1, 2]);
+
+      final device = await startUiDevice(tester, MemoryBeaconHub().a, 'Alice');
+      await pumpWindow(tester, device);
+      await openShareByLinkPage(tester);
+
+      final target = onPage(windowA, ShareByLinkPage, find.byType(DropTarget));
+      tester.widget<DropTarget>(target).onDragDone!(
+        DropDoneDetails(
+          files: [DropItemFile(file.path)],
+          localPosition: Offset.zero,
+          globalPosition: Offset.zero,
+        ),
+      );
+      await tester.pump();
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ShareByLinkPage,
+          find.text(l10n.shareByLinkFileCount(1)),
+        ).evaluate().isNotEmpty,
+        description: 'the share card to appear',
+      );
+
+      // Back out to the transfer list and return: the card must still be
+      // there — the server holds the share, not the page's state.
+      await tester.tap(windowA.within(find.byIcon(Icons.arrow_back)));
+      await pumpUntil(
+        tester,
+        () => windowA
+            .within(find.text(l10n.shareByLinkTitle))
+            .evaluate()
+            .isNotEmpty,
+        description: 'the transfers list with its share entry',
+      );
+      await tester.tap(windowA.within(find.text(l10n.shareByLinkTitle)));
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ShareByLinkPage,
+          find.text(l10n.shareByLinkFileCount(1)),
+        ).evaluate().isNotEmpty,
+        description: 'the same share card after returning',
+      );
+
+      // Deleting the card revokes the share on the server — the link stops
+      // working now, not whenever the 30 minutes would have run out.
+      await tester.tap(
+        onPage(windowA, ShareByLinkPage, find.byTooltip(l10n.deleteMessage)),
+      );
+      await pumpUntil(
+        tester,
+        () => onPage(
+          windowA,
+          ShareByLinkPage,
+          find.byType(QrImageView),
+        ).evaluate().isEmpty,
+        description: 'the card to be gone',
+      );
+      expect(LinkTransfer.instance.shares, isEmpty);
+
+      await stopLinkTransfer(tester);
+      await shutdown(tester, [device]);
+    });
+
     testWidgets('a covered conversation takes no drop meant for this page', (
       tester,
     ) async {

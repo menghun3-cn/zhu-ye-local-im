@@ -33,7 +33,6 @@ class ShareByLinkPage extends StatefulWidget {
 }
 
 class _ShareByLinkPageState extends State<ShareByLinkPage> {
-  final List<_Share> _shares = [];
   bool _isLoading = false;
 
   /// Whether a drag from outside the window is over the page right now.
@@ -83,18 +82,10 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
 
       if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-        if (link != null) {
-          _shares.add(
-            _Share(
-              link: link,
-              fileNames: [for (final file in files) file.name],
-              createdAt: DateTime.now(),
-            ),
-          );
-        }
-      });
+      // The share list is not kept here: the server holds every live share
+      // until it expires or is revoked, and the page redraws from it — so
+      // backing out and returning cannot throw the links away.
+      setState(() => _isLoading = false);
 
       if (link == null) {
         final l10n = AppLocalizations.of(context);
@@ -116,43 +107,11 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
     await TopToast.show(context, l10n.shareByLinkCopied);
   }
 
-  /// Copies [share]'s QR code to the clipboard as an image.
-  ///
-  /// The picture is whatever the card is showing: the boundary is rendered
-  /// at four times its size so the paste lands crisp in a chat window rather
-  /// than blurry at 84 pixels. `writeImage` answers a bool because a
-  /// clipboard that refuses the write — Android in the background, a platform
-  /// the plugin does not know — is an ordinary outcome, reported as one.
-  Future<void> _copyQr(_Share share) async {
-    final boundary =
-        share.qrKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-    if (boundary == null) return;
-
-    final l10n = AppLocalizations.of(context);
-    try {
-      final image = await boundary.toImage(pixelRatio: 4);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (bytes == null) throw StateError('QR encode failed');
-
-      final copied = await PasteResolution.paste.writeImage(
-        bytes.buffer.asUint8List(),
-      );
-      if (!mounted) return;
-      await TopToast.show(
-        context,
-        copied ? l10n.shareByLinkCopiedQr : l10n.shareByLinkCopyQrFailed,
-      );
-    } on Object {
-      if (!mounted) return;
-      await TopToast.show(context, l10n.shareByLinkCopyQrFailed);
-    }
-  }
-
-  /// Removes a share from the list.
-  void _removeShare(int index) {
-    setState(() => _shares.removeAt(index));
+  /// Removes a share — from the server, not just the card, so the link it
+  /// handed out stops working immediately rather than at expiry.
+  void _removeShare(ActiveShare share) {
+    LinkTransfer.instance.revokeShare(share.token);
+    setState(() {});
   }
 
   /// The frame drawn over the page while a drag is in progress.
@@ -250,18 +209,17 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
             },
             child: Stack(
               children: [
-                _shares.isEmpty
+                LinkTransfer.instance.shares.isEmpty
                     ? Center(child: HintText(l10n.shareByLinkEmpty))
                     : ListView.builder(
                         padding: WeChat.pagePadding,
-                        itemCount: _shares.length,
+                        itemCount: LinkTransfer.instance.shares.length,
                         itemBuilder: (context, index) {
-                          final share = _shares[index];
+                          final share = LinkTransfer.instance.shares[index];
                           return _ShareCard(
                             share: share,
-                            onCopyLink: () => _copyLink(share.link),
-                            onCopyQr: () => _copyQr(share),
-                            onRemove: () => _removeShare(index),
+                            onCopyLink: () => _copyLink(share.url),
+                            onRemove: () => _removeShare(share),
                           );
                         },
                       ),
@@ -275,41 +233,64 @@ class _ShareByLinkPageState extends State<ShareByLinkPage> {
   }
 }
 
-/// One share: a link to a list page, its QR code, and the files it covers.
-class _Share {
-  _Share({
-    required this.link,
-    required this.fileNames,
-    required this.createdAt,
-  });
-
-  final String link;
-  final List<String> fileNames;
-  final DateTime createdAt;
-
-  /// Keys the QR's [RepaintBoundary], which is what "copy the QR code" reads
-  /// pixels from.
-  final GlobalKey qrKey = GlobalKey();
-
-  /// Whether this share has expired (30 minutes).
-  bool get isExpired =>
-      DateTime.now().difference(createdAt) > const Duration(minutes: 30);
-}
-
-/// The card one share is drawn as: what it holds, the two ways to hand it
-/// over — link and QR — and the way to take it back.
-class _ShareCard extends StatelessWidget {
+/// The card one live share is drawn as: what it holds, the two ways to hand
+/// it over — link and QR — and the way to take it back.
+///
+/// The share itself is an [ActiveShare] the server is holding; this widget
+/// only draws it. Stateful because the QR's [RepaintBoundary] needs a key
+/// that survives rebuilds — "copy the QR code" reads pixels through it.
+class _ShareCard extends StatefulWidget {
   const _ShareCard({
     required this.share,
     required this.onCopyLink,
-    required this.onCopyQr,
     required this.onRemove,
   });
 
-  final _Share share;
+  final ActiveShare share;
   final VoidCallback onCopyLink;
-  final VoidCallback onCopyQr;
   final VoidCallback onRemove;
+
+  @override
+  State<_ShareCard> createState() => _ShareCardState();
+}
+
+class _ShareCardState extends State<_ShareCard> {
+  /// Keys the QR's [RepaintBoundary], which is what "copy the QR code" reads
+  /// pixels from.
+  final GlobalKey _qrKey = GlobalKey();
+
+  /// Copies the card's QR code to the clipboard as an image.
+  ///
+  /// The picture is whatever the card is showing: the boundary is rendered
+  /// at four times its size so the paste lands crisp in a chat window rather
+  /// than blurry at 84 pixels. `writeImage` answers a bool because a
+  /// clipboard that refuses the write — Android in the background, a platform
+  /// the plugin does not know — is an ordinary outcome, reported as one.
+  Future<void> _copyQr() async {
+    final boundary =
+        _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) return;
+
+    final l10n = AppLocalizations.of(context);
+    try {
+      final image = await boundary.toImage(pixelRatio: 4);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (bytes == null) throw StateError('QR encode failed');
+
+      final copied = await PasteResolution.paste.writeImage(
+        bytes.buffer.asUint8List(),
+      );
+      if (!mounted) return;
+      await TopToast.show(
+        context,
+        copied ? l10n.shareByLinkCopiedQr : l10n.shareByLinkCopyQrFailed,
+      );
+    } on Object {
+      if (!mounted) return;
+      await TopToast.show(context, l10n.shareByLinkCopyQrFailed);
+    }
+  }
 
   /// Opens the QR code large enough to screenshot or show across a room.
   ///
@@ -330,7 +311,7 @@ class _ShareCard extends StatelessWidget {
               color: Colors.white,
               padding: const EdgeInsets.all(12),
               child: QrImageView(
-                data: share.link,
+                data: widget.share.url,
                 size: 256,
                 backgroundColor: Colors.white,
               ),
@@ -342,7 +323,7 @@ class _ShareCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
-                    onCopyQr();
+                    _copyQr();
                   },
                   icon: const Icon(Icons.copy, size: 18),
                   label: Text(l10n.shareByLinkCopyQr),
@@ -362,6 +343,7 @@ class _ShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final share = widget.share;
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
 
@@ -406,7 +388,7 @@ class _ShareCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 8),
                   SelectableText(
-                    share.link,
+                    share.url,
                     style: TextStyle(
                       fontSize: WeChat.fontSizeMeta,
                       color: colors.secondaryText,
@@ -426,17 +408,17 @@ class _ShareCard extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.copy, size: 18),
-                        onPressed: onCopyLink,
+                        onPressed: widget.onCopyLink,
                         tooltip: l10n.shareByLinkCopy,
                       ),
                       IconButton(
                         icon: const Icon(Icons.qr_code, size: 18),
-                        onPressed: onCopyQr,
+                        onPressed: _copyQr,
                         tooltip: l10n.shareByLinkCopyQr,
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        onPressed: onRemove,
+                        onPressed: widget.onRemove,
                         tooltip: l10n.deleteMessage,
                       ),
                     ],
@@ -456,14 +438,14 @@ class _ShareCard extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => _showQrDialog(context),
                   child: RepaintBoundary(
-                    key: share.qrKey,
+                    key: _qrKey,
                     child: Container(
                       width: 84,
                       height: 84,
                       color: Colors.white,
                       padding: const EdgeInsets.all(6),
                       child: QrImageView(
-                        data: share.link,
+                        data: share.url,
                         size: 72,
                         backgroundColor: Colors.white,
                       ),

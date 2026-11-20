@@ -165,6 +165,32 @@ void main() {
       expect(await server.createShare(const []), isNull);
     });
 
+    test('activeShares lists live shares and revokeShare kills one', () async {
+      final first = File('${tempDir.path}${Platform.pathSeparator}a.txt')
+        ..writeAsStringSync('aaa');
+      final second = File('${tempDir.path}${Platform.pathSeparator}b.txt')
+        ..writeAsStringSync('bbb');
+      final link = await server.createShare([
+        (path: first.path, name: 'a.txt'),
+        (path: second.path, name: 'b.txt'),
+      ]);
+      expect(link, isNotNull);
+
+      final shares = server.activeShares();
+      expect(shares, hasLength(1));
+      final share = shares.single;
+      expect(share.url, link);
+      expect(share.fileNames, ['a.txt', 'b.txt']);
+      expect(share.isExpired, isFalse);
+
+      // Revoking removes it from the sender's list and kills the link —
+      // the page and its files answer like an expired share from now on.
+      expect(server.revokeShare(share.token), isTrue);
+      expect(server.activeShares(), isEmpty);
+      expect(server.revokeShare(share.token), isFalse);
+      expect((await get(localUri(link!))).statusCode, HttpStatus.notFound);
+    });
+
     test('answers 404 for an unknown share token or index', () async {
       final file = File('${tempDir.path}${Platform.pathSeparator}a.txt')
         ..writeAsStringSync('x');
