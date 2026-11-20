@@ -1,4 +1,4 @@
-# Agent Note: Troubleshooting diagnoses and repairs the link-share port, dynamic fallback included
+﻿# Agent Note: Troubleshooting diagnoses and repairs the link-share port, dynamic fallback included
 
 Status: implemented
 
@@ -14,9 +14,9 @@ the thing actually serving `/s/` and `/f/` — was invisible to both.
 
 Invisible was not the same as irrelevant, because the port is not fixed.
 [LinkTransferServer](../../../../lib/core/link_transfer/link_server.dart)
-binds lazily on the first share, prefers `defaultLinkTransferPort` (18080),
+binds lazily on the first share, prefers `defaultLinkTransferPort` (47657),
 and falls back to a random port when that one is taken — after which every
-generated link names the fallback. A firewall verdict keyed to 18080 alone
+generated link names the fallback. A firewall verdict keyed to 47657 alone
 would call a machine "open" while the port its links actually use was
 blocked, and the "open the ports" repair would write a rule that still did
 not cover it.
@@ -28,7 +28,7 @@ over preferred value.
 
 - **`linkPortLevel`** joins `sessionPortLevel`/`pairingPortLevel`. A `null`
   port — the server has not started, the ordinary state before the first
-  share — reads `ok`; a bound port other than 18080 reads `warning`, the
+  share — reads `ok`; a bound port other than 47657 reads `warning`, the
   same verdict a Session or Pairing fallback gets.
 - **`requiredInboundPortsFor({linkPort})`** extends the required set with
   `('TCP', linkPort)` for the firewall judgement, deduplicated against the
@@ -42,9 +42,9 @@ over preferred value.
   The port check's detail line gained a `Link TCP` slot, a fallback note
   naming the actual port, and an idle note for the not-started state.
 - **Repair covers both.** `firewallOpenScript` always writes the preferred
-  18080 into the TCP rule — a server that fell back this run may well take
+  47657 into the TCP rule — a server that fell back this run may well take
   it next time — and adds the bound `linkPort` when it differs, so the rule
-  reads e.g. `18080,47655,47656,51234`. `openFirewallPorts` threads the
+  reads e.g. `47657,47655,47656,51234`. `openFirewallPorts` threads the
   parameter through, and `probeHostFirewall` does the same for detection.
 
 ## Alternatives considered
@@ -55,9 +55,9 @@ also what triggers the Windows Firewall prompt, and diagnostics offering to
 *check* should not be the thing that makes the prompt appear. Reporting the
 preferred port while idle answers the same question without binding.
 
-**Judge only 18080.** Rejected: it is exactly the bug being fixed. Once the
+**Judge only 47657.** Rejected: it is exactly the bug being fixed. Once the
 server has fallen back, links name the fallback port, and a verdict or a
-rule keyed to 18080 describes a port nothing is listening on.
+rule keyed to 47657 describes a port nothing is listening on.
 
 **Open the program's TCP range instead of naming ports.** Rejected: a
 `LocalPort Any` or ephemeral-range rule would cover every future fallback,
@@ -79,7 +79,7 @@ no startup snapshot for it to join.
   opt-in through `linkPort`, keeping every existing caller and test on the
   old behaviour until they pass one.
 - A dynamic fallback is only as durable as the process: the next restart
-  may rebind 18080, which is why the repair writes both ports rather than
+  may rebind 47657, which is why the repair writes both ports rather than
   only the one currently bound.
 
 ## Testing
@@ -87,5 +87,5 @@ no startup snapshot for it to join.
 - `test/diagnostics/troubleshooting_test.dart` covers `linkPortLevel`
   (absent/preferred/fallback), a snapshot where the preferred link port is
   covered and where a dynamic `51234` is not — asserting the missing list
-  names `TCP 51234` and not `TCP 18080` — and the elevated script containing
-  `18080,47655,47656,51234` when `linkPort: 51234`.
+  names `TCP 51234` and not `TCP 47657` — and the elevated script containing
+  `47657,47655,47656,51234` when `linkPort: 51234`.

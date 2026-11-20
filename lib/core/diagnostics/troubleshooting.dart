@@ -121,7 +121,7 @@ CheckStatus pairingPortLevel(int? port) {
 /// the ordinary state of a Device that has not shared yet and reads [ok]. A
 /// bound port other than [defaultLinkTransferPort] means the preferred port
 /// was taken and the server fell back to a random one: links still work, but
-/// they name a port a firewall rule written for 18080 alone would not cover,
+/// they name a port a firewall rule written for 47657 alone would not cover,
 /// so it warns like the other fallbacks.
 CheckStatus linkPortLevel(int? port) {
   if (port == null) return CheckStatus.ok;
