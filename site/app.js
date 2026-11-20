@@ -71,6 +71,33 @@
   }
 
   /* ---------------------------------------------------------------------
+     窄屏菜单：860px 以下顶栏导航整体隐藏，菜单按钮接替它 —— 「联系」
+     不能随导航一起消失。交互与「联系」下拉相同：点外面、Esc、点链接都收起。
+     --------------------------------------------------------------------- */
+  var navMenu = document.getElementById('navMenu');
+  if (navMenu) {
+    var navMenuBtn = document.getElementById('navMenuBtn');
+    var navMenuPanel = document.getElementById('navMenuPanel');
+    function setNavMenuOpen(open) {
+      navMenuPanel.hidden = !open;
+      navMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    navMenuBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setNavMenuOpen(navMenuPanel.hidden);
+    });
+    document.addEventListener('click', function (e) {
+      if (!navMenuPanel.hidden && !navMenu.contains(e.target)) setNavMenuOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !navMenuPanel.hidden) setNavMenuOpen(false);
+    });
+    navMenuPanel.addEventListener('click', function (e) {
+      if (e.target.closest('a')) setNavMenuOpen(false);
+    });
+  }
+
+  /* ---------------------------------------------------------------------
      最新版本：按钮默认都指向 releases/latest，能读到 API 时就换成具体产物。
      读不到（离线、被限流、还没有发布）就原样保留 —— 页面照常可用。
 
