@@ -354,6 +354,8 @@
   },
   "aboutUpdateNotes": "Release notes",
   "aboutOpenDownload": "Open the download page",
+  "aboutWebsite": "Website",
+  "aboutOpenWebsite": "Open the website",
   "aboutNoRelease": "No version has been published yet, so there is nothing to compare this build against.",
   "aboutUnreachable": "The update server could not be reached. Check the network, or download the new version by hand.",
   "aboutHowToUpgrade": "To upgrade: close the app, download the new zip, and unpack it over this folder. Nothing else is kept outside this folder except %APPDATA%\\LocalTransfer, which holds this Device's identity and must not be touched.",

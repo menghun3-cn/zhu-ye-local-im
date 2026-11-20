@@ -749,6 +749,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutOpenDownload => '打开下载页';
 
   @override
+  String get aboutWebsite => '官网';
+
+  @override
+  String get aboutOpenWebsite => '打开官网';
+
+  @override
   String get aboutNoRelease => '还没有发布过任何版本，暂时无从比较本机这版。';
 
   @override

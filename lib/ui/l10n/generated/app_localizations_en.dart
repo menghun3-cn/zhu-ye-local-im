@@ -781,6 +781,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutOpenDownload => 'Open the download page';
 
   @override
+  String get aboutWebsite => 'Website';
+
+  @override
+  String get aboutOpenWebsite => 'Open the website';
+
+  @override
   String get aboutNoRelease =>
       'No version has been published yet, so there is nothing to compare this build against.';
 
