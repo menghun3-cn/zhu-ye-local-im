@@ -21,10 +21,12 @@ Dart suites, neither of which parses `.iss` files.
 
 ## Decision
 
-Rename the variable to `AppExe`. Nothing else changes: the netsh command
-lines, the UAC elevation, and the firewall rules are byte-identical. The
-string literal `program="..."` inside the netsh arguments is data for
-`netsh.exe`, not Pascal, and was never the problem.
+Rename the variable to `AppExe` at both use sites — the declaration feeds
+two netsh `add rule` lines, and the first fix renamed only the TCP one, so
+the UDP line kept the reserved word and the compiler stopped one line
+later. The netsh command lines themselves, the UAC elevation, and the
+firewall rules are unchanged: the string literal `program="..."` inside
+them is data for `netsh.exe`, not Pascal, and was never the problem.
 
 ## Alternatives considered
 
@@ -41,9 +43,9 @@ executable — rather than what it is used for.
 
 ## Consequences
 
-- The release pipeline compiles the installer again; v0.1.59 carries this fix
-  because tag `v0.1.58` already pointed at the broken commit and tags are
-  never moved.
+- The release pipeline compiles the installer again; the fix ships in the
+  version after `v0.1.59` because that tag already pointed at a commit that
+  still carried the reserved word on the UDP line, and tags are never moved.
 - `.iss` edits remain ungated locally: `flutter analyze`, `dart test`, and
   `flutter test` cannot see them, and the note-format gate does not either.
   The only compile happens in `pack-windows-installer.ps1` / CI. A syntax

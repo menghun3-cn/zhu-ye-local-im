@@ -8,6 +8,11 @@
 
 ## [Unreleased]
 
+## [0.1.60] - 2026-11-21
+
+### 修复
+- 修复 Windows 安装包脚本（local_transfer.iss）编译仍失败：UDP 防火墙规则里残留的 Pascal 保留字 `Program` 一并改名，本地 ISCC 编译验证通过
+
 ## [0.1.59] - 2026-11-21
 
 ### 修复

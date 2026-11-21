@@ -19,9 +19,11 @@ Windows 打包任务挂了，「建 Release」被它挡在后面。
 
 ## Decision
 
-把变量改名为 `AppExe`。其余不动：netsh 命令行、UAC 提权、防火墙规则逐字
-节不变。netsh 参数里的字符串字面量 `program="..."` 是给 `netsh.exe` 的数
-据，不是 Pascal，从来就不是问题。
+把变量在两处使用点都改名为 `AppExe`——声明喂的是两条 netsh `add rule`
+命令行，第一次修复只改了 TCP 那条，UDP 那行还留着保留字，编译器于是
+在下一行又停了一次。netsh 命令行本身、UAC 提权和防火墙规则都不变：
+其中字符串字面量 `program="..."` 是给 `netsh.exe` 的数据，不是 Pascal，
+从来就不是问题。
 
 ## Alternatives considered
 
@@ -35,8 +37,8 @@ ISCC——这次失败恰恰是因为 CI 是第一台真正编译这个文件的
 
 ## Consequences
 
-- 发布流水线重新能编译安装包；v0.1.59 带上这个修复，因为 tag `v0.1.58`
-  已经指向了坏提交，而 tag 永不移动。
+- 发布流水线重新能编译安装包；修复随 `v0.1.59` 之后的版本发布，因为那个
+  tag 已经指向了 UDP 行仍带保留字的提交，而 tag 永不移动。
 - `.iss` 的改动在本地依然没有门禁：`flutter analyze`、`dart test`、
   `flutter test` 都看不见它，笔记格式门禁也看不见。唯一的编译发生在
   `pack-windows-installer.ps1` / CI 里。所以这个文件的语法错误只会在打包
