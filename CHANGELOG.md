@@ -16,7 +16,7 @@
 
 ### 修复
 - 修复 Android 上长按图片「复制图片」总是失败并提示「没能复制这张照片」：补上 pasteboard 插件写剪贴板所需的 FileProvider 声明
-- 修复 Filled/Text 按钮禁用后看不出已禁用的问题，并将禁用态样式扩展到分段按钮与调色板浮层
+- 修复 Filled/Text 按钮禁用后看不出已禁用的问题，并将禁用态样式扩展到分段按钮（segmented buttons）与调色板浮层（paletted overlays）
 
 ## [0.1.57] - 2026-11-20
 
