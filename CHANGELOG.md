@@ -8,6 +8,14 @@
 
 ## [Unreleased]
 
+## [0.1.59] - 2026-11-21
+
+### 修复
+- 修复 Windows 安装包脚本（local_transfer.iss）编译失败：Inno Setup 的 Pascal 中 `Program` 是保留字，导致 installer script 无法构建、发布流水线中止
+
+### 变更
+- 更新 0.1.58 更新日志条目，补全 segmented-buttons 与 paletted overlays 的说明
+
 ## [0.1.58] - 2026-11-21
 
 ### 新增
