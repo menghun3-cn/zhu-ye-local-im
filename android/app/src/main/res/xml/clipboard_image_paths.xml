@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pasteboard plugin writes a copied image to a scratch PNG under
+     cacheDir and hands the clipboard a content:// URI for it. Only that
+     directory is exposed: nothing else the app caches is a picture the
+     user asked to copy. -->
+<paths>
+    <cache-path name="clipboard_image" path="." />
+</paths>

@@ -48,6 +48,12 @@ class Win32Window {
   // Show the current window. Returns true if the window was successfully shown.
   bool Show();
 
+  // Makes Show() present the window maximized rather than at the size it was
+  // created with. Call before the first Show(); the created size still
+  // matters, because it is what the window returns to when the user restores
+  // it from maximized.
+  void SetShowMaximized();
+
   // Release OS resources associated with window.
   void Destroy();
 
@@ -106,6 +112,10 @@ class Win32Window {
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // Whether Show() maximizes the window instead of showing it at its created
+  // size.
+  bool show_maximized_ = false;
 };
 
 #endif  // RUNNER_WIN32_WINDOW_H_

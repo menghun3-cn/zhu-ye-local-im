@@ -512,6 +512,44 @@ void main() {
       });
     });
 
+    group('the startup firewall offer', () {
+      DeviceProfile profileOf(DevicePlatform platform) =>
+          DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
+
+      test('a new profile has not settled the offer yet', () {
+        expect(profileOf(DevicePlatform.windows).firewallCheckDone, isFalse);
+      });
+
+      test('a profile written before the key existed reads as unsettled', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.firewallCheckDone, isFalse);
+      });
+
+      test('a value of the wrong type reads as unsettled too', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+          'firewallCheckDone': 'yes',
+        });
+        expect(restored.firewallCheckDone, isFalse);
+      });
+
+      test('settling survives a JSON round trip', () {
+        final profile = profileOf(DevicePlatform.windows)
+          ..firewallCheckDone = true;
+        expect(profile.toJson()['firewallCheckDone'], isTrue);
+        expect(
+          DeviceProfile.fromJson(profile.toJson()).firewallCheckDone,
+          isTrue,
+        );
+      });
+    });
+
     group('the update-check interval', () {
       DeviceProfile profileOf(DevicePlatform platform) =>
           DeviceProfile(self: _fp('a'), alias: 'Desk', platform: platform);
@@ -699,6 +737,7 @@ void main() {
         incomingDirectory: 'D:/shared/inbox',
         closeBehaviour: CloseBehaviour.quit,
         autostartPreference: false,
+        firewallCheckDone: true,
         updateCheckInterval: UpdateCheckInterval.everyThreeDays,
         known: {
           _fp('d').hex: KnownDevice(
@@ -720,6 +759,7 @@ void main() {
       expect(restored.incomingDirectory, 'D:/shared/inbox');
       expect(restored.closeBehaviour, CloseBehaviour.quit);
       expect(restored.autostartPreference, isFalse);
+      expect(restored.firewallCheckDone, isTrue);
       expect(restored.updateCheckInterval, UpdateCheckInterval.everyThreeDays);
       final known = restored.known(_fp('d'));
       expect(known, isNotNull);

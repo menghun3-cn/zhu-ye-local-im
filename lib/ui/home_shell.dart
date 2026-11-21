@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app.dart';
 import '../core/core.dart';
 import 'controller_scope.dart';
+import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'nav_rail.dart';
 import 'pages/conversations_page.dart';
@@ -158,6 +159,13 @@ class _HomeShellState extends State<HomeShell> {
   /// that a press is the apply.
   bool _updateLocked = false;
 
+  /// Whether the one-time firewall offer has been asked for this run.
+  ///
+  /// The offer itself is once per install — [DeviceProfile.firewallCheckDone]
+  /// is the persisted half — but the probe behind it is not free, so this
+  /// flag keeps `didChangeDependencies` from queueing it on every rebuild.
+  bool _firewallOfferAsked = false;
+
   @override
   void initState() {
     super.initState();
@@ -175,6 +183,15 @@ class _HomeShellState extends State<HomeShell> {
     );
     _watchUpdate(widget.update);
     _syncUnread();
+    // The firewall offer waits for the first frame rather than firing inside
+    // didChangeDependencies: a dialog raised mid-build has no frame to land
+    // on, and the probe itself can take a moment.
+    if (!_firewallOfferAsked) {
+      _firewallOfferAsked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(offerFirewallIfBlocked(context, controller));
+      });
+    }
   }
 
   /// Hears the session's reports for the rail's lock and label.
@@ -565,6 +582,10 @@ class _UpdateEntry extends StatelessWidget {
           // glyph over two characters.
           style: TextButton.styleFrom(
             foregroundColor: colors.brandStrong,
+            // `foregroundColor` alone would stay the action green while the
+            // entry is locked mid-download — a press that cannot happen must
+            // not keep the colour of one that can.
+            disabledForegroundColor: colors.disabledText,
             // As tall as a comfortable target: the width comes from the rail,
             // as it does for every other entry.
             minimumSize: const Size(0, 52),

@@ -85,8 +85,13 @@ Windows 坚持要 UAC 弹窗的那一处。
 无法区分「我们的监听」和「别的进程占坑」，而页面要回答的问题——「对端
 能否连到我」——是关于我们已经知道的监听器，不是关于空闲端口。
 
-**用 `netsh advfirewall` 做探测和修复。** 修复上已否决：`netsh` 不能把规则
-限定到程序，会把端口对机器上所有进程放开。探测上它可行，但输出需要文本
+**用 `netsh advfirewall` 做探测和修复。** 修复上当时以一个后被证明是错的
+理由否决了：`netsh` *可以*把规则限定到程序——它的 `program=` 参数正是
+干这个的，安装脚本的防火墙步骤
+（[2026-11-20-firewall-exception-at-install-and-startup](2026-11-20-firewall-exception-at-install-and-startup.zh.md)）
+用的就是它。运行时写入保留 PowerShell，是因为提权命令必须扛住
+`Start-Process -ArgumentList` 的引号嵌套，`-EncodedCommand` 直接解决了这
+一点，且删旧建新的脚本在那里已有测试缝。探测上，netsh 的输出仍需要文本
 解析，会被本地化和格式变化打破。
 
 **对 `FirewallPolicy\FirewallRules` 跑 `reg query`。** 已否决：规则在注册表

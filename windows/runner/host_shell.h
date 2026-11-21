@@ -46,6 +46,16 @@ class HostShell {
   // Shows or clears the taskbar overlay that says a conversation is unread.
   void set_unread(bool value);
 
+  // Whether the window was last left maximized, as remembered between runs.
+  //
+  // The registry is the store, read once when the shell attaches and written
+  // back whenever the state changes, so the answer doubles as the startup
+  // decision and the running record. Only the maximized bit is kept: a
+  // windowed window always opens at the size it was created with, because a
+  // remembered rectangle can land off-screen after a monitor change.
+  bool maximized() const;
+  void set_maximized(bool value);
+
   // The per-user autostart entry. Nothing is cached on this side: the registry
   // is the only store, so an entry changed by hand reads back as it is.
   bool autostart_enabled() const;
@@ -90,6 +100,7 @@ class HostShell {
   HICON unread_icon_ = nullptr;
   ITaskbarList3* taskbar_ = nullptr;
   bool close_to_tray_ = true;
+  bool maximized_ = false;
   bool tray_icon_added_ = false;
   bool unread_ = false;
   bool screenshot_enabled_ = false;

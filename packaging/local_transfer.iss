@@ -116,3 +116,70 @@ function UpdateWasRequested(): Boolean;
 begin
   Result := WizardSilent and CmdLineParamExists('/update');
 end;
+
+// ---- 防火墙入站例外 ----
+//
+// 本程序是每用户安装（PrivilegesRequired=lowest），自身没有权限写防火墙
+// 规则；规则写入必须经一次 UAC。安装结束时用 ShellExec 的 runas 动词拉起
+// 一个提升权限的 netsh.exe，命令行经 -f 脚本文件传入 —— 一次提权跑完
+// 「删旧规则 + 建新规则」四条命令，而不是每条命令各弹一次 UAC。
+//
+// 规则与运行时「放开防火墙端口」写的是同一对 DisplayName（LocalTransfer /
+// LocalTransfer Discovery）、同一组端口（TCP 47655-47657、UDP 47654），按
+// 程序路径限定：故障排查页的检查与运行时重建认的都是这两个名字，三方不冲突。
+// 短链端口的动态回退在安装时无从预知，规则只写首选 47657 —— 与运行时规则
+// 的口径一致，回退端口由运行时那条补上。
+//
+// 用户在 UAC 上点拒绝不算安装失败：ShellExec 的返回值被故意丢弃，安装照常
+// 完成，运行时那次启动检查会再给一次机会（绿色包也只有那一次机会）。
+// 静默安装（/SILENT，含应用内更新）整体跳过：更新中途弹 UAC 是惊吓，且
+// 规则按路径限定，升级后依然有效。
+
+function RunElevatedNetsh(const Commands: String): Boolean;
+var
+  ScriptFile: String;
+  ErrorCode: Integer;
+begin
+  Result := False;
+  ScriptFile := ExpandConstant('{tmp}\localtransfer-firewall.txt');
+  if not SaveStringToFile(ScriptFile, Commands, False) then
+    Exit;
+  Result := ShellExec(
+    'runas',
+    ExpandConstant('{sys}\netsh.exe'),
+    '-f "' + ScriptFile + '"',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ErrorCode);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Program: String;
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+  if WizardSilent then
+    Exit;
+  Program := ExpandConstant('{app}\local_transfer.exe');
+  // 删旧再建新：升级安装、程序换目录都靠这一步幂等，而不是堆一条条残留规则。
+  RunElevatedNetsh(
+    'advfirewall firewall delete rule name="LocalTransfer"' + #13#10 +
+    'advfirewall firewall delete rule name="LocalTransfer Discovery"' + #13#10 +
+    'advfirewall firewall add rule name="LocalTransfer" dir=in action=allow protocol=TCP localport=47655-47657 program="' + Program + '"' + #13#10 +
+    'advfirewall firewall add rule name="LocalTransfer Discovery" dir=in action=allow protocol=UDP localport=47654 program="' + Program + '"' + #13#10);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep <> usUninstall then
+    Exit;
+  if WizardSilent then
+    Exit;
+  // 卸载同样只删自己那两个名字的规则：不留指向已删 exe 的残留。
+  // 与安装对称，同样是一次 UAC，拒绝同样不阻塞卸载。
+  RunElevatedNetsh(
+    'advfirewall firewall delete rule name="LocalTransfer"' + #13#10 +
+    'advfirewall firewall delete rule name="LocalTransfer Discovery"' + #13#10);
+end;
