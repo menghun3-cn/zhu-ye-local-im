@@ -156,18 +156,18 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Program: String;
+  AppExe: String;
 begin
   if CurStep <> ssPostInstall then
     Exit;
   if WizardSilent then
     Exit;
-  Program := ExpandConstant('{app}\local_transfer.exe');
+  AppExe := ExpandConstant('{app}\local_transfer.exe');
   // 删旧再建新：升级安装、程序换目录都靠这一步幂等，而不是堆一条条残留规则。
   RunElevatedNetsh(
     'advfirewall firewall delete rule name="LocalTransfer"' + #13#10 +
     'advfirewall firewall delete rule name="LocalTransfer Discovery"' + #13#10 +
-    'advfirewall firewall add rule name="LocalTransfer" dir=in action=allow protocol=TCP localport=47655-47657 program="' + Program + '"' + #13#10 +
+    'advfirewall firewall add rule name="LocalTransfer" dir=in action=allow protocol=TCP localport=47655-47657 program="' + AppExe + '"' + #13#10 +
     'advfirewall firewall add rule name="LocalTransfer Discovery" dir=in action=allow protocol=UDP localport=47654 program="' + Program + '"' + #13#10);
 end;
 

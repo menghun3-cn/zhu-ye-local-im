@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-21-a-pascal-keyword-broke-the-installer-script.md
+#   git hash-object 2026-11-21-a-pascal-keyword-broke-the-installer-script.zh.md
+2026-11-21-a-pascal-keyword-broke-the-installer-script.md: 3dbddcf72a89a4237bf8d635a29d19e14afdd9a6
+2026-11-21-a-pascal-keyword-broke-the-installer-script.zh.md: 261e767c5e1be646abe5ab6e4b96a1e05e2dd37a
