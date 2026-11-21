@@ -8,6 +8,14 @@
 
 ## [Unreleased]
 
+## [0.1.59] - 2026-11-21
+
+### 修复
+- 修复 Windows 安装包脚本（local_transfer.iss）编译失败：Inno Setup 的 Pascal 中 `Program` 是保留字，导致 installer script 无法构建、发布流水线中止
+
+### 变更
+- 更新 0.1.58 更新日志条目，补全 segmented-buttons 与 paletted overlays 的说明
+
 ## [0.1.58] - 2026-11-21
 
 ### 新增
@@ -16,7 +24,7 @@
 
 ### 修复
 - 修复 Android 上长按图片「复制图片」总是失败并提示「没能复制这张照片」：补上 pasteboard 插件写剪贴板所需的 FileProvider 声明
-- 修复 Filled/Text 按钮禁用后看不出已禁用的问题，并将禁用态样式扩展到分段按钮与调色板浮层
+- 修复 Filled/Text 按钮禁用后看不出已禁用的问题，并将禁用态样式扩展到分段按钮（segmented buttons）与调色板浮层（paletted overlays）
 
 ## [0.1.57] - 2026-11-20
 
