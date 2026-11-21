@@ -168,7 +168,7 @@ begin
     'advfirewall firewall delete rule name="LocalTransfer"' + #13#10 +
     'advfirewall firewall delete rule name="LocalTransfer Discovery"' + #13#10 +
     'advfirewall firewall add rule name="LocalTransfer" dir=in action=allow protocol=TCP localport=47655-47657 program="' + AppExe + '"' + #13#10 +
-    'advfirewall firewall add rule name="LocalTransfer Discovery" dir=in action=allow protocol=UDP localport=47654 program="' + Program + '"' + #13#10);
+    'advfirewall firewall add rule name="LocalTransfer Discovery" dir=in action=allow protocol=UDP localport=47654 program="' + AppExe + '"' + #13#10);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
