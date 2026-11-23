@@ -1016,6 +1016,18 @@ abstract class AppLocalizations {
   /// **'No Devices to forward to yet.'**
   String get noDevicesToForward;
 
+  /// No description provided for @searchForwardTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Devices'**
+  String get searchForwardTargets;
+
+  /// No description provided for @forwardTargetNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No Device matches that search.'**
+  String get forwardTargetNoMatch;
+
   /// No description provided for @selectedCount.
   ///
   /// In en, this message translates to:

@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-23-forward-target-picker.md
+#   git hash-object 2026-11-23-forward-target-picker.zh.md
+2026-11-23-forward-target-picker.md: f51e7580194979e02db7e638e5d2bcbc27de6b75
+2026-11-23-forward-target-picker.zh.md: da56c519d0504454848cfc720f38f385105f67d1

@@ -169,6 +169,8 @@
   "multiSelect": "多选",
   "forwardTo": "转发给",
   "noDevicesToForward": "暂无可转发的设备。",
+  "searchForwardTargets": "搜索设备",
+  "forwardTargetNoMatch": "没有匹配的设备。",
   "selectedCount": "{count, plural, other{已选 {count} 条}}",
   "forwardFailedCount": "{count, plural, other{{count} 条消息未能转发。}}",
 
