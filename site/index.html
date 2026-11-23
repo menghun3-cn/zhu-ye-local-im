@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>竹叶局域网传输 · Local Transfer</title>
-<meta name="description" content="在同一个局域网里的设备之间传文件、传文字、同步剪贴板；Windows 版还带截图标注工具。没有服务端、没有账号、没有云端。">
+<meta name="description" content="在同一个局域网里的设备之间传文件、传文字、同步剪贴板，还能生成临时链接让对方直接下载；Windows 版还带截图标注工具。没有服务端、没有账号、没有云端。">
 <meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="styles.css">
 <!-- 主题在首屏之前定下来，避免浅色闪一下再切深色 -->
@@ -95,7 +95,8 @@
           <p class="eyebrow">局域网直连 · 无服务端</p>
           <h1>两台设备之间传东西，<br>走你自己的<em>局域网</em>。</h1>
           <p class="lede">
-            在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板。
+            在同一个 Wi-Fi 或网线里的设备之间传文件、传文字、同步剪贴板，
+            或者生成一条临时链接让对方用浏览器直接下载。
             没有服务端、没有账号、没有云端 —— 程序平时只和局域网说话，
             与外界的唯一往来是向 GitHub 询问有没有新版本（只问版本号，不发送任何内容）。
           </p>
@@ -169,7 +170,7 @@
         <span class="tag tag--brand">Windows 与 Android</span>
       </div>
       <p class="block__lede">
-        七件事，每一件都只发生在你自己的网络里。点开任意一张看它到底怎么工作。
+        八件事，每一件都只发生在你自己的网络里。点开任意一张看它到底怎么工作。
       </p>
 
       <div class="grid grid--features">
@@ -206,6 +207,7 @@
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>发现后直接建立连接，没有按钮、配对码或接受请求</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>连上即可发送文字、图片、文件和表情</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>设备组关系会记住，重启或短暂断网后自动恢复</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Android 上有前台服务，退到后台也保持在线</li>
           </ul>
         </article>
 
@@ -256,7 +258,28 @@
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>回车发送、Shift+回车换行；长文件名折行显示，不会被截断</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>表情面板带「最近使用」；会话列表可按内容搜索，未读会标 [N]</li>
             <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>对话记录保存在本机磁盘，重启后仍在；单条消息可删，也能清空或整个删除某个会话</li>
-            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>右键「打开所在目录」「复制图片」；别人发来的文件就地显示「接受 / 拒绝」</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>右键「打开所在目录」「复制图片」；别人发来的文件就地显示「接受 / 拒绝」，点一下就能用系统默认程序打开</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>消息里的网址可点击直接打开；一条或多条消息可以转发到另一台设备</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>整个文件夹也能发，目录结构原样到达；对方不在线时发的消息会留在会话里，恢复后点一下重发</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>气泡皮肤左右两侧可分别自定义；Android 上长按消息呼出同样的操作菜单，还能把文件分享给其他应用</li>
+          </ul>
+        </article>
+
+        <article class="card feature reveal">
+          <div class="feature__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 14a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>
+              <path d="M14 10a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
+            </svg>
+          </div>
+          <h3>链接分享：对方不用装也能拿</h3>
+          <p>把文件变成一条临时下载链接，发给局域网里任何人 —— 浏览器打开就能下。</p>
+          <ul>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>一次分享可带多个文件，接收方看到的是文件列表、逐个下载</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>每条链接附带二维码，扫码即下；链接也可以复制转发</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>链接 30 分钟后自动失效，随时可以手动删除立即吊销</li>
+            <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>只在局域网内可访问，文件不经过任何第三方</li>
           </ul>
         </article>
 
@@ -344,7 +367,7 @@
             <span class="download__name">Android</span>
           </div>
           <p class="download__note">
-            直装 APK。
+            直装 APK。退到后台也保持在线，收到的文件可以直接分享给其他应用。
           </p>
           <div class="download__name-file" data-asset-label=".apk">LocalTransfer-….apk</div>
           <a class="btn btn--primary" data-asset=".apk"
@@ -358,7 +381,7 @@
         <strong>防火墙一般会自动处理。</strong>
         安装版在安装时会请求一次管理员授权来放行入站端口；绿色包首次运行检测到被阻止时也会问一次。
         当时点了取消，或者机器上装了别的安全软件，就会出现「设备列表里看不到对方」或者自动连接超时——
-        可以在应用的「故障排查」页手动放行。要用的端口是 UDP 47654（自动发现）、TCP 47656（建立设备组信任）、TCP 47655（数据通道），全部只在本局域网内。
+        可以在应用的「故障排查」页手动放行。要用的端口是 UDP 47654（自动发现）、TCP 47656（建立设备组信任）、TCP 47655（数据通道）、TCP 47657（链接分享下载），全部只在本局域网内。
       </div>
 
       <div class="callout reveal">
