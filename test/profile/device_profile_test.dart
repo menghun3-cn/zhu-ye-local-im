@@ -231,6 +231,80 @@ void main() {
       });
     });
 
+    group('remarks', () {
+      DeviceProfile profileOf() => DeviceProfile(
+        self: _fp('a'),
+        alias: 'Desk',
+        platform: DevicePlatform.windows,
+      );
+
+      test('a remark is set, read and cleared by Fingerprint', () {
+        final profile = profileOf();
+        final peer = _fp('b');
+        expect(profile.remarkFor(peer), isNull);
+        profile.setRemark(peer, 'upstairs laptop');
+        expect(profile.remarkFor(peer), 'upstairs laptop');
+        profile.setRemark(peer, '  ');
+        expect(profile.remarkFor(peer), isNull);
+        profile.setRemark(peer, null);
+        expect(profile.remarkFor(peer), isNull);
+      });
+
+      test('a remark is sanitised like any other name on screen', () {
+        final profile = profileOf();
+        profile.setRemark(_fp('b'), '  NAS\x1b[31m  ');
+        expect(profile.remarkFor(_fp('b')), 'NAS[31m');
+      });
+
+      test('self can never be remarked', () {
+        final self = _fp('a');
+        final profile = profileOf();
+        profile.setRemark(self, 'me');
+        expect(profile.remarkFor(self), isNull);
+      });
+
+      test('a remark survives a JSON round trip', () {
+        final profile = profileOf();
+        profile.setRemark(_fp('b'), 'upstairs laptop');
+        final restored = DeviceProfile.fromJson(profile.toJson());
+        expect(restored.remarkFor(_fp('b')), 'upstairs laptop');
+      });
+
+      test('a profile written before remarks existed reads with none', () {
+        final restored = DeviceProfile.fromJson({
+          'self': _fp('a').hex,
+          'alias': 'Desk',
+          'platform': 'windows',
+        });
+        expect(restored.remarkFor(_fp('b')), isNull);
+      });
+
+      test('a remark under a key that is not a Fingerprint is rejected', () {
+        expect(
+          () => DeviceProfile.fromJson({
+            'self': _fp('a').hex,
+            'alias': 'Desk',
+            'platform': 'windows',
+            'remarks': {'not-a-fingerprint': 'x'},
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      });
+
+      test('forgetDevice takes the remark with it', () {
+        // A Remark describes the peer, not the history: deleting the Device
+        // must not leave a name pointing at nothing.
+        final profile = profileOf();
+        final doomed = _fp('b');
+        final kept = _fp('c');
+        profile.setRemark(doomed, 'doomed');
+        profile.setRemark(kept, 'kept');
+        profile.forgetDevice(doomed);
+        expect(profile.remarkFor(doomed), isNull);
+        expect(profile.remarkFor(kept), 'kept');
+      });
+    });
+
     group('the clipboard-sharing whitelist', () {
       test('starts empty, so pairing a Device shares nothing', () {
         // Separate from the group on purpose: joining an Owner Group is about

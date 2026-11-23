@@ -101,11 +101,15 @@ String describePeerAddress(PeerView peer, AppLocalizations l10n) {
 
 /// The heading of a conversation with [peer].
 ///
-/// The address is the fact that tells machines apart on the local network, so
-/// it leads whenever Discovery has placed the peer. The name remains the
-/// fallback for a Device that has never been seen, because there is then no
-/// address to show.
+/// A Remark leads whenever the user set one: it is the name this Device's
+/// owner gave the peer, and it is the answer to "which contact is this" that
+/// an address — or an Alias the peer chose for itself — cannot give. Without
+/// one, the address is the fact that tells machines apart on the local
+/// network, so it leads whenever Discovery has placed the peer. The name
+/// remains the fallback for a Device that has never been seen, because there
+/// is then no address to show.
 String describePeerTitle(PeerView peer) {
+  if (peer.hasRemark) return peer.remark!;
   final address = peer.address;
   return address == null || address.isEmpty ? peer.displayName : address;
 }

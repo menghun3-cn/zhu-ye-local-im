@@ -16,6 +16,12 @@ _Avoid_: Client, Peer, Node, Endpoint, 客户端
 The human-readable name a Device shows to other Devices.
 _Avoid_: Name, Hostname, DisplayName, Nickname
 
+**Remark**:
+The name a user gives a Device on their own Device, shown in place of its
+Alias or address. A Remark is local: it is never announced, never synced,
+and the peer it names never sees it.
+_Avoid_: Nickname, Note, Contact, 备注名
+
 **Fingerprint**:
 The stable identity of a Device, which lets other Devices tell it apart, avoid
 discovering themselves, and recognise it again after a restart.

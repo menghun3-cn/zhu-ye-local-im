@@ -1174,6 +1174,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'This forgets the Device and its pairing permissions, closes the connection and clears chat and clipboard history plus unsent drafts. Files you sent or received are kept, and the current system clipboard content stays. This cannot be undone.';
 
   @override
+  String get editRemark => 'Edit remark';
+
+  @override
+  String get remarkFieldLabel => 'Remark';
+
+  @override
+  String get remarkHelper =>
+      'Shown on this Device instead of the announced name or address. The other Device never sees it. Leave empty to clear.';
+
+  @override
   String get conversationPickOne =>
       'Pick a conversation on the left, or wait for a nearby Device to connect automatically.';
 
