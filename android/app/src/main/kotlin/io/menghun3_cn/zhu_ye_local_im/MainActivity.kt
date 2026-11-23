@@ -1,5 +1,6 @@
 package io.menghun3_cn.zhu_ye_local_im
 
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -43,6 +44,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "openFile" -> openPath(call, result, directory = false)
                 "openFolder" -> openPath(call, result, directory = true)
+                "share" -> sharePaths(call, result)
                 else -> result.notImplemented()
             }
         }
@@ -109,6 +111,68 @@ class MainActivity : FlutterActivity() {
             result.success(true)
         } catch (error: Exception) {
             result.error("open_failed", error.message, path)
+        }
+    }
+
+    /**
+     * Hands files to Android's share sheet — the chooser that lists WeChat and
+     * every other application that takes one.
+     *
+     * Every path becomes a `content://` URI through the same FileProvider
+     * `openPath` uses: `update_paths.xml` exposes filesDir, cacheDir and
+     * external storage, which covers where this app keeps received and picked
+     * files. One file goes as `ACTION_SEND` under its real MIME type; several
+     * go as `ACTION_SEND_MULTIPLE` under `*/*`, and the chooser decides what
+     * it will take.
+     *
+     * There is deliberately no `queryIntentActivities` pre-check: on Android
+     * 11+ package visibility would filter the answer unless the manifest
+     * declared the schemes, and a filtered-empty answer would report "nothing
+     * can take this" while WeChat sits right there. `startActivity` resolves
+     * the sheet itself; an empty one throws and is answered as an error, which
+     * Dart reads as false — the same sentence either way.
+     */
+    private fun sharePaths(call: MethodCall, result: MethodChannel.Result) {
+        val raw = call.argument<List<String>>("paths")
+        val files = raw.orEmpty().map { File(it) }.filter { it.isFile }
+        if (files.isEmpty()) {
+            result.success(false)
+            return
+        }
+        try {
+            val uris = files.map {
+                FileProvider.getUriForFile(
+                    this,
+                    "$packageName.update_file_provider",
+                    it,
+                )
+            }
+            val intent = if (uris.size == 1) {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = mimeOf(files[0])
+                    putExtra(Intent.EXTRA_STREAM, uris[0])
+                }
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = "*/*"
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                }
+            }
+            // The grant flag alone covers the intent, but receivers read the
+            // URIs through the clip data — carrying every URI there is what
+            // makes a multi-file share readable by all of them, not just the
+            // first.
+            val clip = ClipData.newUri(contentResolver, null, uris.first())
+            for (uri in uris.drop(1)) {
+                clip.addItem(ClipData.Item(uri))
+            }
+            intent.clipData = clip
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("share_failed", error.message, null)
         }
     }
 

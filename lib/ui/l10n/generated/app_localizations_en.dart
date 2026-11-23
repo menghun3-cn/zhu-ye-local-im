@@ -513,6 +513,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get withdrawMessage => 'Withdraw';
 
   @override
+  String get shareFile => 'Share';
+
+  @override
+  String get cannotShareFile => 'Could not share that file.';
+
+  @override
   String get shareByLink => 'Share by link';
 
   @override

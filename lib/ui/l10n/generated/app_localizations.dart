@@ -908,6 +908,18 @@ abstract class AppLocalizations {
   /// **'Withdraw'**
   String get withdrawMessage;
 
+  /// No description provided for @shareFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareFile;
+
+  /// No description provided for @cannotShareFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not share that file.'**
+  String get cannotShareFile;
+
   /// No description provided for @shareByLink.
   ///
   /// In en, this message translates to:
