@@ -496,6 +496,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get withdrawMessage => '撤回';
 
   @override
+  String get shareFile => '分享';
+
+  @override
+  String get cannotShareFile => '没能分享这个文件。';
+
+  @override
   String get shareByLink => '通过链接分享';
 
   @override
@@ -555,6 +561,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noDevicesToForward => '暂无可转发的设备。';
+
+  @override
+  String get searchForwardTargets => '搜索设备';
+
+  @override
+  String get forwardTargetNoMatch => '没有匹配的设备。';
 
   @override
   String selectedCount(int count) {

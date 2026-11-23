@@ -8,6 +8,22 @@
     <!-- Android hands the checked APK to the system installer. The system may
          first send the user to the per-app "install unknown apps" setting. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- The foreground service is what keeps the process — and the sockets
+         and Dart timers inside it — alive after the user switches apps.
+         FOREGROUND_SERVICE is the API-28+ base permission; the
+         _CONNECTED_DEVICE suffix is the API-34+ per-type permission for the
+         connectedDevice type declared on the service below. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <!-- Android 13+ hides a foreground-service notification until this
+         runtime permission is granted. The service still runs without it;
+         MainActivity asks once on first resume. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Android 14+ requires a connectedDevice foreground service to hold
+         one of a fixed set of network-ish permissions; multicast state is
+         the honest one — LAN discovery is broadcast/multicast-adjacent, and
+         the same permission is what a future MulticastLock needs. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <application
         android:label="竹叶局域网传输"
         android:name="${applicationName}"
@@ -34,6 +50,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Keeps the process at foreground priority while the app is alive
+             so LAN discovery and Sessions survive switching apps. The type
+             is connectedDevice rather than dataSync because dataSync carries
+             a 6-hours-per-24 budget on Android 15+; this service never moves
+             data itself. -->
+        <service
+            android:name=".LocalTransferForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -51,9 +76,14 @@
         <!-- The pasteboard plugin hardcodes the authority
              `${packageName}.provider` when it stages a copied image for the
              clipboard. Without this second provider its getUriForFile call
-             throws and every image copy reports failure. -->
+             throws and every image copy reports failure. It must be a
+             different class than the update provider's FileProvider: Android
+             runs one provider instance per class name, and two declarations
+             of the same class make the `.provider` authority resolve to the
+             update provider's instance, which does not know the clipboard
+             paths. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".ClipboardFileProvider"
             android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">

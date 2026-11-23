@@ -14,6 +14,7 @@ import 'feedback.dart';
 import 'forward.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'open_file.dart';
+import 'share_file.dart';
 import 'system_reveal.dart';
 import 'top_toast.dart';
 
@@ -323,6 +324,36 @@ Future<void> openTransferFile(BuildContext context, TransferView view) async {
   await TopToast.showIn(overlay, l10n.cannotOpenFile);
 }
 
+/// Whether [view] names a file on this machine that can be handed to another
+/// application.
+///
+/// The same predicate as [canRevealTransfer] — a path on this machine is what
+/// a share needs — narrowed by the platform: only Android has a share sheet
+/// this Device can reach, so the line is not offered where it could only ever
+/// fail. The sharer itself answers [FileSharer.supported], which a test can
+/// stand in for; `Platform.isAndroid` is never read here.
+bool canShareTransferFile(TransferView view) =>
+    view.localPath != null && ShareResolution.sharer.supported;
+
+/// Hands [view]'s file to this machine's share sheet.
+///
+/// On Android that sheet is where WeChat lives: there is no WeChat SDK and no
+/// URL scheme for sending into it, so the chooser — with WeChat as one of its
+/// targets — is the whole mechanism. A failure is said out loud for the same
+/// reason a failed open is: the file moved, or no application on the machine
+/// takes it, and "nothing happened" is not something a user can act on.
+Future<void> shareTransferFile(BuildContext context, TransferView view) async {
+  final path = view.localPath;
+  if (path == null) return;
+  final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  // Through the seam, so a widget test can assert the path it was handed
+  // without a chooser opening on the test machine.
+  if (await ShareResolution.sharer.share([path])) return;
+  if (overlay == null) return;
+  await TopToast.showIn(overlay, l10n.cannotShareFile);
+}
+
 /// Whether [view] is a picture whose bytes are on this machine and can
 /// therefore be put on the clipboard.
 ///
@@ -553,6 +584,7 @@ class TransferContextMenu extends StatelessWidget {
     // menu the user is looking at either.
     final reveal = canRevealTransfer(view);
     final openFile = canOpenTransferFile(view);
+    final shareFile = canShareTransferFile(view);
     final copyImage = canCopyImage(view);
     final copyText = canCopyText(view);
     final cancel = canCancelTransfer(view);
@@ -632,6 +664,12 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.file_open_outlined,
             label: l10n.openFile,
           ),
+        if (shareFile)
+          _item(
+            value: _shareFileAction,
+            icon: Icons.share_outlined,
+            label: l10n.shareFile,
+          ),
         if (copyImage)
           _item(
             value: _copyAction,
@@ -685,6 +723,8 @@ class TransferContextMenu extends StatelessWidget {
         await revealTransfer(context, view);
       case _openFileAction:
         await openTransferFile(context, view);
+      case _shareFileAction:
+        await shareTransferFile(context, view);
       case _copyAction:
         await copyTransferImage(context, view);
       case _copyTextAction:
@@ -749,6 +789,7 @@ const String _copySelectionAction = 'copy-selection';
 const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _openFileAction = 'open-file';
+const String _shareFileAction = 'share-file';
 const String _copyAction = 'copy';
 const String _withdrawAction = 'withdraw';
 const String _shareByLinkAction = 'share-by-link';

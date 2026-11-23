@@ -908,6 +908,18 @@ abstract class AppLocalizations {
   /// **'Withdraw'**
   String get withdrawMessage;
 
+  /// No description provided for @shareFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareFile;
+
+  /// No description provided for @cannotShareFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not share that file.'**
+  String get cannotShareFile;
+
   /// No description provided for @shareByLink.
   ///
   /// In en, this message translates to:
@@ -1015,6 +1027,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No Devices to forward to yet.'**
   String get noDevicesToForward;
+
+  /// No description provided for @searchForwardTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Devices'**
+  String get searchForwardTargets;
+
+  /// No description provided for @forwardTargetNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No Device matches that search.'**
+  String get forwardTargetNoMatch;
 
   /// No description provided for @selectedCount.
   ///

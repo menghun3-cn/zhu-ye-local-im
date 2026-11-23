@@ -18,6 +18,9 @@ const String openFileMethod = 'openFile';
 /// The method [androidFilesChannel] shows a folder with.
 const String openFolderMethod = 'openFolder';
 
+/// The method [androidFilesChannel] hands files to the share sheet with.
+const String shareMethod = 'share';
+
 /// Hands [path] to Android's "open with" and answers whether anything took it.
 ///
 /// Every failure — a platform that never registered the channel, a file that
@@ -30,6 +33,23 @@ Future<bool> openAndroidFile(String path) =>
 /// took it. See [androidFilesChannel] for why false is ordinary.
 Future<bool> openAndroidFolder(String path) =>
     _askAndroidFiles(openFolderMethod, path);
+
+/// Hands [paths] to Android's share sheet — the chooser that lists WeChat and
+/// every other application that takes a file.
+///
+/// Every failure — a platform that never registered the channel, a path that
+/// is not a file any more, no application wanting it — is false, because the
+/// caller's answer to all of them is the same sentence.
+Future<bool> shareAndroidFiles(List<String> paths) async {
+  try {
+    final answer = await androidFilesChannel.invokeMethod<bool>(shareMethod, {
+      'paths': paths,
+    });
+    return answer ?? false;
+  } on Object {
+    return false;
+  }
+}
 
 Future<bool> _askAndroidFiles(String method, String path) async {
   try {

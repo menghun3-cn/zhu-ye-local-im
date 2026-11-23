@@ -513,6 +513,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get withdrawMessage => 'Withdraw';
 
   @override
+  String get shareFile => 'Share';
+
+  @override
+  String get cannotShareFile => 'Could not share that file.';
+
+  @override
   String get shareByLink => 'Share by link';
 
   @override
@@ -574,6 +580,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noDevicesToForward => 'No Devices to forward to yet.';
+
+  @override
+  String get searchForwardTargets => 'Search Devices';
+
+  @override
+  String get forwardTargetNoMatch => 'No Device matches that search.';
 
   @override
   String selectedCount(int count) {

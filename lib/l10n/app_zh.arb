@@ -151,6 +151,8 @@
   "copySelection": "复制",
   "deleteMessage": "删除",
   "withdrawMessage": "撤回",
+  "shareFile": "分享",
+  "cannotShareFile": "没能分享这个文件。",
   "shareByLink": "通过链接分享",
   "shareByLinkTitle": "通过链接分享",
   "shareByLinkDesc": "任何拥有此链接的人都可以下载文件。链接30分钟后过期。",
@@ -169,6 +171,8 @@
   "multiSelect": "多选",
   "forwardTo": "转发给",
   "noDevicesToForward": "暂无可转发的设备。",
+  "searchForwardTargets": "搜索设备",
+  "forwardTargetNoMatch": "没有匹配的设备。",
   "selectedCount": "{count, plural, other{已选 {count} 条}}",
   "forwardFailedCount": "{count, plural, other{{count} 条消息未能转发。}}",
 
