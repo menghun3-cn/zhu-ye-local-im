@@ -23,6 +23,7 @@ import 'package:local_transfer/ui/open_file.dart';
 import 'package:local_transfer/ui/pickers.dart';
 import 'package:local_transfer/ui/reveal.dart';
 import 'package:local_transfer/ui/seams.dart';
+import 'package:local_transfer/ui/share_file.dart';
 import 'package:local_transfer/ui/system_reveal.dart';
 import 'package:local_transfer/ui/update_check.dart';
 import 'package:local_transfer/ui/update_install.dart';
@@ -1236,6 +1237,51 @@ class ScriptedFileOpener implements FileOpener {
   @override
   Future<bool> open(String path) async {
     opened.add(path);
+    return answers;
+  }
+}
+
+/// A [FileSharer] that records what it was asked to share.
+///
+/// The same seam argument as [ScriptedFileOpener]: the real sharer hands the
+/// files to Android's chooser — an activity a widget test on any host cannot
+/// drive — so a test installs this, chooses the menu line, and asserts on the
+/// paths it was handed.
+///
+/// ```dart
+/// final sharer = ScriptedSharer.install();
+/// await tester.tap(find.text(l10n.shareFile));
+/// expect(sharer.shared.single, [landedPath]);
+/// ```
+class ScriptedSharer implements FileSharer {
+  ScriptedSharer._();
+
+  /// Installs a scripted sharer in place of the system one.
+  ///
+  /// A test that calls this must also call [ShareResolution.reset] in a
+  /// `tearDown`, for the same reason [ScriptedFileOpener.install] insists on
+  /// it.
+  static ScriptedSharer install() {
+    final sharer = ScriptedSharer._();
+    ShareResolution.sharer = sharer;
+    return sharer;
+  }
+
+  /// Every list of paths the action was asked to share, in order.
+  final List<List<String>> shared = [];
+
+  /// Whether this sharer claims a share sheet exists — the menu asks before
+  /// it draws the line, so a test turns this off to watch the line go away.
+  @override
+  bool supported = true;
+
+  /// What the next call answers — false stands in for a sheet that never
+  /// opened or an empty one, which is what the failure sentence is for.
+  bool answers = true;
+
+  @override
+  Future<bool> share(List<String> paths) async {
+    shared.add(paths);
     return answers;
   }
 }

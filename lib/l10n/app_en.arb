@@ -256,6 +256,8 @@
   "copySelection": "Copy",
   "deleteMessage": "Delete",
   "withdrawMessage": "Withdraw",
+  "shareFile": "Share",
+  "cannotShareFile": "Could not share that file.",
   "shareByLink": "Share by link",
   "shareByLinkTitle": "Share by link",
   "shareByLinkDesc": "Anyone with this link can download the file. The link expires in 30 minutes.",
