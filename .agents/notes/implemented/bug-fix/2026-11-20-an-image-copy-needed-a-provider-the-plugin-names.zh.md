@@ -25,14 +25,25 @@ Windows 看不到这个问题，因为它的 `writeImage` 路径是另一条：�
 macOS 同样原生写图。这个 bug 在构造上就是 Android 独有的，而不是测试偶然
 漏掉的。
 
+只声明 authority 事实证明还不够。真机验证显示 `ContentResolver` 把
+`<applicationId>.provider` 的 URI 路由到了*更新* provider 的实例——
+logcat 报 "The authority `...provider` does not match the one of the
+contentProvider: `...update_file_provider`"——于是剪贴板 URI 的 `getType`
+失败，剪贴板项拿不到可用的 MIME 类型。Android 在一个包内**按类名只运行一
+个 provider 实例**：两条 `<provider>` 声明如果都写
+`androidx.core.content.FileProvider`，会在 `ActivityThread` 的 provider
+缓存里撞车，第二个 authority 被第一个实例应答，而那个实例根本不知道剪
+贴板路径。
+
 ## Decision
 
-Manifest 为插件要求的 authority 声明第二个 `FileProvider`，与更新用的那个
-并列：
+Manifest 为插件要求的 authority 声明第二个 provider，与更新用的那个并列
+——并且第二个必须是不同的*类*：`ClipboardFileProvider`，一个在应用包
+内声明的 `FileProvider` 空子类：
 
 ```xml
 <provider
-    android:name="androidx.core.content.FileProvider"
+    android:name=".ClipboardFileProvider"
     android:authorities="${applicationId}.provider"
     android:exported="false"
     android:grantUriPermissions="true">
@@ -47,8 +58,9 @@ path="."/>`），即插件写临时 PNG 的唯一目录。现有的 `update_path
 包含 `cache-path`，但复用它会把 `filesDir` 和外部存储也暴露在新 authority
 之下——比剪贴板写入所需的面更大，且没有任何收益。
 
-一个 Manifest 里放两个 `FileProvider` 是 Android 的常规做法：authority 是
-区分它们的键，各自持有自己的路径文件。
+同一个类的两个 provider 不能靠 authority 区分：`ActivityThread` 的运行
+中 provider 缓存以类名为键，所以剪贴板 provider 必须是另一个类才能拿到
+自己的实例。一行子类是拿到它的最小代价。
 
 ## Alternatives considered
 
@@ -73,4 +85,9 @@ provider 声明。修复属于 Manifest——缺失的事实就在那里。
   漏，有系统缓存清理兜底，本次改动不去动它。
 - 这次没有 Dart 侧或 widget 测试覆盖：故障完全位于 Manifest 与插件的交
   互里，`dart test` 和 `flutter test` 都够不到。验证方式是在真机上构建并
-  点按。
+  点按——在模拟器上，对暂存的
+  `content://<applicationId>.provider/clipboard_image/…` URI 执行
+  `content query`/`content read` 能取回临时 PNG，logcat 也不再为它记录
+  "Failed to get type"。其他应用读取该 URI 仍走剪贴板的常规授权：
+  Android 的 `ClipboardService` 会把剪贴板项中 URI 的读权限授予每一个拉
+  取 `getPrimaryClip` 的包，这正是 provider 保持不导出的原因。
