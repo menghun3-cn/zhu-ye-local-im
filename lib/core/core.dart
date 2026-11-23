@@ -6,8 +6,10 @@
 /// acceptance harness as in the app.
 library;
 
+export 'ai/ai_gateway.dart';
 export 'ai/ai_message.dart';
 export 'ai/ai_router.dart';
+export 'ai/gateway_token.dart';
 export 'ai/presets.dart';
 export 'ai/provider.dart';
 export 'ai/provider_store.dart';

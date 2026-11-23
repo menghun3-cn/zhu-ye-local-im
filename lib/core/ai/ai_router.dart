@@ -164,6 +164,13 @@ final class AiRouter {
         );
   }
 
+  /// Every model reference callers may ask for: enabled provider models plus
+  /// routing groups — what `GET /v1/models` on the gateway lists.
+  Future<List<String>> exposedModelRefs() async {
+    final config = await store.load();
+    return config.exposedModelRefs();
+  }
+
   /// Fetches the model list a provider reports for [protocol].
   ///
   /// Returns an empty list when the provider has no endpoint or the codec

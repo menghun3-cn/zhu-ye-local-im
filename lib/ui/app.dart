@@ -74,6 +74,15 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
 
   /// The screenshot feature's service, on the one platform that has it.
   ScreenshotService? _screenshots;
+
+  /// The local AI gateway, when the configuration asks for one.
+  ///
+  /// Started after the controller rather than inside it: the gateway serves
+  /// AI providers, which have nothing to do with peer sessions, and keeping
+  /// it out of [LocalTransferController] keeps `lib/app` free of a second
+  /// kind of network listener. It is stopped with the app like every other
+  /// seam-adjacent resource.
+  AiGateway? _aiGateway;
   StreamSubscription<void>? _screenshotChanges;
   StreamSubscription<void>? _screenshotTray;
   bool? _screenshotEnabledSeen;
@@ -141,6 +150,44 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     _update.attach(controller);
     setState(() => _controller = controller);
     unawaited(_openScreenshots(controller));
+    unawaited(_openAiGateway());
+  }
+
+  /// Brings up the local AI gateway when `providers.json` asks for it.
+  ///
+  /// The whole stack is assembled here rather than in `openPlatformSeams`
+  /// because seams carry platform *facts*, not running services — and a
+  /// test that opens seams must not bind a port as a side effect. A Device
+  /// with nowhere durable to write gets no gateway: its providers would be
+  /// gone at the next launch anyway, and an endpoint that 401s everything
+  /// is worse than none.
+  Future<void> _openAiGateway() async {
+    final directory = widget.seams.aiDirectory;
+    if (directory == null) return;
+    try {
+      final secrets = await SecretBox.open('$directory/secrets.key');
+      final store = AiConfigStore(
+        store: FileMessageStore('$directory/providers.json'),
+        secrets: secrets,
+      );
+      final config = await store.load();
+      if (!config.gateway.enabled) return;
+      final gateway = AiGateway(
+        store: store,
+        router: AiRouter(store: store),
+        token: await AiGatewayToken.loadOrCreate('$directory/gateway_token'),
+      );
+      await gateway.start(preferredPort: config.gateway.port);
+      if (!mounted) {
+        await gateway.stop();
+        return;
+      }
+      _aiGateway = gateway;
+    } on Object {
+      // A gateway that cannot start must not take the app down with it:
+      // messaging works without it, and the settings surface can say the
+      // endpoint is not listening.
+    }
   }
 
   /// Brings the screenshot feature up on Windows: the service that owns the
@@ -207,6 +254,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     // not own them.
     unawaited(_controller?.close());
     unawaited(_screenshots?.dispose());
+    unawaited(_aiGateway?.stop());
     unawaited(_screenshotChanges?.cancel());
     unawaited(_screenshotTray?.cancel());
     screenshotService = null;
