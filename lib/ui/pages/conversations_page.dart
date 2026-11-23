@@ -517,11 +517,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
                           selected?.peer.fingerprint.hex,
                       unread: controller.unreadCount(entry.peer.fingerprint),
                       controller: controller,
-                      onContextMenu: (position) => _showConversationMenu(
-                        context,
-                        entry.peer.fingerprint,
-                        position,
-                      ),
+                      onContextMenu: (position) =>
+                          _showConversationMenu(context, entry.peer, position),
                       onTap: () => _open(entry.peer.fingerprint),
                     );
                   },
@@ -591,7 +588,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
   /// choosing Delete is what raises the confirmation question.
   Future<void> _showConversationMenu(
     BuildContext context,
-    Fingerprint peer,
+    PeerView peer,
     Offset position,
   ) async {
     final l10n = AppLocalizations.of(context);
@@ -609,13 +606,27 @@ class _ConversationsPageState extends State<ConversationsPage> {
       ),
       items: [
         PopupMenuItem(
+          value: _ConversationListAction.editRemark,
+          child: Text(l10n.editRemark),
+        ),
+        PopupMenuItem(
           value: _ConversationListAction.delete,
           child: Text(l10n.deleteConversation),
         ),
       ],
     );
+    if (chosen == _ConversationListAction.editRemark) {
+      if (!context.mounted) return;
+      await showPeerRemarkDialog(
+        context,
+        ControllerScope.of(context),
+        peer: peer.fingerprint,
+        initial: peer.remark,
+      );
+      return;
+    }
     if (chosen != _ConversationListAction.delete || !context.mounted) return;
-    await _confirmDeleteConversation(context, peer);
+    await _confirmDeleteConversation(context, peer.fingerprint);
   }
 
   /// Confirms, then hard-deletes the conversation with [peer].
@@ -1029,7 +1040,7 @@ String _titleFor(PeerView peer) {
 
 enum _PeerAction { connect }
 
-enum _ConversationListAction { delete }
+enum _ConversationListAction { editRemark, delete }
 
 /// A row that answers the mouse the way the desktop client's list does.
 ///

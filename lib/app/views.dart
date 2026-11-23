@@ -85,6 +85,7 @@ final class PeerView {
     required this.isInGroup,
     required this.isFavorite,
     required this.lastSeen,
+    this.remark,
   });
 
   /// The Device's stable identity.
@@ -126,6 +127,13 @@ final class PeerView {
   /// When this Device last heard from the peer, or last had a Session with it.
   final DateTime? lastSeen;
 
+  /// The name the user gave this peer on this Device, or null.
+  ///
+  /// A Remark is local user data, not something the peer announced: it comes
+  /// from this Device's own profile, wins over every other name on screen,
+  /// and is never sent anywhere. See `DeviceProfile.setRemark`.
+  final String? remark;
+
   /// Whether there is both an address and a port to dial.
   bool get isDiallable => address != null && sessionPort != null;
 
@@ -140,9 +148,15 @@ final class PeerView {
     return PeerPresence.offline;
   }
 
+  /// Whether the user named this peer on this Device.
+  bool get hasRemark => remark != null && remark!.isNotEmpty;
+
   /// What to show for this peer, in order of how much it tells a person.
   ///
-  /// An Alias first, because it is what the peer chose to be called and it is
+  /// A Remark first: it is the name the *user of this Device* chose, which is
+  /// the only name in the list that answers "which of my contacts is this"
+  /// rather than "what does the wire call it". Then an Alias, because it is
+  /// what the peer chose to be called and it is
   /// the only name anyone recognises. A Device that announces no name still
   /// announces *something* — the sanitiser substitutes
   /// [DeviceDescriptor.fallbackAlias] before the descriptor ever reaches the
@@ -164,6 +178,7 @@ final class PeerView {
   /// is in the Owner Group but has never been heard from has no address at all,
   /// and a row still has to be called something.
   String get displayName {
+    if (hasRemark) return remark!;
     final named = alias;
     if (named != null &&
         named.isNotEmpty &&
@@ -181,14 +196,15 @@ final class PeerView {
   /// What to draw in this peer's avatar, when the name is not what should be
   /// drawn there.
   ///
-  /// Null for a Device that announced a name: the first letter of a name is
-  /// what an avatar is for, and every other avatar in the application is drawn
-  /// that way. A Device named by its address would otherwise get the first
+  /// Null for a Device that announced a name — or that the user named: the
+  /// first letter of a name is what an avatar is for, and every other avatar
+  /// in the application is drawn that way. A Device named by its address would otherwise get the first
   /// character of the address, which is a `1` on every peer in the list —
   /// the one thing an avatar must never be is the same for everybody. What
   /// identifies the machine there is the last number, so `192.168.1.115` puts
   /// `115` in the circle.
-  String? get avatarLabel => hasRealAlias ? null : lastOctetOf(address ?? '');
+  String? get avatarLabel =>
+      hasRemark || hasRealAlias ? null : lastOctetOf(address ?? '');
 
   /// Whether the peer announced a name of its own choosing.
   ///

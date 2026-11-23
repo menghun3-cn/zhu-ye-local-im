@@ -29,6 +29,22 @@ Future<void> showRenameDialog(
   builder: (_) => _RenameDialog(controller: controller),
 );
 
+/// Asks for the Remark [peer] is shown under on this Device.
+///
+/// [initial] is the Remark already in force, so the field opens on it rather
+/// than on a blank that would read as "no remark". An empty answer clears the
+/// Remark — [LocalTransferController.setPeerRemark] treats blank as removal.
+Future<void> showPeerRemarkDialog(
+  BuildContext context,
+  LocalTransferController controller, {
+  required Fingerprint peer,
+  String? initial,
+}) => showDialog<void>(
+  context: context,
+  builder: (_) =>
+      _PeerRemarkDialog(controller: controller, peer: peer, initial: initial),
+);
+
 /// Asks for the address of a Device Discovery could not find.
 Future<void> showManualAddressDialog(
   BuildContext context,
@@ -197,6 +213,70 @@ class _RenameDialogState extends State<_RenameDialog> {
           onPressed: _busy ? null : () => unawaited(_save()),
           child: Text(l10n.save),
         ),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------------ remark
+
+/// The Remark editor: one field, saved straight into the profile.
+///
+/// There is no busy state and no error line because there is nothing to wait
+/// for — a Remark is local profile data, not a negotiation with the peer —
+/// and nothing the field can hold is refused: whatever is typed is sanitised
+/// by the same rules an announced name gets, and blank clears.
+class _PeerRemarkDialog extends StatefulWidget {
+  const _PeerRemarkDialog({
+    required this.controller,
+    required this.peer,
+    required this.initial,
+  });
+
+  final LocalTransferController controller;
+  final Fingerprint peer;
+  final String? initial;
+
+  @override
+  State<_PeerRemarkDialog> createState() => _PeerRemarkDialogState();
+}
+
+class _PeerRemarkDialogState extends State<_PeerRemarkDialog> {
+  late final TextEditingController _remark = TextEditingController(
+    text: widget.initial ?? '',
+  );
+
+  @override
+  void dispose() {
+    _remark.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    widget.controller.setPeerRemark(widget.peer, _remark.text);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.editRemark),
+      content: TextField(
+        controller: _remark,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: l10n.remarkFieldLabel,
+          helperText: l10n.remarkHelper,
+        ),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(onPressed: _save, child: Text(l10n.save)),
       ],
     );
   }

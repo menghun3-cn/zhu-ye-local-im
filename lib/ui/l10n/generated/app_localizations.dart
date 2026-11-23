@@ -2023,6 +2023,24 @@ abstract class AppLocalizations {
   /// **'This forgets the Device and its pairing permissions, closes the connection and clears chat and clipboard history plus unsent drafts. Files you sent or received are kept, and the current system clipboard content stays. This cannot be undone.'**
   String get deleteConversationConfirmBody;
 
+  /// No description provided for @editRemark.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit remark'**
+  String get editRemark;
+
+  /// No description provided for @remarkFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remark'**
+  String get remarkFieldLabel;
+
+  /// No description provided for @remarkHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown on this Device instead of the announced name or address. The other Device never sees it. Leave empty to clear.'**
+  String get remarkHelper;
+
   /// No description provided for @conversationPickOne.
   ///
   /// In en, this message translates to:

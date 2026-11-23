@@ -457,6 +457,7 @@ final class LocalTransferController {
           isInGroup: profile.group.contains(entry.fingerprint),
           isFavorite: profile.isFavorite(entry.fingerprint),
           lastSeen: entry.lastSeen,
+          remark: profile.remarkFor(entry.fingerprint),
         ),
     ];
     views.sort((a, b) {
@@ -805,6 +806,17 @@ final class LocalTransferController {
   /// Sets whether Transfers to [peer] skip the per-Transfer confirmation.
   void setFavorite(Fingerprint peer, {required bool value}) {
     _requireLocal().profile.setFavorite(peer, value: value);
+    unawaited(_persist());
+    _notify();
+  }
+
+  /// Sets the Remark [peer] is shown under on this Device, or clears it.
+  ///
+  /// A Remark is local user data — see `DeviceProfile.setRemark` — so this
+  /// costs nothing on the wire: no Session is touched, no peer is told, and
+  /// the change is a profile write and a repaint. A blank [remark] clears it.
+  void setPeerRemark(Fingerprint peer, String? remark) {
+    _requireLocal().profile.setRemark(peer, remark);
     unawaited(_persist());
     _notify();
   }

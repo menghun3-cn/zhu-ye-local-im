@@ -670,6 +670,29 @@ void main() {
         description: 'Bob to hear the new name',
       );
     });
+
+    test('a Remark renames the peer on this Device only', () async {
+      final hub = MemoryBeaconHub();
+      final alice = await startDevice(hub.a, 'Alice');
+      final bob = await startDevice(hub.b, 'Bob');
+      await pairUp(alice, bob);
+
+      alice.controller.setPeerRemark(bob.fingerprint, 'Bob (work)');
+
+      final view = alice.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == bob.fingerprint,
+      );
+      expect(view.remark, 'Bob (work)');
+      expect(view.displayName, 'Bob (work)');
+      // And nothing about it reaches the wire: Bob's own view of Alice is
+      // untouched, because a Remark is this Device's label, not an announced
+      // name.
+      final bobView = bob.controller.peers.firstWhere(
+        (peer) => peer.fingerprint == alice.fingerprint,
+      );
+      expect(bobView.remark, isNull);
+      expect(bobView.displayName, isNot('Bob (work)'));
+    });
   });
 
   group('binding the Session listener', () {
