@@ -155,11 +155,13 @@ inviting.
   mitigation is not to make discovery trustworthy but to keep it untrusted, and
   the UI's job is to show a peer as unverified until the SAS comparison says
   otherwise.
-- Android needs two pieces of platform work this increment does not do: the
-  `ACCESS_LOCAL_NETWORK` permission request before any socket opens, and a
-  decision about whether discovery runs only in the foreground. Both are
-  Android-layer concerns, and both are prerequisites for discovery working on
-  Android at all.
+- Android still owes one piece of platform work this increment does not do:
+  the `ACCESS_LOCAL_NETWORK` permission request before any socket opens.
+  The foreground/background question was settled later by
+  [an Android foreground service keeps Sessions alive in the background](../../implemented/feature/2026-11-23-an-android-foreground-service-keeps-sessions-alive.md):
+  a `connectedDevice` foreground service holds the process at foreground
+  priority, so discovery and Sessions survive switching apps. Screen-off
+  doze remains uncovered.
 - Broadcast is chatty by nature: one small datagram per Device every three
   seconds, and the peer table is rebuilt from scratch on every process start.
   That is the price of no server.

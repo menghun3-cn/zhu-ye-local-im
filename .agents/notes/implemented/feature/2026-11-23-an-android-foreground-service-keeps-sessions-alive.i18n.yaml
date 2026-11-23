@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-23-an-android-foreground-service-keeps-sessions-alive.md
+#   git hash-object 2026-11-23-an-android-foreground-service-keeps-sessions-alive.zh.md
+2026-11-23-an-android-foreground-service-keeps-sessions-alive.md: 19d88ba9060a1d321951e5681004da1fc1745b2d
+2026-11-23-an-android-foreground-service-keeps-sessions-alive.zh.md: f5d7590befe07b33886a95fd7d47b3aa1bebbe92

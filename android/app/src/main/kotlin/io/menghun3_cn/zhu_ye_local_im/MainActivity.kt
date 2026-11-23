@@ -1,10 +1,15 @@
 package io.menghun3_cn.zhu_ye_local_im
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.Manifest
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import android.webkit.MimeTypeMap
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,6 +30,49 @@ import java.io.File
  * (Windows, where the environment already says where to write) is not an error.
  */
 class MainActivity : FlutterActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // The service only exists to keep this process — and the sockets and
+        // Dart timers inside it — at foreground priority while the app is
+        // alive. Starting it here is legal because an Activity's onCreate is
+        // always foreground; Android 12+ forbids the same call from the
+        // background. It stops itself when the user swipes the app away.
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, LocalTransferForegroundService::class.java),
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        askNotificationPermissionOnce()
+    }
+
+    /**
+     * Android 13+ hides an app's foreground-service notification until the
+     * POST_NOTIFICATIONS runtime permission is granted. The service still
+     * runs without it — only the shade entry is missing — but a user who
+     * never sees the notification has no idea the app is deliberately
+     * staying online, so the permission is asked once, here, where the app
+     * is already in front of them.
+     */
+    private fun askNotificationPermissionOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_NOTIFICATIONS_ASKED, false)) return
+        prefs.edit().putBoolean(KEY_NOTIFICATIONS_ASKED, true).apply()
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            REQUEST_POST_NOTIFICATIONS,
+        )
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
@@ -202,5 +250,11 @@ class MainActivity : FlutterActivity() {
         } catch (error: Exception) {
             result.error("install_failed", error.message, path)
         }
+    }
+
+    private companion object {
+        const val PREFS_NAME = "local_transfer"
+        const val KEY_NOTIFICATIONS_ASKED = "notification_permission_asked"
+        const val REQUEST_POST_NOTIFICATIONS = 1
     }
 }
