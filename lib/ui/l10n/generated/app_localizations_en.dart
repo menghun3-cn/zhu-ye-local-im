@@ -582,6 +582,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDevicesToForward => 'No Devices to forward to yet.';
 
   @override
+  String get searchForwardTargets => 'Search Devices';
+
+  @override
+  String get forwardTargetNoMatch => 'No Device matches that search.';
+
+  @override
   String selectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

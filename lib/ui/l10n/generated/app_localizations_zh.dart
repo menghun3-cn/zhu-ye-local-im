@@ -563,6 +563,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noDevicesToForward => '暂无可转发的设备。';
 
   @override
+  String get searchForwardTargets => '搜索设备';
+
+  @override
+  String get forwardTargetNoMatch => '没有匹配的设备。';
+
+  @override
   String selectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
