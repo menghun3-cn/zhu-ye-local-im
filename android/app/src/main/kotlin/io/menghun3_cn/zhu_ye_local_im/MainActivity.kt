@@ -170,8 +170,8 @@ class MainActivity : FlutterActivity() {
      * `openPath` uses: `update_paths.xml` exposes filesDir, cacheDir and
      * external storage, which covers where this app keeps received and picked
      * files. One file goes as `ACTION_SEND` under its real MIME type; several
-     * go as `ACTION_SEND_MULTIPLE` under `*/*`, and the chooser decides what
-     * it will take.
+     * go as `ACTION_SEND_MULTIPLE` under a wildcard MIME type, and the
+     * chooser decides what it will take.
      *
      * There is deliberately no `queryIntentActivities` pre-check: on Android
      * 11+ package visibility would filter the answer unless the manifest
