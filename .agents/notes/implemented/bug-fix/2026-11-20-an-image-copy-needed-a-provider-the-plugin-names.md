@@ -29,14 +29,27 @@ no `FileProvider` anywhere in the story. iOS and macOS likewise write the
 image natively. The bug was Android-only by construction, not by accident of
 testing.
 
+Declaring the authority turned out not to be the whole story. On-device
+verification showed `ContentResolver` routing `<applicationId>.provider` URIs
+to the *update* provider's instance — logcat reported "The authority
+`...provider` does not match the one of the contentProvider:
+`...update_file_provider`" — so `getType` on the clipboard URI failed and the
+clip went out without a usable MIME type. Android runs **one provider instance
+per class name** within a package: two `<provider>` entries that both name
+`androidx.core.content.FileProvider` collide in `ActivityThread`'s provider
+cache, and the second authority is served by the first instance, which knows
+nothing about the clipboard paths.
+
 ## Decision
 
 The manifest declares the authority the plugin asks for, as a **second**
-`FileProvider` beside the update one:
+`FileProvider` beside the update one — and the second one is a distinct
+*class*, `ClipboardFileProvider`, a trivial `FileProvider` subclass declared
+in the app package:
 
 ```xml
 <provider
-    android:name="androidx.core.content.FileProvider"
+    android:name=".ClipboardFileProvider"
     android:authorities="${applicationId}.provider"
     android:exported="false"
     android:grantUriPermissions="true">
@@ -52,8 +65,10 @@ into. The existing `update_paths.xml` already maps `cache-path`, but reusing
 it would also expose `filesDir` and external storage under the new authority —
 more surface than a clipboard write needs, for no gain.
 
-Two `FileProvider` entries in one manifest is ordinary Android: authorities
-are the disambiguator, and each keeps its own paths file.
+Authorities alone do not disambiguate two providers of the same class: the
+class name is what `ActivityThread` keys its running-provider cache on, so the
+clipboard provider must be a different class to get its own instance. A
+one-line subclass is the smallest way to get one.
 
 ## Alternatives considered
 
@@ -84,4 +99,10 @@ file grants exactly that.
   eviction, and not something this change takes on.
 - There is no Dart-side or widget-test coverage for this: the failure lived
   entirely in manifest/plugin interaction, which `dart test` and
-  `flutter test` cannot reach. Verification is a build-and-tap on a device.
+  `flutter test` cannot reach. Verification is a build-and-tap on a device —
+  on the emulator, `content query`/`content read` against the staged
+  `content://<applicationId>.provider/clipboard_image/…` URI returns the
+  scratch PNG, and logcat no longer logs "Failed to get type" for it. Other
+  apps reading the URI still get the usual clipboard grant: Android's
+  `ClipboardService` grants read on a clip's URIs to each package that pulls
+  `getPrimaryClip`, which is why the provider stays non-exported.

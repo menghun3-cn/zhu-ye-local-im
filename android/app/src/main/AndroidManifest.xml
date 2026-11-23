@@ -76,9 +76,14 @@
         <!-- The pasteboard plugin hardcodes the authority
              `${packageName}.provider` when it stages a copied image for the
              clipboard. Without this second provider its getUriForFile call
-             throws and every image copy reports failure. -->
+             throws and every image copy reports failure. It must be a
+             different class than the update provider's FileProvider: Android
+             runs one provider instance per class name, and two declarations
+             of the same class make the `.provider` authority resolve to the
+             update provider's instance, which does not know the clipboard
+             paths. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".ClipboardFileProvider"
             android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">
