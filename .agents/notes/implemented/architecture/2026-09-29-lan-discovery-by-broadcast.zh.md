@@ -66,5 +66,5 @@ Status: implemented
 - 广播本身仍只回答「这条链路上有谁」，仅此而已。跨子网发现现已被部分覆盖——单播探测能到达提供者给出的地址（记住的对端、tailnet 成员）——由[跨越 VPN 与 tailnet 的发现](../../implemented/feature/2026-11-05-discovery-across-vpn-and-tailnets.zh.md)实现。仍未覆盖的是两台从未相遇的 Device 在无人枚举的网络上的冷启动：没有广播、没有记忆、没有目录。残余部分是被点名的缺口，不是疏漏。
 - 信标是一种线上格式，因而现在带版本（`beaconVersion`）。未知版本被直接拒绝，而不是被半懂不懂地解析，于是未来对发现的改动不可能与这一版静默互通。
 - 链路上每台 Device 都能看到其他每台 Device 的 Alias 与平台，并且可以伪造其中任何一项。这是无认证发现的固有性质；应对方式不是让发现变得可信，而是让它保持不可信 —— UI 的职责，是在 SAS 比对确认之前，一直把对端显示为未验证。
-- Android 还差两块本增量未做的平台层工作：在任何 socket 打开前请求 `ACCESS_LOCAL_NETWORK` 权限；以及决定发现是否只在前台运行。两者都属于 Android 层，且都是「发现在 Android 上能否工作」的前置条件。
+- Android 还差一块本增量未做的平台层工作：在任何 socket 打开前请求 `ACCESS_LOCAL_NETWORK` 权限。前后台的问题后来由[Android 前台服务让 Session 在后台保持存活](../../implemented/feature/2026-11-23-an-android-foreground-service-keeps-sessions-alive.zh.md)定案：`connectedDevice` 前台服务让进程保持前台优先级，发现与 Session 在切换应用后继续存活；息屏 doze 仍未覆盖。
 - 广播天性话多：每台 Device 每三秒一个小数据报，且进程每次启动都要从零重建对等表。这就是没有服务端要付的代价。
