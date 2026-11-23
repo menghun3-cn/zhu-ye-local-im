@@ -148,7 +148,10 @@ final class KnownDevice {
 ///   settled", which a probe that could not answer leaves in place so the
 ///   next launch asks again;
 /// * `known` — every Device met, favorited or not, for redial without
-///   Discovery.
+///   Discovery;
+/// * `remarks` — the names the user gave peers on this Device. Local labels
+///   keyed by Fingerprint: never announced, never synced, and cleared with
+///   the peer when [forgetDevice] runs.
 ///
 /// Mutators mutate in place. A profile is the live state of a running
 /// Device, not a value object: an app layer holds one and lets the sessions,
@@ -162,6 +165,7 @@ final class DeviceProfile {
     Set<Fingerprint> favorites = const {},
     Set<Fingerprint> clipboardPeers = const {},
     Map<String, KnownDevice> known = const {},
+    Map<String, String> remarks = const {},
     List<String> recentEmojis = const [],
     this.incomingDirectory,
     this.closeBehaviour = CloseBehaviour.minimiseToTray,
@@ -181,7 +185,12 @@ final class DeviceProfile {
        _clipboardPeers = {...clipboardPeers}
          ..removeWhere((peer) => peer == self),
        _known = {...known}
-         ..removeWhere((_, device) => device.fingerprint == self) {
+         ..removeWhere((_, device) => device.fingerprint == self),
+       _remarks = {
+         for (final entry in remarks.entries)
+           if (entry.key != self.hex && entry.value.trim().isNotEmpty)
+             entry.key: _sanitise(entry.value),
+       } {
     setRecentEmojis(recentEmojis);
   }
 
@@ -324,6 +333,7 @@ final class DeviceProfile {
   final Set<Fingerprint> _favorites;
   final Set<Fingerprint> _clipboardPeers;
   final Map<String, KnownDevice> _known;
+  final Map<String, String> _remarks;
   List<String> _recentEmojis = const [];
 
   /// The Fingerprints marked as favorites, sorted.
@@ -389,6 +399,7 @@ final class DeviceProfile {
   void forgetDevice(Fingerprint fingerprint) {
     if (fingerprint == self) return;
     _known.remove(fingerprint.hex);
+    _remarks.remove(fingerprint.hex);
     _favorites.remove(fingerprint);
     _clipboardPeers.remove(fingerprint);
     group = group.without(fingerprint);
@@ -396,6 +407,31 @@ final class DeviceProfile {
 
   /// What is known about [fingerprint], or null when the Device is unknown.
   KnownDevice? known(Fingerprint fingerprint) => _known[fingerprint.hex];
+
+  /// The Remark the user gave [fingerprint] on this Device, or null.
+  ///
+  /// A Remark is a local label: it is what this Device calls the peer on
+  /// screen, it is never announced on the wire, and no other Device ever
+  /// sees it. It is keyed by Fingerprint so it survives the peer's address
+  /// changing underneath it.
+  String? remarkFor(Fingerprint fingerprint) => _remarks[fingerprint.hex];
+
+  /// Sets or clears the Remark [fingerprint] is shown under on this Device.
+  ///
+  /// A blank [remark] clears it, which is how the user goes back to the
+  /// announced name or address. [self] cannot be remarked: the Remark exists
+  /// to tell *other* Devices apart, and this Device already has its Alias.
+  /// The value is sanitised by the same rules a peer-announced name gets,
+  /// because it lands in the same lists.
+  void setRemark(Fingerprint fingerprint, String? remark) {
+    if (fingerprint == self) return;
+    final trimmed = remark?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      _remarks.remove(fingerprint.hex);
+      return;
+    }
+    _remarks[fingerprint.hex] = _sanitise(trimmed);
+  }
 
   /// The faces the composer's Recent strip should draw, newest first.
   List<String> get recentEmojis => List.unmodifiable(_recentEmojis);
@@ -455,6 +491,10 @@ final class DeviceProfile {
     if (incomingBubbleSkin != null)
       'incomingBubbleSkin': incomingBubbleSkin!.toJson(),
     'known': [for (final device in knownDevices) device.toJson()],
+    if (_remarks.isNotEmpty)
+      'remarks': {
+        for (final key in _remarks.keys.toList()..sort()) key: _remarks[key],
+      },
     'recentEmojis': recentEmojis,
   };
 
@@ -463,6 +503,7 @@ final class DeviceProfile {
     final rawFavorites = json['favorites'];
     final rawClipboardPeers = json['clipboardPeers'];
     final rawKnown = json['known'];
+    final rawRemarks = json['remarks'];
     final rawRecentEmojis = json['recentEmojis'];
     final platform = DevicePlatform.fromWireName(_string(json, 'platform'));
     final self = Fingerprint(_string(json, 'self'));
@@ -494,6 +535,21 @@ final class DeviceProfile {
         known[device.fingerprint.hex] = device;
       }
     }
+    final remarks = <String, String>{};
+    if (rawRemarks is Map) {
+      for (final entry in rawRemarks.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String || value is! String) {
+          throw const FormatException('"remarks" entries must be strings');
+        }
+        // The key is a Fingerprint like every other peer reference in this
+        // file: an entry under a key that is not one could never be looked
+        // up, and keeping it would let a damaged file grow silently.
+        Fingerprint(key);
+        remarks[key] = value;
+      }
+    }
     final recentEmojis = <String>[];
     if (rawRecentEmojis is List) {
       for (final entry in rawRecentEmojis) {
@@ -511,6 +567,7 @@ final class DeviceProfile {
       favorites: favorites,
       clipboardPeers: clipboardPeers,
       known: known,
+      remarks: remarks,
       recentEmojis: recentEmojis,
       incomingDirectory: _optionalString(json, 'incomingDirectory'),
       closeBehaviour: _closeBehaviour(json['closeBehaviour']),
@@ -536,7 +593,7 @@ final class DeviceProfile {
       'DeviceProfile(${self.short()}, "$alias", '
       '${group.length} group, ${_favorites.length} favorites, '
       '${_clipboardPeers.length} clipboard peers, '
-      '${_known.length} known, '
+      '${_known.length} known, ${_remarks.length} remarks, '
       'close ${closeBehaviour.wireName}, '
       'update ${updateCheckInterval.wireName})';
 

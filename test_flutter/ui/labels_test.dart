@@ -23,6 +23,7 @@ void main() {
     bool connected = false,
     bool inGroup = true,
     DateTime? lastSeen,
+    String? remark,
   }) => PeerView(
     fingerprint: Fingerprint.ofPublicKey(const [7, 8, 9]),
     alias: alias,
@@ -34,6 +35,7 @@ void main() {
     isInGroup: inGroup,
     isFavorite: false,
     lastSeen: lastSeen,
+    remark: remark,
   );
 
   group('a peer that has never been placed', () {
@@ -129,6 +131,24 @@ void main() {
 
     test('falls back to the name when there is no address', () {
       expect(describePeerTitle(peer(alias: 'Bob')), 'Bob');
+    });
+
+    test('is titled by the Remark whenever the user set one', () {
+      // The Remark is the name this Device's owner gave the peer — the answer
+      // to "which contact is this" — so it leads over both the address the
+      // wire knows and the Alias the peer announced for itself.
+      expect(
+        describePeerTitle(
+          peer(alias: 'Bob', address: '10.0.0.7', remark: 'upstairs laptop'),
+        ),
+        'upstairs laptop',
+      );
+      expect(
+        describePeerTitle(
+          peer(alias: null, address: '10.0.0.7', remark: 'NAS'),
+        ),
+        'NAS',
+      );
     });
 
     test('does not repeat the title address in the supporting line', () {

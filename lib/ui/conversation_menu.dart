@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/app.dart';
 import '../core/core.dart';
 import 'controller_scope.dart';
+import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
 
 /// The three-dot menu shared by the compact conversation header and the
@@ -41,6 +42,10 @@ class ConversationMenuButton extends StatelessWidget {
               ),
             ),
           PopupMenuItem(
+            value: _ConversationAction.editRemark,
+            child: Text(l10n.editRemark),
+          ),
+          PopupMenuItem(
             value: _ConversationAction.clearConversation,
             child: Text(l10n.clearConversation),
           ),
@@ -67,6 +72,16 @@ class ConversationMenuButton extends StatelessWidget {
         if (known != null) {
           controller.setFavorite(peer, value: !known.isFavorite);
         }
+        return;
+      case _ConversationAction.editRemark:
+        // Offered for every peer, known to the peer list or not: a Remark is
+        // keyed by Fingerprint and needs nothing the other Device says.
+        await showPeerRemarkDialog(
+          context,
+          controller,
+          peer: peer,
+          initial: known?.remark,
+        );
         return;
       case _ConversationAction.clearConversation:
         final l10n = AppLocalizations.of(context);
@@ -95,4 +110,4 @@ class ConversationMenuButton extends StatelessWidget {
   }
 }
 
-enum _ConversationAction { toggleFavorite, clearConversation }
+enum _ConversationAction { toggleFavorite, editRemark, clearConversation }

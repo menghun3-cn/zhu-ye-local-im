@@ -1113,6 +1113,15 @@ class AppLocalizationsZh extends AppLocalizations {
       '会忘记这台设备及其配对权限、关闭连接、清除聊天与剪贴板记录和未发送草稿。你收到或发送的文件不会删除，系统剪贴板当前内容保留。';
 
   @override
+  String get editRemark => '修改备注';
+
+  @override
+  String get remarkFieldLabel => '备注';
+
+  @override
+  String get remarkHelper => '只在本机显示，代替对方自报的名称或地址，对方看不到。留空即清除。';
+
+  @override
   String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';
 
   @override

@@ -168,6 +168,7 @@ void main() {
       String? alias,
       bool connected = false,
       bool connecting = false,
+      String? remark,
     }) => PeerView(
       fingerprint: Fingerprint.ofPublicKey(const [4, 5, 6]),
       alias: alias,
@@ -180,6 +181,7 @@ void main() {
       isInGroup: true,
       isFavorite: false,
       lastSeen: null,
+      remark: remark,
     );
 
     test('is diallable only with both an address and a port', () {
@@ -230,6 +232,20 @@ void main() {
       );
     });
 
+    test('a Remark leads over the Alias, the address and the Fingerprint', () {
+      // The Remark is the only name on the list the *user of this Device*
+      // chose: it answers "which contact is this" where an announced Alias
+      // answers "what does the wire call it". Once set it wins everywhere.
+      expect(view(remark: 'upstairs').displayName, 'upstairs');
+      expect(
+        view(alias: 'Bob', address: '10.0.0.2', remark: 'upstairs').displayName,
+        'upstairs',
+      );
+      expect(view(remark: 'upstairs').hasRemark, isTrue);
+      expect(view().hasRemark, isFalse);
+      expect(view(remark: '').hasRemark, isFalse);
+    });
+
     test('has something to show even with neither a name nor an address', () {
       // The address is the one fallback that can be *absent*: a peer in the
       // Owner Group that has never been heard from has none, and its row still
@@ -259,7 +275,7 @@ void main() {
   });
 
   group('the label a peer wears in its avatar', () {
-    PeerView view({String? address, String? alias}) => PeerView(
+    PeerView view({String? address, String? alias, String? remark}) => PeerView(
       fingerprint: Fingerprint.ofPublicKey(const [4, 5, 6]),
       alias: alias,
       platform: DevicePlatform.windows,
@@ -270,6 +286,7 @@ void main() {
       isInGroup: true,
       isFavorite: false,
       lastSeen: null,
+      remark: remark,
     );
 
     test('is the address, ten digits through, for a Device with no name', () {
@@ -282,6 +299,12 @@ void main() {
 
     test('is left to the name when the Device announced one', () {
       expect(view(alias: 'Bob', address: '192.168.1.115').avatarLabel, isNull);
+    });
+
+    test('is left to the Remark when the user named the Device', () {
+      // A Remark is the display name, so the circle draws its first letter —
+      // the address's last octet would be labelling a name that is not shown.
+      expect(view(address: '192.168.1.115', remark: 'NAS').avatarLabel, isNull);
     });
 
     test('is left to the name when there is no octet to read', () {
