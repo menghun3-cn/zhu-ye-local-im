@@ -1436,4 +1436,165 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bubbleSkinPresetLilac => 'Lilac';
+
+  @override
+  String get myCardAi => 'AI';
+
+  @override
+  String get myCardAiSummaryOn => 'Gateway on';
+
+  @override
+  String get myCardAiSummaryOff => 'Gateway off';
+
+  @override
+  String get aiUnavailableHere =>
+      'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.';
+
+  @override
+  String get aiLoadFailed => 'The AI configuration could not be read';
+
+  @override
+  String get aiPageHint =>
+      'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.';
+
+  @override
+  String get aiCopied => 'Copied';
+
+  @override
+  String get aiSectionProviders => 'Providers';
+
+  @override
+  String get aiAddProvider => 'Add provider';
+
+  @override
+  String get aiProviderCustom => 'Custom endpoint';
+
+  @override
+  String get aiProviderName => 'Name';
+
+  @override
+  String get aiProviderApiKey => 'API key';
+
+  @override
+  String get aiProviderApiKeyHint =>
+      'Stored encrypted on this Device; leave empty for local models';
+
+  @override
+  String get aiProviderModels => 'Models';
+
+  @override
+  String aiProviderModelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count models on',
+      one: '1 model on',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiKindPreset => 'Preset';
+
+  @override
+  String get aiKindCustom => 'Custom';
+
+  @override
+  String get aiKindLocal => 'Local';
+
+  @override
+  String get aiEditProvider => 'Provider';
+
+  @override
+  String get aiEndpointHint => 'Base URL, e.g. https://api.example.com/v1';
+
+  @override
+  String get aiFetchModels => 'Fetch models';
+
+  @override
+  String get aiFetchEmpty => 'The provider reported no models';
+
+  @override
+  String aiFetchAdded(int count) {
+    return 'Added $count new model(s)';
+  }
+
+  @override
+  String get aiProtocolOpenaiChat => 'OpenAI Chat';
+
+  @override
+  String get aiProtocolOpenaiResponses => 'OpenAI Responses';
+
+  @override
+  String get aiProtocolAnthropic => 'Anthropic Messages';
+
+  @override
+  String get aiProtocolGemini => 'Gemini';
+
+  @override
+  String get aiSectionGroups => 'Routing groups';
+
+  @override
+  String get aiAddGroup => 'Add routing group';
+
+  @override
+  String get aiEditGroup => 'Routing group';
+
+  @override
+  String get aiGroupName => 'Name';
+
+  @override
+  String get aiGroupMembers => 'Members, tried in order';
+
+  @override
+  String get aiGroupEmpty =>
+      'No members yet — add at least one model or group.';
+
+  @override
+  String aiGroupMemberCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count members',
+      one: '1 member',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiAddMember => 'Add member';
+
+  @override
+  String get aiMoveUp => 'Move up';
+
+  @override
+  String get aiMoveDown => 'Move down';
+
+  @override
+  String get aiGatewayTitle => 'Local AI gateway';
+
+  @override
+  String get aiGatewayOn =>
+      'OpenAI-compatible tools on this machine can use the enabled models';
+
+  @override
+  String get aiGatewayOff =>
+      'Local tools cannot reach the configured providers';
+
+  @override
+  String get aiGatewayEndpoint => 'Endpoint';
+
+  @override
+  String get aiGatewayToken => 'Access token';
+
+  @override
+  String get aiGatewayNotListening => 'Configured, but not listening right now';
+
+  @override
+  String get aiGatewayNotListeningHint =>
+      'The gateway is enabled but did not bind — check that the port is free, then restart the app.';
+
+  @override
+  String get aiGatewayHint =>
+      'Point an OpenAI-compatible client at this endpoint with the token as its API key.';
 }

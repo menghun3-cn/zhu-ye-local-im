@@ -182,8 +182,19 @@ final class AiRouter {
   ) async {
     final config = await store.load();
     final provider = config.providerNamed(providerId);
-    final baseUrl = provider?.endpointFor(protocol);
-    if (provider == null || baseUrl == null) return const [];
+    if (provider == null) return const [];
+    return fetchModels(provider, protocol);
+  }
+
+  /// [listModels] for a provider object the caller already holds — the
+  /// settings editor fetches against unsaved endpoint edits, which the
+  /// persisted document does not know about yet.
+  Future<List<String>> fetchModels(
+    AiProvider provider,
+    AiProtocol protocol,
+  ) async {
+    final baseUrl = provider.endpointFor(protocol);
+    if (baseUrl == null) return const [];
     final codec = codecFor(protocol);
     final spec = codec.modelsSpec(baseUrl: baseUrl, apiKey: provider.apiKey);
     if (spec == null) return const [];

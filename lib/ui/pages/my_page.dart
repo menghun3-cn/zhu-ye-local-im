@@ -13,6 +13,7 @@ import '../update_session.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 import 'about_page.dart';
+import 'ai_settings_page.dart';
 import 'clipboard_page.dart';
 import 'devices_page.dart';
 import 'screenshot_page.dart';
@@ -26,6 +27,7 @@ enum _SubPage {
   devices,
   clipboard,
   screenshot,
+  ai,
   settings,
   troubleshooting,
   about,
@@ -102,6 +104,7 @@ class MyPage extends StatefulWidget {
   const MyPage({
     super.key,
     required this.seams,
+    this.ai,
     this.update,
     this.installSession,
     this.openAboutRequests = 0,
@@ -110,6 +113,10 @@ class MyPage extends StatefulWidget {
 
   /// The platform facts a page needs but the controller does not carry.
   final PlatformSeams seams;
+
+  /// The AI stack the AI card edits, or null on a Device with nowhere
+  /// durable to keep one.
+  final AiRuntime? ai;
 
   /// Whether a newer build has been published, when this page was given
   /// something that knows.
@@ -224,6 +231,19 @@ class _MyPageState extends State<MyPage> {
           ),
         ],
         const SizedBox(height: WeChat.sectionGap),
+        // The AI card exists only where the stack can persist: a Device with
+        // no durable directory would show providers that vanish at exit.
+        if (widget.ai != null) ...[
+          _MyCard(
+            icon: Icons.auto_awesome_outlined,
+            title: l10n.myCardAi,
+            summary: widget.ai!.gateway == null
+                ? l10n.myCardAiSummaryOff
+                : l10n.myCardAiSummaryOn,
+            onTap: () => _openSubPage(_SubPage.ai),
+          ),
+          const SizedBox(height: WeChat.sectionGap),
+        ],
         _MyCard(
           icon: Icons.settings_outlined,
           title: l10n.myCardSettings,
@@ -290,6 +310,14 @@ class _MyPageState extends State<MyPage> {
         children: [
           SubPageHeader(title: l10n.myCardScreenshot, onBack: _closeSubPage),
           const Expanded(child: ScreenshotPage()),
+        ],
+      ),
+      _SubPage.ai => Column(
+        children: [
+          SubPageHeader(title: l10n.myCardAi, onBack: _closeSubPage),
+          Expanded(
+            child: AiSettingsPage(runtime: widget.ai, seams: widget.seams),
+          ),
         ],
       ),
       _SubPage.settings => Column(

@@ -54,11 +54,15 @@ const int _mySurface = 2;
 /// whole of why the constant exists — see its own doc.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
-  const HomeShell({super.key, required this.seams, this.update});
+  const HomeShell({super.key, required this.seams, this.update, this.ai});
 
   /// The platform facts a page needs but the controller does not carry —
   /// where a Transfer lands by default, and where the profile lives.
   final PlatformSeams seams;
+
+  /// The AI stack the settings surface edits, or null on a Device with
+  /// nowhere durable to keep one — see `AiRuntime`.
+  final AiRuntime? ai;
 
   /// Whether a newer build has been published, when this shell was given
   /// something that knows.
@@ -348,6 +352,7 @@ class _HomeShellState extends State<HomeShell> {
       TransfersPage(defaultIncomingDirectory: incoming),
       MyPage(
         seams: widget.seams,
+        ai: widget.ai,
         update: widget.update,
         installSession: _installSession,
         openAboutRequests: _aboutRequests,
