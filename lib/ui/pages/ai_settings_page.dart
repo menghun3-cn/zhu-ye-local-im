@@ -98,7 +98,15 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           onCopy: (text) => unawaited(_copy(text)),
         ),
         const SizedBox(height: WeChat.sectionGap),
-        SectionHeader(title: l10n.aiSectionProviders),
+        SectionHeader(
+          title: l10n.aiSectionProviders,
+          trailing: TextButton.icon(
+            onPressed: () =>
+                unawaited(guarded(context, () => _addProvider(config))),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(l10n.aiAddProvider),
+          ),
+        ),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(WeChat.cardPadding),
@@ -126,21 +134,19 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                       guarded(context, () => _editProvider(provider)),
                     ),
                   ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        unawaited(guarded(context, () => _addProvider(config))),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(l10n.aiAddProvider),
-                  ),
-                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: WeChat.sectionGap),
-        SectionHeader(title: l10n.aiSectionGroups),
+        SectionHeader(
+          title: l10n.aiSectionGroups,
+          trailing: TextButton.icon(
+            onPressed: () => unawaited(_editGroup(null)),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(l10n.aiAddGroup),
+          ),
+        ),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(WeChat.cardPadding),
@@ -158,14 +164,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                     onTap: () =>
                         unawaited(guarded(context, () => _editGroup(group))),
                   ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => unawaited(_editGroup(null)),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(l10n.aiAddGroup),
-                  ),
-                ),
               ],
             ),
           ),
