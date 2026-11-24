@@ -629,6 +629,11 @@
   "@aiFetchAdded": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiTestConnection": "Test connection",
+  "aiConnectionOk": "Connection OK — the provider reports {count} model(s)",
+  "@aiConnectionOk": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "aiProtocolOpenaiChat": "OpenAI Chat",
   "aiProtocolOpenaiResponses": "OpenAI Responses",
   "aiProtocolAnthropic": "Anthropic Messages",

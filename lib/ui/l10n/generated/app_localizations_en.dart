@@ -1520,6 +1520,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiTestConnection => 'Test connection';
+
+  @override
+  String aiConnectionOk(int count) {
+    return 'Connection OK — the provider reports $count model(s)';
+  }
+
+  @override
   String get aiProtocolOpenaiChat => 'OpenAI Chat';
 
   @override

@@ -455,6 +455,11 @@
   "@aiFetchAdded": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiTestConnection": "测试连通",
+  "aiConnectionOk": "连接正常——供应商报告 {count} 个模型",
+  "@aiConnectionOk": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "aiProtocolOpenaiChat": "OpenAI Chat",
   "aiProtocolOpenaiResponses": "OpenAI Responses",
   "aiProtocolAnthropic": "Anthropic Messages",

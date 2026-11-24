@@ -1445,6 +1445,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get aiTestConnection => '测试连通';
+
+  @override
+  String aiConnectionOk(int count) {
+    return '连接正常——供应商报告 $count 个模型';
+  }
+
+  @override
   String get aiProtocolOpenaiChat => 'OpenAI Chat';
 
   @override

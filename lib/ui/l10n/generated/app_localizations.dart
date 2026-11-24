@@ -2641,6 +2641,18 @@ abstract class AppLocalizations {
   /// **'Added {count} new model(s)'**
   String aiFetchAdded(int count);
 
+  /// No description provided for @aiTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get aiTestConnection;
+
+  /// No description provided for @aiConnectionOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection OK — the provider reports {count} model(s)'**
+  String aiConnectionOk(int count);
+
   /// No description provided for @aiProtocolOpenaiChat.
   ///
   /// In en, this message translates to:

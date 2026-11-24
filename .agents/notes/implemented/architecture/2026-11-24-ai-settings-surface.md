@@ -52,7 +52,8 @@ Concretely the surface covers:
   `seams.clipboard`, toasted through `TopToast` like every other refusal).
 - **Providers** — preset picker (the `aiProviderPresets` catalogue) or a
   custom endpoint; the editor has name, API key (obscure, hint that local
-  models need none), one base-URL row per protocol, and the model catalogue
+  models need none), one tab per protocol holding its base-URL field with
+  "Fetch models" and "Test connection" actions, and the model catalogue
   with per-model enable switches. "Fetch models" calls the new
   `AiRouter.fetchModels(provider, protocol)`, which takes the provider
   object so it can fetch against *unsaved* endpoint edits; fetched ids merge

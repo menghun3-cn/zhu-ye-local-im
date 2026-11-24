@@ -728,6 +728,70 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
     }
   }
 
+  /// Same probe as [_fetchModels] but reports instead of merging: the point
+  /// is "does this URL + key + protocol answer", not the catalogue.
+  Future<void> _testConnection(AiProtocol protocol) async {
+    setState(() {
+      _busy = true;
+      _note = null;
+    });
+    try {
+      final ids = await widget.runtime.router.fetchModels(_collect(), protocol);
+      if (!mounted) return;
+      setState(
+        () => _note = AppLocalizations.of(context).aiConnectionOk(ids.length),
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _note = '$error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// One protocol's tab: its base-URL field plus the two actions that need
+  /// it — pull the catalogue, or just prove the endpoint answers.
+  Widget _endpointTab(AppLocalizations l10n, AiProtocol protocol) {
+    final hasUrl = _endpoints[protocol]!.text.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _endpoints[protocol],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: l10n.aiEndpointHint,
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _busy || !hasUrl
+                    ? null
+                    : () => unawaited(_fetchModels(protocol)),
+                icon: const Icon(Icons.cloud_download_outlined, size: 18),
+                label: Text(l10n.aiFetchModels),
+              ),
+              TextButton.icon(
+                onPressed: _busy || !hasUrl
+                    ? null
+                    : () => unawaited(_testConnection(protocol)),
+                icon: const Icon(Icons.wifi_tethering, size: 18),
+                label: Text(l10n.aiTestConnection),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -759,40 +823,34 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                 ),
                 const SizedBox(height: 12),
               ],
-              for (final protocol in AiProtocol.values) ...[
-                Row(
+              // One protocol per tab: four stacked URL rows read as a form
+              // to fill completely, when in practice a provider usually
+              // speaks one. Each tab keeps its own field, so filling a
+              // second protocol later costs nothing.
+              DefaultTabController(
+                length: AiProtocol.values.length,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Text(
-                        _protocolLabel(l10n, protocol),
-                        style: TextStyle(
-                          fontSize: WeChat.fontSizePreview,
-                          color: colors.secondaryText,
-                        ),
+                    TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        for (final protocol in AiProtocol.values)
+                          Tab(text: _protocolLabel(l10n, protocol)),
+                      ],
+                    ),
+                    SizedBox(
+                      height: 150,
+                      child: TabBarView(
+                        children: [
+                          for (final protocol in AiProtocol.values)
+                            _endpointTab(l10n, protocol),
+                        ],
                       ),
                     ),
-                    if (_endpoints[protocol]!.text.trim().isNotEmpty)
-                      IconButton(
-                        tooltip: l10n.aiFetchModels,
-                        onPressed: _busy
-                            ? null
-                            : () => unawaited(_fetchModels(protocol)),
-                        icon: const Icon(
-                          Icons.cloud_download_outlined,
-                          size: 18,
-                        ),
-                      ),
                   ],
                 ),
-                TextField(
-                  controller: _endpoints[protocol],
-                  decoration: InputDecoration(
-                    hintText: l10n.aiEndpointHint,
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
+              ),
               if (_note != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
