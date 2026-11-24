@@ -111,12 +111,44 @@ final class AiGateway {
       );
       return [
         for (final interface in interfaces)
-          for (final addr in interface.addresses)
-            if (!addr.isLoopback && !addr.isLinkLocal) addr.address,
+          if (!_isVirtualInterface(interface.name))
+            for (final addr in interface.addresses)
+              if (!addr.isLoopback &&
+                  !addr.isLinkLocal &&
+                  !_isVirtualSubnet(addr.address))
+                addr.address,
       ];
     } on Object {
       return const [];
     }
+  }
+
+  /// `dart:io` reports virtual adapters as plain ethernet interfaces — a
+  /// Hyper-V `vEthernet`, a VMware host-only NIC and the real LAN card are
+  /// indistinguishable by type. The name is the only signal available, so
+  /// the known virtual-adapter names are filtered out; a renamed virtual
+  /// NIC can still slip through, which costs a stray endpoint row, never a
+  /// wrong bind (the socket is `0.0.0.0` regardless).
+  static final RegExp _virtualInterfaceName = RegExp(
+    r'vethernet|vmware|virtualbox|vbox|hyper-?v|docker|wsl|'
+    r'tap-|tun|vpn|loopback|bluetooth|teredo|isatap|npcap|wan miniport',
+    caseSensitive: false,
+  );
+
+  static bool _isVirtualInterface(String name) =>
+      _virtualInterfaceName.hasMatch(name);
+
+  /// VirtualBox's default host-only subnet. Its adapter often carries a
+  /// generic localised name ("以太网 4") that the name filter cannot catch,
+  /// and 192.168.56.0/24 is the one virtual range common enough to be worth
+  /// a hard-coded exclusion — a real LAN on that exact /24 loses only the
+  /// display row, not connectivity.
+  static bool _isVirtualSubnet(String address) {
+    final parts = address.split('.');
+    return parts.length == 4 &&
+        parts[0] == '192' &&
+        parts[1] == '168' &&
+        parts[2] == '56';
   }
 
   Future<void> stop() async {

@@ -40,7 +40,12 @@ exactly this.
 with one listener — which is what "include both this machine and its IPs"
 requires. `AiGateway` enumerates non-loopback IPv4 interfaces at bind time
 (`NetworkInterface.list`, failures degrade to an empty list) so the settings
-card can print one copyable endpoint per address. The card shows a
+card can print one copyable endpoint per address. `dart:io` cannot tell a
+virtual adapter from a physical NIC — Hyper-V `vEthernet`, VMware and
+VirtualBox interfaces all report as ethernet — so the list filters known
+virtual-adapter names and VirtualBox's default `192.168.56.0/24` host-only
+subnet; a renamed virtual NIC may still appear, which costs a stray row,
+never a wrong bind, because the socket is `0.0.0.0` either way. The card shows a
 loopback/LAN `SegmentedButton`, the local endpoint always, and one
 `http://<lan-ip>:<port>/v1` field per discovered address under LAN scope,
 plus a hint that the token is the only credential on the wire.
