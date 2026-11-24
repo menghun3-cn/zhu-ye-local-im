@@ -669,7 +669,13 @@
   "aiGatewayLanHint": "LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.",
 
   "aiRoutingTitle": "Routing",
-  "aiRoutingSource": "Requests",
+  "aiRoutingSource": "Agent",
+  "aiRoutingGateway": "Leaf gateway",
+  "aiRoutingCooling": "Cooling {seconds}s",
+  "@aiRoutingCooling": {
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "aiRoutingFailed": "Last request failed",
   "aiRoutingEmpty": "No providers yet.",
 
   "aiDeleteProviderTitle": "Delete provider?",

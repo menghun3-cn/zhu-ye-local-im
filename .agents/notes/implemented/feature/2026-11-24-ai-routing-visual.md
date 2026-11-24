@@ -58,16 +58,31 @@ throwing listener cannot slow a request.
 
 **The routing view draws the wires and flies a leaf.**
 `AiRoutingView` (embedded at the top of the AI settings page, not pushed —
-the live route belongs above the configuration that decides it)
-puts a "Requests" node on the left and every provider on the right,
-bezier wires for the enabled ones, and one `Icons.eco` leaf per in-flight
-request flying source→provider on `attempt` and home on `served`/
-`failed`. Position is a pure function of layout and the controller's
-0→1 progress, so resizes re-anchor for free. `MediaQuery.disableAnimations`
-drops the flights and keeps the status line — magpie's reduced-motion
-degradation, same intent. Provider enable/disable needed no new work:
-`AiProvider.enabled` already gated the router and the gateway's exposed
-refs; the settings tile's switch was already there.
+the live route belongs above the configuration that decides it) draws
+three columns — Agent, the 竹叶网关 node showing its `ip:port`, and every
+enabled provider — with bezier wires for agent→gateway and
+gateway→provider, each roughly half the length of the old single hop.
+One `Icons.eco` leaf per in-flight request flies agent→gateway→provider
+on `attempt` and back on `served`/`failed`; the wire a leaf is riding
+turns dashed while the flight exists. Position is a pure function of
+layout and the controller's 0→1 progress, so resizes re-anchor for free.
+`MediaQuery.disableAnimations` drops the flights and keeps the status
+line — magpie's reduced-motion degradation, same intent. Provider
+enable/disable needed no new work: `AiProvider.enabled` already gated
+the router and the gateway's exposed refs; the settings tile's switch
+was already there.
+
+**Member health is per-node, not global.** A `failed` event now carries
+`cooling`: true when the member entered its cooldown rather than dying
+fatally. The view keeps `member → cooldown-until` and `member →
+last-fatal-error` maps, aggregates them worst-first onto each provider
+node ("Cooling 42s" in amber, "Last request failed" in red for 30s), and
+seeds cooldowns already in flight from `AiRouter.coolingDownUntil` — so
+a benched member shows as cooling instead of the whole picture looking
+dead. A 1s ticker expires marks, refreshes the countdown, and polls
+`AiRuntime.configVersion` (bumped by every `save`) plus a gateway
+signature so edits made elsewhere on the page repaint the canvas without
+a reload handshake.
 
 **The name field asks instead of answering.** A provider draft opens
 with an empty name field — the preset label demotes to `hintText` — and
@@ -100,9 +115,11 @@ unaffected: they only read endpoints and key.
 - **Resurrect a deleted built-in when its id is missing.** Rejected:
   "seeded once" is the only rule that respects deletion. The flag makes
   the choice permanent rather than inferred.
-- **Animate inside the settings page itself.** Rejected: a full routing
-  view is what magpie proved people want — nodes, wires, live flights —
-  and a card-sized animation can only hint at it.
+- **A card-sized animation inside the settings page.** Partially
+  adopted: what shipped is the full routing view embedded at the top of
+  the settings page — not a pushed page, and not a thumbnail — because
+  magpie proved people want the whole picture (nodes, wires, live
+  flights) and top-embedded keeps "which route is live" always visible.
 - **Pre-fill the name and let users ignore it.** Rejected by the
   requester: every provider named "DeepSeek" tells the user nothing about
   which endpoint it actually points at.

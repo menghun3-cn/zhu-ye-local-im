@@ -8,8 +8,9 @@ import '../l10n/generated/app_localizations.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
-/// The routing surface: which providers a request can reach, drawn as wires,
-/// with a bamboo leaf flying the wire while a request is in flight.
+/// The routing surface: which providers a request can reach, drawn as wires
+/// through the local gateway, with a bamboo leaf flying the route while a
+/// request is in flight.
 ///
 /// The picture is a view over [AiRouter.events] — the same stream any future
 /// in-app chat will feed — so a request the gateway serves and one the app
@@ -46,16 +47,34 @@ class _AiRoutingViewState extends State<AiRoutingView>
   final List<_LeafFlight> _flights = [];
   AiRouteEvent? _last;
 
+  /// member ref → when its cooldown ends. Seeded from the router on load so
+  /// a cooldown that began before the page opened still shows.
+  final Map<String, DateTime> _coolingUntil = {};
+
+  /// member ref → when it last failed fatally. Shown briefly, then cleared —
+  /// a stale "failed" badge is worse than none.
+  final Map<String, DateTime> _erroredAt = {};
+  static const _errorVisibleFor = Duration(seconds: 30);
+
+  /// 1s heartbeat: expires health marks, refreshes cooldown countdowns, and
+  /// notices configuration saves and gateway rebinds without a handshake.
+  Timer? _ticker;
+  int _seenVersion = 0;
+  String _gatewaySignature = '';
+
   @override
   void initState() {
     super.initState();
+    _seenVersion = widget.runtime.configVersion;
     _events = widget.runtime.router.events.listen(_onEvent);
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     unawaited(_reload());
   }
 
   @override
   void dispose() {
     unawaited(_events?.cancel() ?? Future.value());
+    _ticker?.cancel();
     for (final flight in _flights) {
       flight.controller.dispose();
     }
@@ -69,6 +88,8 @@ class _AiRoutingViewState extends State<AiRoutingView>
         setState(() {
           _config = config;
           _failure = null;
+          _seenVersion = widget.runtime.configVersion;
+          _seedHealth(config);
         });
       }
     } on Object catch (error) {
@@ -76,9 +97,89 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
   }
 
+  /// Every concrete `provider/model` the config can currently route to.
+  static Iterable<String> _memberRefs(AiConfig config) sync* {
+    for (final provider in config.providers) {
+      if (!provider.enabled) continue;
+      for (final model in provider.models) {
+        if (model.enabled) yield '${provider.id}/${model.id}';
+      }
+    }
+  }
+
+  /// Pulls live cooldown state out of the router for every routable member.
+  void _seedHealth(AiConfig config) {
+    final now = DateTime.now();
+    _coolingUntil.removeWhere((_, until) => until.isBefore(now));
+    for (final ref in _memberRefs(config)) {
+      final until = widget.runtime.router.coolingDownUntil(ref);
+      if (until == null) {
+        _coolingUntil.remove(ref);
+      } else {
+        _coolingUntil[ref] = until;
+      }
+    }
+  }
+
+  void _recordHealth(AiRouteEvent event) {
+    switch (event.phase) {
+      case AiRoutePhase.attempt:
+      case AiRoutePhase.served:
+        // Being tried — or having answered — clears both marks.
+        _coolingUntil.remove(event.member);
+        _erroredAt.remove(event.member);
+      case AiRoutePhase.failed:
+        if (event.cooling) {
+          _coolingUntil[event.member] = DateTime.now().add(
+            widget.runtime.router.cooldown,
+          );
+          _erroredAt.remove(event.member);
+        } else {
+          _erroredAt[event.member] = DateTime.now();
+        }
+    }
+  }
+
+  void _tick() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    var dirty = false;
+    if (widget.runtime.configVersion != _seenVersion) {
+      _seenVersion = widget.runtime.configVersion;
+      unawaited(_reload());
+      dirty = true;
+    }
+    final signature = _gatewaySig();
+    if (signature != _gatewaySignature) {
+      _gatewaySignature = signature;
+      dirty = true;
+    }
+    final hadMarks = _coolingUntil.isNotEmpty || _erroredAt.isNotEmpty;
+    _coolingUntil.removeWhere((_, until) => until.isBefore(now));
+    _erroredAt.removeWhere((_, at) => now.difference(at) > _errorVisibleFor);
+    // Rebuild while marks live (the countdown needs a fresh second), and
+    // once more when the last mark expires so the badge actually clears.
+    if (dirty ||
+        hadMarks ||
+        _coolingUntil.isNotEmpty ||
+        _erroredAt.isNotEmpty) {
+      setState(() {});
+    }
+  }
+
+  String _gatewaySig() {
+    final gateway = widget.runtime.gateway;
+    if (gateway == null) return 'off';
+    return '${gateway.actualPort}|${gateway.scope.name}|'
+        '${widget.runtime.lanAddresses.join(',')}';
+  }
+
   void _onEvent(AiRouteEvent event) {
     if (!mounted) return;
-    setState(() => _last = event);
+    setState(() {
+      _last = event;
+      _recordHealth(event);
+    });
     if (MediaQuery.disableAnimationsOf(context)) return;
     switch (event.phase) {
       case AiRoutePhase.attempt:
@@ -89,7 +190,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
   }
 
-  /// Sends a leaf along the wire to [event]'s provider, if the provider is
+  /// Sends a leaf along the route to [event]'s provider, if the provider is
   /// one this page can draw. A member whose provider vanished mid-request
   /// (deleted while in flight) gets no leaf — there is no wire to fly.
   void _depart(AiRouteEvent event) {
@@ -137,6 +238,49 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
   }
 
+  /// Worst-first health per provider: any cooling member marks the node
+  /// cooling, else any recently-failed member marks it failed.
+  Map<String, _NodeHealth> _healthByProvider(AiConfig config) {
+    final health = <String, _NodeHealth>{};
+    final now = DateTime.now();
+    for (final provider in config.providers) {
+      var cooling = false;
+      var seconds = 0;
+      var error = false;
+      for (final model in provider.models) {
+        if (!model.enabled) continue;
+        final ref = '${provider.id}/${model.id}';
+        final until = _coolingUntil[ref];
+        if (until != null) {
+          cooling = true;
+          seconds = math.max(seconds, until.difference(now).inSeconds);
+        } else if (_erroredAt.containsKey(ref)) {
+          error = true;
+        }
+      }
+      health[provider.id] = _NodeHealth(
+        cooling: cooling,
+        coolingSeconds: seconds,
+        error: error,
+      );
+    }
+    return health;
+  }
+
+  /// `ip:port` the gateway answers on — the LAN address under LAN scope,
+  /// loopback otherwise — or the not-listening hint while it is down.
+  String _gatewayAddress(AppLocalizations l10n) {
+    final gateway = widget.runtime.gateway;
+    final port = gateway?.actualPort;
+    if (gateway == null || port == null) return l10n.aiGatewayNotListening;
+    final host =
+        gateway.scope == AiGatewayScope.lan &&
+            widget.runtime.lanAddresses.isNotEmpty
+        ? widget.runtime.lanAddresses.first
+        : '127.0.0.1';
+    return '$host:$port';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -158,12 +302,29 @@ class _AiRoutingViewState extends State<AiRoutingView>
             config: config,
             flights: _flights,
             sourceLabel: l10n.aiRoutingSource,
+            gatewayLabel: l10n.aiRoutingGateway,
+            gatewayAddress: _gatewayAddress(l10n),
+            gatewayOnline: widget.runtime.gateway != null,
+            health: _healthByProvider(config),
           ),
         ),
         _StatusBar(event: _last),
       ],
     );
   }
+}
+
+/// Per-provider rollup of its members' route health.
+final class _NodeHealth {
+  const _NodeHealth({
+    required this.cooling,
+    required this.coolingSeconds,
+    required this.error,
+  });
+
+  final bool cooling;
+  final int coolingSeconds;
+  final bool error;
 }
 
 /// One leaf's flight state: which call it belongs to, which member it is
@@ -182,8 +343,10 @@ final class _LeafFlight {
   final AnimationController controller;
 }
 
-/// The wires and the nodes they join. Positions are computed from the
-/// [LayoutBuilder] constraints on every build, so a window resize simply
+/// The wires and the nodes they join: Agent → gateway → each provider. The
+/// gateway node splits what used to be one long hop into two short ones, so
+/// every wire is roughly half its old length. Positions are computed from
+/// the [LayoutBuilder] constraints on every build, so a window resize simply
 /// re-anchors everything — the animations ride along because they only own
 /// a 0→1 progress value, never a pixel position.
 class _RoutingCanvas extends StatelessWidget {
@@ -191,15 +354,25 @@ class _RoutingCanvas extends StatelessWidget {
     required this.config,
     required this.flights,
     required this.sourceLabel,
+    required this.gatewayLabel,
+    required this.gatewayAddress,
+    required this.gatewayOnline,
+    required this.health,
   });
 
   final AiConfig config;
   final List<_LeafFlight> flights;
   final String sourceLabel;
+  final String gatewayLabel;
+  final String gatewayAddress;
+  final bool gatewayOnline;
+  final Map<String, _NodeHealth> health;
 
-  static const double _sourceWidth = 132;
+  static const double _agentWidth = 104;
+  static const double _gatewayWidth = 150;
   static const double _nodeWidth = 168;
   static const double _nodeHeight = 48;
+  static const double _cardHeight = 76;
   static const double _margin = 16;
 
   @override
@@ -212,60 +385,97 @@ class _RoutingCanvas extends StatelessWidget {
         final slot = slots == 0
             ? size.height
             : math.max(56.0, size.height / slots);
-        Offset anchorFor(int index) => Offset(
-          size.width - _margin - _nodeWidth,
-          _margin + slot * index + slot / 2,
-        );
-        final source = Offset(_margin + _sourceWidth, size.height / 2);
+        final providerLeft = size.width - _margin - _nodeWidth;
+        Offset anchorFor(int index) =>
+            Offset(providerLeft, _margin + slot * index + slot / 2);
+
+        // Three columns: the agent on the left, the gateway centered in the
+        // gap before the provider column on the right.
+        final midY = size.height / 2;
+        final agentOut = Offset(_margin + _agentWidth, midY);
+        final gatewayLeft =
+            agentOut.dx + (providerLeft - agentOut.dx - _gatewayWidth) / 2;
+        final gatewayIn = Offset(gatewayLeft, midY);
+        final gatewayCenter = Offset(gatewayLeft + _gatewayWidth / 2, midY);
+        final gatewayOut = Offset(gatewayLeft + _gatewayWidth, midY);
+
+        bool wireActive(String providerId) =>
+            flights.any((f) => f.providerId == providerId);
+
         return Stack(
           children: [
             Positioned.fill(
               child: CustomPaint(
                 painter: _WirePainter(
-                  source: source,
-                  targets: [
+                  segments: [
+                    _WireSegment(
+                      from: agentOut,
+                      to: gatewayIn,
+                      dashed: flights.isNotEmpty,
+                    ),
                     for (var i = 0; i < slots; i++)
-                      if (providers[i].enabled) anchorFor(i),
+                      if (providers[i].enabled)
+                        _WireSegment(
+                          from: gatewayOut,
+                          to: anchorFor(i),
+                          dashed: wireActive(providers[i].id),
+                        ),
                   ],
                   color: WeChatColors.of(context).brandLine,
                 ),
               ),
             ),
-            // Provider nodes first so the source card sits on top of any
-            // wire that happens to pass under it.
+            // Leaves under the cards: a leaf crossing the gateway node
+            // slips beneath it, which reads as "through" rather than
+            // "over".
+            for (final flight in flights)
+              _Leaf(
+                flight: flight,
+                agent: agentOut,
+                gateway: gatewayCenter,
+                target: _targetAnchor(flight, providers, anchorFor),
+              ),
+            // Provider nodes first so the cards sit on top of any wire
+            // that happens to pass under them.
             for (var i = 0; i < slots; i++)
               Positioned(
-                left: size.width - _margin - _nodeWidth,
+                left: providerLeft,
                 top: _margin + slot * i + (slot - _nodeHeight) / 2,
                 width: _nodeWidth,
                 height: _nodeHeight,
                 child: _ProviderNode(
                   provider: providers[i],
                   enabled: providers[i].enabled,
+                  health: health[providers[i].id],
                 ),
               ),
             Positioned(
+              left: gatewayLeft,
+              top: midY - _cardHeight / 2,
+              width: _gatewayWidth,
+              height: _cardHeight,
+              child: _GatewayNode(
+                label: gatewayLabel,
+                address: gatewayAddress,
+                online: gatewayOnline,
+              ),
+            ),
+            Positioned(
               left: _margin,
-              top: size.height / 2 - _nodeHeight / 2 - 12,
-              width: _sourceWidth,
-              height: _nodeHeight + 24,
+              top: midY - _cardHeight / 2,
+              width: _agentWidth,
+              height: _cardHeight,
               child: _SourceNode(label: sourceLabel),
             ),
-            for (final flight in flights)
-              _Leaf(
-                flight: flight,
-                source: source,
-                target: _targetAnchor(flight, providers, anchorFor),
-              ),
           ],
         );
       },
     );
   }
 
-  /// Where [flight]'s leaf is headed: its provider's anchor, or the canvas
-  /// bottom edge when the provider is not in the list (it was deleted
-  /// mid-flight — the leaf still comes home, just to nowhere).
+  /// Where [flight]'s leaf is headed: its provider's anchor, or [Offset.zero]
+  /// when the provider is not in the list (it was deleted mid-flight — the
+  /// leaf still comes home, just to nowhere).
   Offset _targetAnchor(
     _LeafFlight flight,
     List<AiProvider> providers,
@@ -292,7 +502,7 @@ Offset _bezier(Offset p0, Offset c1, Offset c2, Offset p3, double t) {
   );
 }
 
-/// The four control points of the wire's cubic: start, two handles at the
+/// The four control points of a wire's cubic: start, two handles at the
 /// horizontal thirds, end. Shared by the painter and the leaf so the leaf
 /// rides exactly on the line it is flying.
 List<Offset> _wirePoints(Offset from, Offset to) {
@@ -300,15 +510,24 @@ List<Offset> _wirePoints(Offset from, Offset to) {
   return [from, Offset(from.dx + dx, from.dy), Offset(to.dx - dx, to.dy), to];
 }
 
-class _WirePainter extends CustomPainter {
-  _WirePainter({
-    required this.source,
-    required this.targets,
-    required this.color,
+/// One wire: [from] → [to], drawn dashed while [dashed] — the in-flight
+/// marker, so the route a request is taking reads at a glance.
+final class _WireSegment {
+  const _WireSegment({
+    required this.from,
+    required this.to,
+    required this.dashed,
   });
 
-  final Offset source;
-  final List<Offset> targets;
+  final Offset from;
+  final Offset to;
+  final bool dashed;
+}
+
+class _WirePainter extends CustomPainter {
+  _WirePainter({required this.segments, required this.color});
+
+  final List<_WireSegment> segments;
   final Color color;
 
   @override
@@ -317,36 +536,55 @@ class _WirePainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
-    for (final target in targets) {
-      final points = _wirePoints(source, target);
-      canvas.drawPath(
-        Path()
-          ..moveTo(points[0].dx, points[0].dy)
-          ..cubicTo(
-            points[1].dx,
-            points[1].dy,
-            points[2].dx,
-            points[2].dy,
-            points[3].dx,
-            points[3].dy,
-          ),
-        paint,
-      );
+    for (final segment in segments) {
+      final points = _wirePoints(segment.from, segment.to);
+      final path = Path()
+        ..moveTo(points[0].dx, points[0].dy)
+        ..cubicTo(
+          points[1].dx,
+          points[1].dy,
+          points[2].dx,
+          points[2].dy,
+          points[3].dx,
+          points[3].dy,
+        );
+      if (segment.dashed) {
+        _drawDashed(canvas, path, paint);
+      } else {
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  /// 5px dash, 4px gap, extracted along the path's own metrics so the dashes
+  /// follow the curve instead of a straight bounding box.
+  void _drawDashed(Canvas canvas, Path path, Paint paint) {
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, math.min(distance + 5, metric.length)),
+          paint,
+        );
+        distance += 9;
+      }
     }
   }
 
   @override
   bool shouldRepaint(_WirePainter old) =>
-      old.source != source ||
-      old.color != color ||
-      old.targets.length != targets.length ||
-      !_samePoints(old.targets, targets);
+      old.color != color || !_sameSegments(old.segments, segments);
 
-  bool _samePoints(List<Offset> a, List<Offset> b) {
-    for (var i = 0; i < a.length && i < b.length; i++) {
-      if (a[i] != b[i]) return false;
+  bool _sameSegments(List<_WireSegment> a, List<_WireSegment> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.from != y.from || x.to != y.to || x.dashed != y.dashed) {
+        return false;
+      }
     }
-    return a.length == b.length;
+    return true;
   }
 }
 
@@ -368,7 +606,7 @@ class _SourceNode extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.hub_outlined, size: 22, color: colors.brandStrong),
+          Icon(Icons.bolt_outlined, size: 22, color: colors.brandStrong),
           const SizedBox(height: 2),
           Text(
             label,
@@ -385,17 +623,87 @@ class _SourceNode extends StatelessWidget {
   }
 }
 
+/// The local gateway hop every routed request passes through. Shows the
+/// address callers actually dial — `ip:port` — and dims while nothing is
+/// listening, so "configured but down" is visible on the picture itself.
+class _GatewayNode extends StatelessWidget {
+  const _GatewayNode({
+    required this.label,
+    required this.address,
+    required this.online,
+  });
+
+  final String label;
+  final String address;
+  final bool online;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
+    return Opacity(
+      opacity: online ? 1 : 0.45,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(WeChat.controlRadius),
+          border: Border.all(color: colors.brandLine),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.eco, size: 22, color: const Color(0xFF2E9E5B)),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: WeChat.fontSizePreview,
+                fontWeight: FontWeight.w600,
+                color: colors.brandStrong,
+              ),
+            ),
+            Text(
+              address,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: colors.secondaryText),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProviderNode extends StatelessWidget {
-  const _ProviderNode({required this.provider, required this.enabled});
+  const _ProviderNode({
+    required this.provider,
+    required this.enabled,
+    this.health,
+  });
 
   final AiProvider provider;
   final bool enabled;
+  final _NodeHealth? health;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     final enabledModels = provider.models.where((m) => m.enabled).length;
+    final nodeHealth = health;
+    final status = nodeHealth == null
+        ? null
+        : nodeHealth.cooling
+        ? l10n.aiRoutingCooling(nodeHealth.coolingSeconds)
+        : nodeHealth.error
+        ? l10n.aiRoutingFailed
+        : null;
+    final statusColor = nodeHealth != null && nodeHealth.cooling
+        ? const Color(0xFFB26A00)
+        : colors.danger;
     return Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Container(
@@ -420,10 +728,13 @@ class _ProviderNode extends StatelessWidget {
               ),
             ),
             Text(
-              l10n.aiProviderModelCount(enabledModels),
+              status ?? l10n.aiProviderModelCount(enabledModels),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: colors.secondaryText),
+              style: TextStyle(
+                fontSize: 11,
+                color: status == null ? colors.secondaryText : statusColor,
+              ),
             ),
           ],
         ),
@@ -433,17 +744,20 @@ class _ProviderNode extends StatelessWidget {
 }
 
 /// The flying leaf: an [Icons.eco] glyph positioned each frame along its
-/// flight's bezier. Position comes from the controller's value; rotation
-/// sways gently so the leaf reads as fluttering rather than sliding.
+/// route — agent → gateway → provider on the way out, back again on
+/// return. Position comes from the controller's value; rotation sways
+/// gently so the leaf reads as fluttering rather than sliding.
 class _Leaf extends StatelessWidget {
   const _Leaf({
     required this.flight,
-    required this.source,
+    required this.agent,
+    required this.gateway,
     required this.target,
   });
 
   final _LeafFlight flight;
-  final Offset source;
+  final Offset agent;
+  final Offset gateway;
   final Offset target;
 
   @override
@@ -453,8 +767,11 @@ class _Leaf extends StatelessWidget {
       animation: flight.controller,
       builder: (context, _) {
         final t = flight.controller.value;
-        final points = _wirePoints(source, target);
-        final point = _bezier(points[0], points[1], points[2], points[3], t);
+        // Two hops: the first half of the trip ends at the gateway's
+        // center, the second half continues to the provider.
+        final point = t <= 0.5
+            ? _bezierPoint(agent, gateway, t * 2)
+            : _bezierPoint(gateway, target, (t - 0.5) * 2);
         final sway = math.sin(t * math.pi * 2) * 0.35;
         return Positioned(
           left: point.dx - 11,
@@ -466,6 +783,11 @@ class _Leaf extends StatelessWidget {
         );
       },
     );
+  }
+
+  Offset _bezierPoint(Offset from, Offset to, double t) {
+    final points = _wirePoints(from, to);
+    return _bezier(points[0], points[1], points[2], points[3], t);
   }
 }
 
@@ -484,7 +806,8 @@ class _StatusBar extends StatelessWidget {
     final (mark, color) = switch (event.phase) {
       AiRoutePhase.attempt => ('→', colors.secondaryText),
       AiRoutePhase.served => ('✓', colors.brandStrong),
-      AiRoutePhase.failed => ('✗', colors.danger),
+      AiRoutePhase.failed =>
+        (event.cooling ? ('⏳', const Color(0xFFB26A00)) : ('✗', colors.danger)),
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

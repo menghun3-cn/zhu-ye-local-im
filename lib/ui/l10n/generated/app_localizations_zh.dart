@@ -1548,7 +1548,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRoutingTitle => '路由';
 
   @override
-  String get aiRoutingSource => '请求来源';
+  String get aiRoutingSource => 'Agent';
+
+  @override
+  String get aiRoutingGateway => '竹叶网关';
+
+  @override
+  String aiRoutingCooling(int seconds) {
+    return '冷却中 ${seconds}s';
+  }
+
+  @override
+  String get aiRoutingFailed => '上次请求失败';
 
   @override
   String get aiRoutingEmpty => '还没有供应商。';

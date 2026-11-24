@@ -49,6 +49,12 @@ final class AiRuntime {
   /// nobody holds a reference to.
   Future<void> _syncing = Future.value();
 
+  int _configVersion = 0;
+
+  /// Bumped on every [save]. Live views (the routing canvas) poll it to
+  /// learn the document changed without a reload handshake.
+  int get configVersion => _configVersion;
+
   /// The bound gateway, or null while the flag is off or the bind failed.
   AiGateway? get gateway => _gateway;
 
@@ -108,6 +114,7 @@ final class AiRuntime {
   /// reports null so the UI can say "configured but not listening".
   Future<void> save(AiConfig config) async {
     await store.save(config);
+    _configVersion++;
     await _syncGateway(config.gateway);
   }
 

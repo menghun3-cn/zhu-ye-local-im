@@ -2830,8 +2830,26 @@ abstract class AppLocalizations {
   /// No description provided for @aiRoutingSource.
   ///
   /// In en, this message translates to:
-  /// **'Requests'**
+  /// **'Agent'**
   String get aiRoutingSource;
+
+  /// No description provided for @aiRoutingGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaf gateway'**
+  String get aiRoutingGateway;
+
+  /// No description provided for @aiRoutingCooling.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooling {seconds}s'**
+  String aiRoutingCooling(int seconds);
+
+  /// No description provided for @aiRoutingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last request failed'**
+  String get aiRoutingFailed;
 
   /// No description provided for @aiRoutingEmpty.
   ///

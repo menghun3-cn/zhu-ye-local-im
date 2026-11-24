@@ -143,12 +143,18 @@ final class AiRouteEvent {
     required this.phase,
     required this.member,
     required this.model,
+    this.cooling = false,
   });
 
   final int callId;
   final AiRoutePhase phase;
   final String member;
   final String model;
+
+  /// True on a `failed` event when the member entered its cooldown — the
+  /// routing view marks the node "cooling down" rather than "error", which
+  /// is the honest picture: it will be tried again shortly.
+  final bool cooling;
 }
 
 /// Resolves `provider/model` and `group/<id>` references to concrete upstream
@@ -186,12 +192,29 @@ final class AiRouter {
   Stream<AiRouteEvent> get events => _events.stream;
   int _nextCallId = 0;
 
-  void _emit(int callId, AiRoutePhase phase, String member, String model) {
+  void _emit(
+    int callId,
+    AiRoutePhase phase,
+    String member,
+    String model, {
+    bool cooling = false,
+  }) {
     if (_events.isClosed) return;
     _events.add(
-      AiRouteEvent(callId: callId, phase: phase, member: member, model: model),
+      AiRouteEvent(
+        callId: callId,
+        phase: phase,
+        member: member,
+        model: model,
+        cooling: cooling,
+      ),
     );
   }
+
+  /// When [member] may be tried again, or null while it is not cooling
+  /// down. The routing view polls this to mark benched nodes — including
+  /// cooldowns that began before the page opened.
+  DateTime? coolingDownUntil(String member) => _cooldownOf(member)?.until;
 
   /// Sends [request] and returns the reply from the first member that works.
   ///
@@ -225,7 +248,13 @@ final class AiRouter {
         _emit(callId, AiRoutePhase.served, member, request.model);
         return reply;
       } on _RetryableFailure catch (failure) {
-        _emit(callId, AiRoutePhase.failed, member, request.model);
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          cooling: true,
+        );
         _cooledDown[member] = (
           until: DateTime.now().add(cooldown),
           error: failure.error,

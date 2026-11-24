@@ -495,7 +495,13 @@
   "aiGatewayLanHint": "局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。",
 
   "aiRoutingTitle": "路由",
-  "aiRoutingSource": "请求来源",
+  "aiRoutingSource": "Agent",
+  "aiRoutingGateway": "竹叶网关",
+  "aiRoutingCooling": "冷却中 {seconds}s",
+  "@aiRoutingCooling": {
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "aiRoutingFailed": "上次请求失败",
   "aiRoutingEmpty": "还没有供应商。",
 
   "aiDeleteProviderTitle": "删除供应商？",

@@ -1629,7 +1629,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingTitle => 'Routing';
 
   @override
-  String get aiRoutingSource => 'Requests';
+  String get aiRoutingSource => 'Agent';
+
+  @override
+  String get aiRoutingGateway => 'Leaf gateway';
+
+  @override
+  String aiRoutingCooling(int seconds) {
+    return 'Cooling ${seconds}s';
+  }
+
+  @override
+  String get aiRoutingFailed => 'Last request failed';
 
   @override
   String get aiRoutingEmpty => 'No providers yet.';
