@@ -6,6 +6,7 @@
 
   "tabConversation": "Conversations",
   "tabTransfers": "Transfers",
+  "tabAi": "AI",
   "tabMy": "My",
   "tabDevices": "Devices",
   "tabClipboard": "Clipboard",
@@ -598,15 +599,11 @@
   "bubbleSkinPresetApricot": "Apricot",
   "bubbleSkinPresetLilac": "Lilac",
 
-  "myCardAi": "AI",
-  "myCardAiSummaryOn": "Gateway on",
-  "myCardAiSummaryOff": "Gateway off",
-
-  "aiUnavailableHere": "This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.",
   "aiLoadFailed": "The AI configuration could not be read",
-  "aiPageHint": "Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.",
+  "aiPageHint": "Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.",
   "aiCopied": "Copied",
 
+  "aiNavGateway": "Gateway",
   "aiSectionProviders": "Providers",
   "aiAddProvider": "Add provider",
   "aiProviderCustom": "Custom endpoint",

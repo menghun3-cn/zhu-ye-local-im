@@ -6,6 +6,7 @@
 
   "tabConversation": "对话",
   "tabTransfers": "传输",
+  "tabAi": "AI",
   "tabMy": "我的",
   "tabDevices": "设备",
   "tabClipboard": "剪贴板",
@@ -424,15 +425,11 @@
   "bubbleSkinPresetApricot": "杏橙",
   "bubbleSkinPresetLilac": "丁香",
 
-  "myCardAi": "AI",
-  "myCardAiSummaryOn": "网关已开启",
-  "myCardAiSummaryOff": "网关已关闭",
-
-  "aiUnavailableHere": "这台设备没有可持久保存 AI 配置的位置，AI 功能在此不可用。",
   "aiLoadFailed": "AI 配置读取失败",
-  "aiPageHint": "供应商及其密钥只保存在本设备上，不会与设备组共享。网关只监听本机。",
+  "aiPageHint": "供应商及其密钥只保存在本设备上，不会与设备组共享。网关默认仅监听本机，可切换到局域网。",
   "aiCopied": "已复制",
 
+  "aiNavGateway": "网关",
   "aiSectionProviders": "供应商",
   "aiAddProvider": "添加供应商",
   "aiProviderCustom": "自定义端点",

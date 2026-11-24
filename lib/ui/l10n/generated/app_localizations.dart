@@ -122,6 +122,12 @@ abstract class AppLocalizations {
   /// **'Transfers'**
   String get tabTransfers;
 
+  /// No description provided for @tabAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI'**
+  String get tabAi;
+
   /// No description provided for @tabMy.
   ///
   /// In en, this message translates to:
@@ -2503,30 +2509,6 @@ abstract class AppLocalizations {
   /// **'Lilac'**
   String get bubbleSkinPresetLilac;
 
-  /// No description provided for @myCardAi.
-  ///
-  /// In en, this message translates to:
-  /// **'AI'**
-  String get myCardAi;
-
-  /// No description provided for @myCardAiSummaryOn.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway on'**
-  String get myCardAiSummaryOn;
-
-  /// No description provided for @myCardAiSummaryOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway off'**
-  String get myCardAiSummaryOff;
-
-  /// No description provided for @aiUnavailableHere.
-  ///
-  /// In en, this message translates to:
-  /// **'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.'**
-  String get aiUnavailableHere;
-
   /// No description provided for @aiLoadFailed.
   ///
   /// In en, this message translates to:
@@ -2536,7 +2518,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiPageHint.
   ///
   /// In en, this message translates to:
-  /// **'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.'**
+  /// **'Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.'**
   String get aiPageHint;
 
   /// No description provided for @aiCopied.
@@ -2544,6 +2526,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied'**
   String get aiCopied;
+
+  /// No description provided for @aiNavGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway'**
+  String get aiNavGateway;
 
   /// No description provided for @aiSectionProviders.
   ///

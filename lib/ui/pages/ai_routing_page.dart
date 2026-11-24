@@ -18,9 +18,13 @@ import '../widgets.dart';
 /// providers says what *can* be routed, the flight says what *is* being
 /// routed, right now.
 ///
-/// This is an embeddable view, not a route: the AI settings page shows it
-/// inline at the top, where "what is being asked" belongs above the
-/// configuration that decides it. It needs a bounded height from its parent.
+/// This is an embeddable view, not a route: the AI page shows it as its
+/// first tab, at full height. It needs a bounded height from its parent.
+///
+/// Provider nodes are earned, not listed: a node appears when a request
+/// actually targets its provider and stays for a short while after, so a
+/// catalogue of dozens does not have to fit — the canvas only ever draws
+/// the nodes a request is using.
 class AiRoutingView extends StatefulWidget {
   /// Builds the surface over [runtime]'s router and configuration.
   const AiRoutingView({super.key, required this.runtime, this.configLoader});
@@ -39,8 +43,12 @@ class AiRoutingView extends StatefulWidget {
 class _AiRoutingViewState extends State<AiRoutingView>
         // Plural: each in-flight request owns its leaf's controller, and a
         // single-ticker mixin would refuse the second concurrent flight.
+        // Keep-alive: the view is a tab child, and a request in flight must
+        // not lose its leaf — or its node marks — because the user looked
+        // at the Providers tab for a moment.
         with
-        TickerProviderStateMixin {
+        TickerProviderStateMixin,
+        AutomaticKeepAliveClientMixin {
   AiConfig? _config;
   Object? _failure;
   StreamSubscription<AiRouteEvent>? _events;
@@ -55,6 +63,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// a stale "failed" badge is worse than none.
   final Map<String, DateTime> _erroredAt = {};
   static const _errorVisibleFor = Duration(seconds: 30);
+
+  /// provider id → when its node stops being drawn. See the class doc: the
+  /// canvas shows only providers a request has actually used recently.
+  final Map<String, DateTime> _nodeVisibleUntil = {};
+  static const _nodeVisibleFor = Duration(seconds: 20);
 
   /// 1s heartbeat: expires health marks, refreshes cooldown countdowns, and
   /// notices configuration saves and gateway rebinds without a handshake.
@@ -121,6 +134,14 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
   }
 
+  /// Every route event — attempt, served or failed — is proof the provider
+  /// was asked for, so it earns (or renews) its node's place on the canvas.
+  void _noteNodeActivity(AiRouteEvent event) {
+    final providerId = AiModelRef.parse(event.member)?.providerId;
+    if (providerId == null) return;
+    _nodeVisibleUntil[providerId] = DateTime.now().add(_nodeVisibleFor);
+  }
+
   void _recordHealth(AiRouteEvent event) {
     switch (event.phase) {
       case AiRoutePhase.attempt:
@@ -154,15 +175,20 @@ class _AiRoutingViewState extends State<AiRoutingView>
       _gatewaySignature = signature;
       dirty = true;
     }
-    final hadMarks = _coolingUntil.isNotEmpty || _erroredAt.isNotEmpty;
+    final hadMarks =
+        _coolingUntil.isNotEmpty ||
+        _erroredAt.isNotEmpty ||
+        _nodeVisibleUntil.isNotEmpty;
     _coolingUntil.removeWhere((_, until) => until.isBefore(now));
     _erroredAt.removeWhere((_, at) => now.difference(at) > _errorVisibleFor);
+    _nodeVisibleUntil.removeWhere((_, until) => until.isBefore(now));
     // Rebuild while marks live (the countdown needs a fresh second), and
     // once more when the last mark expires so the badge actually clears.
     if (dirty ||
         hadMarks ||
         _coolingUntil.isNotEmpty ||
-        _erroredAt.isNotEmpty) {
+        _erroredAt.isNotEmpty ||
+        _nodeVisibleUntil.isNotEmpty) {
       setState(() {});
     }
   }
@@ -178,6 +204,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     if (!mounted) return;
     setState(() {
       _last = event;
+      _noteNodeActivity(event);
       _recordHealth(event);
     });
     if (MediaQuery.disableAnimationsOf(context)) return;
@@ -231,7 +258,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// Flies every leaf of [event]'s call home. Failover produces one leaf per
   /// member, so the match is on the member, not just the call.
   void _returnHome(AiRouteEvent event) {
-    for (final flight in _flights) {
+    // A copy: reverse() on a leaf that never left completes synchronously,
+    // and its dismissal listener removes it from _flights mid-iteration.
+    for (final flight in [..._flights]) {
       if (flight.callId == event.callId && flight.member == event.member) {
         unawaited(flight.controller.reverse());
       }
@@ -282,7 +311,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final l10n = AppLocalizations.of(context);
     final config = _config;
     if (config == null) {
@@ -295,12 +328,22 @@ class _AiRoutingViewState extends State<AiRoutingView>
     if (config.providers.isEmpty) {
       return Center(child: HintText(l10n.aiRoutingEmpty));
     }
+    // A provider keeps its node while it was asked recently — or while a
+    // leaf is still flying to it, however long a stream runs.
+    final now = DateTime.now();
+    final visibleProviders = <String>{
+      for (final provider in config.providers)
+        if ((_nodeVisibleUntil[provider.id]?.isAfter(now) ?? false) ||
+            _flights.any((f) => f.providerId == provider.id))
+          provider.id,
+    };
     return Column(
       children: [
         Expanded(
           child: _RoutingCanvas(
             config: config,
             flights: _flights,
+            visibleProviders: visibleProviders,
             sourceLabel: l10n.aiRoutingSource,
             gatewayLabel: l10n.aiRoutingGateway,
             gatewayAddress: _gatewayAddress(l10n),
@@ -353,6 +396,7 @@ class _RoutingCanvas extends StatelessWidget {
   const _RoutingCanvas({
     required this.config,
     required this.flights,
+    required this.visibleProviders,
     required this.sourceLabel,
     required this.gatewayLabel,
     required this.gatewayAddress,
@@ -362,6 +406,10 @@ class _RoutingCanvas extends StatelessWidget {
 
   final AiConfig config;
   final List<_LeafFlight> flights;
+
+  /// Provider ids whose nodes are drawn — the ones a request has used
+  /// recently, not the whole catalogue.
+  final Set<String> visibleProviders;
   final String sourceLabel;
   final String gatewayLabel;
   final String gatewayAddress;
@@ -380,7 +428,10 @@ class _RoutingCanvas extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        final providers = config.providers;
+        final providers = [
+          for (final provider in config.providers)
+            if (visibleProviders.contains(provider.id)) provider,
+        ];
         final slots = providers.length;
         final slot = slots == 0
             ? size.height

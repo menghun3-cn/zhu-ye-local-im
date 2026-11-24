@@ -216,6 +216,19 @@ final class AiRouter {
   /// cooldowns that began before the page opened.
   DateTime? coolingDownUntil(String member) => _cooldownOf(member)?.until;
 
+  /// Emits a route event without running a request.
+  ///
+  /// The routing view's widget tests drive it through here: standing up a
+  /// real transport and socket to make one leaf fly would test the network,
+  /// not the picture.
+  void emitRouteEventForTest(
+    int callId,
+    AiRoutePhase phase,
+    String member, [
+    String model = '',
+    bool cooling = false,
+  ]) => _emit(callId, phase, member, model, cooling: cooling);
+
   /// Sends [request] and returns the reply from the first member that works.
   ///
   /// Throws [AiRequestException] when the reference is unresolvable, every

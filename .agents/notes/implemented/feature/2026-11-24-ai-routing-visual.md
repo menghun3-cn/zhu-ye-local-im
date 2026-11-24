@@ -57,20 +57,27 @@ answer. Emission is best-effort: broadcast controller, no awaiting, a
 throwing listener cannot slow a request.
 
 **The routing view draws the wires and flies a leaf.**
-`AiRoutingView` (embedded at the top of the AI settings page, not pushed —
-the live route belongs above the configuration that decides it) draws
-three columns — Agent, the 竹叶网关 node showing its `ip:port`, and every
-enabled provider — with bezier wires for agent→gateway and
-gateway→provider, each roughly half the length of the old single hop.
-One `Icons.eco` leaf per in-flight request flies agent→gateway→provider
-on `attempt` and back on `served`/`failed`; the wire a leaf is riding
-turns dashed while the flight exists. Position is a pure function of
-layout and the controller's 0→1 progress, so resizes re-anchor for free.
-`MediaQuery.disableAnimations` drops the flights and keeps the status
-line — magpie's reduced-motion degradation, same intent. Provider
-enable/disable needed no new work: `AiProvider.enabled` already gated
-the router and the gateway's exposed refs; the settings tile's switch
-was already there.
+`AiRoutingView` is the AI page's first tab, at full height — the live
+route is what the page is *for*, so it leads rather than sits embedded
+in a scrolling list. It draws three columns — Agent, the 竹叶网关 node
+showing its `ip:port`, and provider nodes — with bezier wires for
+agent→gateway and gateway→provider, each roughly half the length of the
+old single hop. One `Icons.eco` leaf per in-flight request flies
+agent→gateway→provider on `attempt` and back on `served`/`failed`; the
+wire a leaf is riding turns dashed while the flight exists. Position is
+a pure function of layout and the controller's 0→1 progress, so resizes
+re-anchor for free. `MediaQuery.disableAnimations` drops the flights
+and keeps the status line — magpie's reduced-motion degradation, same
+intent. Provider enable/disable needed no new work: `AiProvider.enabled`
+already gated the router and the gateway's exposed refs; the settings
+tile's switch was already there.
+
+**Provider nodes are earned, not listed.** The catalogue can hold dozens
+of providers; drawing all of them would push the column off-screen, so
+a node appears only when a route event names its provider and stays for
+20 seconds after (or while a leaf is still flying to it, however long a
+stream runs). Idle canvas shows Agent and gateway only — "what can be
+asked" lives on the Providers tab, "what is being asked" lives here.
 
 **Member health is per-node, not global.** A `failed` event now carries
 `cooling`: true when the member entered its cooldown rather than dying
@@ -115,11 +122,11 @@ unaffected: they only read endpoints and key.
 - **Resurrect a deleted built-in when its id is missing.** Rejected:
   "seeded once" is the only rule that respects deletion. The flag makes
   the choice permanent rather than inferred.
-- **A card-sized animation inside the settings page.** Partially
-  adopted: what shipped is the full routing view embedded at the top of
-  the settings page — not a pushed page, and not a thumbnail — because
-  magpie proved people want the whole picture (nodes, wires, live
-  flights) and top-embedded keeps "which route is live" always visible.
+- **A card-sized animation inside the settings page.** Rejected: what
+  shipped is the full routing view as the AI surface's first tab — not
+  a thumbnail, not a pushed page — because magpie proved people want
+  the whole picture (nodes, wires, live flights) and a dedicated tab
+  gives it the whole height of the window.
 - **Pre-fill the name and let users ignore it.** Rejected by the
   requester: every provider named "DeepSeek" tells the user nothing about
   which endpoint it actually points at.

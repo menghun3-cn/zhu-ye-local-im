@@ -11,30 +11,43 @@ import '../wechat/theme.dart';
 import '../widgets.dart';
 import 'ai_routing_page.dart';
 
-/// The AI surface: providers, routing groups and the local gateway.
+/// The AI surface: routing, providers, the local gateway and routing groups.
 ///
 /// Everything on this page is a view over one [AiConfig] document plus the
 /// [AiRuntime] that persists it — there is no second copy of "what is
 /// configured" kept in widget state. Each edit loads the document, changes
 /// it, and hands it back through [AiRuntime.save], which is also what keeps
 /// the gateway's bind in step with the flag.
-class AiSettingsPage extends StatefulWidget {
-  /// Builds the surface over [runtime]; null on a Device with nowhere
-  /// durable to keep AI configuration.
-  const AiSettingsPage({super.key, required this.runtime, required this.seams});
+///
+/// The four tabs answer the four questions in the order they are asked:
+/// "what is being routed right now" first, then "who can serve it", "where
+/// do callers dial", and "which members fail over to which".
+class AiPage extends StatefulWidget {
+  /// Builds the surface over [runtime].
+  const AiPage({
+    super.key,
+    required this.runtime,
+    required this.seams,
+    this.configLoader,
+  });
 
-  /// The AI stack, or null when this Device cannot persist one.
-  final AiRuntime? runtime;
+  /// The AI stack this page edits.
+  final AiRuntime runtime;
 
   /// Platform facts — only the clipboard is needed, to copy the endpoint
   /// and token a local tool asks for.
   final PlatformSeams seams;
 
+  /// Where the configuration comes from; defaults to [AiRuntime.load].
+  /// Injectable so a widget test can answer from memory instead of real
+  /// file IO, which the fake-async test clock cannot advance.
+  final Future<AiConfig> Function()? configLoader;
+
   @override
-  State<AiSettingsPage> createState() => _AiSettingsPageState();
+  State<AiPage> createState() => _AiPageState();
 }
 
-class _AiSettingsPageState extends State<AiSettingsPage> {
+class _AiPageState extends State<AiPage> {
   AiConfig? _config;
   Object? _failure;
 
@@ -45,10 +58,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   }
 
   Future<void> _reload() async {
-    final runtime = widget.runtime;
-    if (runtime == null) return;
     try {
-      final config = await runtime.load();
+      final config = await (widget.configLoader ?? widget.runtime.load)();
       if (mounted) {
         setState(() {
           _config = config;
@@ -64,22 +75,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   /// flag's effect on the bound socket is the runtime's business, and the
   /// page's only honest summary of it is "is there an endpoint".
   Future<void> _save(AiConfig next) async {
-    final runtime = widget.runtime;
-    if (runtime == null) return;
-    await runtime.save(next);
+    await widget.runtime.save(next);
     await _reload();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final runtime = widget.runtime;
-    if (runtime == null) {
-      return ListView(
-        padding: WeChat.pagePadding,
-        children: [HintText(l10n.aiUnavailableHere)],
-      );
-    }
     final config = _config;
     if (config == null) {
       return Center(
@@ -88,30 +90,53 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             : HintText('${l10n.aiLoadFailed}: $_failure'),
       );
     }
+    // Routing first: "what is being asked right now" is the question the
+    // other three tabs configure the answer to, and it is also the only tab
+    // with something live to show — a fresh install lands on an idle canvas
+    // rather than an empty form.
+    return DefaultTabController(
+      length: 4,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: [
+                Tab(text: l10n.aiRoutingTitle),
+                Tab(text: l10n.aiSectionProviders),
+                Tab(text: l10n.aiNavGateway),
+                Tab(text: l10n.aiSectionGroups),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                // Full height, no card: the canvas wants every pixel it can
+                // get, and the status line sits on its bottom edge.
+                _routingPane(),
+                _providersPane(l10n, config),
+                _gatewayPane(l10n, config),
+                _groupsPane(l10n, config),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The routing pane is just the view — it owns its own status line and
+  /// needs no scrolling chrome of its own.
+  Widget _routingPane() =>
+      AiRoutingView(runtime: widget.runtime, configLoader: widget.configLoader);
+
+  Widget _providersPane(AppLocalizations l10n, AiConfig config) {
     return ListView(
       padding: WeChat.pagePadding,
       children: [
-        // The live route first: "which provider is being asked" is the
-        // question the rest of the page configures the answer to.
-        SectionHeader(title: l10n.aiRoutingTitle),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(WeChat.cardPadding),
-            child: SizedBox(
-              height: 300,
-              child: AiRoutingView(runtime: runtime),
-            ),
-          ),
-        ),
-        const SizedBox(height: WeChat.sectionGap),
-        _GatewayCard(
-          config: config,
-          gateway: runtime.gateway,
-          token: runtime.token.value,
-          onChanged: (gateway) => _save(config.copyWith(gateway: gateway)),
-          onCopy: (text) => unawaited(_copy(text)),
-        ),
-        const SizedBox(height: WeChat.sectionGap),
         SectionHeader(
           title: l10n.aiSectionProviders,
           trailing: TextButton.icon(
@@ -153,6 +178,32 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ),
         ),
         const SizedBox(height: WeChat.sectionGap),
+        HintText(l10n.aiPageHint),
+      ],
+    );
+  }
+
+  Widget _gatewayPane(AppLocalizations l10n, AiConfig config) {
+    return ListView(
+      padding: WeChat.pagePadding,
+      children: [
+        SectionHeader(title: l10n.aiGatewayTitle),
+        const SizedBox(height: WeChat.sectionGap),
+        _GatewayCard(
+          config: config,
+          gateway: widget.runtime.gateway,
+          token: widget.runtime.token.value,
+          onChanged: (gateway) => _save(config.copyWith(gateway: gateway)),
+          onCopy: (text) => unawaited(_copy(text)),
+        ),
+      ],
+    );
+  }
+
+  Widget _groupsPane(AppLocalizations l10n, AiConfig config) {
+    return ListView(
+      padding: WeChat.pagePadding,
+      children: [
         SectionHeader(
           title: l10n.aiSectionGroups,
           trailing: TextButton.icon(
@@ -182,8 +233,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
           ),
         ),
-        const SizedBox(height: WeChat.sectionGap),
-        HintText(l10n.aiPageHint),
       ],
     );
   }
@@ -267,7 +316,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => _ProviderEditorDialog(
-        runtime: widget.runtime!,
+        runtime: widget.runtime,
         provider: provider,
         onSave: _saveProvider,
         onDelete: persisted ? () => _deleteProvider(provider) : null,

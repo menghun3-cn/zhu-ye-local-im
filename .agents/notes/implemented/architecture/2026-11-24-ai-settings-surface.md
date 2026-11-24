@@ -32,12 +32,16 @@ listening". `AiRuntime.open(directory)` is plain Dart — `dart:io` only — so
 
 The app state opens the runtime whenever `seams.aiDirectory` exists — even
 with the gateway flag off, because the settings page needs somewhere to write
-the flag *to* — and hands it to `HomeShell` → `MyPage` → `AiSettingsPage`.
-The My page gains an AI card only when a runtime exists, matching the
-screenshot card's rule: a surface that can do nothing is absent, not
-disabled.
+the flag *to* — and hands it to `HomeShell`, which shows `AiPage` as a
+fourth top-level surface between Transfers and My, only when a runtime
+exists. The AI surface is a destination in its own right, matching the
+screenshot card's rule one level up: a surface that can do nothing is
+absent, not disabled. `AiPage` is a `DefaultTabController` with four
+tabs — routing, providers, gateway, routing groups — over one shared
+`AiConfig`; the routing tab is first because "what is being asked" is
+the question the other three configure.
 
-**The page is a view, not a second store.** `AiSettingsPage` holds the loaded
+**The page is a view, not a second store.** `AiPage` holds the loaded
 `AiConfig` and re-reads it after every save; edits go through
 `runtime.save`, never around it. Provider and group editors are dialogs that
 mutate a draft and hand one `AiProvider`/`AiRoutingGroup` back — the page
@@ -73,9 +77,9 @@ Concretely the surface covers:
 - `AiRouter.listModels(providerId, …)` remains for stored providers;
   `fetchModels(provider, …)` serves the editor's draft. Both share one code
   path.
-- The AI card's summary ("gateway on/off") reads `runtime.gateway`, which is
-  only fresh after a rebuild — acceptable because returning from the sub-page
-  rebuilds the card list.
+- The AI surface's index shifts My one slot, so `_mySurface` is computed
+  from `widget.ai != null` rather than written as a constant — the one
+  index machinery still has to name stays single-sourced.
 - New l10n keys (~45) landed in both ARB files and the generated
   localizations were regenerated and committed, per `l10n.yaml`.
 - Still absent by design: in-app AI chat, message processing, smart replies —
@@ -90,9 +94,12 @@ Concretely the surface covers:
   Rejected: it is the split-brain described above. One `save` keeps document
   and socket in step.
 - **A separate route/page per concern** (providers page, groups page, gateway
-  page). Rejected for v1: the My page's sub-page pattern already gives one
-  back-button surface, and three pages for ~45 fields would be navigation
-  without payoff.
+  page). Rejected: four pushed pages for ~45 fields would be navigation
+  without payoff — the shipped shape is four tabs inside one surface, which
+  keeps one back-navigation level and lets the routing view stay mounted.
+- **AI as a card inside My.** Rejected by the requester: the routing
+  animation is the feature's front door, and a card two taps deep buries
+  it. Pulling AI out to its own top-level menu is what was asked for.
 - **Fetch models only for persisted providers.** Rejected: the editor's whole
   point is fixing a wrong endpoint and *then* fetching; `fetchModels` taking
   the draft provider object is what makes that honest.

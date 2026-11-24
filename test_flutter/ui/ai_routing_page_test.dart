@@ -28,7 +28,9 @@ void main() {
     }
   });
 
-  testWidgets('draws the seeded providers as route targets', (tester) async {
+  testWidgets('draws only the provider nodes a request has used', (
+    tester,
+  ) async {
     // The config is read once, up front, on the real event loop; the page
     // then gets it from memory — its own disk read could not complete
     // under the fake-async test clock.
@@ -54,9 +56,28 @@ void main() {
     await tester.pump();
     final l10n = lookupAppLocalizations(appLocale);
 
-    // The built-ins seeded on open are the view's nodes.
-    expect(find.text('OpenCode Zen'), findsOneWidget);
-    expect(find.text('Kilo'), findsOneWidget);
+    // No request yet: agent and gateway only. The seeded providers exist
+    // but earn their nodes by being asked — a long catalogue must not have
+    // to fit.
+    expect(find.text('OpenCode Zen'), findsNothing);
+    expect(find.text('Kilo'), findsNothing);
     expect(find.text(l10n.aiRoutingSource), findsOneWidget);
+    expect(find.text(l10n.aiRoutingGateway), findsOneWidget);
+
+    // A request to one provider puts its node up — and only its node.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('OpenCode Zen'), findsOneWidget);
+    expect(find.text('Kilo'), findsNothing);
   });
 }

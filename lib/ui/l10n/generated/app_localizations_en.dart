@@ -22,6 +22,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabTransfers => 'Transfers';
 
   @override
+  String get tabAi => 'AI';
+
+  @override
   String get tabMy => 'My';
 
   @override
@@ -1438,27 +1441,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bubbleSkinPresetLilac => 'Lilac';
 
   @override
-  String get myCardAi => 'AI';
-
-  @override
-  String get myCardAiSummaryOn => 'Gateway on';
-
-  @override
-  String get myCardAiSummaryOff => 'Gateway off';
-
-  @override
-  String get aiUnavailableHere =>
-      'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.';
-
-  @override
   String get aiLoadFailed => 'The AI configuration could not be read';
 
   @override
   String get aiPageHint =>
-      'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.';
+      'Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.';
 
   @override
   String get aiCopied => 'Copied';
+
+  @override
+  String get aiNavGateway => 'Gateway';
 
   @override
   String get aiSectionProviders => 'Providers';

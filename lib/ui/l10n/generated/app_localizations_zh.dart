@@ -22,6 +22,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabTransfers => '传输';
 
   @override
+  String get tabAi => 'AI';
+
+  @override
   String get tabMy => '我的';
 
   @override
@@ -1367,25 +1370,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bubbleSkinPresetLilac => '丁香';
 
   @override
-  String get myCardAi => 'AI';
-
-  @override
-  String get myCardAiSummaryOn => '网关已开启';
-
-  @override
-  String get myCardAiSummaryOff => '网关已关闭';
-
-  @override
-  String get aiUnavailableHere => '这台设备没有可持久保存 AI 配置的位置，AI 功能在此不可用。';
-
-  @override
   String get aiLoadFailed => 'AI 配置读取失败';
 
   @override
-  String get aiPageHint => '供应商及其密钥只保存在本设备上，不会与设备组共享。网关只监听本机。';
+  String get aiPageHint => '供应商及其密钥只保存在本设备上，不会与设备组共享。网关默认仅监听本机，可切换到局域网。';
 
   @override
   String get aiCopied => '已复制';
+
+  @override
+  String get aiNavGateway => '网关';
 
   @override
   String get aiSectionProviders => '供应商';
