@@ -51,7 +51,12 @@ final class IoAiTransport implements AiTransport {
       final ioRequest = await client.openUrl(request.method, uri);
       request.headers.forEach(ioRequest.headers.set);
       final body = request.body;
-      if (body != null) ioRequest.write(body);
+      // HttpClientRequest encodes strings as latin1 and its encoding is
+      // not mutable, so a String body is written as bytes: the codecs
+      // always produce JSON, and UTF-8 is the only correct encoding.
+      // Writing the String directly threw on every non-latin1 character —
+      // every CJK prompt died before a byte left the machine.
+      if (body != null) ioRequest.add(utf8.encode(body));
       final response = await ioRequest.close().timeout(totalTimeout);
       return AiHttpResponse(
         statusCode: response.statusCode,
