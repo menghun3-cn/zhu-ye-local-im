@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'ai_message.dart';
 import 'ai_router.dart';
-import 'gateway_token.dart';
+import 'gateway_keys.dart';
 import 'provider.dart';
 import 'provider_store.dart';
 
@@ -33,7 +33,7 @@ final class AiGateway {
   AiGateway({
     required this.store,
     required this.router,
-    required this.token,
+    required this.keySource,
     this.maxRequestBytes = 1 << 20,
   });
 
@@ -44,8 +44,9 @@ final class AiGateway {
   /// Resolves model references and fails over across routing groups.
   final AiRouter router;
 
-  /// The bearer token callers must present.
-  final AiGatewayToken token;
+  /// The keyring, read on every request so adding or deleting a key in
+  /// settings takes effect without a rebind.
+  final Future<List<AiGatewayKey>> Function() keySource;
 
   /// Bodies larger than this are refused with 413 — a chat request is
   /// kilobytes, and an unbounded read is a memory bomb on loopback.
@@ -183,15 +184,16 @@ final class AiGateway {
 
   Future<void> _handle(HttpRequest request) async {
     try {
-      if (request.headers.value('authorization') != 'Bearer ${token.value}') {
-        _writeError(request, 401, 'missing or invalid gateway token');
+      final key = await _authorizedKey(request);
+      if (key == null) {
+        _writeError(request, 401, 'missing or invalid gateway key');
         return;
       }
       final path = request.uri.path;
       if (request.method == 'GET' && path == '/v1/models') {
         await _models(request);
       } else if (request.method == 'POST' && path == '/v1/chat/completions') {
-        await _chatCompletions(request);
+        await _chatCompletions(request, key.name);
       } else {
         _writeError(request, 404, 'unknown endpoint: ${request.method} $path');
       }
@@ -206,6 +208,19 @@ final class AiGateway {
         // Nothing left to tell the caller; the socket is the only witness.
       }
     }
+  }
+
+  /// The key matching the request's bearer credential, or null. The
+  /// keyring is re-read per request so a settings edit is live immediately.
+  Future<AiGatewayKey?> _authorizedKey(HttpRequest request) async {
+    final auth = request.headers.value('authorization');
+    if (auth == null || !auth.startsWith('Bearer ')) return null;
+    final secret = auth.substring('Bearer '.length).trim();
+    if (secret.isEmpty) return null;
+    for (final key in await keySource()) {
+      if (key.secret == secret) return key;
+    }
+    return null;
   }
 
   Future<void> _models(HttpRequest request) async {
@@ -224,7 +239,7 @@ final class AiGateway {
     });
   }
 
-  Future<void> _chatCompletions(HttpRequest request) async {
+  Future<void> _chatCompletions(HttpRequest request, String keyName) async {
     final raw = await _readBody(request);
     if (raw == null) {
       _writeError(request, 413, 'request body too large');
@@ -275,7 +290,7 @@ final class AiGateway {
 
     final AiReply reply;
     try {
-      reply = await router.chat(chatRequest);
+      reply = await router.chat(chatRequest, clientKey: keyName);
     } on AiRequestException catch (error) {
       _writeError(request, 502, _errorDetail(error));
       return;

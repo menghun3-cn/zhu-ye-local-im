@@ -146,37 +146,37 @@ class _AiPageState extends State<AiPage> {
             label: Text(l10n.aiAddProvider),
           ),
         ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(WeChat.cardPadding),
-            child: Column(
-              children: [
-                for (final provider in config.providers)
-                  _ProviderTile(
-                    provider: provider,
-                    onToggle: (enabled) => unawaited(
-                      guarded(
-                        context,
-                        () => _save(
-                          config.copyWith(
-                            providers: [
-                              for (final p in config.providers)
-                                identical(p, provider)
-                                    ? p.copyWith(enabled: enabled)
-                                    : p,
-                            ],
-                          ),
-                        ),
+        // One card per provider: rows inside a shared card bleed into each
+        // other, and a provider is a thing you act on as a unit — enable,
+        // edit, delete — so it gets its own boundary.
+        for (final provider in config.providers)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: _ProviderTile(
+                provider: provider,
+                onToggle: (enabled) => unawaited(
+                  guarded(
+                    context,
+                    () => _save(
+                      config.copyWith(
+                        providers: [
+                          for (final p in config.providers)
+                            identical(p, provider)
+                                ? p.copyWith(enabled: enabled)
+                                : p,
+                        ],
                       ),
                     ),
-                    onEdit: () => unawaited(
-                      guarded(context, () => _editProvider(provider)),
-                    ),
                   ),
-              ],
+                ),
+                onEdit: () =>
+                    unawaited(guarded(context, () => _editProvider(provider))),
+              ),
             ),
           ),
-        ),
         const SizedBox(height: WeChat.sectionGap),
         HintText(l10n.aiPageHint),
       ],
@@ -192,7 +192,7 @@ class _AiPageState extends State<AiPage> {
         _GatewayCard(
           config: config,
           gateway: widget.runtime.gateway,
-          token: widget.runtime.token.value,
+          runtime: widget.runtime,
           onChanged: (gateway) => _save(config.copyWith(gateway: gateway)),
           onCopy: (text) => unawaited(_copy(text)),
         ),
@@ -418,7 +418,7 @@ class _GatewayCard extends StatelessWidget {
   const _GatewayCard({
     required this.config,
     required this.gateway,
-    required this.token,
+    required this.runtime,
     required this.onChanged,
     required this.onCopy,
   });
@@ -428,7 +428,7 @@ class _GatewayCard extends StatelessWidget {
   /// The bound server, or null while the flag is off or the bind failed —
   /// the card shows "configured but not listening" from that alone.
   final AiGateway? gateway;
-  final String token;
+  final AiRuntime runtime;
   final ValueChanged<AiGatewayConfig> onChanged;
   final ValueChanged<String> onCopy;
 
@@ -508,12 +508,7 @@ class _GatewayCard extends StatelessWidget {
                     ),
                   ),
               const SizedBox(height: 8),
-              _CopyableField(
-                label: l10n.aiGatewayToken,
-                value: token,
-                secret: true,
-                onCopy: onCopy,
-              ),
+              _GatewayKeysSection(runtime: runtime, onCopy: onCopy),
               const SizedBox(height: 8),
               HintText(
                 endpoint == null
@@ -530,42 +525,300 @@ class _GatewayCard extends StatelessWidget {
   }
 }
 
-/// A read-only value with a copy button — the endpoint and token are facts
-/// to hand to another program, not preferences to edit. A [secret] field
-/// starts obscured and reveals on the eye toggle, so the token is not
-/// shoulder-readable while the endpoint beside it stays plain.
-class _CopyableField extends StatefulWidget {
-  const _CopyableField({
-    required this.label,
-    required this.value,
-    required this.onCopy,
-    this.enabled = true,
-    this.secret = false,
-  });
+/// The gateway keyring: one row per client key — name, masked secret with
+/// an eye toggle, copy and delete — plus the request count and token spend
+/// the request log attributes to it. "Add gateway key" opens an inline row
+/// rather than a dialog: two fields and two buttons are cheaper as a row
+/// than as a modal.
+class _GatewayKeysSection extends StatefulWidget {
+  const _GatewayKeysSection({required this.runtime, required this.onCopy});
 
-  final String label;
-  final String value;
+  final AiRuntime runtime;
   final ValueChanged<String> onCopy;
-  final bool enabled;
-  final bool secret;
 
   @override
-  State<_CopyableField> createState() => _CopyableFieldState();
+  State<_GatewayKeysSection> createState() => _GatewayKeysSectionState();
 }
 
-class _CopyableFieldState extends State<_CopyableField> {
+class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
+  List<AiGatewayKey> _keys = const [];
+  final Map<String, int> _requests = {};
+  final Map<String, int> _tokens = {};
+  bool _adding = false;
+  final _name = TextEditingController();
+  final _secret = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_reload());
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _secret.dispose();
+    super.dispose();
+  }
+
+  /// Keys and per-key usage come from two files; both are tiny, so this is
+  /// two reads, not a query.
+  Future<void> _reload() async {
+    final keys = await widget.runtime.keys.load();
+    final records = await widget.runtime.requestLog.load();
+    final requests = <String, int>{};
+    final tokens = <String, int>{};
+    for (final record in records) {
+      // Rows written before keys existed belong to the migrated default.
+      final name = record.key ?? 'default';
+      requests[name] = (requests[name] ?? 0) + 1;
+      tokens[name] = (tokens[name] ?? 0) + (record.totalTokens ?? 0);
+    }
+    if (mounted) {
+      setState(() {
+        _keys = keys;
+        _requests
+          ..clear()
+          ..addAll(requests);
+        _tokens
+          ..clear()
+          ..addAll(tokens);
+      });
+    }
+  }
+
+  Future<void> _create() async {
+    final l10n = AppLocalizations.of(context);
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    var secret = _secret.text.trim();
+    if (secret.isEmpty) secret = AiGatewayKeyStore.generateSecret();
+    if (_keys.any((k) => k.name == name || k.secret == secret)) {
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay != null) {
+        unawaited(TopToast.showIn(overlay, l10n.aiGatewayKeyDuplicate));
+      }
+      return;
+    }
+    await widget.runtime.keys.save([
+      ..._keys,
+      AiGatewayKey(name: name, secret: secret, createdAt: DateTime.now()),
+    ]);
+    _name.clear();
+    _secret.clear();
+    setState(() => _adding = false);
+    await _reload();
+  }
+
+  /// The last key cannot go — a gateway with no credential refuses every
+  /// caller, which is a locked door with no key under the mat.
+  Future<void> _remove(AiGatewayKey key) async {
+    if (_keys.length <= 1) return;
+    await widget.runtime.keys.save([
+      for (final k in _keys)
+        if (k.name != key.name || k.secret != key.secret) k,
+    ]);
+    await _reload();
+  }
+
+  String _usageText(String name) {
+    final l10n = AppLocalizations.of(context);
+    final requests = _requests[name] ?? 0;
+    final tokens = _tokens[name] ?? 0;
+    return l10n.aiGatewayKeyUsage(
+      requests,
+      tokens >= 1000 ? '${(tokens / 1000).toStringAsFixed(1)}k' : '$tokens',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.aiGatewayKeys,
+          style: TextStyle(
+            fontSize: WeChat.fontSizePreview,
+            color: colors.secondaryText,
+          ),
+        ),
+        const SizedBox(height: 6),
+        for (final key in _keys)
+          _GatewayKeyTile(
+            name: key.name,
+            secret: key.secret,
+            usage: _usageText(key.name),
+            canDelete: _keys.length > 1,
+            onCopy: widget.onCopy,
+            onDelete: () => unawaited(_remove(key)),
+          ),
+        if (_adding)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _name,
+                  decoration: InputDecoration(
+                    hintText: l10n.aiGatewayKeyNameHint,
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _secret,
+                  decoration: InputDecoration(
+                    hintText: l10n.aiGatewayKeySecretHint,
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => _adding = false),
+                      child: Text(l10n.aiGatewayKeyCancel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () => unawaited(_create()),
+                      child: Text(l10n.aiGatewayKeyCreate),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )
+        else
+          TextButton.icon(
+            onPressed: () => setState(() => _adding = true),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(l10n.aiGatewayKeyAdd),
+          ),
+      ],
+    );
+  }
+}
+
+/// One key row: name and usage on the left, masked secret with an eye
+/// toggle, copy and delete on the right.
+class _GatewayKeyTile extends StatefulWidget {
+  const _GatewayKeyTile({
+    required this.name,
+    required this.secret,
+    required this.usage,
+    required this.canDelete,
+    required this.onCopy,
+    required this.onDelete,
+  });
+
+  final String name;
+  final String secret;
+  final String usage;
+  final bool canDelete;
+  final ValueChanged<String> onCopy;
+  final VoidCallback onDelete;
+
+  @override
+  State<_GatewayKeyTile> createState() => _GatewayKeyTileState();
+}
+
+class _GatewayKeyTileState extends State<_GatewayKeyTile> {
   bool _revealed = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
-    final obscured = widget.secret && !_revealed;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: WeChat.fontSizePreview,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  _revealed ? widget.secret : '•' * 16,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: colors.secondaryText),
+                ),
+                Text(
+                  widget.usage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: colors.secondaryText),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: _revealed
+                ? l10n.aiGatewayKeyHide
+                : l10n.aiGatewayKeyReveal,
+            onPressed: () => setState(() => _revealed = !_revealed),
+            icon: Icon(
+              _revealed
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 18,
+            ),
+          ),
+          IconButton(
+            tooltip: l10n.copySelection,
+            onPressed: () => widget.onCopy(widget.secret),
+            icon: const Icon(Icons.copy_outlined, size: 18),
+          ),
+          IconButton(
+            tooltip: l10n.deleteMessage,
+            onPressed: widget.canDelete ? widget.onDelete : null,
+            icon: const Icon(Icons.delete_outline, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A read-only value with a copy button — the endpoints are facts to hand
+/// to another program, not preferences to edit.
+class _CopyableField extends StatelessWidget {
+  const _CopyableField({
+    required this.label,
+    required this.value,
+    required this.onCopy,
+    this.enabled = true,
+  });
+
+  final String label;
+  final String value;
+  final ValueChanged<String> onCopy;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.label,
+          label,
           style: TextStyle(
             fontSize: WeChat.fontSizePreview,
             color: colors.secondaryText,
@@ -573,39 +826,18 @@ class _CopyableFieldState extends State<_CopyableField> {
         ),
         const SizedBox(height: 6),
         TextFormField(
-          initialValue: widget.value,
+          initialValue: value,
           readOnly: true,
           enableInteractiveSelection: true,
-          obscureText: obscured,
           style: const TextStyle(fontSize: WeChat.fontSizeInput),
           decoration: InputDecoration(
             isDense: true,
             filled: true,
             fillColor: colors.surfaceSunken,
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.secret)
-                  IconButton(
-                    tooltip: obscured
-                        ? l10n.aiGatewayTokenReveal
-                        : l10n.aiGatewayTokenHide,
-                    onPressed: () => setState(() => _revealed = !_revealed),
-                    icon: Icon(
-                      obscured
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 18,
-                    ),
-                  ),
-                IconButton(
-                  tooltip: l10n.copySelection,
-                  onPressed: widget.enabled
-                      ? () => widget.onCopy(widget.value)
-                      : null,
-                  icon: const Icon(Icons.copy_outlined, size: 18),
-                ),
-              ],
+            suffixIcon: IconButton(
+              tooltip: l10n.copySelection,
+              onPressed: enabled ? () => onCopy(value) : null,
+              icon: const Icon(Icons.copy_outlined, size: 18),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(WeChat.controlRadius),
@@ -638,27 +870,44 @@ class _ProviderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
     final enabledModels = provider.models.where((m) => m.enabled).length;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.dns_outlined, size: 20),
-      title: Text(provider.name),
-      subtitle: Text(
-        '${_kindLabel(l10n, provider.kind)} · '
-        '${l10n.aiProviderModelCount(enabledModels)}',
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Switch(value: provider.enabled, onChanged: onToggle),
-          IconButton(
-            tooltip: l10n.editRemark,
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
+    // A disabled provider fades rather than disappearing: the row still
+    // explains itself, it just stops competing for attention.
+    return Opacity(
+      opacity: provider.enabled ? 1 : 0.55,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: colors.brandSoft,
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
+          child: Icon(Icons.dns_outlined, size: 20, color: colors.brand),
+        ),
+        title: Text(
+          provider.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          '${_kindLabel(l10n, provider.kind)} · '
+          '${l10n.aiProviderModelCount(enabledModels)}',
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Switch(value: provider.enabled, onChanged: onToggle),
+            IconButton(
+              tooltip: l10n.editRemark,
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+            ),
+          ],
+        ),
+        onTap: onEdit,
       ),
-      onTap: onEdit,
     );
   }
 
@@ -815,18 +1064,53 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
       // Fetch against the *draft's* endpoints, not the persisted ones: the
       // user may have just corrected a URL and expects the fetch to use it.
       final protocol = AiProtocol.values[_shownIndex];
-      final ids = await widget.runtime.router.fetchModels(_collect(), protocol);
+      final catalog = await widget.runtime.router.fetchModelCatalog(
+        _collect(),
+        protocol,
+      );
       if (!mounted) return;
-      final existing = {
-        for (final m in _draft.models) '${m.protocol.name}/${m.id}': m,
+      // Built-in providers are free-tier by definition: an endpoint that
+      // confirms a model is paid never reaches the draft. Unknown pricing
+      // stays — Zen's Anthropic-shaped listing carries none.
+      final entries = _draft.kind == AiProviderKind.builtin
+          ? [
+              for (final m in catalog)
+                if (m.isFree != false) m,
+            ]
+          : catalog;
+      final merged = [for (final m in _draft.models) m];
+      final byKey = {
+        for (var i = 0; i < merged.length; i++)
+          '${merged[i].protocol.name}/${merged[i].id}': i,
       };
-      final merged = <AiProviderModel>[
-        for (final model in _draft.models) model,
-      ];
-      for (final id in ids) {
-        final key = '${protocol.name}/$id';
-        if (existing.containsKey(key)) continue;
-        merged.add(AiProviderModel(id: id, protocol: protocol));
+      var added = 0;
+      for (final entry in entries) {
+        final key = '${protocol.name}/${entry.id}';
+        final at = byKey[key];
+        if (at != null) {
+          // A refetch refreshes the catalogue metadata but never the
+          // user's enable choice.
+          final current = merged[at];
+          merged[at] = AiProviderModel(
+            id: current.id,
+            protocol: current.protocol,
+            enabled: current.enabled,
+            label: entry.label ?? current.label,
+            contextTokens: entry.contextTokens ?? current.contextTokens,
+            isFree: entry.isFree ?? current.isFree,
+          );
+          continue;
+        }
+        merged.add(
+          AiProviderModel(
+            id: entry.id,
+            protocol: protocol,
+            label: entry.label,
+            contextTokens: entry.contextTokens,
+            isFree: entry.isFree,
+          ),
+        );
+        added++;
       }
       setState(() => _draft = _draft.copyWith(models: merged));
       final l10n = AppLocalizations.of(context);
@@ -834,7 +1118,9 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         unawaited(
           TopToast.showIn(
             overlay,
-            ids.isEmpty ? l10n.aiFetchEmpty : l10n.aiFetchAdded(ids.length),
+            entries.isEmpty
+                ? (catalog.isEmpty ? l10n.aiFetchEmpty : l10n.aiFetchNoFree)
+                : l10n.aiFetchAdded(added),
           ),
         );
       }
@@ -898,7 +1184,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     return AlertDialog(
       title: Text(l10n.aiEditProvider),
       content: SizedBox(
-        width: 480,
+        width: 640,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -993,27 +1279,31 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                     color: colors.secondaryText,
                   ),
                 ),
-                const SizedBox(height: 4),
-                for (final model in _draft.models)
-                  SwitchListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    value: model.enabled,
-                    onChanged: (value) => setState(() {
-                      _draft = _draft.copyWith(
-                        models: [
-                          for (final m in _draft.models)
-                            identical(m, model)
-                                ? m.copyWith(enabled: value)
-                                : m,
-                        ],
-                      );
-                    }),
-                    title: Text(model.label ?? model.id),
-                    subtitle: Text(
-                      '${model.id} · ${_protocolLabel(l10n, model.protocol)}',
-                    ),
-                  ),
+                const SizedBox(height: 8),
+                // Capsules, not rows: a catalogue can run to hundreds of
+                // models, and a wrap lets the eye scan names and badges
+                // instead of scrolling a switch column.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final model in _draft.models)
+                      _ModelCapsule(
+                        model: model,
+                        protocolLabel: _protocolLabel(l10n, model.protocol),
+                        onTap: () => setState(() {
+                          _draft = _draft.copyWith(
+                            models: [
+                              for (final m in _draft.models)
+                                identical(m, model)
+                                    ? m.copyWith(enabled: !m.enabled)
+                                    : m,
+                            ],
+                          );
+                        }),
+                      ),
+                  ],
+                ),
               ],
               if (widget.onDelete != null) ...[
                 const SizedBox(height: 8),
@@ -1052,6 +1342,124 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         AiProtocol.anthropic => l10n.aiProtocolAnthropic,
         AiProtocol.gemini => l10n.aiProtocolGemini,
       };
+}
+
+/// One model as a capsule: name plus whatever badges the catalogue knew —
+/// a green 免费 tag and the context window. Tapping toggles [enabled]; the
+/// capsule *is* the switch, so selected state is drawn, not toggled.
+class _ModelCapsule extends StatelessWidget {
+  const _ModelCapsule({
+    required this.model,
+    required this.protocolLabel,
+    required this.onTap,
+  });
+
+  final AiProviderModel model;
+  final String protocolLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    final selected = model.enabled;
+    final ink = selected ? colors.brand : colors.bubbleText;
+    return Tooltip(
+      message: '${model.id} · $protocolLabel',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? colors.brand : colors.divider,
+              width: selected ? 1.5 : 1,
+            ),
+            color: selected ? colors.brandSoft : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check, size: 14, color: colors.brand),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  model.label ?? model.id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: ink,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (model.isFree == true) ...[
+                const SizedBox(width: 6),
+                _ModelTag(
+                  text: l10n.aiModelFree,
+                  color: const Color(0xFF1E9E50),
+                  background: colors.brandSoft,
+                ),
+              ],
+              if (model.contextTokens != null) ...[
+                const SizedBox(width: 6),
+                _ModelTag(
+                  text: _formatContext(model.contextTokens!),
+                  color: colors.secondaryText,
+                  background: colors.surfaceSunken,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// `1000000` → `1.0M`, `256000` → `256K`, small values stay raw — the
+  /// tag is a scan aid, not an exact figure.
+  static String _formatContext(int tokens) {
+    if (tokens >= 1000000) {
+      return '${(tokens / 1000000).toStringAsFixed(1)}M';
+    }
+    if (tokens >= 1000) return '${(tokens / 1000).round()}K';
+    return '$tokens';
+  }
+}
+
+/// The little badge inside a [_ModelCapsule]: tinted text on a tinted
+/// plate, small enough to read as metadata rather than content.
+class _ModelTag extends StatelessWidget {
+  const _ModelTag({
+    required this.text,
+    required this.color,
+    required this.background,
+  });
+
+  final String text;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 10, color: color, height: 1.4),
+      ),
+    );
+  }
 }
 
 /// The routing-group editor: a name, and an ordered member list — order *is*

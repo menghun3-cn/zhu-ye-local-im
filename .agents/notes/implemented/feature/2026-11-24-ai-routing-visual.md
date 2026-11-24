@@ -61,10 +61,11 @@ throwing listener cannot slow a request.
 route is what the page is *for*, so it leads rather than sits embedded
 in a scrolling list. It draws three columns — Agent, the 竹叶网关 node
 showing its `ip:port`, and provider nodes — with bezier wires for
-agent→gateway and gateway→provider, each roughly half the length of the
-old single hop. One `Icons.eco` leaf per in-flight request flies
-agent→gateway→provider on `attempt` and back on `served`/`failed`; the
-wire a leaf is riding turns dashed while the flight exists. Position is
+agent→gateway and gateway→provider — each hop deliberately short so the
+three columns read as one pipeline, not three islands. One `Icons.eco`
+leaf per in-flight request flies agent→gateway→provider on `attempt`
+and back on `served`/`failed` at a readable 1s per hop; the wire a
+leaf is riding turns dashed while the flight exists. Position is
 a pure function of layout and the controller's 0→1 progress, so resizes
 re-anchor for free. `MediaQuery.disableAnimations` drops the flights
 and keeps the status line — magpie's reduced-motion degradation, same
@@ -72,12 +73,17 @@ intent. Provider enable/disable needed no new work: `AiProvider.enabled`
 already gated the router and the gateway's exposed refs; the settings
 tile's switch was already there.
 
-**Provider nodes are earned, not listed.** The catalogue can hold dozens
-of providers; drawing all of them would push the column off-screen, so
-a node appears only when a route event names its provider and stays for
-20 seconds after (or while a leaf is still flying to it, however long a
-stream runs). Idle canvas shows Agent and gateway only — "what can be
-asked" lives on the Providers tab, "what is being asked" lives here.
+**Provider nodes are earned, not listed — and they linger.** The
+catalogue can hold dozens of providers; drawing all of them would push
+the column off-screen, so a node appears only when a route event names
+its provider and stays for 60 seconds after its last request (or while
+a leaf is still flying to it, however long a stream runs). Idle canvas
+shows Agent and gateway only — "what can be asked" lives on the
+Providers tab, "what is being asked" lives here. Nodes claim a fixed
+slot in first-requested order (capped at 10) rather than packing
+vertically, so a node arriving or expiring never slides its neighbours
+— appear/disappear jitter was the difference between "alive" and
+"seasick".
 
 **Member health is per-node, not global.** A `failed` event now carries
 `cooling`: true when the member entered its cooldown rather than dying
@@ -91,13 +97,16 @@ dead. A 1s ticker expires marks, refreshes the countdown, and polls
 signature so edits made elsewhere on the page repaint the canvas without
 a reload handshake.
 
-**The canvas is answered by a request log.** Under the status line the
-view lists the last 7 days of *finished* requests — two lines each:
-`MM-dd HH:mm:ss` in its own column beside the model that served, then
-duration, time-to-first-token, total/cached tokens and token speed.
+**The canvas is answered by a request log.** Under the animation the
+view splits its height with a request list: the last 7 days of
+*finished* requests, two lines each — `MM-dd HH:mm:ss` in its own
+column beside the model that served, then a compact metrics line
+(`2.3s · first token 2.1s · 37.4k tokens · 99% cached`) whose tooltip
+expands the exact uncached-input/output/cache-read/cache-write counts.
 `AiRouter` records every reply that completed (streams count when their
 event stream ends; failures leave no row — the red node already says
-that) into `requests.json` beside `providers.json`, pruned to the
+that) into `requests.json` beside `providers.json`, stamped with the
+gateway key name when the request arrived through one, pruned to the
 window on every write and hard-capped at 500 rows. Timing comes from
 the router's own clock, tokens from `AiUsage`, which gained
 `cachedTokens` — decoded per protocol (`prompt_tokens_details`,

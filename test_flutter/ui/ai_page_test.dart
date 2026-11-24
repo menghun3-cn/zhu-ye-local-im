@@ -90,7 +90,7 @@ void main() {
     expect(find.text(l10n.aiAddProvider), findsOneWidget);
   });
 
-  testWidgets('the gateway token stays obscured until the eye is tapped', (
+  testWidgets('a gateway key stays masked until its eye is tapped', (
     tester,
   ) async {
     final config = await tester.runAsync(() => runtime.load());
@@ -127,23 +127,25 @@ void main() {
 
     await tester.tap(find.widgetWithText(Tab, l10n.aiNavGateway));
     await tester.pumpAndSettle();
+    // The keyring and request log load from real files in two awaits; each
+    // needs a real event-loop turn the fake-async clock cannot give it.
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
 
-    // The token field is the only obscured one on the tab. TextFormField
-    // hides the flag on its inner TextField, so look there.
-    final obscured = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .where((field) => field.obscureText)
-        .length;
-    expect(obscured, 1);
-
+    final loadedKeys = await tester.runAsync(() => runtime.keys.load());
+    expect(loadedKeys, hasLength(1));
+    expect(find.text(l10n.aiGatewayKeys), findsOneWidget);
+    expect(find.text(l10n.aiGatewayKeyAdd), findsOneWidget);
+    // The seeded default key is masked; its eye toggle reveals the secret.
+    expect(find.text('•' * 16), findsOneWidget);
     await tester.tap(find.byIcon(Icons.visibility_outlined));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widgetList<TextField>(find.byType(TextField))
-          .where((field) => field.obscureText)
-          .length,
-      0,
-    );
+    expect(find.text('•' * 16), findsNothing);
+    expect(find.textContaining('sk-'), findsWidgets);
   });
 }

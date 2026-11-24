@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-24-ai-settings-surface.md
 #   git hash-object -- 2026-11-24-ai-settings-surface.zh.md
-2026-11-24-ai-settings-surface.md: 33fa85a7f4a22fa002d33aa9ceac44c57a2e3946
-2026-11-24-ai-settings-surface.zh.md: 318f9c56fdc04d4008fb58e5ab6ea0f8345ed301
+2026-11-24-ai-settings-surface.md: ae804d747c54fea33776d17eade4ab82ef953113
+2026-11-24-ai-settings-surface.zh.md: 25f89cda8545960659310c82e586607fa09283c6

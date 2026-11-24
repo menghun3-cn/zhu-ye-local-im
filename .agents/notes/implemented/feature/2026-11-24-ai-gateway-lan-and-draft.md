@@ -8,6 +8,11 @@ English | [中文](2026-11-24-ai-gateway-lan-and-draft.zh.md)
 > [the loopback-only gateway](2026-11-23-ai-local-gateway.md): the bind is
 > no longer loopback-only by fiat — scope is a persisted setting — and the
 > flag now defaults on.
+>
+> Later amended by
+> [the gateway keyring](2026-11-24-ai-gateway-keys.md): "the token" below
+> is now one key in a named list; the scope, draft and rebind decisions
+> stand.
 
 ## Problem
 

@@ -11,10 +11,13 @@ final class AiRequestRecord {
     required this.at,
     required this.model,
     this.servedBy,
+    this.key,
     required this.durationMs,
     this.ttftMs,
     this.totalTokens,
+    this.promptTokens,
     this.cachedTokens,
+    this.cacheWriteTokens,
     this.completionTokens,
   });
 
@@ -29,6 +32,10 @@ final class AiRequestRecord {
   /// router resolved one.
   final String? servedBy;
 
+  /// The gateway key name that made the request — which client spent the
+  /// tokens. Null for requests that did not come through the gateway.
+  final String? key;
+
   /// Wall-clock time from request start to the last event.
   final int durationMs;
 
@@ -37,17 +44,22 @@ final class AiRequestRecord {
   final int? ttftMs;
 
   final int? totalTokens;
+  final int? promptTokens;
   final int? cachedTokens;
+  final int? cacheWriteTokens;
   final int? completionTokens;
 
   Map<String, Object?> toJson() => {
     'at': at.toIso8601String(),
     'model': model,
     if (servedBy != null) 'served_by': servedBy,
+    if (key != null) 'key': key,
     'duration_ms': durationMs,
     if (ttftMs != null) 'ttft_ms': ttftMs,
     if (totalTokens != null) 'total_tokens': totalTokens,
+    if (promptTokens != null) 'prompt_tokens': promptTokens,
     if (cachedTokens != null) 'cached_tokens': cachedTokens,
+    if (cacheWriteTokens != null) 'cache_write_tokens': cacheWriteTokens,
     if (completionTokens != null) 'completion_tokens': completionTokens,
   };
 
@@ -58,10 +70,13 @@ final class AiRequestRecord {
       at: at,
       model: json['model'] as String? ?? '',
       servedBy: json['served_by'] as String?,
+      key: json['key'] as String?,
       durationMs: json['duration_ms'] as int? ?? 0,
       ttftMs: json['ttft_ms'] as int?,
       totalTokens: json['total_tokens'] as int?,
+      promptTokens: json['prompt_tokens'] as int?,
       cachedTokens: json['cached_tokens'] as int?,
+      cacheWriteTokens: json['cache_write_tokens'] as int?,
       completionTokens: json['completion_tokens'] as int?,
     );
   }

@@ -238,10 +238,14 @@ final class AiRouter {
 
   /// Sends [request] and returns the reply from the first member that works.
   ///
+  /// [clientKey] names the gateway key the request arrived on — stamped on
+  /// the request-log row so per-client usage adds up. Null for callers
+  /// that are not a gateway client.
+  ///
   /// Throws [AiRequestException] when the reference is unresolvable, every
   /// member failed fatally, or every member failed retryably — the last case
   /// carries the most recent failure as its cause.
-  Future<AiReply> chat(AiChatRequest request) async {
+  Future<AiReply> chat(AiChatRequest request, {String? clientKey}) async {
     final startedAt = DateTime.now();
     final config = await store.load();
     final members = _expand(request.model, config);
@@ -269,6 +273,7 @@ final class AiRouter {
               member,
               request.model,
               startedAt,
+              clientKey,
             ),
           );
         }
@@ -279,6 +284,7 @@ final class AiRouter {
           member,
           (reply as AiFullReply).response.usage,
           null,
+          clientKey,
         );
         return reply;
       } on _RetryableFailure catch (failure) {
@@ -329,6 +335,7 @@ final class AiRouter {
     String member,
     AiUsage? usage,
     int? ttftMs,
+    String? clientKey,
   ) {
     final log = requestLog;
     if (log == null) return;
@@ -339,10 +346,13 @@ final class AiRouter {
             at: startedAt,
             model: model,
             servedBy: member,
+            key: clientKey,
             durationMs: DateTime.now().difference(startedAt).inMilliseconds,
             ttftMs: ttftMs,
             totalTokens: usage?.totalTokens,
+            promptTokens: usage?.promptTokens,
             cachedTokens: usage?.cachedTokens,
+            cacheWriteTokens: usage?.cacheWriteTokens,
             completionTokens: usage?.completionTokens,
           ),
         );
@@ -361,6 +371,7 @@ final class AiRouter {
     String member,
     String model,
     DateTime startedAt,
+    String? clientKey,
   ) async* {
     var settled = false;
     DateTime? firstContentAt;
@@ -383,6 +394,7 @@ final class AiRouter {
         member,
         usage,
         firstContentAt?.difference(startedAt).inMilliseconds,
+        clientKey,
       );
     } catch (_) {
       settled = true;
@@ -421,6 +433,15 @@ final class AiRouter {
   Future<List<String>> fetchModels(
     AiProvider provider,
     AiProtocol protocol,
+  ) async => [
+    for (final model in await fetchModelCatalog(provider, protocol)) model.id,
+  ];
+
+  /// [fetchModels] with the catalogue metadata the endpoint volunteers —
+  /// context window, pricing, display name — for callers that can show it.
+  Future<List<AiCatalogModel>> fetchModelCatalog(
+    AiProvider provider,
+    AiProtocol protocol,
   ) async {
     final baseUrl = provider.endpointFor(protocol);
     if (baseUrl == null) return const [];
@@ -432,7 +453,7 @@ final class AiRouter {
       return const [];
     }
     final body = await _readBody(response.bodyBytes);
-    return codec.decodeModels(body);
+    return codec.decodeModelCatalog(body);
   }
 
   /// Expands [ref] into concrete `provider/model` members, depth-first.

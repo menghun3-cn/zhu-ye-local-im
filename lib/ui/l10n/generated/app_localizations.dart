@@ -2635,6 +2635,18 @@ abstract class AppLocalizations {
   /// **'Added {count} new model(s)'**
   String aiFetchAdded(int count);
 
+  /// No description provided for @aiFetchNoFree.
+  ///
+  /// In en, this message translates to:
+  /// **'No free models to add'**
+  String get aiFetchNoFree;
+
+  /// No description provided for @aiModelFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get aiModelFree;
+
   /// No description provided for @aiTestConnection.
   ///
   /// In en, this message translates to:
@@ -2755,23 +2767,65 @@ abstract class AppLocalizations {
   /// **'Endpoint'**
   String get aiGatewayEndpoint;
 
-  /// No description provided for @aiGatewayToken.
+  /// No description provided for @aiGatewayKeys.
   ///
   /// In en, this message translates to:
-  /// **'Access token'**
-  String get aiGatewayToken;
+  /// **'Gateway keys'**
+  String get aiGatewayKeys;
 
-  /// No description provided for @aiGatewayTokenReveal.
+  /// No description provided for @aiGatewayKeyAdd.
   ///
   /// In en, this message translates to:
-  /// **'Show token'**
-  String get aiGatewayTokenReveal;
+  /// **'Add gateway key'**
+  String get aiGatewayKeyAdd;
 
-  /// No description provided for @aiGatewayTokenHide.
+  /// No description provided for @aiGatewayKeyNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Hide token'**
-  String get aiGatewayTokenHide;
+  /// **'Key name (e.g. Laptop)'**
+  String get aiGatewayKeyNameHint;
+
+  /// No description provided for @aiGatewayKeySecretHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom key (optional)'**
+  String get aiGatewayKeySecretHint;
+
+  /// No description provided for @aiGatewayKeyCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get aiGatewayKeyCreate;
+
+  /// No description provided for @aiGatewayKeyCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiGatewayKeyCancel;
+
+  /// No description provided for @aiGatewayKeyUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'{requests} requests · {tokens} tokens'**
+  String aiGatewayKeyUsage(int requests, String tokens);
+
+  /// No description provided for @aiGatewayKeyDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'That key already exists'**
+  String get aiGatewayKeyDuplicate;
+
+  /// No description provided for @aiGatewayKeyReveal.
+  ///
+  /// In en, this message translates to:
+  /// **'Show key'**
+  String get aiGatewayKeyReveal;
+
+  /// No description provided for @aiGatewayKeyHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide key'**
+  String get aiGatewayKeyHide;
 
   /// No description provided for @aiGatewayNotListening.
   ///
@@ -2788,7 +2842,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiGatewayHint.
   ///
   /// In en, this message translates to:
-  /// **'Point an OpenAI-compatible client at this endpoint with the token as its API key.'**
+  /// **'Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.'**
   String get aiGatewayHint;
 
   /// No description provided for @aiGatewayScope.
@@ -2875,35 +2929,46 @@ abstract class AppLocalizations {
   /// **'No requests yet.'**
   String get aiRequestsEmpty;
 
-  /// No description provided for @aiMetricDuration.
+  /// No description provided for @aiLogSeconds.
   ///
   /// In en, this message translates to:
-  /// **'Duration'**
-  String get aiMetricDuration;
+  /// **'{value}s'**
+  String aiLogSeconds(String value);
 
-  /// No description provided for @aiMetricFirstToken.
+  /// No description provided for @aiLogMetrics.
   ///
   /// In en, this message translates to:
-  /// **'First token'**
-  String get aiMetricFirstToken;
+  /// **'{duration} first token {ttft} · {tokens} tokens · {percent} cached'**
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+  );
 
-  /// No description provided for @aiMetricTokens.
+  /// No description provided for @aiLogInputUncached.
   ///
   /// In en, this message translates to:
-  /// **'Total tokens'**
-  String get aiMetricTokens;
+  /// **'Input (uncached)'**
+  String get aiLogInputUncached;
 
-  /// No description provided for @aiMetricCached.
+  /// No description provided for @aiLogOutput.
   ///
   /// In en, this message translates to:
-  /// **'Cached'**
-  String get aiMetricCached;
+  /// **'Output'**
+  String get aiLogOutput;
 
-  /// No description provided for @aiMetricSpeed.
+  /// No description provided for @aiLogCacheRead.
   ///
   /// In en, this message translates to:
-  /// **'Speed'**
-  String get aiMetricSpeed;
+  /// **'Cache read'**
+  String get aiLogCacheRead;
+
+  /// No description provided for @aiLogCacheWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache write'**
+  String get aiLogCacheWrite;
 
   /// No description provided for @aiDeleteProviderTitle.
   ///

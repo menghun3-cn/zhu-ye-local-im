@@ -627,6 +627,8 @@
   "@aiFetchAdded": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiFetchNoFree": "No free models to add",
+  "aiModelFree": "Free",
   "aiTestConnection": "Test connection",
   "aiConnectionOk": "Connection OK — the provider reports {count} model(s)",
   "@aiConnectionOk": {
@@ -655,12 +657,25 @@
   "aiGatewayOn": "OpenAI-compatible tools on this machine can use the enabled models",
   "aiGatewayOff": "Local tools cannot reach the configured providers",
   "aiGatewayEndpoint": "Endpoint",
-  "aiGatewayToken": "Access token",
-  "aiGatewayTokenReveal": "Show token",
-  "aiGatewayTokenHide": "Hide token",
+  "aiGatewayKeys": "Gateway keys",
+  "aiGatewayKeyAdd": "Add gateway key",
+  "aiGatewayKeyNameHint": "Key name (e.g. Laptop)",
+  "aiGatewayKeySecretHint": "Custom key (optional)",
+  "aiGatewayKeyCreate": "Create",
+  "aiGatewayKeyCancel": "Cancel",
+  "aiGatewayKeyUsage": "{requests} requests · {tokens} tokens",
+  "@aiGatewayKeyUsage": {
+    "placeholders": {
+      "requests": { "type": "int" },
+      "tokens": { "type": "String" }
+    }
+  },
+  "aiGatewayKeyDuplicate": "That key already exists",
+  "aiGatewayKeyReveal": "Show key",
+  "aiGatewayKeyHide": "Hide key",
   "aiGatewayNotListening": "Configured, but not listening right now",
   "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then restart the app.",
-  "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with the token as its API key.",
+  "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.",
   "aiGatewayScope": "Listen on",
   "aiGatewayScopeLoopback": "This device only",
   "aiGatewayScopeLan": "Local network",
@@ -679,11 +694,23 @@
   "aiRequestsTitle": "Requests",
   "aiRequestsWindow": "Last 7 days",
   "aiRequestsEmpty": "No requests yet.",
-  "aiMetricDuration": "Duration",
-  "aiMetricFirstToken": "First token",
-  "aiMetricTokens": "Total tokens",
-  "aiMetricCached": "Cached",
-  "aiMetricSpeed": "Speed",
+  "aiLogSeconds": "{value}s",
+  "@aiLogSeconds": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "aiLogMetrics": "{duration} first token {ttft} · {tokens} tokens · {percent} cached",
+  "@aiLogMetrics": {
+    "placeholders": {
+      "duration": { "type": "String" },
+      "ttft": { "type": "String" },
+      "tokens": { "type": "String" },
+      "percent": { "type": "String" }
+    }
+  },
+  "aiLogInputUncached": "Input (uncached)",
+  "aiLogOutput": "Output",
+  "aiLogCacheRead": "Cache read",
+  "aiLogCacheWrite": "Cache write",
 
   "aiDeleteProviderTitle": "Delete provider?",
   "aiDeleteProviderBody": "The provider's key and models are removed, and every routing-group member pointing at it is dropped.",

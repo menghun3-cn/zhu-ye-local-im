@@ -71,7 +71,15 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// provider id → when its node stops being drawn. See the class doc: the
   /// canvas shows only providers a request has actually used recently.
   final Map<String, DateTime> _nodeVisibleUntil = {};
-  static const _nodeVisibleFor = Duration(seconds: 20);
+  static const _nodeVisibleFor = Duration(seconds: 60);
+
+  /// provider ids in first-requested order — each keeps a fixed slot on the
+  /// canvas so a node appearing or expiring never slides its neighbours.
+  /// Capped: past this many distinct providers the spacing would squeeze
+  /// nodes into each other, and the canvas is a "what is being asked" view,
+  /// not a catalogue.
+  final List<String> _slotOrder = [];
+  static const _maxSlots = 10;
 
   /// 1s heartbeat: expires health marks, refreshes cooldown countdowns, and
   /// notices configuration saves and gateway rebinds without a handshake.
@@ -108,6 +116,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
           _config = config;
           _failure = null;
           _seenVersion = widget.runtime.configVersion;
+          // Deleted providers leave stale slots behind; pruning keeps the
+          // spacing honest without moving live nodes.
+          _slotOrder.removeWhere((id) => config.providerNamed(id) == null);
           _seedHealth(config);
         });
       }
@@ -160,6 +171,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
     final providerId = AiModelRef.parse(event.member)?.providerId;
     if (providerId == null) return;
     _nodeVisibleUntil[providerId] = DateTime.now().add(_nodeVisibleFor);
+    if (!_slotOrder.contains(providerId) && _slotOrder.length < _maxSlots) {
+      _slotOrder.add(providerId);
+    }
   }
 
   void _recordHealth(AiRouteEvent event) {
@@ -259,7 +273,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
     final controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 650),
+      duration: const Duration(milliseconds: 1000),
     );
     late final _LeafFlight flight;
     flight = _LeafFlight(
@@ -352,22 +366,28 @@ class _AiRoutingViewState extends State<AiRoutingView>
       return Center(child: HintText(l10n.aiRoutingEmpty));
     }
     // A provider keeps its node while it was asked recently — or while a
-    // leaf is still flying to it, however long a stream runs.
+    // leaf is still flying to it, however long a stream runs. Visible nodes
+    // render in slot order, not request order, so nothing slides when a
+    // neighbour expires.
     final now = DateTime.now();
-    final visibleProviders = <String>{
+    final visibleIds = <String>{
       for (final provider in config.providers)
         if ((_nodeVisibleUntil[provider.id]?.isAfter(now) ?? false) ||
             _flights.any((f) => f.providerId == provider.id))
           provider.id,
     };
+    final orderedProviders = [
+      for (final id in _slotOrder)
+        if (visibleIds.contains(id)) config.providerNamed(id),
+    ].whereType<AiProvider>().toList();
     return Column(
       children: [
         Expanded(
           flex: 3,
           child: _RoutingCanvas(
-            config: config,
+            slotOrder: _slotOrder,
+            providers: orderedProviders,
             flights: _flights,
-            visibleProviders: visibleProviders,
             sourceLabel: l10n.aiRoutingSource,
             gatewayLabel: l10n.aiRoutingGateway,
             gatewayAddress: _gatewayAddress(l10n),
@@ -419,9 +439,9 @@ final class _LeafFlight {
 /// a 0→1 progress value, never a pixel position.
 class _RoutingCanvas extends StatelessWidget {
   const _RoutingCanvas({
-    required this.config,
+    required this.slotOrder,
+    required this.providers,
     required this.flights,
-    required this.visibleProviders,
     required this.sourceLabel,
     required this.gatewayLabel,
     required this.gatewayAddress,
@@ -429,12 +449,13 @@ class _RoutingCanvas extends StatelessWidget {
     required this.health,
   });
 
-  final AiConfig config;
-  final List<_LeafFlight> flights;
+  /// provider ids in fixed slot order — a node's vertical position is its
+  /// index here, so appearing and expiring nodes never move their neighbours.
+  final List<String> slotOrder;
 
-  /// Provider ids whose nodes are drawn — the ones a request has used
-  /// recently, not the whole catalogue.
-  final Set<String> visibleProviders;
+  /// The providers currently drawn, already in [slotOrder] order.
+  final List<AiProvider> providers;
+  final List<_LeafFlight> flights;
   final String sourceLabel;
   final String gatewayLabel;
   final String gatewayAddress;
@@ -453,24 +474,42 @@ class _RoutingCanvas extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        final providers = [
-          for (final provider in config.providers)
-            if (visibleProviders.contains(provider.id)) provider,
-        ];
-        final slots = providers.length;
+        final slots = slotOrder.length;
+        // Slots divide the height *between* the margins, so the first and
+        // last nodes keep their breathing room at any count.
         final slot = slots == 0
             ? size.height
-            : math.max(56.0, size.height / slots);
-        final providerLeft = size.width - _margin - _nodeWidth;
-        Offset anchorFor(int index) =>
-            Offset(providerLeft, _margin + slot * index + slot / 2);
+            : math.max(44.0, (size.height - 2 * _margin) / slots);
 
-        // Three columns: the agent on the left, the gateway centered in the
-        // gap before the provider column on the right.
+        // Three columns with each hop half the length it used to be: the
+        // whole agent→gateway→provider group is centered, so shrinking the
+        // wires leaves equal air on both sides instead of piling up against
+        // the right edge.
         final midY = size.height / 2;
-        final agentOut = Offset(_margin + _agentWidth, midY);
-        final gatewayLeft =
-            agentOut.dx + (providerLeft - agentOut.dx - _gatewayWidth) / 2;
+        final span =
+            size.width - 2 * _margin - _agentWidth - _gatewayWidth - _nodeWidth;
+        var segment = math.max(24.0, span / 4);
+        var groupWidth = _agentWidth + 2 * segment + _gatewayWidth + _nodeWidth;
+        var startX = (size.width - groupWidth) / 2;
+        if (startX < _margin || groupWidth > size.width - 2 * _margin) {
+          // Too narrow for the airy layout — fall back to edge-to-edge.
+          segment = math.max(8.0, (span - _gatewayWidth) / 2);
+          groupWidth = _agentWidth + 2 * segment + _gatewayWidth + _nodeWidth;
+          startX = _margin;
+        }
+        // Never let a squeezed layout push the provider column off-canvas.
+        final providerLeft = math.min(
+          startX + groupWidth - _nodeWidth,
+          size.width - _margin - _nodeWidth,
+        );
+        Offset anchorFor(String providerId) {
+          final index = slotOrder.indexOf(providerId);
+          if (index < 0) return Offset.zero;
+          return Offset(providerLeft, _margin + slot * index + slot / 2);
+        }
+
+        final agentOut = Offset(startX + _agentWidth, midY);
+        final gatewayLeft = agentOut.dx + segment;
         final gatewayIn = Offset(gatewayLeft, midY);
         final gatewayCenter = Offset(gatewayLeft + _gatewayWidth / 2, midY);
         final gatewayOut = Offset(gatewayLeft + _gatewayWidth, midY);
@@ -489,12 +528,12 @@ class _RoutingCanvas extends StatelessWidget {
                       to: gatewayIn,
                       dashed: flights.isNotEmpty,
                     ),
-                    for (var i = 0; i < slots; i++)
-                      if (providers[i].enabled)
+                    for (final provider in providers)
+                      if (provider.enabled)
                         _WireSegment(
                           from: gatewayOut,
-                          to: anchorFor(i),
-                          dashed: wireActive(providers[i].id),
+                          to: anchorFor(provider.id),
+                          dashed: wireActive(provider.id),
                         ),
                   ],
                   color: WeChatColors.of(context).brandLine,
@@ -509,20 +548,23 @@ class _RoutingCanvas extends StatelessWidget {
                 flight: flight,
                 agent: agentOut,
                 gateway: gatewayCenter,
-                target: _targetAnchor(flight, providers, anchorFor),
+                target: anchorFor(flight.providerId),
               ),
             // Provider nodes first so the cards sit on top of any wire
             // that happens to pass under them.
-            for (var i = 0; i < slots; i++)
+            for (final provider in providers)
               Positioned(
                 left: providerLeft,
-                top: _margin + slot * i + (slot - _nodeHeight) / 2,
+                top:
+                    _margin +
+                    slot * slotOrder.indexOf(provider.id) +
+                    (slot - _nodeHeight) / 2,
                 width: _nodeWidth,
                 height: _nodeHeight,
                 child: _ProviderNode(
-                  provider: providers[i],
-                  enabled: providers[i].enabled,
-                  health: health[providers[i].id],
+                  provider: provider,
+                  enabled: provider.enabled,
+                  health: health[provider.id],
                 ),
               ),
             Positioned(
@@ -537,7 +579,7 @@ class _RoutingCanvas extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: _margin,
+              left: startX,
               top: midY - _cardHeight / 2,
               width: _agentWidth,
               height: _cardHeight,
@@ -547,20 +589,6 @@ class _RoutingCanvas extends StatelessWidget {
         );
       },
     );
-  }
-
-  /// Where [flight]'s leaf is headed: its provider's anchor, or [Offset.zero]
-  /// when the provider is not in the list (it was deleted mid-flight — the
-  /// leaf still comes home, just to nowhere).
-  Offset _targetAnchor(
-    _LeafFlight flight,
-    List<AiProvider> providers,
-    Offset Function(int) anchorFor,
-  ) {
-    for (var i = 0; i < providers.length; i++) {
-      if (providers[i].id == flight.providerId) return anchorFor(i);
-    }
-    return Offset.zero;
   }
 }
 
@@ -935,11 +963,19 @@ class _RequestTile extends StatelessWidget {
       '${_pad(t.month)}-${_pad(t.day)} '
       '${_pad(t.hour)}:${_pad(t.minute)}:${_pad(t.second)}';
 
-  static String _duration(int ms) =>
-      ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
-
   static String _tokens(int n) =>
       n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
+
+  /// `1,433` — the tooltip's exact counts read better grouped than compact.
+  static String _grouped(int n) {
+    final digits = n.abs().toString();
+    final buf = StringBuffer(n < 0 ? '-' : '');
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+      buf.write(digits[i]);
+    }
+    return buf.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -948,27 +984,34 @@ class _RequestTile extends StatelessWidget {
     final caption = TextStyle(fontSize: 11, color: colors.secondaryText);
     final body = TextStyle(fontSize: WeChat.fontSizePreview);
 
-    // Speed is completion tokens over generation time — the span after the
-    // first token. Without a TTFT (non-streamed replies) the whole
-    // duration is the generation span.
-    final ttft = record.ttftMs;
-    final genMs = ttft == null
-        ? record.durationMs
-        : math.max(1, record.durationMs - ttft);
-    final completion = record.completionTokens;
-    final speed = completion == null ? null : completion * 1000 / genMs;
+    String seconds(int ms) => l10n.aiLogSeconds((ms / 1000).toStringAsFixed(1));
 
-    final metrics = [
-      '${l10n.aiMetricDuration} ${_duration(record.durationMs)}',
-      '${l10n.aiMetricFirstToken} '
-          '${record.ttftMs == null ? '—' : _duration(record.ttftMs!)}',
-      '${l10n.aiMetricTokens} '
-          '${record.totalTokens == null ? '—' : _tokens(record.totalTokens!)}',
-      '${l10n.aiMetricCached} '
-          '${record.cachedTokens == null ? '—' : _tokens(record.cachedTokens!)}',
-      '${l10n.aiMetricSpeed} '
-          '${speed == null ? '—' : '${speed.toStringAsFixed(0)} tok/s'}',
-    ].join(' · ');
+    final ttft = record.ttftMs;
+    final prompt = record.promptTokens;
+    final cached = record.cachedTokens;
+    final percent = prompt != null && prompt > 0 && cached != null
+        ? '${(cached * 100 / prompt).round()}%'
+        : '—';
+    final metrics = l10n.aiLogMetrics(
+      seconds(record.durationMs),
+      ttft == null ? '—' : seconds(ttft),
+      record.totalTokens == null ? '—' : _tokens(record.totalTokens!),
+      percent,
+    );
+
+    // Hover detail: the exact token split behind the compact line — what
+    // was read from cache, what was written to it, and what was billed fresh.
+    final uncachedInput = prompt == null
+        ? '—'
+        : _grouped(math.max(0, prompt - (cached ?? 0)));
+    final tooltip = [
+      '${l10n.aiLogInputUncached}: $uncachedInput',
+      '${l10n.aiLogOutput}: '
+          '${record.completionTokens == null ? '—' : _grouped(record.completionTokens!)}',
+      '${l10n.aiLogCacheRead}: ${cached == null ? '—' : _grouped(cached)}',
+      '${l10n.aiLogCacheWrite}: '
+          '${_grouped(record.cacheWriteTokens ?? 0)}',
+    ].join('\n');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,11 +1034,14 @@ class _RequestTile extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(left: 96),
-          child: Text(
-            metrics,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: caption,
+          child: Tooltip(
+            message: tooltip,
+            child: Text(
+              metrics,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: caption,
+            ),
           ),
         ),
       ],

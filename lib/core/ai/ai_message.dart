@@ -105,6 +105,7 @@ final class AiUsage {
     this.completionTokens,
     this.totalTokens,
     this.cachedTokens,
+    this.cacheWriteTokens,
   });
 
   final int? promptTokens;
@@ -117,6 +118,11 @@ final class AiUsage {
   /// `cache_read_input_tokens`, Gemini's `cachedContentTokenCount`).
   final int? cachedTokens;
 
+  /// Prompt tokens the provider *wrote into* its cache — Anthropic's
+  /// `cache_creation_input_tokens`. Only Anthropic reports this; the rest
+  /// leave it null and callers show 0.
+  final int? cacheWriteTokens;
+
   static const AiUsage empty = AiUsage();
 
   Map<String, Object?> toJson() => {
@@ -124,6 +130,7 @@ final class AiUsage {
     if (completionTokens != null) 'completion_tokens': completionTokens,
     if (totalTokens != null) 'total_tokens': totalTokens,
     if (cachedTokens != null) 'cached_tokens': cachedTokens,
+    if (cacheWriteTokens != null) 'cache_write_tokens': cacheWriteTokens,
   };
 
   factory AiUsage.fromJson(Map<String, Object?> json) => AiUsage(
@@ -131,6 +138,7 @@ final class AiUsage {
     completionTokens: json['completion_tokens'] as int?,
     totalTokens: json['total_tokens'] as int?,
     cachedTokens: json['cached_tokens'] as int?,
+    cacheWriteTokens: json['cache_write_tokens'] as int?,
   );
 }
 

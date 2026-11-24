@@ -453,6 +453,8 @@
   "@aiFetchAdded": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiFetchNoFree": "没有可添加的免费模型",
+  "aiModelFree": "免费",
   "aiTestConnection": "测试连通",
   "aiConnectionOk": "连接正常——供应商报告 {count} 个模型",
   "@aiConnectionOk": {
@@ -481,12 +483,25 @@
   "aiGatewayOn": "本机的 OpenAI 兼容工具可以使用已启用的模型",
   "aiGatewayOff": "本地工具无法访问已配置的供应商",
   "aiGatewayEndpoint": "端点",
-  "aiGatewayToken": "访问令牌",
-  "aiGatewayTokenReveal": "显示令牌",
-  "aiGatewayTokenHide": "隐藏令牌",
+  "aiGatewayKeys": "网关密钥",
+  "aiGatewayKeyAdd": "添加网关密钥",
+  "aiGatewayKeyNameHint": "密钥名称（如：笔记本）",
+  "aiGatewayKeySecretHint": "自定义密钥（可选）",
+  "aiGatewayKeyCreate": "创建",
+  "aiGatewayKeyCancel": "取消",
+  "aiGatewayKeyUsage": "{requests} 次请求 · {tokens} token",
+  "@aiGatewayKeyUsage": {
+    "placeholders": {
+      "requests": { "type": "int" },
+      "tokens": { "type": "String" }
+    }
+  },
+  "aiGatewayKeyDuplicate": "该密钥已存在",
+  "aiGatewayKeyReveal": "显示密钥",
+  "aiGatewayKeyHide": "隐藏密钥",
   "aiGatewayNotListening": "已配置，但当前未在监听",
   "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
-  "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。",
+  "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把网关密钥作为 API 密钥。",
   "aiGatewayScope": "监听范围",
   "aiGatewayScopeLoopback": "仅本机",
   "aiGatewayScopeLan": "局域网",
@@ -505,11 +520,23 @@
   "aiRequestsTitle": "请求记录",
   "aiRequestsWindow": "最近 7 天",
   "aiRequestsEmpty": "暂无请求记录。",
-  "aiMetricDuration": "耗时",
-  "aiMetricFirstToken": "首字",
-  "aiMetricTokens": "总 Token",
-  "aiMetricCached": "缓存",
-  "aiMetricSpeed": "速度",
+  "aiLogSeconds": "{value}秒",
+  "@aiLogSeconds": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "aiLogMetrics": "{duration} 首字耗时 {ttft} {tokens} token 缓存 {percent}",
+  "@aiLogMetrics": {
+    "placeholders": {
+      "duration": { "type": "String" },
+      "ttft": { "type": "String" },
+      "tokens": { "type": "String" },
+      "percent": { "type": "String" }
+    }
+  },
+  "aiLogInputUncached": "输入（未缓存）",
+  "aiLogOutput": "输出",
+  "aiLogCacheRead": "缓存读取",
+  "aiLogCacheWrite": "缓存写入",
 
   "aiDeleteProviderTitle": "删除供应商？",
   "aiDeleteProviderBody": "供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。",

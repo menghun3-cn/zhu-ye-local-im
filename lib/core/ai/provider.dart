@@ -27,6 +27,8 @@ final class AiProviderModel {
     required this.protocol,
     this.enabled = false,
     this.label,
+    this.contextTokens,
+    this.isFree,
   });
 
   /// The model id as the provider knows it (`deepseek-chat`, `claude-opus-4-6`).
@@ -41,11 +43,25 @@ final class AiProviderModel {
   /// Optional display name when it differs from [id].
   final String? label;
 
-  AiProviderModel copyWith({bool? enabled, String? label}) => AiProviderModel(
+  /// Context window in tokens, when the catalogue reported one.
+  final int? contextTokens;
+
+  /// Whether the catalogue reported the model as free; null means the
+  /// endpoint said nothing about pricing.
+  final bool? isFree;
+
+  AiProviderModel copyWith({
+    bool? enabled,
+    String? label,
+    int? contextTokens,
+    bool? isFree,
+  }) => AiProviderModel(
     id: id,
     protocol: protocol,
     enabled: enabled ?? this.enabled,
     label: label ?? this.label,
+    contextTokens: contextTokens ?? this.contextTokens,
+    isFree: isFree ?? this.isFree,
   );
 
   Map<String, Object?> toJson() => {
@@ -53,6 +69,8 @@ final class AiProviderModel {
     'protocol': protocol.name,
     'enabled': enabled,
     if (label != null) 'label': label,
+    if (contextTokens != null) 'context_tokens': contextTokens,
+    if (isFree != null) 'is_free': isFree,
   };
 
   factory AiProviderModel.fromJson(Map<String, Object?> json) =>
@@ -63,6 +81,8 @@ final class AiProviderModel {
             AiProtocol.openaiChat,
         enabled: json['enabled'] as bool? ?? false,
         label: json['label'] as String?,
+        contextTokens: json['context_tokens'] as int?,
+        isFree: json['is_free'] as bool?,
       );
 }
 

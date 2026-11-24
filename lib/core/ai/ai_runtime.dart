@@ -3,7 +3,7 @@ import 'dart:io';
 import 'ai_gateway.dart';
 import 'ai_router.dart';
 import 'builtin_providers.dart';
-import 'gateway_token.dart';
+import 'gateway_keys.dart';
 import 'provider.dart';
 import 'provider_store.dart';
 import 'request_log.dart';
@@ -26,11 +26,12 @@ final class AiRuntime {
     required this.directory,
     required this.store,
     required this.router,
-    required this.token,
+    required this.keys,
     required this.requestLog,
   });
 
-  /// Where `providers.json`, `secrets.key` and `gateway_token` live.
+  /// Where `providers.json`, `secrets.key`, `gateway_keys.json` and
+  /// `requests.json` live.
   final String directory;
 
   /// Configuration persistence, with keys sealed on the way out.
@@ -39,8 +40,8 @@ final class AiRuntime {
   /// Reference resolution and failover, reading [store] per request.
   final AiRouter router;
 
-  /// The bearer token the gateway asks callers for.
-  final AiGatewayToken token;
+  /// The gateway keyring — one named credential per client.
+  final AiGatewayKeyStore keys;
 
   /// Rolling history of finished requests — the routing view's bottom list.
   final AiRequestLog requestLog;
@@ -85,11 +86,16 @@ final class AiRuntime {
     );
     await _seedBuiltins(store);
     final requestLog = AiRequestLog(file: File('$directory/requests.json'));
+    final keys = AiGatewayKeyStore(
+      file: File('$directory/gateway_keys.json'),
+      legacyTokenPath: '$directory/gateway_token',
+    );
+    await keys.loadOrCreate();
     return AiRuntime._(
       directory: directory,
       store: store,
       router: AiRouter(store: store, requestLog: requestLog),
-      token: await AiGatewayToken.loadOrCreate('$directory/gateway_token'),
+      keys: keys,
       requestLog: requestLog,
     );
   }
@@ -164,7 +170,11 @@ final class AiRuntime {
       _boundGateway = null;
       await running.stop();
     }
-    final server = AiGateway(store: store, router: router, token: token);
+    final server = AiGateway(
+      store: store,
+      router: router,
+      keySource: keys.load,
+    );
     try {
       await server.start(preferredPort: gateway.port, scope: gateway.scope);
       _gateway = server;

@@ -51,21 +51,31 @@ dropped.
 
 Concretely the surface covers:
 
-- **Gateway card** — the enable switch, and while enabled the endpoint and
-  `lt-ai-` token as read-only copyable fields (copied through
-  `seams.clipboard`, toasted through `TopToast` like every other refusal).
-  The token renders obscured behind an eye toggle — it is a bearer
-  credential, and a settings page is exactly where shoulder-surfing
-  happens.
-- **Providers** — preset picker (the `aiProviderPresets` catalogue) or a
-  custom endpoint; the editor has name, API key (obscure, hint that local
-  models need none), one tab per protocol holding its base-URL field with
-  "Fetch models" and "Test connection" actions, and the model catalogue
-  with per-model enable switches. "Fetch models" calls the new
-  `AiRouter.fetchModels(provider, protocol)`, which takes the provider
-  object so it can fetch against *unsaved* endpoint edits; fetched ids merge
-  into the catalogue disabled, preserving existing enable flags — a refresh
-  cannot silently widen what the gateway exposes.
+- **Gateway card** — the enable switch, and while enabled the endpoint as a
+  read-only copyable field plus the keyring from
+  [the gateway-keys note](2026-11-24-ai-gateway-keys.md): one tile per
+  named key, masked secret behind an eye toggle, copy, per-key usage and
+  delete (see that note for the auth model this replaced).
+- **Providers** — one card per provider (a provider is acted on as a
+  unit, so it gets its own boundary; disabled providers fade rather than
+  disappear). The editor dialog is wide enough for a real catalogue and
+  has name, API key (obscure, hint that local models need none), one tab
+  per protocol holding its base-URL field with "Fetch models" and
+  "Test connection" actions, and the model catalogue as *capsules* — a
+  wrap of tappable pills, each showing a green 免费 tag and the context
+  window when the endpoint reported them, selected state drawn as a
+  check + brand border/background rather than a switch column. "Fetch
+  models" calls `AiRouter.fetchModelCatalog(provider, protocol)`, which
+  takes the provider object so it can fetch against *unsaved* endpoint
+  edits; the codecs' new `decodeModelCatalog` keeps whatever metadata
+  the listing volunteers (OpenRouter `context_length`/`pricing`, Zen
+  `limit.context`/`cost`, Gemini token limits, Anthropic `display_name`)
+  and merges it onto `AiProviderModel.contextTokens`/`isFree`/`label`,
+  refreshing metadata on refetch while never touching enable flags —
+  a refresh cannot silently widen what the gateway exposes. Built-in
+  providers additionally drop anything the endpoint confirms as paid:
+  they are free-tier by definition, and unknown pricing stays because
+  some listings (Zen's Anthropic-shaped one) carry none.
 - **Routing groups** — name plus an ordered member list with up/down
   reorder, because order *is* the failover order. The member picker offers
   `config.exposedModelRefs()` minus the group itself.

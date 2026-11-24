@@ -1442,6 +1442,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get aiFetchNoFree => '没有可添加的免费模型';
+
+  @override
+  String get aiModelFree => '免费';
+
+  @override
   String get aiTestConnection => '测试连通';
 
   @override
@@ -1511,13 +1517,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayEndpoint => '端点';
 
   @override
-  String get aiGatewayToken => '访问令牌';
+  String get aiGatewayKeys => '网关密钥';
 
   @override
-  String get aiGatewayTokenReveal => '显示令牌';
+  String get aiGatewayKeyAdd => '添加网关密钥';
 
   @override
-  String get aiGatewayTokenHide => '隐藏令牌';
+  String get aiGatewayKeyNameHint => '密钥名称（如：笔记本）';
+
+  @override
+  String get aiGatewayKeySecretHint => '自定义密钥（可选）';
+
+  @override
+  String get aiGatewayKeyCreate => '创建';
+
+  @override
+  String get aiGatewayKeyCancel => '取消';
+
+  @override
+  String aiGatewayKeyUsage(int requests, String tokens) {
+    return '$requests 次请求 · $tokens token';
+  }
+
+  @override
+  String get aiGatewayKeyDuplicate => '该密钥已存在';
+
+  @override
+  String get aiGatewayKeyReveal => '显示密钥';
+
+  @override
+  String get aiGatewayKeyHide => '隐藏密钥';
 
   @override
   String get aiGatewayNotListening => '已配置，但当前未在监听';
@@ -1526,7 +1555,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayNotListeningHint => '网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。';
 
   @override
-  String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。';
+  String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把网关密钥作为 API 密钥。';
 
   @override
   String get aiGatewayScope => '监听范围';
@@ -1574,19 +1603,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRequestsEmpty => '暂无请求记录。';
 
   @override
-  String get aiMetricDuration => '耗时';
+  String aiLogSeconds(String value) {
+    return '$value秒';
+  }
 
   @override
-  String get aiMetricFirstToken => '首字';
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+  ) {
+    return '$duration 首字耗时 $ttft $tokens token 缓存 $percent';
+  }
 
   @override
-  String get aiMetricTokens => '总 Token';
+  String get aiLogInputUncached => '输入（未缓存）';
 
   @override
-  String get aiMetricCached => '缓存';
+  String get aiLogOutput => '输出';
 
   @override
-  String get aiMetricSpeed => '速度';
+  String get aiLogCacheRead => '缓存读取';
+
+  @override
+  String get aiLogCacheWrite => '缓存写入';
 
   @override
   String get aiDeleteProviderTitle => '删除供应商？';

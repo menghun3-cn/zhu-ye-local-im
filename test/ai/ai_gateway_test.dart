@@ -45,7 +45,7 @@ final class FakeTransport implements AiTransport {
 void main() {
   late FakeTransport transport;
   late AiGateway gateway;
-  late AiGatewayToken token;
+  late List<AiGatewayKey> keys;
   late HttpClient client;
   late String base;
 
@@ -82,11 +82,14 @@ void main() {
         ],
       ),
     );
-    token = const AiGatewayToken('lt-ai-test-token');
+    keys = [
+      const AiGatewayKey(name: 'default', secret: 'lt-ai-test-token'),
+      const AiGatewayKey(name: 'laptop', secret: 'sk-laptop-key'),
+    ];
     gateway = AiGateway(
       store: store,
       router: AiRouter(store: store, transport: transport),
-      token: token,
+      keySource: () async => keys,
     );
     await gateway.start();
     base = 'http://127.0.0.1:${gateway.actualPort}';
@@ -104,14 +107,18 @@ void main() {
     bool auth = true,
   }) async {
     final request = await client.postUrl(Uri.parse('$base$path'));
-    if (auth) request.headers.set('authorization', 'Bearer ${token.value}');
+    if (auth) {
+      request.headers.set('authorization', 'Bearer ${keys.first.secret}');
+    }
     request.write(jsonEncode(body));
     return request.close();
   }
 
   Future<HttpClientResponse> httpGet(String path, {bool auth = true}) async {
     final request = await client.getUrl(Uri.parse('$base$path'));
-    if (auth) request.headers.set('authorization', 'Bearer ${token.value}');
+    if (auth) {
+      request.headers.set('authorization', 'Bearer ${keys.first.secret}');
+    }
     return request.close();
   }
 
@@ -149,6 +156,24 @@ void main() {
     final response = await httpGet('/v1/models', auth: false);
     expect(response.statusCode, 401);
     await response.drain<void>();
+  });
+
+  test('every key authenticates, and a removed key stops working', () async {
+    // The second key answers just like the default one.
+    final laptop = await client.getUrl(Uri.parse('$base/v1/models'));
+    laptop.headers.set('authorization', 'Bearer sk-laptop-key');
+    final ok = await laptop.close();
+    expect(ok.statusCode, 200);
+    await ok.drain<void>();
+
+    // The keyring is re-read per request: deleting the key revokes it
+    // without a gateway restart.
+    keys.removeWhere((k) => k.name == 'laptop');
+    final revoked = await client.getUrl(Uri.parse('$base/v1/models'));
+    revoked.headers.set('authorization', 'Bearer sk-laptop-key');
+    final denied = await revoked.close();
+    expect(denied.statusCode, 401);
+    await denied.drain<void>();
   });
 
   test('/v1/models lists enabled models and groups', () async {
@@ -271,7 +296,7 @@ void main() {
     final request = await client.postUrl(
       Uri.parse('$base/v1/chat/completions'),
     );
-    request.headers.set('authorization', 'Bearer ${token.value}');
+    request.headers.set('authorization', 'Bearer ${keys.first.secret}');
     request.write('{not json');
     final response = await request.close();
     expect(response.statusCode, 400);

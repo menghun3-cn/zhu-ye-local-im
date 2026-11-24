@@ -110,4 +110,19 @@ void main() {
       );
     });
   });
+
+  group('GeminiCodec.decodeModelCatalog', () {
+    test('sums input and output limits into the context window', () {
+      final catalog = codec.decodeModelCatalog('''
+        {"models":[
+          {"name":"models/gemini-2.5-pro","displayName":"Gemini Pro",
+           "inputTokenLimit":1000000,"outputTokenLimit":64000}
+        ]}
+      ''');
+      expect(catalog.single.id, 'gemini-2.5-pro');
+      expect(catalog.single.label, 'Gemini Pro');
+      expect(catalog.single.contextTokens, 1064000);
+      expect(catalog.single.isFree, isNull);
+    });
+  });
 }

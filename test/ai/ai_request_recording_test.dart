@@ -103,12 +103,13 @@ void main() {
         'prompt_tokens_details': {'cached_tokens': 12},
       },
     });
-    await router.chat(chat());
+    await router.chat(chat(), clientKey: 'laptop');
     final records = await settled();
     expect(records, hasLength(1));
     final record = records.single;
     expect(record.model, 'a/m1');
     expect(record.servedBy, 'a/m1');
+    expect(record.key, 'laptop');
     expect(record.totalTokens, 25);
     expect(record.cachedTokens, 12);
     expect(record.completionTokens, 5);

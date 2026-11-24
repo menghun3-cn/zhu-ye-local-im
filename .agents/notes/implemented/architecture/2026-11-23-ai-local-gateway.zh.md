@@ -7,8 +7,12 @@ Status: implemented
 > **部分被取代**，见
 > [网关局域网 scope 与供应商草稿](../feature/2026-11-24-ai-gateway-lan-and-draft.zh.md)：
 > 绑定不再由「只绑回环」一刀切——`AiGatewayConfig.scope` 可选回环或
-> `0.0.0.0`，且 `enabled` 现在默认开启。下文的令牌、端点与逐请求读取
-> 存储的机制不变。
+> `0.0.0.0`，且 `enabled` 现在默认开启。
+>
+> **被修正**，见
+> [网关密钥环](2026-11-24-ai-gateway-keys.zh.md)：单个生成的 bearer
+> 令牌变为可维护的命名密钥列表；下文的端点、逐请求读取存储与绑定
+> 生命周期不变。
 
 ## Problem
 
@@ -33,11 +37,13 @@ Windows 和 Android 两个平台。
 
 - **仅回环。** 绑定更宽的地址会把 owner 的 API key 发布到局域网，这与按设备配置的决策
   相悖。默认端口 0——端点显示在界面上，而不是写进各处配置。
-- **生成的 bearer token**（`gateway_token.dart`）守住这个端口。威胁不是网络——而是
-  同一台机器上的其他进程，否则它们可以把 `providers.json` 里存的 key 全部花掉。token
-  放在独立文件 `ai/gateway_token`，与 `providers.json` 分开，因为它按设计要在界面上
-  明文展示，泄漏时不应把旁边的 provider key 一起带走。`lt-ai-` 前缀让它像 magpie 的
-  `sk-magpie-key` 一样一眼可辨。
+- **生成的 bearer 凭据**守住这个端口——最初是单个 `lt-ai-` 令牌
+  （`gateway_token.dart`），现在是按
+  [网关密钥笔记](2026-11-24-ai-gateway-keys.zh.md)的命名密钥列表。威胁
+  不是网络——而是同一台机器上的其他进程，否则它们可以把 `providers.json`
+  里存的 key 全部花掉。秘密放在 `providers.json` 旁的独立文件，因为它们
+  按设计要在界面上明文展示，泄漏时不应把旁边的 provider key 一起带走。
+  `sk-`/`lt-ai-` 前缀让它像 magpie 的 `sk-magpie-key` 一样一眼可辨。
 - **入站只讲 OpenAI 协议。** `/v1/models` 列出已启用的 `provider/model` 引用加
   `group/<id>` 条目，正是 magpie 暴露它们的方式；`/v1/chat/completions` 把请求映射到
   规范格式（字符串或分片数组 content、工具调用、`max_tokens`/`top_p`/`stop`），再把

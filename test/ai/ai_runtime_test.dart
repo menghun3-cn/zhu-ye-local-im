@@ -145,13 +145,27 @@ void main() {
     expect(runtime.endpoint, isNotNull);
   });
 
-  test('the token is generated once and reused', () async {
-    final first = runtime.token.value;
-    expect(first, startsWith('lt-ai-'));
+  test('the default gateway key is seeded once and reused', () async {
+    final keys = await runtime.keys.load();
+    expect(keys, hasLength(1));
+    expect(keys.single.name, 'default');
+    expect(keys.single.secret, startsWith('sk-'));
 
-    final again = await AiGatewayToken.loadOrCreate(
-      '${directory.path}/gateway_token',
+    // Reopening reads the same keyring rather than rotating.
+    final again = await AiGatewayKeyStore(
+      file: File('${directory.path}/gateway_keys.json'),
+    ).load();
+    expect(again.single.secret, keys.single.secret);
+  });
+
+  test('a legacy gateway_token file migrates into the default key', () async {
+    await File('${directory.path}/gateway_token').writeAsString('lt-ai-old');
+    final store = AiGatewayKeyStore(
+      file: File('${directory.path}/keys-migrated.json'),
+      legacyTokenPath: '${directory.path}/gateway_token',
     );
-    expect(again.value, first);
+    final keys = await store.loadOrCreate();
+    expect(keys.single.name, 'default');
+    expect(keys.single.secret, 'lt-ai-old');
   });
 }

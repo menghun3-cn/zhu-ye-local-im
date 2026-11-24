@@ -34,6 +34,9 @@ void main() {
             id: 'deepseek-chat',
             protocol: AiProtocol.openaiChat,
             enabled: true,
+            label: 'DeepSeek Chat',
+            contextTokens: 128000,
+            isFree: false,
           ),
         ],
       ),
@@ -54,6 +57,10 @@ void main() {
     expect(loaded.providers.single.id, 'deepseek');
     expect(loaded.providers.single.apiKey, 'sk-live-secret');
     expect(loaded.providers.single.models.single.enabled, isTrue);
+    final model = loaded.providers.single.models.single;
+    expect(model.label, 'DeepSeek Chat');
+    expect(model.contextTokens, 128000);
+    expect(model.isFree, isFalse);
     expect(loaded.routingGroups.single.id, 'main');
     expect(loaded.gateway.enabled, isTrue);
   });

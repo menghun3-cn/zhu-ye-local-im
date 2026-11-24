@@ -301,6 +301,28 @@ void main() {
     expect(transport.sent, isEmpty);
   });
 
+  test('fetchModelCatalog keeps the metadata the endpoint reports', () async {
+    transport.pushJson(200, {
+      'data': [
+        {
+          'id': 'free/m',
+          'name': 'Free Model',
+          'context_length': 256000,
+          'pricing': {'prompt': '0', 'completion': '0'},
+        },
+      ],
+    });
+    final provider = _config().providers.first;
+    final catalog = await router.fetchModelCatalog(
+      provider,
+      AiProtocol.openaiChat,
+    );
+    expect(catalog.single.id, 'free/m');
+    expect(catalog.single.label, 'Free Model');
+    expect(catalog.single.contextTokens, 256000);
+    expect(catalog.single.isFree, isTrue);
+  });
+
   test('route events trace a failover under one call id', () async {
     final seen = <AiRouteEvent>[];
     final sub = router.events.listen(seen.add);

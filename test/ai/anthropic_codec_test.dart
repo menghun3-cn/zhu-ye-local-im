@@ -164,4 +164,16 @@ void main() {
       expect(codec.classifyError(529, ''), AiErrorKind.retryable);
     });
   });
+
+  group('AnthropicCodec.decodeModelCatalog', () {
+    test('reads ids and display_name, metadata stays unknown', () {
+      final catalog = codec.decodeModelCatalog(
+        '{"data":[{"id":"claude-opus-4-6","display_name":"Claude Opus"}]}',
+      );
+      expect(catalog.single.id, 'claude-opus-4-6');
+      expect(catalog.single.label, 'Claude Opus');
+      expect(catalog.single.contextTokens, isNull);
+      expect(catalog.single.isFree, isNull);
+    });
+  });
 }

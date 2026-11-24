@@ -152,4 +152,51 @@ void main() {
       ]);
     });
   });
+
+  group('OpenAiChatCodec.decodeModelCatalog', () {
+    test('plain ids carry no metadata', () {
+      final catalog = codec.decodeModelCatalog(
+        '{"data":[{"id":"a"},{"id":"b"}]}',
+      );
+      expect(catalog.map((m) => m.id), ['a', 'b']);
+      expect(catalog.first.contextTokens, isNull);
+      expect(catalog.first.isFree, isNull);
+      expect(catalog.first.label, isNull);
+    });
+
+    test('OpenRouter shape reads context and pricing', () {
+      final catalog = codec.decodeModelCatalog('''
+        {"data":[
+          {"id":"free/m","name":"Free Model","context_length":256000,
+           "pricing":{"prompt":"0","completion":"0"}},
+          {"id":"paid/m","context_length":1000000,
+           "pricing":{"prompt":"0.000004","completion":"0.00002"}},
+          {"id":"auto/m","context_length":1000000,
+           "pricing":{"prompt":"-1","completion":"-1"}}
+        ]}
+      ''');
+      expect(catalog[0].id, 'free/m');
+      expect(catalog[0].label, 'Free Model');
+      expect(catalog[0].contextTokens, 256000);
+      expect(catalog[0].isFree, isTrue);
+      expect(catalog[1].isFree, isFalse);
+      expect(catalog[1].contextTokens, 1000000);
+      // "-1" prices mean "varies" — unknown, not paid.
+      expect(catalog[2].isFree, isNull);
+    });
+
+    test('Zen shape reads limit.context and cost prices', () {
+      final catalog = codec.decodeModelCatalog('''
+        {"data":[
+          {"id":"big-pickle","name":"Big Pickle",
+           "limit":{"context":200000,"input":160000,"output":32000},
+           "cost":{"text":{"input":{"price":0},"output":{"price":0}}}}
+        ]}
+      ''');
+      expect(catalog.single.id, 'big-pickle');
+      expect(catalog.single.label, 'Big Pickle');
+      expect(catalog.single.contextTokens, 200000);
+      expect(catalog.single.isFree, isTrue);
+    });
+  });
 }

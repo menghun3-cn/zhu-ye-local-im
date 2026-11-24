@@ -81,3 +81,76 @@ int? jsonIntField(Map<String, Object?> json, String key) {
   if (value is double) return value.round();
   return null;
 }
+
+/// Decodes an OpenAI-shaped `/models` body (`{"data": [{"id": ...}]}`) into
+/// catalogue entries, keeping the metadata richer endpoints add on top.
+///
+/// Three shapes share this envelope:
+///
+/// - plain OpenAI: `id` only — every extra stays null;
+/// - OpenRouter-compatible (Kilo): `context_length` plus `pricing` with
+///   per-token prices as strings, `"0"` meaning free;
+/// - Zen: `limit.context` plus `cost.text.{input,output}.price` as numbers.
+///
+/// A negative price (`"-1"` on OpenRouter auto routers) means "varies", so
+/// it counts as unknown rather than paid.
+List<AiCatalogModel> decodeOpenAiCatalog(String body) {
+  final json = jsonObjectOrEmpty(body);
+  final models = <AiCatalogModel>[];
+  for (final entry in asList(json['data'])) {
+    final model = asObject(entry);
+    final id = jsonStringField(model, 'id');
+    if (id == null) continue;
+    models.add(
+      AiCatalogModel(
+        id: id,
+        contextTokens: _catalogContext(model),
+        isFree: _catalogIsFree(model),
+        label:
+            _nonEmpty(jsonStringField(model, 'name')) ??
+            _nonEmpty(jsonStringField(model, 'display_name')),
+      ),
+    );
+  }
+  return models;
+}
+
+String? _nonEmpty(String? value) =>
+    value == null || value.isEmpty ? null : value;
+
+int? _catalogContext(Map<String, Object?> model) {
+  final direct = jsonIntField(model, 'context_length');
+  if (direct != null) return direct;
+  return jsonIntField(asObject(model['limit']), 'context');
+}
+
+/// Whether the model is reported free. OpenRouter puts prices under
+/// `pricing`, Zen under `cost.text.*.price`; either pair being all zeros
+/// means free, any positive price means paid, anything else is unknown.
+bool? _catalogIsFree(Map<String, Object?> model) {
+  final pricing = asObject(model['pricing']);
+  final prompt = _priceValue(pricing['prompt']);
+  final completion = _priceValue(pricing['completion']);
+  if (prompt != null && completion != null) {
+    return prompt == 0 && completion == 0;
+  }
+  final cost = asObject(asObject(model['cost'])['text']);
+  final input = _priceValue(asObject(cost['input'])['price']);
+  final output = _priceValue(asObject(cost['output'])['price']);
+  if (input != null && output != null) {
+    return input == 0 && output == 0;
+  }
+  return null;
+}
+
+/// A price as a non-negative number, or null when absent, unparseable or
+/// negative ("-1" prices mean "varies", not "free" or "paid").
+double? _priceValue(Object? value) {
+  final parsed = switch (value) {
+    num n => n.toDouble(),
+    String s => double.tryParse(s),
+    _ => null,
+  };
+  if (parsed == null || parsed < 0) return null;
+  return parsed;
+}

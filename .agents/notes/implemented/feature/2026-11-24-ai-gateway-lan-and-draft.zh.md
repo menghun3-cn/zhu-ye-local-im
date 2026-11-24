@@ -7,6 +7,10 @@ Status: implemented
 > 修订
 > [仅回环的网关](2026-11-23-ai-local-gateway.zh.md)：绑定不再由「只绑
 > 127.0.0.1」一刀切——scope 成为持久化设置；开关默认值也改为开。
+>
+> 后被修正，见
+> [网关密钥环](2026-11-24-ai-gateway-keys.zh.md)：下文的「token」现在
+> 是命名列表中的一员；scope、草稿与重绑的决策不变。
 
 ## Problem
 

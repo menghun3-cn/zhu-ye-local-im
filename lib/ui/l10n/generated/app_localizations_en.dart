@@ -1516,6 +1516,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiFetchNoFree => 'No free models to add';
+
+  @override
+  String get aiModelFree => 'Free';
+
+  @override
   String get aiTestConnection => 'Test connection';
 
   @override
@@ -1589,13 +1595,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiGatewayEndpoint => 'Endpoint';
 
   @override
-  String get aiGatewayToken => 'Access token';
+  String get aiGatewayKeys => 'Gateway keys';
 
   @override
-  String get aiGatewayTokenReveal => 'Show token';
+  String get aiGatewayKeyAdd => 'Add gateway key';
 
   @override
-  String get aiGatewayTokenHide => 'Hide token';
+  String get aiGatewayKeyNameHint => 'Key name (e.g. Laptop)';
+
+  @override
+  String get aiGatewayKeySecretHint => 'Custom key (optional)';
+
+  @override
+  String get aiGatewayKeyCreate => 'Create';
+
+  @override
+  String get aiGatewayKeyCancel => 'Cancel';
+
+  @override
+  String aiGatewayKeyUsage(int requests, String tokens) {
+    return '$requests requests · $tokens tokens';
+  }
+
+  @override
+  String get aiGatewayKeyDuplicate => 'That key already exists';
+
+  @override
+  String get aiGatewayKeyReveal => 'Show key';
+
+  @override
+  String get aiGatewayKeyHide => 'Hide key';
 
   @override
   String get aiGatewayNotListening => 'Configured, but not listening right now';
@@ -1606,7 +1635,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiGatewayHint =>
-      'Point an OpenAI-compatible client at this endpoint with the token as its API key.';
+      'Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.';
 
   @override
   String get aiGatewayScope => 'Listen on';
@@ -1654,19 +1683,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRequestsEmpty => 'No requests yet.';
 
   @override
-  String get aiMetricDuration => 'Duration';
+  String aiLogSeconds(String value) {
+    return '${value}s';
+  }
 
   @override
-  String get aiMetricFirstToken => 'First token';
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+  ) {
+    return '$duration first token $ttft · $tokens tokens · $percent cached';
+  }
 
   @override
-  String get aiMetricTokens => 'Total tokens';
+  String get aiLogInputUncached => 'Input (uncached)';
 
   @override
-  String get aiMetricCached => 'Cached';
+  String get aiLogOutput => 'Output';
 
   @override
-  String get aiMetricSpeed => 'Speed';
+  String get aiLogCacheRead => 'Cache read';
+
+  @override
+  String get aiLogCacheWrite => 'Cache write';
 
   @override
   String get aiDeleteProviderTitle => 'Delete provider?';

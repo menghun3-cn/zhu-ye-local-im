@@ -163,6 +163,7 @@ final class AnthropicCodec implements AiCodec {
           (jsonIntField(json, 'input_tokens') ?? 0) +
           (jsonIntField(json, 'output_tokens') ?? 0),
       cachedTokens: jsonIntField(json, 'cache_read_input_tokens'),
+      cacheWriteTokens: jsonIntField(json, 'cache_creation_input_tokens'),
     );
   }
 
@@ -271,11 +272,14 @@ final class AnthropicCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
-    final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['data']))
-        ?jsonStringField(asObject(entry), 'id'),
-    ];
-  }
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  // Anthropic's own listing is a bare `data[].id` envelope, but gateways
+  // like Zen answer the same URL with the rich OpenAI-style catalogue —
+  // the shared parser reads both, display_name included.
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) =>
+      decodeOpenAiCatalog(body);
 }

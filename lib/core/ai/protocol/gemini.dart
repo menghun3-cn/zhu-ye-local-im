@@ -229,12 +229,38 @@ final class GeminiCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) {
     final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['models']))
-        if (jsonStringField(asObject(entry), 'name') case final name?)
-          name.startsWith('models/') ? name.substring(7) : name,
-    ];
+    final models = <AiCatalogModel>[];
+    for (final entry in asList(json['models'])) {
+      final model = asObject(entry);
+      final rawName = jsonStringField(model, 'name');
+      if (rawName == null) continue;
+      models.add(
+        AiCatalogModel(
+          id: rawName.startsWith('models/') ? rawName.substring(7) : rawName,
+          // Gemini reports input and output limits separately; the
+          // usable window is their sum.
+          contextTokens: _geminiContext(model),
+          label: _nonEmptyLabel(jsonStringField(model, 'displayName')),
+        ),
+      );
+    }
+    return models;
   }
 }
+
+int? _geminiContext(Map<String, Object?> model) {
+  final input = jsonIntField(model, 'inputTokenLimit');
+  final output = jsonIntField(model, 'outputTokenLimit');
+  if (input == null && output == null) return null;
+  return (input ?? 0) + (output ?? 0);
+}
+
+String? _nonEmptyLabel(String? value) =>
+    value == null || value.isEmpty ? null : value;

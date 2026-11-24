@@ -236,11 +236,11 @@ final class OpenAiResponsesCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
-    final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['data']))
-        ?jsonStringField(asObject(entry), 'id'),
-    ];
-  }
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) =>
+      decodeOpenAiCatalog(body);
 }
