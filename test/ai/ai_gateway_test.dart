@@ -121,6 +121,30 @@ void main() {
     expect(gateway.endpoint, endsWith('/v1'));
   });
 
+  test('LAN scope lists RFC1918 addresses before overlay space', () async {
+    await gateway.stop();
+    await gateway.start(scope: AiGatewayScope.lan);
+    final addresses = gateway.lanAddresses;
+    bool isPrivate(String address) {
+      final parts = address.split('.').map(int.tryParse).toList();
+      if (parts.length != 4 || parts.any((p) => p == null)) return false;
+      final a = parts[0]!;
+      final b = parts[1]!;
+      return a == 10 || a == 192 && b == 168 || a == 172 && b >= 16 && b <= 31;
+    }
+
+    // The list must be a partition: once an overlay address (Tailscale's
+    // 100.64/10, a VPN) appears, no private one may follow it — the first
+    // entry is what the routing node advertises as "the" LAN address.
+    final firstOverlay = addresses.indexWhere((a) => !isPrivate(a));
+    if (firstOverlay == -1) return;
+    expect(
+      addresses.skip(firstOverlay).every((a) => !isPrivate(a)),
+      isTrue,
+      reason: 'addresses: $addresses',
+    );
+  });
+
   test('requests without the token are refused', () async {
     final response = await httpGet('/v1/models', auth: false);
     expect(response.statusCode, 401);

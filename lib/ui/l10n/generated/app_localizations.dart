@@ -2836,7 +2836,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiRoutingGateway.
   ///
   /// In en, this message translates to:
-  /// **'Leaf gateway'**
+  /// **'Gateway'**
   String get aiRoutingGateway;
 
   /// No description provided for @aiRoutingCooling.

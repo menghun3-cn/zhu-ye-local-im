@@ -110,7 +110,7 @@ final class AiGateway {
         type: InternetAddressType.IPv4,
         includeLinkLocal: false,
       );
-      return [
+      final addresses = [
         for (final interface in interfaces)
           if (!_isVirtualInterface(interface.name))
             for (final addr in interface.addresses)
@@ -119,6 +119,14 @@ final class AiGateway {
                   !_isVirtualSubnet(addr.address))
                 addr.address,
       ];
+      // Interface enumeration order is arbitrary, and overlay networks
+      // (Tailscale's 100.64/10, VPNs) routinely come first — but the
+      // address a LAN peer actually dials is the RFC1918 one. Rank
+      // private ranges ahead so "the" gateway address is the LAN's.
+      return addresses..sort((a, b) {
+        final byRank = _lanAddressRank(a).compareTo(_lanAddressRank(b));
+        return byRank != 0 ? byRank : a.compareTo(b);
+      });
     } on Object {
       return const [];
     }
@@ -135,6 +143,20 @@ final class AiGateway {
     r'tap-|tun|vpn|loopback|bluetooth|teredo|isatap|npcap|wan miniport',
     caseSensitive: false,
   );
+
+  /// 0 for RFC1918 space a LAN peer would dial, 1 for overlay/CGNAT and
+  /// anything else — the sort key that keeps Tailscale from outranking the
+  /// real LAN address.
+  static int _lanAddressRank(String address) {
+    final parts = address.split('.');
+    if (parts.length != 4) return 1;
+    final a = int.tryParse(parts[0]);
+    final b = int.tryParse(parts[1]);
+    if (a == null || b == null) return 1;
+    if (a == 10 || a == 192 && b == 168) return 0;
+    if (a == 172 && b >= 16 && b <= 31) return 0;
+    return 1;
+  }
 
   static bool _isVirtualInterface(String name) =>
       _virtualInterfaceName.hasMatch(name);

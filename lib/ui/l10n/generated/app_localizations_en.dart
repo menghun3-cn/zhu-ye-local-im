@@ -1631,7 +1631,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingSource => 'Agent';
 
   @override
-  String get aiRoutingGateway => 'Leaf gateway';
+  String get aiRoutingGateway => 'Gateway';
 
   @override
   String aiRoutingCooling(int seconds) {

@@ -46,7 +46,12 @@ virtual adapter from a physical NIC — Hyper-V `vEthernet`, VMware and
 VirtualBox interfaces all report as ethernet — so the list filters known
 virtual-adapter names and VirtualBox's default `192.168.56.0/24` host-only
 subnet; a renamed virtual NIC may still appear, which costs a stray row,
-never a wrong bind, because the socket is `0.0.0.0` either way. The card shows a
+never a wrong bind, because the socket is `0.0.0.0` either way. The
+surviving list is sorted so RFC1918 space precedes overlay ranges —
+interface enumeration order is arbitrary and an overlay NIC (Tailscale's
+100.64/10, a VPN) routinely wins it, while the address a LAN peer
+actually dials is the private one; the first entry is what the routing
+node advertises as the gateway's address. The card shows a
 loopback/LAN `SegmentedButton`, the local endpoint always, and one
 `http://<lan-ip>:<port>/v1` field per discovered address under LAN scope,
 plus a hint that the token is the only credential on the wire.

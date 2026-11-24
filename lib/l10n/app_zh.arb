@@ -495,7 +495,7 @@
 
   "aiRoutingTitle": "路由",
   "aiRoutingSource": "Agent",
-  "aiRoutingGateway": "竹叶网关",
+  "aiRoutingGateway": "网关",
   "aiRoutingCooling": "冷却中 {seconds}s",
   "@aiRoutingCooling": {
     "placeholders": { "seconds": { "type": "int" } }

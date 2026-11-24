@@ -669,7 +669,7 @@
 
   "aiRoutingTitle": "Routing",
   "aiRoutingSource": "Agent",
-  "aiRoutingGateway": "Leaf gateway",
+  "aiRoutingGateway": "Gateway",
   "aiRoutingCooling": "Cooling {seconds}s",
   "@aiRoutingCooling": {
     "placeholders": { "seconds": { "type": "int" } }
