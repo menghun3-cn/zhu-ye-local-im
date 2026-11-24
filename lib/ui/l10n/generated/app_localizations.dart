@@ -2761,6 +2761,18 @@ abstract class AppLocalizations {
   /// **'Access token'**
   String get aiGatewayToken;
 
+  /// No description provided for @aiGatewayTokenReveal.
+  ///
+  /// In en, this message translates to:
+  /// **'Show token'**
+  String get aiGatewayTokenReveal;
+
+  /// No description provided for @aiGatewayTokenHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide token'**
+  String get aiGatewayTokenHide;
+
   /// No description provided for @aiGatewayNotListening.
   ///
   /// In en, this message translates to:

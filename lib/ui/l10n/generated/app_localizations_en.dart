@@ -1592,6 +1592,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiGatewayToken => 'Access token';
 
   @override
+  String get aiGatewayTokenReveal => 'Show token';
+
+  @override
+  String get aiGatewayTokenHide => 'Hide token';
+
+  @override
   String get aiGatewayNotListening => 'Configured, but not listening right now';
 
   @override

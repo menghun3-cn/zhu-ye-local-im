@@ -87,4 +87,61 @@ void main() {
     expect(find.text('Kilo'), findsOneWidget);
     expect(find.text(l10n.aiAddProvider), findsOneWidget);
   });
+
+  testWidgets('the gateway token stays obscured until the eye is tapped', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    final seams = PlatformSeams(
+      store: MemoryProfileStore(),
+      profilePath: null,
+      messageStore: MemoryMessageStore(),
+      messagePath: null,
+      beacon: MemoryBeaconHub().a,
+      clipboard: MemorySystemClipboard(),
+      platform: DevicePlatform.windows,
+      defaultIncomingDirectory: null,
+      hostShell: ScriptedHostShell(),
+      controlsWindow: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: AiPage(
+            runtime: runtime,
+            seams: seams,
+            configLoader: () async => config!,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final l10n = lookupAppLocalizations(appLocale);
+
+    await tester.tap(find.text(l10n.aiNavGateway));
+    await tester.pumpAndSettle();
+
+    // The token field is the only obscured one on the tab. TextFormField
+    // hides the flag on its inner TextField, so look there.
+    final obscured = tester
+        .widgetList<TextField>(find.byType(TextField))
+        .where((field) => field.obscureText)
+        .length;
+    expect(obscured, 1);
+
+    await tester.tap(find.byIcon(Icons.visibility_outlined));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<TextField>(find.byType(TextField))
+          .where((field) => field.obscureText)
+          .length,
+      0,
+    );
+  });
 }

@@ -482,6 +482,8 @@
   "aiGatewayOff": "本地工具无法访问已配置的供应商",
   "aiGatewayEndpoint": "端点",
   "aiGatewayToken": "访问令牌",
+  "aiGatewayTokenReveal": "显示令牌",
+  "aiGatewayTokenHide": "隐藏令牌",
   "aiGatewayNotListening": "已配置，但当前未在监听",
   "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
   "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。",

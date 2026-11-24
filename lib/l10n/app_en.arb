@@ -656,6 +656,8 @@
   "aiGatewayOff": "Local tools cannot reach the configured providers",
   "aiGatewayEndpoint": "Endpoint",
   "aiGatewayToken": "Access token",
+  "aiGatewayTokenReveal": "Show token",
+  "aiGatewayTokenHide": "Hide token",
   "aiGatewayNotListening": "Configured, but not listening right now",
   "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then restart the app.",
   "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with the token as its API key.",

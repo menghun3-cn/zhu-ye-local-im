@@ -1514,6 +1514,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayToken => '访问令牌';
 
   @override
+  String get aiGatewayTokenReveal => '显示令牌';
+
+  @override
+  String get aiGatewayTokenHide => '隐藏令牌';
+
+  @override
   String get aiGatewayNotListening => '已配置，但当前未在监听';
 
   @override

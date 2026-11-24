@@ -511,6 +511,7 @@ class _GatewayCard extends StatelessWidget {
               _CopyableField(
                 label: l10n.aiGatewayToken,
                 value: token,
+                secret: true,
                 onCopy: onCopy,
               ),
               const SizedBox(height: 8),
@@ -530,29 +531,41 @@ class _GatewayCard extends StatelessWidget {
 }
 
 /// A read-only value with a copy button — the endpoint and token are facts
-/// to hand to another program, not preferences to edit.
-class _CopyableField extends StatelessWidget {
+/// to hand to another program, not preferences to edit. A [secret] field
+/// starts obscured and reveals on the eye toggle, so the token is not
+/// shoulder-readable while the endpoint beside it stays plain.
+class _CopyableField extends StatefulWidget {
   const _CopyableField({
     required this.label,
     required this.value,
     required this.onCopy,
     this.enabled = true,
+    this.secret = false,
   });
 
   final String label;
   final String value;
   final ValueChanged<String> onCopy;
   final bool enabled;
+  final bool secret;
+
+  @override
+  State<_CopyableField> createState() => _CopyableFieldState();
+}
+
+class _CopyableFieldState extends State<_CopyableField> {
+  bool _revealed = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
+    final obscured = widget.secret && !_revealed;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          widget.label,
           style: TextStyle(
             fontSize: WeChat.fontSizePreview,
             color: colors.secondaryText,
@@ -560,18 +573,39 @@ class _CopyableField extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         TextFormField(
-          initialValue: value,
+          initialValue: widget.value,
           readOnly: true,
           enableInteractiveSelection: true,
+          obscureText: obscured,
           style: const TextStyle(fontSize: WeChat.fontSizeInput),
           decoration: InputDecoration(
             isDense: true,
             filled: true,
             fillColor: colors.surfaceSunken,
-            suffixIcon: IconButton(
-              tooltip: l10n.copySelection,
-              onPressed: enabled ? () => onCopy(value) : null,
-              icon: const Icon(Icons.copy_outlined, size: 18),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.secret)
+                  IconButton(
+                    tooltip: obscured
+                        ? l10n.aiGatewayTokenReveal
+                        : l10n.aiGatewayTokenHide,
+                    onPressed: () => setState(() => _revealed = !_revealed),
+                    icon: Icon(
+                      obscured
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 18,
+                    ),
+                  ),
+                IconButton(
+                  tooltip: l10n.copySelection,
+                  onPressed: widget.enabled
+                      ? () => widget.onCopy(widget.value)
+                      : null,
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                ),
+              ],
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(WeChat.controlRadius),

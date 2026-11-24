@@ -54,6 +54,9 @@ Concretely the surface covers:
 - **Gateway card** — the enable switch, and while enabled the endpoint and
   `lt-ai-` token as read-only copyable fields (copied through
   `seams.clipboard`, toasted through `TopToast` like every other refusal).
+  The token renders obscured behind an eye toggle — it is a bearer
+  credential, and a settings page is exactly where shoulder-surfing
+  happens.
 - **Providers** — preset picker (the `aiProviderPresets` catalogue) or a
   custom endpoint; the editor has name, API key (obscure, hint that local
   models need none), one tab per protocol holding its base-URL field with
