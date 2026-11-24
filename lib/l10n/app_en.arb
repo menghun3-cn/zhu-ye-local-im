@@ -656,6 +656,11 @@
   "aiGatewayNotListening": "Configured, but not listening right now",
   "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then restart the app.",
   "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with the token as its API key.",
+  "aiGatewayScope": "Listen on",
+  "aiGatewayScopeLoopback": "This device only",
+  "aiGatewayScopeLan": "Local network",
+  "aiGatewayLanEndpoint": "LAN endpoint",
+  "aiGatewayLanHint": "LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.",
 
   "aiDeleteProviderTitle": "Delete provider?",
   "aiDeleteProviderBody": "The provider's key and models are removed, and every routing-group member pointing at it is dropped.",

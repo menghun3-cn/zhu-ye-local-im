@@ -482,6 +482,11 @@
   "aiGatewayNotListening": "已配置，但当前未在监听",
   "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
   "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。",
+  "aiGatewayScope": "监听范围",
+  "aiGatewayScopeLoopback": "仅本机",
+  "aiGatewayScopeLan": "局域网",
+  "aiGatewayLanEndpoint": "局域网端点",
+  "aiGatewayLanHint": "局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。",
 
   "aiDeleteProviderTitle": "删除供应商？",
   "aiDeleteProviderBody": "供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。",

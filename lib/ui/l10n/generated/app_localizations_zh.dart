@@ -1518,6 +1518,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。';
 
   @override
+  String get aiGatewayScope => '监听范围';
+
+  @override
+  String get aiGatewayScopeLoopback => '仅本机';
+
+  @override
+  String get aiGatewayScopeLan => '局域网';
+
+  @override
+  String get aiGatewayLanEndpoint => '局域网端点';
+
+  @override
+  String get aiGatewayLanHint =>
+      '局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。';
+
+  @override
   String get aiDeleteProviderTitle => '删除供应商？';
 
   @override

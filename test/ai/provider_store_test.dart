@@ -99,7 +99,19 @@ void main() {
   test('load with nothing saved returns defaults', () async {
     final loaded = await store.load();
     expect(loaded.providers, isEmpty);
-    expect(loaded.gateway.enabled, isFalse);
+    // Gateway on by default (loopback, ephemeral port) — see
+    // AiGatewayConfig's doc comment for why.
+    expect(loaded.gateway.enabled, isTrue);
+    expect(loaded.gateway.scope, AiGatewayScope.loopback);
+  });
+
+  test('the gateway scope round-trips through providers.json', () async {
+    final config = sampleConfig().copyWith(
+      gateway: const AiGatewayConfig(enabled: true, scope: AiGatewayScope.lan),
+    );
+    await store.save(config);
+    final loaded = await store.load();
+    expect(loaded.gateway.scope, AiGatewayScope.lan);
   });
 
   test('AiConfig.exposedModelRefs lists enabled models and groups', () async {

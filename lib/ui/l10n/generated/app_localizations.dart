@@ -2773,6 +2773,36 @@ abstract class AppLocalizations {
   /// **'Point an OpenAI-compatible client at this endpoint with the token as its API key.'**
   String get aiGatewayHint;
 
+  /// No description provided for @aiGatewayScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen on'**
+  String get aiGatewayScope;
+
+  /// No description provided for @aiGatewayScopeLoopback.
+  ///
+  /// In en, this message translates to:
+  /// **'This device only'**
+  String get aiGatewayScopeLoopback;
+
+  /// No description provided for @aiGatewayScopeLan.
+  ///
+  /// In en, this message translates to:
+  /// **'Local network'**
+  String get aiGatewayScopeLan;
+
+  /// No description provided for @aiGatewayLanEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN endpoint'**
+  String get aiGatewayLanEndpoint;
+
+  /// No description provided for @aiGatewayLanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.'**
+  String get aiGatewayLanHint;
+
   /// No description provided for @aiDeleteProviderTitle.
   ///
   /// In en, this message translates to:

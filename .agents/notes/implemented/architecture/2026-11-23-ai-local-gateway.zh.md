@@ -4,6 +4,12 @@ Status: implemented
 
 [English](2026-11-23-ai-local-gateway.md) | 中文
 
+> **部分被取代**，见
+> [网关局域网 scope 与供应商草稿](../feature/2026-11-24-ai-gateway-lan-and-draft.zh.md)：
+> 绑定不再由「只绑回环」一刀切——`AiGatewayConfig.scope` 可选回环或
+> `0.0.0.0`，且 `enabled` 现在默认开启。下文的令牌、端点与逐请求读取
+> 存储的机制不变。
+
 ## Problem
 
 AI 核心（见

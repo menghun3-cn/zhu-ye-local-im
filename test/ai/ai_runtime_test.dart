@@ -20,7 +20,11 @@ void main() {
   test('opens with defaults and persists providers', () async {
     var config = await runtime.load();
     expect(config.providers, isEmpty);
-    expect(config.gateway.enabled, isFalse);
+    // The gateway defaults on: loopback is nil-risk behind the token, and
+    // "configure once, use everywhere" needs it listening without a detour
+    // through settings. `start()` was never called, so nothing is bound.
+    expect(config.gateway.enabled, isTrue);
+    expect(config.gateway.scope, AiGatewayScope.loopback);
     expect(runtime.gateway, isNull);
 
     config = config.copyWith(
@@ -85,6 +89,31 @@ void main() {
       client.getUrl(Uri.parse('$endpoint/models')),
       throwsA(isA<SocketException>()),
     );
+  });
+
+  test('a scope change rebinds the gateway', () async {
+    final config = await runtime.load();
+    await runtime.save(
+      config.copyWith(gateway: const AiGatewayConfig(enabled: true)),
+    );
+    final loopback = runtime.gateway;
+    expect(loopback, isNotNull);
+    expect(loopback!.scope, AiGatewayScope.loopback);
+
+    await runtime.save(
+      config.copyWith(
+        gateway: const AiGatewayConfig(
+          enabled: true,
+          scope: AiGatewayScope.lan,
+        ),
+      ),
+    );
+    final lan = runtime.gateway;
+    expect(lan, isNotNull);
+    expect(lan, isNot(loopback));
+    expect(lan!.scope, AiGatewayScope.lan);
+    // 0.0.0.0 answers loopback too, so the local endpoint still works.
+    expect(runtime.endpoint, isNotNull);
   });
 
   test('the token is generated once and reused', () async {

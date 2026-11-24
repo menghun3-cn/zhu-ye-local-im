@@ -4,6 +4,12 @@ Status: implemented
 
 English | [中文](2026-11-23-ai-local-gateway.zh.md)
 
+> **Superseded in part** by
+> [gateway LAN scope and provider drafts](../feature/2026-11-24-ai-gateway-lan-and-draft.md):
+> the bind is no longer loopback-only by fiat — `AiGatewayConfig.scope`
+> selects loopback or `0.0.0.0`, and `enabled` now defaults on. The token,
+> endpoints and per-request store reads below are unchanged.
+
 ## Problem
 
 The AI core (see

@@ -39,6 +39,10 @@ final class AiRuntime {
 
   AiGateway? _gateway;
 
+  /// The gateway configuration the running server was bound with — a save
+  /// that changes scope or port must rebind, not just flip a flag.
+  AiGatewayConfig? _boundGateway;
+
   /// Serializes [_syncGateway]: two saves landing while a bind is in flight
   /// must not each create a server — the loser would leak a listening port
   /// nobody holds a reference to.
@@ -49,6 +53,10 @@ final class AiRuntime {
 
   /// The base URL callers configure, or null while nothing listens.
   String? get endpoint => _gateway?.endpoint;
+
+  /// The LAN addresses the gateway answers on, empty under loopback scope
+  /// or while nothing listens.
+  List<String> get lanAddresses => _gateway?.lanAddresses ?? const [];
 
   /// Assembles the stack under [directory].
   ///
@@ -101,20 +109,36 @@ final class AiRuntime {
     if (!gateway.enabled) {
       if (running != null) {
         _gateway = null;
+        _boundGateway = null;
         await running.stop();
       }
       return;
     }
-    if (running != null) return;
+    // Already bound *with this exact configuration*: a scope or port change
+    // is a different server, not a no-op.
+    final bound = _boundGateway;
+    if (running != null &&
+        bound != null &&
+        bound.port == gateway.port &&
+        bound.scope == gateway.scope) {
+      return;
+    }
+    if (running != null) {
+      _gateway = null;
+      _boundGateway = null;
+      await running.stop();
+    }
     final server = AiGateway(store: store, router: router, token: token);
     try {
-      await server.start(preferredPort: gateway.port);
+      await server.start(preferredPort: gateway.port, scope: gateway.scope);
       _gateway = server;
+      _boundGateway = gateway;
     } on Object {
       // Port taken and the fallback also failed, or the socket is denied:
       // the flag stays set so the next launch retries, and the settings
       // surface reports the endpoint as absent rather than pretending.
       _gateway = null;
+      _boundGateway = null;
     }
   }
 
@@ -123,6 +147,7 @@ final class AiRuntime {
   Future<void> dispose() async {
     final running = _gateway;
     _gateway = null;
+    _boundGateway = null;
     await running?.stop();
   }
 }

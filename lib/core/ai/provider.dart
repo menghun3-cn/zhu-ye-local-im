@@ -200,23 +200,51 @@ final class AiRoutingGroup {
   );
 }
 
+/// Which interfaces the local AI gateway listens on.
+enum AiGatewayScope {
+  /// `127.0.0.1` only — tools on this machine reach it, nothing else can.
+  loopback,
+
+  /// Every IPv4 interface (`0.0.0.0`) — loopback *and* each LAN address.
+  /// The bearer token is the only thing between the LAN and the configured
+  /// providers' keys, so this mode is opt-in, never the default.
+  lan,
+}
+
 /// Whether the local AI gateway binds at startup, and where.
 final class AiGatewayConfig {
-  const AiGatewayConfig({this.enabled = false, this.port = 0});
+  const AiGatewayConfig({
+    this.enabled = true,
+    this.port = 0,
+    this.scope = AiGatewayScope.loopback,
+  });
 
-  /// When true the gateway listens on 127.0.0.1 for as long as the app runs.
+  /// When true the gateway listens for as long as the app runs. On by
+  /// default: the endpoint is how local tools discover the configured
+  /// providers, and loopback exposure is nil-risk behind the token.
   final bool enabled;
 
   /// Preferred port; 0 means "any free port" and the actual one is reported
   /// back through the running server, never assumed.
   final int port;
 
-  Map<String, Object?> toJson() => {'enabled': enabled, 'port': port};
+  /// Loopback-only or every interface.
+  final AiGatewayScope scope;
+
+  Map<String, Object?> toJson() => {
+    'enabled': enabled,
+    'port': port,
+    'scope': scope.name,
+  };
 
   factory AiGatewayConfig.fromJson(Map<String, Object?>? json) =>
       AiGatewayConfig(
-        enabled: json?['enabled'] as bool? ?? false,
+        enabled: json?['enabled'] as bool? ?? true,
         port: json?['port'] as int? ?? 0,
+        scope: switch (json?['scope']) {
+          'lan' => AiGatewayScope.lan,
+          _ => AiGatewayScope.loopback,
+        },
       );
 }
 

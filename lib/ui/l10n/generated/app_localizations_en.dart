@@ -1599,6 +1599,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Point an OpenAI-compatible client at this endpoint with the token as its API key.';
 
   @override
+  String get aiGatewayScope => 'Listen on';
+
+  @override
+  String get aiGatewayScopeLoopback => 'This device only';
+
+  @override
+  String get aiGatewayScopeLan => 'Local network';
+
+  @override
+  String get aiGatewayLanEndpoint => 'LAN endpoint';
+
+  @override
+  String get aiGatewayLanHint =>
+      'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.';
+
+  @override
   String get aiDeleteProviderTitle => 'Delete provider?';
 
   @override

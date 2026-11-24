@@ -92,7 +92,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       children: [
         _GatewayCard(
           config: config,
-          endpoint: runtime.endpoint,
+          gateway: runtime.gateway,
           token: runtime.token.value,
           onChanged: (gateway) => _save(config.copyWith(gateway: gateway)),
           onCopy: (text) => unawaited(_copy(text)),
@@ -225,11 +225,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         kind: AiProviderKind.custom,
       );
     }
-    await _save(
-      (_config ?? config).copyWith(
-        providers: [...(_config ?? config).providers, provider],
-      ),
-    );
+    // The draft is *not* saved here: persisting on selection meant a user
+    // who picked a preset and then cancelled still owned a provider they
+    // never confirmed. `_saveProvider` appends on save, so the editor can
+    // open on a provider the document does not contain yet.
     if (!mounted) return;
     await _editProvider(provider);
   }
@@ -248,13 +247,18 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   /// Opens the provider editor; resolves when the dialog closes.
   Future<void> _editProvider(AiProvider provider) async {
+    // Delete only makes sense for a provider the document already holds —
+    // a fresh draft has nothing to remove, and offering the button would
+    // write a no-op save.
+    final persisted =
+        _config?.providers.any((p) => p.id == provider.id) ?? false;
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => _ProviderEditorDialog(
         runtime: widget.runtime!,
         provider: provider,
         onSave: _saveProvider,
-        onDelete: () => _deleteProvider(provider),
+        onDelete: persisted ? () => _deleteProvider(provider) : null,
       ),
     );
     if (saved == true) await _reload();
@@ -352,14 +356,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 class _GatewayCard extends StatelessWidget {
   const _GatewayCard({
     required this.config,
-    required this.endpoint,
+    required this.gateway,
     required this.token,
     required this.onChanged,
     required this.onCopy,
   });
 
   final AiConfig config;
-  final String? endpoint;
+
+  /// The bound server, or null while the flag is off or the bind failed —
+  /// the card shows "configured but not listening" from that alone.
+  final AiGateway? gateway;
   final String token;
   final ValueChanged<AiGatewayConfig> onChanged;
   final ValueChanged<String> onCopy;
@@ -367,7 +374,10 @@ class _GatewayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final enabled = config.gateway.enabled;
+    final gatewayConfig = config.gateway;
+    final enabled = gatewayConfig.enabled;
+    final endpoint = gateway?.endpoint;
+    final port = gateway?.actualPort;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(WeChat.cardPadding),
@@ -378,12 +388,45 @@ class _GatewayCard extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               value: enabled,
               onChanged: (value) => onChanged(
-                AiGatewayConfig(enabled: value, port: config.gateway.port),
+                AiGatewayConfig(
+                  enabled: value,
+                  port: gatewayConfig.port,
+                  scope: gatewayConfig.scope,
+                ),
               ),
               title: Text(l10n.aiGatewayTitle),
               subtitle: Text(enabled ? l10n.aiGatewayOn : l10n.aiGatewayOff),
             ),
             if (enabled) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.aiGatewayScope,
+                style: TextStyle(
+                  fontSize: WeChat.fontSizePreview,
+                  color: WeChatColors.of(context).secondaryText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SegmentedButton<AiGatewayScope>(
+                segments: [
+                  ButtonSegment(
+                    value: AiGatewayScope.loopback,
+                    label: Text(l10n.aiGatewayScopeLoopback),
+                  ),
+                  ButtonSegment(
+                    value: AiGatewayScope.lan,
+                    label: Text(l10n.aiGatewayScopeLan),
+                  ),
+                ],
+                selected: {gatewayConfig.scope},
+                onSelectionChanged: (selection) => onChanged(
+                  AiGatewayConfig(
+                    enabled: enabled,
+                    port: gatewayConfig.port,
+                    scope: selection.first,
+                  ),
+                ),
+              ),
               const SizedBox(height: 8),
               _CopyableField(
                 label: l10n.aiGatewayEndpoint,
@@ -391,6 +434,18 @@ class _GatewayCard extends StatelessWidget {
                 enabled: endpoint != null,
                 onCopy: onCopy,
               ),
+              // Under LAN scope the same port answers on every interface;
+              // loopback alone would hide the addresses peers actually use.
+              if (gatewayConfig.scope == AiGatewayScope.lan && port != null)
+                for (final address in gateway?.lanAddresses ?? const [])
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _CopyableField(
+                      label: l10n.aiGatewayLanEndpoint,
+                      value: 'http://$address:$port/v1',
+                      onCopy: onCopy,
+                    ),
+                  ),
               const SizedBox(height: 8),
               _CopyableField(
                 label: l10n.aiGatewayToken,
@@ -401,6 +456,8 @@ class _GatewayCard extends StatelessWidget {
               HintText(
                 endpoint == null
                     ? l10n.aiGatewayNotListeningHint
+                    : gatewayConfig.scope == AiGatewayScope.lan
+                    ? l10n.aiGatewayLanHint
                     : l10n.aiGatewayHint,
               ),
             ],
@@ -525,13 +582,16 @@ class _ProviderEditorDialog extends StatefulWidget {
     required this.runtime,
     required this.provider,
     required this.onSave,
-    required this.onDelete,
+    this.onDelete,
   });
 
   final AiRuntime runtime;
   final AiProvider provider;
   final Future<void> Function(AiProvider next) onSave;
-  final Future<void> Function() onDelete;
+
+  /// Null while the provider is still an unsaved draft — there is nothing
+  /// persisted to delete.
+  final Future<void> Function()? onDelete;
 
   @override
   State<_ProviderEditorDialog> createState() => _ProviderEditorDialogState();
@@ -605,6 +665,8 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
   /// deleting a conversation gets.
   Future<void> _confirmDelete() async {
     final l10n = AppLocalizations.of(context);
+    final onDelete = widget.onDelete;
+    if (onDelete == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -624,7 +686,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
     );
     if (confirmed != true || !mounted) return;
     await guarded(context, () async {
-      await widget.onDelete();
+      await onDelete();
       if (mounted) Navigator.of(context).pop(true);
     });
   }
@@ -768,15 +830,17 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                     ),
                   ),
               ],
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _busy ? null : () => unawaited(_confirmDelete()),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: Text(l10n.deleteMessage),
+              if (widget.onDelete != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : () => unawaited(_confirmDelete()),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: Text(l10n.deleteMessage),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

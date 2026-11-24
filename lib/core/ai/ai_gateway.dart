@@ -6,22 +6,23 @@ import 'dart:typed_data';
 import 'ai_message.dart';
 import 'ai_router.dart';
 import 'gateway_token.dart';
+import 'provider.dart';
 import 'provider_store.dart';
 
-/// The local AI gateway: an OpenAI-compatible endpoint on `127.0.0.1` that
-/// serves the providers configured inside the app.
+/// The local AI gateway: an OpenAI-compatible endpoint that serves the
+/// providers configured inside the app.
 ///
 /// This is the piece that makes "configure once, use everywhere" true for
 /// tools that only know how to speak OpenAI: Claude Code, Codex, OpenCode or
-/// a curl one-liner can point at `http://127.0.0.1:<port>/v1` with the
-/// gateway token and reach every enabled model — including routing groups,
-/// which appear in `/v1/models` as `group/<id>` exactly as magpie exposes
-/// them.
+/// a curl one-liner can point at `http://<host>:<port>/v1` with the gateway
+/// token and reach every enabled model — including routing groups, which
+/// appear in `/v1/models` as `group/<id>` exactly as magpie exposes them.
 ///
-/// Loopback only, by design: the gateway exists so *this machine's* tools
-/// can use *this device's* providers. Binding wider would publish the
-/// owner's API keys to the LAN, which the per-device configuration decision
-/// explicitly ruled out.
+/// Two scopes, both behind the bearer token: `loopback` binds `127.0.0.1`
+/// only, the default; `lan` binds `0.0.0.0`, which answers on loopback *and*
+/// every LAN address — how another machine on the network reaches the same
+/// configured providers. Wider exposure is opt-in because the token is the
+/// only thing between the LAN and the owner's API keys.
 ///
 /// v1 speaks two endpoints — `GET /v1/models` and
 /// `POST /v1/chat/completions`, streaming included. Anthropic- and
@@ -52,37 +53,77 @@ final class AiGateway {
 
   HttpServer? _server;
   int? _actualPort;
+  AiGatewayScope _scope = AiGatewayScope.loopback;
+  List<String> _lanAddresses = const [];
 
   /// The port actually bound — meaningful only while [isRunning].
   int? get actualPort => _actualPort;
 
+  /// The scope this server was started with.
+  AiGatewayScope get scope => _scope;
+
+  /// Non-loopback IPv4 addresses the LAN scope answers on, discovered at
+  /// bind time. Empty under loopback scope — and possibly empty under LAN
+  /// too, when the machine has no usable interface; the endpoint list then
+  /// just shows loopback, which still works because `0.0.0.0` covers it.
+  List<String> get lanAddresses => _lanAddresses;
+
   bool get isRunning => _server != null;
 
-  /// The base URL callers configure, e.g. `http://127.0.0.1:51234/v1`.
+  /// The base URL callers on this machine configure,
+  /// e.g. `http://127.0.0.1:51234/v1`. Works under both scopes: `0.0.0.0`
+  /// answers loopback too.
   String? get endpoint =>
       _actualPort == null ? null : 'http://127.0.0.1:$_actualPort/v1';
 
-  /// Binds loopback. [preferredPort] 0 — the default — takes any free port,
+  /// Binds [scope]. [preferredPort] 0 — the default — takes any free port,
   /// which is the honest answer for a service whose port is displayed in
   /// the UI rather than written into configs.
-  Future<void> start({int preferredPort = 0}) async {
+  Future<void> start({
+    int preferredPort = 0,
+    AiGatewayScope scope = AiGatewayScope.loopback,
+  }) async {
     if (_server != null) return;
+    final address = scope == AiGatewayScope.lan
+        ? InternetAddress.anyIPv4
+        : InternetAddress.loopbackIPv4;
     try {
-      _server = await HttpServer.bind(
-        InternetAddress.loopbackIPv4,
-        preferredPort,
-      );
+      _server = await HttpServer.bind(address, preferredPort);
     } on SocketException {
-      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      _server = await HttpServer.bind(address, 0);
     }
+    _scope = scope;
     _actualPort = _server!.port;
+    if (scope == AiGatewayScope.lan) {
+      _lanAddresses = await _listLanAddresses();
+    }
     _server!.listen(_handle);
+  }
+
+  /// Every usable LAN IPv4 address, for the settings page to print. A
+  /// failure here must not take the gateway down — an empty list just
+  /// means the UI shows loopback alone.
+  static Future<List<String>> _listLanAddresses() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+      return [
+        for (final interface in interfaces)
+          for (final addr in interface.addresses)
+            if (!addr.isLoopback && !addr.isLinkLocal) addr.address,
+      ];
+    } on Object {
+      return const [];
+    }
   }
 
   Future<void> stop() async {
     await _server?.close(force: true);
     _server = null;
     _actualPort = null;
+    _lanAddresses = const [];
   }
 
   Future<void> _handle(HttpRequest request) async {
