@@ -16,9 +16,13 @@ import '../widgets.dart';
 /// makes itself look identical here. The leaf is the whole point: a list of
 /// providers says what *can* be routed, the flight says what *is* being
 /// routed, right now.
-class AiRoutingPage extends StatefulWidget {
+///
+/// This is an embeddable view, not a route: the AI settings page shows it
+/// inline at the top, where "what is being asked" belongs above the
+/// configuration that decides it. It needs a bounded height from its parent.
+class AiRoutingView extends StatefulWidget {
   /// Builds the surface over [runtime]'s router and configuration.
-  const AiRoutingPage({super.key, required this.runtime, this.configLoader});
+  const AiRoutingView({super.key, required this.runtime, this.configLoader});
 
   final AiRuntime runtime;
 
@@ -28,10 +32,10 @@ class AiRoutingPage extends StatefulWidget {
   final Future<AiConfig> Function()? configLoader;
 
   @override
-  State<AiRoutingPage> createState() => _AiRoutingPageState();
+  State<AiRoutingView> createState() => _AiRoutingViewState();
 }
 
-class _AiRoutingPageState extends State<AiRoutingPage>
+class _AiRoutingViewState extends State<AiRoutingView>
         // Plural: each in-flight request owns its leaf's controller, and a
         // single-ticker mixin would refuse the second concurrent flight.
         with
@@ -137,28 +141,27 @@ class _AiRoutingPageState extends State<AiRoutingPage>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final config = _config;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.aiRoutingTitle)),
-      body: config == null
-          ? Center(
-              child: _failure == null
-                  ? const CircularProgressIndicator()
-                  : HintText('${l10n.aiLoadFailed}: $_failure'),
-            )
-          : config.providers.isEmpty
-          ? Center(child: HintText(l10n.aiRoutingEmpty))
-          : Column(
-              children: [
-                Expanded(
-                  child: _RoutingCanvas(
-                    config: config,
-                    flights: _flights,
-                    sourceLabel: l10n.aiRoutingSource,
-                  ),
-                ),
-                _StatusBar(event: _last),
-              ],
-            ),
+    if (config == null) {
+      return Center(
+        child: _failure == null
+            ? const CircularProgressIndicator()
+            : HintText('${l10n.aiLoadFailed}: $_failure'),
+      );
+    }
+    if (config.providers.isEmpty) {
+      return Center(child: HintText(l10n.aiRoutingEmpty));
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: _RoutingCanvas(
+            config: config,
+            flights: _flights,
+            sourceLabel: l10n.aiRoutingSource,
+          ),
+        ),
+        _StatusBar(event: _last),
+      ],
     );
   }
 }

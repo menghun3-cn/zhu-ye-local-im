@@ -2827,12 +2827,6 @@ abstract class AppLocalizations {
   /// **'Routing'**
   String get aiRoutingTitle;
 
-  /// No description provided for @aiRoutingSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'See which provider a request is heading to'**
-  String get aiRoutingSubtitle;
-
   /// No description provided for @aiRoutingSource.
   ///
   /// In en, this message translates to:

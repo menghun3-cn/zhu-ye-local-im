@@ -669,7 +669,6 @@
   "aiGatewayLanHint": "LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.",
 
   "aiRoutingTitle": "Routing",
-  "aiRoutingSubtitle": "See which provider a request is heading to",
   "aiRoutingSource": "Requests",
   "aiRoutingEmpty": "No providers yet.",
 

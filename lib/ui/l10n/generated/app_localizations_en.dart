@@ -1629,9 +1629,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingTitle => 'Routing';
 
   @override
-  String get aiRoutingSubtitle => 'See which provider a request is heading to';
-
-  @override
   String get aiRoutingSource => 'Requests';
 
   @override

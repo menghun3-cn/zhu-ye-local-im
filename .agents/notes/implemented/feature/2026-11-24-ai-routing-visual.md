@@ -56,8 +56,9 @@ mid-stream reports `failed`, because the provider never finished its
 answer. Emission is best-effort: broadcast controller, no awaiting, a
 throwing listener cannot slow a request.
 
-**A routing page draws the wires and flies a leaf.**
-`AiRoutingPage` (pushed from a card at the foot of the AI settings page)
+**The routing view draws the wires and flies a leaf.**
+`AiRoutingView` (embedded at the top of the AI settings page, not pushed —
+the live route belongs above the configuration that decides it)
 puts a "Requests" node on the left and every provider on the right,
 bezier wires for the enabled ones, and one `Icons.eco` leaf per in-flight
 request flying source→provider on `attempt` and home on `served`/

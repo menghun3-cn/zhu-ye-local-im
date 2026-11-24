@@ -91,6 +91,19 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     return ListView(
       padding: WeChat.pagePadding,
       children: [
+        // The live route first: "which provider is being asked" is the
+        // question the rest of the page configures the answer to.
+        SectionHeader(title: l10n.aiRoutingTitle),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(WeChat.cardPadding),
+            child: SizedBox(
+              height: 300,
+              child: AiRoutingView(runtime: runtime),
+            ),
+          ),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
         _GatewayCard(
           config: config,
           gateway: runtime.gateway,
@@ -166,23 +179,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                         unawaited(guarded(context, () => _editGroup(group))),
                   ),
               ],
-            ),
-          ),
-        ),
-        const SizedBox(height: WeChat.sectionGap),
-        Card(
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            leading: const Icon(Icons.hub_outlined, size: 20),
-            title: Text(l10n.aiRoutingTitle),
-            subtitle: Text(l10n.aiRoutingSubtitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AiRoutingPage(runtime: runtime),
-                ),
-              ),
             ),
           ),
         ),

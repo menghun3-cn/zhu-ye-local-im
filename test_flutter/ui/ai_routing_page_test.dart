@@ -39,9 +39,14 @@ void main() {
         locale: appLocale,
         supportedLocales: appLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
-        home: AiRoutingPage(
-          runtime: runtime,
-          configLoader: () async => config!,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
         ),
       ),
     );
@@ -49,8 +54,7 @@ void main() {
     await tester.pump();
     final l10n = lookupAppLocalizations(appLocale);
 
-    expect(find.text(l10n.aiRoutingTitle), findsOneWidget);
-    // The built-ins seeded on open are the page's nodes.
+    // The built-ins seeded on open are the view's nodes.
     expect(find.text('OpenCode Zen'), findsOneWidget);
     expect(find.text('Kilo'), findsOneWidget);
     expect(find.text(l10n.aiRoutingSource), findsOneWidget);

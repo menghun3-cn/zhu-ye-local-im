@@ -1548,9 +1548,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRoutingTitle => '路由';
 
   @override
-  String get aiRoutingSubtitle => '查看请求正在走向哪个供应商';
-
-  @override
   String get aiRoutingSource => '请求来源';
 
   @override

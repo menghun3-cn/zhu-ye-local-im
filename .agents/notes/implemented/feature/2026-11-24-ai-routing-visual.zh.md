@@ -48,8 +48,8 @@ Google 原生 `/v1beta` 布局。
 best-effort：broadcast controller、不等待、抛异常的订阅者拖慢不了
 请求。
 
-**路由页画连线、放飞叶。** `AiRoutingPage`（从 AI 设置页底部卡片
-push 进入）左侧一个「请求来源」节点、右侧全部 provider 节点，
+**路由视图画连线、放飞叶。** `AiRoutingView`（内嵌在 AI 设置页顶部，
+不是 push 的独立页面——实时路由应当位于决定它的配置之上）左侧一个「请求来源」节点、右侧全部 provider 节点，
 启用者画贝塞尔连线，每个在途请求一片 `Icons.eco` 竹叶在
 attempt 时从源飞到 provider、served/failed 时飞回。位置是布局与
 控制器 0→1 进度的纯函数，窗口缩放免费重锚。`MediaQuery.disableAnimations`
