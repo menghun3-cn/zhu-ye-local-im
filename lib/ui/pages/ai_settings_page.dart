@@ -595,13 +595,15 @@ class _ProviderEditorDialog extends StatefulWidget {
   State<_ProviderEditorDialog> createState() => _ProviderEditorDialogState();
 }
 
-class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
+class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _name;
   late final TextEditingController _apiKey;
   late final Map<AiProtocol, TextEditingController> _endpoints;
+  late final TabController _tab;
   late AiProvider _draft;
   bool _busy = false;
-  String? _note;
+  int _shownIndex = 0;
 
   @override
   void initState() {
@@ -615,12 +617,21 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
           text: widget.provider.endpoints[protocol] ?? '',
         ),
     };
+    // The shared fetch/test buttons act on whichever tab is showing, so the
+    // build has to hear about tab switches — not just field edits.
+    _tab = TabController(length: AiProtocol.values.length, vsync: this)
+      ..addListener(() {
+        if (mounted && _tab.index != _shownIndex) {
+          setState(() => _shownIndex = _tab.index);
+        }
+      });
   }
 
   @override
   void dispose() {
     _name.dispose();
     _apiKey.dispose();
+    _tab.dispose();
     for (final controller in _endpoints.values) {
       controller.dispose();
     }
@@ -642,6 +653,9 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
   );
 
   Future<void> _persist() async {
+    // Same overlay capture as [_copy]: the dialog may be gone by the time a
+    // failed save reports back, and the toast still has to land somewhere.
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
     setState(() => _busy = true);
     try {
       await widget.onSave(_collect());
@@ -650,10 +664,10 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
       // A failed save must say so — silently re-enabling the button would
       // read as "saved" to a user who never saw the error.
       if (mounted) {
-        setState(() {
-          _busy = false;
-          _note = '$error';
-        });
+        setState(() => _busy = false);
+        if (overlay != null) {
+          unawaited(TopToast.showIn(overlay, '$error'));
+        }
       }
     }
   }
@@ -689,17 +703,16 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
     });
   }
 
-  /// Merges the ids a provider reports into the catalogue. Existing entries
-  /// keep their enable flag — a refresh must not silently widen what the
-  /// gateway exposes, the same rule the store documents.
-  Future<void> _fetchModels(AiProtocol protocol) async {
-    setState(() {
-      _busy = true;
-      _note = null;
-    });
+  /// Feedback goes to a [TopToast], not an inline note: a note appearing or
+  /// disappearing inside the dialog resizes it mid-gesture, which reads as
+  /// the window jittering.
+  Future<void> _fetchModels() async {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    setState(() => _busy = true);
     try {
       // Fetch against the *draft's* endpoints, not the persisted ones: the
       // user may have just corrected a URL and expects the fetch to use it.
+      final protocol = AiProtocol.values[_shownIndex];
       final ids = await widget.runtime.router.fetchModels(_collect(), protocol);
       if (!mounted) return;
       final existing = {
@@ -713,15 +726,19 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
         if (existing.containsKey(key)) continue;
         merged.add(AiProviderModel(id: id, protocol: protocol));
       }
-      setState(() {
-        _draft = _draft.copyWith(models: merged);
-        _note = ids.isEmpty
-            ? AppLocalizations.of(context).aiFetchEmpty
-            : AppLocalizations.of(context).aiFetchAdded(ids.length);
-      });
+      setState(() => _draft = _draft.copyWith(models: merged));
+      final l10n = AppLocalizations.of(context);
+      if (overlay != null) {
+        unawaited(
+          TopToast.showIn(
+            overlay,
+            ids.isEmpty ? l10n.aiFetchEmpty : l10n.aiFetchAdded(ids.length),
+          ),
+        );
+      }
     } on Object catch (error) {
-      if (mounted) {
-        setState(() => _note = '$error');
+      if (mounted && overlay != null) {
+        unawaited(TopToast.showIn(overlay, '$error'));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -730,64 +747,44 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
 
   /// Same probe as [_fetchModels] but reports instead of merging: the point
   /// is "does this URL + key + protocol answer", not the catalogue.
-  Future<void> _testConnection(AiProtocol protocol) async {
-    setState(() {
-      _busy = true;
-      _note = null;
-    });
+  Future<void> _testConnection() async {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    setState(() => _busy = true);
     try {
-      final ids = await widget.runtime.router.fetchModels(_collect(), protocol);
-      if (!mounted) return;
-      setState(
-        () => _note = AppLocalizations.of(context).aiConnectionOk(ids.length),
+      final ids = await widget.runtime.router.fetchModels(
+        _collect(),
+        AiProtocol.values[_shownIndex],
       );
+      if (!mounted) return;
+      if (overlay != null) {
+        unawaited(
+          TopToast.showIn(
+            overlay,
+            AppLocalizations.of(context).aiConnectionOk(ids.length),
+          ),
+        );
+      }
     } on Object catch (error) {
-      if (mounted) {
-        setState(() => _note = '$error');
+      if (mounted && overlay != null) {
+        unawaited(TopToast.showIn(overlay, '$error'));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// One protocol's tab: its base-URL field plus the two actions that need
-  /// it — pull the catalogue, or just prove the endpoint answers.
-  Widget _endpointTab(AppLocalizations l10n, AiProtocol protocol) {
-    final hasUrl = _endpoints[protocol]!.text.trim().isNotEmpty;
+  /// One protocol's tab content: just its base-URL field. The fetch/test
+  /// actions live once below the tab bar and act on the visible tab.
+  Widget _endpointField(AppLocalizations l10n, AiProtocol protocol) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _endpoints[protocol],
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: l10n.aiEndpointHint,
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: _busy || !hasUrl
-                    ? null
-                    : () => unawaited(_fetchModels(protocol)),
-                icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                label: Text(l10n.aiFetchModels),
-              ),
-              TextButton.icon(
-                onPressed: _busy || !hasUrl
-                    ? null
-                    : () => unawaited(_testConnection(protocol)),
-                icon: const Icon(Icons.wifi_tethering, size: 18),
-                label: Text(l10n.aiTestConnection),
-              ),
-            ],
-          ),
-        ],
+      child: TextField(
+        controller: _endpoints[protocol],
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: l10n.aiEndpointHint,
+          isDense: true,
+        ),
       ),
     );
   }
@@ -810,9 +807,33 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                 decoration: InputDecoration(labelText: l10n.aiProviderName),
               ),
               const SizedBox(height: 12),
+              // One protocol per tab: four stacked URL rows read as a form
+              // to fill completely, when in practice a provider usually
+              // speaks one. Each tab keeps its own field, so filling a
+              // second protocol later costs nothing.
+              TabBar(
+                controller: _tab,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [
+                  for (final protocol in AiProtocol.values)
+                    Tab(text: _protocolLabel(l10n, protocol)),
+                ],
+              ),
+              SizedBox(
+                height: 76,
+                child: TabBarView(
+                  controller: _tab,
+                  children: [
+                    for (final protocol in AiProtocol.values)
+                      _endpointField(l10n, protocol),
+                  ],
+                ),
+              ),
               // A local model (Ollama, LM Studio) has no credential, so the
               // key field would only invite a paste that goes nowhere.
               if (_draft.kind != AiProviderKind.local) ...[
+                const SizedBox(height: 12),
                 TextField(
                   controller: _apiKey,
                   obscureText: true,
@@ -821,41 +842,39 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                     helperText: l10n.aiProviderApiKeyHint,
                   ),
                 ),
-                const SizedBox(height: 12),
               ],
-              // One protocol per tab: four stacked URL rows read as a form
-              // to fill completely, when in practice a provider usually
-              // speaks one. Each tab keeps its own field, so filling a
-              // second protocol later costs nothing.
-              DefaultTabController(
-                length: AiProtocol.values.length,
-                child: Column(
-                  children: [
-                    TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      tabs: [
-                        for (final protocol in AiProtocol.values)
-                          Tab(text: _protocolLabel(l10n, protocol)),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 150,
-                      child: TabBarView(
-                        children: [
-                          for (final protocol in AiProtocol.values)
-                            _endpointTab(l10n, protocol),
-                        ],
+              const SizedBox(height: 8),
+              // One pair of actions for the whole tab strip: they probe the
+              // protocol whose tab is showing, so repeating them per tab
+              // would only duplicate identical buttons.
+              Builder(
+                builder: (context) {
+                  final active = AiProtocol.values[_shownIndex];
+                  final hasUrl = _endpoints[active]!.text.trim().isNotEmpty;
+                  return Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _busy || !hasUrl
+                            ? null
+                            : () => unawaited(_fetchModels()),
+                        icon: const Icon(
+                          Icons.cloud_download_outlined,
+                          size: 18,
+                        ),
+                        label: Text(l10n.aiFetchModels),
                       ),
-                    ),
-                  ],
-                ),
+                      TextButton.icon(
+                        onPressed: _busy || !hasUrl
+                            ? null
+                            : () => unawaited(_testConnection()),
+                        icon: const Icon(Icons.wifi_tethering, size: 18),
+                        label: Text(l10n.aiTestConnection),
+                      ),
+                    ],
+                  );
+                },
               ),
-              if (_note != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: HintText(_note!),
-                ),
               if (_draft.models.isNotEmpty) ...[
                 Text(
                   l10n.aiProviderModels,
