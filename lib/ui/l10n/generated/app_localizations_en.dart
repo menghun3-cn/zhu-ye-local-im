@@ -1597,4 +1597,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiGatewayHint =>
       'Point an OpenAI-compatible client at this endpoint with the token as its API key.';
+
+  @override
+  String get aiDeleteProviderTitle => 'Delete provider?';
+
+  @override
+  String get aiDeleteProviderBody =>
+      'The provider\'s key and models are removed, and every routing-group member pointing at it is dropped.';
+
+  @override
+  String get aiDeleteGroupTitle => 'Delete routing group?';
+
+  @override
+  String get aiDeleteGroupBody =>
+      'The group disappears from /v1/models. Groups that list it as a member keep the reference but it will no longer resolve.';
 }

@@ -39,6 +39,11 @@ final class AiRuntime {
 
   AiGateway? _gateway;
 
+  /// Serializes [_syncGateway]: two saves landing while a bind is in flight
+  /// must not each create a server — the loser would leak a listening port
+  /// nobody holds a reference to.
+  Future<void> _syncing = Future.value();
+
   /// The bound gateway, or null while the flag is off or the bind failed.
   AiGateway? get gateway => _gateway;
 
@@ -83,7 +88,15 @@ final class AiRuntime {
   /// Called once at app start; afterwards [save] keeps the two in step.
   Future<void> start() async => _syncGateway((await store.load()).gateway);
 
-  Future<void> _syncGateway(AiGatewayConfig gateway) async {
+  Future<void> _syncGateway(AiGatewayConfig gateway) {
+    final run = _syncing.then((_) => _syncGatewayNow(gateway));
+    // The chain survives a failed link: a bind error is already swallowed
+    // inside, but a store error must not poison every later save.
+    _syncing = run.catchError((_) {});
+    return run;
+  }
+
+  Future<void> _syncGatewayNow(AiGatewayConfig gateway) async {
     final running = _gateway;
     if (!gateway.enabled) {
       if (running != null) {

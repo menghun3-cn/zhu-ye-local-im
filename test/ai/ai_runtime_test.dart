@@ -62,6 +62,31 @@ void main() {
     expect(runtime.endpoint, isNull);
   });
 
+  test('concurrent saves bind exactly one gateway', () async {
+    final config = await runtime.load();
+    final enabled = config.copyWith(
+      gateway: const AiGatewayConfig(enabled: true),
+    );
+    // Two saves racing the bind must not each open a socket: the loser
+    // would leak a listener nobody can reach to close.
+    await Future.wait([runtime.save(enabled), runtime.save(enabled)]);
+    expect(runtime.gateway, isNotNull);
+    final endpoint = runtime.endpoint;
+    expect(endpoint, isNotNull);
+
+    await runtime.save(
+      config.copyWith(gateway: const AiGatewayConfig(enabled: false)),
+    );
+    expect(runtime.gateway, isNull);
+    // And nothing is still listening on the old endpoint.
+    final client = HttpClient();
+    addTearDown(client.close);
+    await expectLater(
+      client.getUrl(Uri.parse('$endpoint/models')),
+      throwsA(isA<SocketException>()),
+    );
+  });
+
   test('the token is generated once and reused', () async {
     final first = runtime.token.value;
     expect(first, startsWith('lt-ai-'));

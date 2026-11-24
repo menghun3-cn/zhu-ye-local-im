@@ -101,8 +101,14 @@ final class AiGateway {
       }
     } on Object catch (error) {
       // A handler that throws must still answer: a hung socket looks like a
-      // dead gateway, and the caller cannot tell the difference.
-      _writeError(request, 500, '$error');
+      // dead gateway, and the caller cannot tell the difference. The write
+      // itself can fail — the client may already be gone — so it is guarded
+      // rather than allowed to escape as an unhandled async error.
+      try {
+        _writeError(request, 500, '$error');
+      } on Object {
+        // Nothing left to tell the caller; the socket is the only witness.
+      }
     }
   }
 
@@ -153,6 +159,14 @@ final class AiGateway {
     }
 
     final wantsStream = body['stream'] == true;
+    final messages = [
+      for (final entry in rawMessages)
+        if (entry is Map) _canonicalMessage(entry.cast<String, Object?>()),
+    ];
+    if (messages.isEmpty) {
+      _writeError(request, 400, '"messages" contains no usable entries');
+      return;
+    }
     final chatRequest = AiChatRequest(
       model: model,
       stream: wantsStream,
@@ -160,10 +174,7 @@ final class AiGateway {
       maxTokens: _int(body['max_tokens']),
       topP: _number(body['top_p']),
       stop: _stringList(body['stop']),
-      messages: [
-        for (final entry in rawMessages)
-          if (entry is Map) _canonicalMessage(entry.cast<String, Object?>()),
-      ],
+      messages: messages,
     );
 
     final AiReply reply;
@@ -186,10 +197,15 @@ final class AiGateway {
   /// response rather than left hanging.
   Future<void> _fullReply(HttpRequest request, AiReply reply) async {
     if (reply is AiStreamReply) {
-      reply = AiFullReply(
-        servedBy: reply.servedBy,
-        response: await _collect(reply.events),
-      );
+      try {
+        reply = AiFullReply(
+          servedBy: reply.servedBy,
+          response: await _collect(reply.events),
+        );
+      } on AiRequestException catch (error) {
+        _writeError(request, 502, error.message);
+        return;
+      }
     }
     _writeJson(request, 200, _completionJson(reply as AiFullReply));
   }
@@ -225,16 +241,29 @@ final class AiGateway {
       ]);
     }
 
+    // One id and timestamp for the whole response: OpenAI clients match
+    // chunks to a completion by id, and a fresh one per event would make
+    // every delta look like a different answer.
+    final completionId = 'chatcmpl-${DateTime.now().millisecondsSinceEpoch}';
+    final created = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     var toolCallIndex = 0;
+    var sawToolCall = false;
+    var finished = false;
     try {
       await for (final event in events) {
         switch (event.kind) {
           case AiStreamKind.textDelta:
-            _writeSse(response, _chunkJson(servedBy, {'content': event.text}));
-          case AiStreamKind.toolCall:
             _writeSse(
               response,
-              _chunkJson(servedBy, {
+              _chunkJson(servedBy, completionId, created, {
+                'content': event.text,
+              }),
+            );
+          case AiStreamKind.toolCall:
+            sawToolCall = true;
+            _writeSse(
+              response,
+              _chunkJson(servedBy, completionId, created, {
                 'tool_calls': [
                   {
                     'index': toolCallIndex++,
@@ -249,7 +278,10 @@ final class AiGateway {
               }),
             );
           case AiStreamKind.usage:
-            _writeSse(response, _usageChunkJson(servedBy, event.usage!));
+            _writeSse(
+              response,
+              _usageChunkJson(servedBy, completionId, created, event.usage!),
+            );
           case AiStreamKind.done:
             break;
           case AiStreamKind.error:
@@ -259,15 +291,38 @@ final class AiGateway {
         }
         await response.flush();
       }
+      finished = true;
     } on Object catch (error) {
       // The status line is already gone; the only honest signal left is an
       // error frame before DONE.
-      _writeSse(response, {
-        'error': {'message': '$error'},
-      });
+      try {
+        _writeSse(response, {
+          'error': {'message': '$error'},
+        });
+      } on Object {
+        // The peer is gone; there is nowhere left to report it.
+      }
     }
-    response.write('data: [DONE]\n\n');
-    await response.close();
+    if (finished) {
+      // OpenAI streams close with an empty-delta chunk carrying the finish
+      // reason — clients wait for it before treating the answer as complete.
+      _writeSse(
+        response,
+        _chunkJson(
+          servedBy,
+          completionId,
+          created,
+          const {},
+          finishReason: sawToolCall ? 'tool_calls' : 'stop',
+        ),
+      );
+    }
+    try {
+      response.write('data: [DONE]\n\n');
+      await response.close();
+    } on Object {
+      // Client hung up mid-stream; nothing to do but let the socket die.
+    }
   }
 
   /// Folds a stream into one reply — the non-streaming path's fallback.
@@ -302,6 +357,8 @@ final class AiGateway {
 
   Map<String, Object?> _completionJson(AiFullReply full) {
     final response = full.response;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final completionId = 'chatcmpl-$now';
     final message = <String, Object?>{
       'role': 'assistant',
       'content': response.toolCalls.isEmpty ? response.content : null,
@@ -316,12 +373,16 @@ final class AiGateway {
         ],
     };
     return {
-      'id': 'chatcmpl-${DateTime.now().millisecondsSinceEpoch}',
+      'id': completionId,
       'object': 'chat.completion',
-      'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'created': now ~/ 1000,
       'model': full.servedBy,
       'choices': [
-        {'index': 0, 'message': message, 'finish_reason': 'stop'},
+        {
+          'index': 0,
+          'message': message,
+          'finish_reason': response.toolCalls.isEmpty ? 'stop' : 'tool_calls',
+        },
       ],
       'usage': {
         if (response.usage.promptTokens != null)
@@ -336,21 +397,29 @@ final class AiGateway {
 
   Map<String, Object?> _chunkJson(
     String servedBy,
-    Map<String, Object?> delta,
-  ) => {
-    'id': 'chatcmpl-${DateTime.now().millisecondsSinceEpoch}',
+    String completionId,
+    int created,
+    Map<String, Object?> delta, {
+    String? finishReason,
+  }) => {
+    'id': completionId,
     'object': 'chat.completion.chunk',
-    'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    'created': created,
     'model': servedBy,
     'choices': [
-      {'index': 0, 'delta': delta, 'finish_reason': null},
+      {'index': 0, 'delta': delta, 'finish_reason': finishReason},
     ],
   };
 
-  Map<String, Object?> _usageChunkJson(String servedBy, AiUsage usage) => {
-    'id': 'chatcmpl-${DateTime.now().millisecondsSinceEpoch}',
+  Map<String, Object?> _usageChunkJson(
+    String servedBy,
+    String completionId,
+    int created,
+    AiUsage usage,
+  ) => {
+    'id': completionId,
     'object': 'chat.completion.chunk',
-    'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    'created': created,
     'model': servedBy,
     'choices': const [],
     'usage': {
@@ -369,8 +438,13 @@ final class AiGateway {
   /// be a plain string or the parts array newer clients send; tool calls
   /// and tool results pass through by their wire names.
   AiMessage _canonicalMessage(Map<String, Object?> json) {
+    // 'developer' is OpenAI's newer name for the system role; both mean
+    // "instructions ahead of the conversation" to every codec.
     final roleName = json['role'] as String? ?? 'user';
-    final role = AiRole.values.asNameMap()[roleName] ?? AiRole.user;
+    final role = switch (roleName) {
+      'developer' => AiRole.system,
+      _ => AiRole.values.asNameMap()[roleName] ?? AiRole.user,
+    };
     return AiMessage(
       role: role,
       content: _contentText(json['content']),
@@ -431,11 +505,16 @@ final class AiGateway {
   }
 
   void _writeJson(HttpRequest request, int status, Object? body) {
-    request.response
-      ..statusCode = status
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode(body));
-    unawaited(request.response.close());
+    try {
+      request.response
+        ..statusCode = status
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode(body));
+      unawaited(request.response.close().catchError((Object _) {}));
+    } on Object {
+      // The peer is gone before the answer could be written; the socket
+      // dies on its own and there is nobody left to tell.
+    }
   }
 
   /// OpenAI-shaped error body: `{"error": {"message": ...}}` is what every

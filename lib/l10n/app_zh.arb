@@ -481,5 +481,10 @@
   "aiGatewayToken": "访问令牌",
   "aiGatewayNotListening": "已配置，但当前未在监听",
   "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
-  "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。"
+  "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。",
+
+  "aiDeleteProviderTitle": "删除供应商？",
+  "aiDeleteProviderBody": "供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。",
+  "aiDeleteGroupTitle": "删除路由组？",
+  "aiDeleteGroupBody": "该路由组将从 /v1/models 中消失。把它列为成员的其他路由组会保留该引用，但将无法再解析。"
 }

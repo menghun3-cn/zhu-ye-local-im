@@ -225,7 +225,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         kind: AiProviderKind.custom,
       );
     }
-    await _save(config.copyWith(providers: [...config.providers, provider]));
+    await _save(
+      (_config ?? config).copyWith(
+        providers: [...(_config ?? config).providers, provider],
+      ),
+    );
     if (!mounted) return;
     await _editProvider(provider);
   }
@@ -319,9 +323,27 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 ];
           await _save(config.copyWith(routingGroups: groups));
         },
+        onDelete: group == null ? null : () => _deleteGroup(group),
       ),
     );
     if (saved == true) await _reload();
+  }
+
+  /// Removes a routing group. Members pointing at it are left alone — a
+  /// `group/<id>` reference inside another group simply stops resolving,
+  /// which the router already reports as an honest error rather than a
+  /// crash.
+  Future<void> _deleteGroup(AiRoutingGroup group) async {
+    final config = _config;
+    if (config == null) return;
+    await _save(
+      config.copyWith(
+        routingGroups: [
+          for (final g in config.routingGroups)
+            if (g.id != group.id) g,
+        ],
+      ),
+    );
   }
 }
 
@@ -521,7 +543,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
   late final Map<AiProtocol, TextEditingController> _endpoints;
   late AiProvider _draft;
   bool _busy = false;
-  String? _fetchNote;
+  String? _note;
 
   @override
   void initState() {
@@ -566,9 +588,45 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
     try {
       await widget.onSave(_collect());
       if (mounted) Navigator.of(context).pop(true);
-    } on Object {
-      if (mounted) setState(() => _busy = false);
+    } on Object catch (error) {
+      // A failed save must say so — silently re-enabling the button would
+      // read as "saved" to a user who never saw the error.
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _note = '$error';
+        });
+      }
     }
+  }
+
+  /// Delete is destructive — the provider's key and every group member
+  /// pointing at it go with it — so it asks first, the same courtesy
+  /// deleting a conversation gets.
+  Future<void> _confirmDelete() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.aiDeleteProviderTitle),
+        content: Text(l10n.aiDeleteProviderBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.deleteMessage),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await guarded(context, () async {
+      await widget.onDelete();
+      if (mounted) Navigator.of(context).pop(true);
+    });
   }
 
   /// Merges the ids a provider reports into the catalogue. Existing entries
@@ -577,7 +635,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
   Future<void> _fetchModels(AiProtocol protocol) async {
     setState(() {
       _busy = true;
-      _fetchNote = null;
+      _note = null;
     });
     try {
       // Fetch against the *draft's* endpoints, not the persisted ones: the
@@ -597,13 +655,13 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
       }
       setState(() {
         _draft = _draft.copyWith(models: merged);
-        _fetchNote = ids.isEmpty
+        _note = ids.isEmpty
             ? AppLocalizations.of(context).aiFetchEmpty
             : AppLocalizations.of(context).aiFetchAdded(ids.length);
       });
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _fetchNote = '$error');
+        setState(() => _note = '$error');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -628,15 +686,19 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                 decoration: InputDecoration(labelText: l10n.aiProviderName),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _apiKey,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: l10n.aiProviderApiKey,
-                  helperText: l10n.aiProviderApiKeyHint,
+              // A local model (Ollama, LM Studio) has no credential, so the
+              // key field would only invite a paste that goes nowhere.
+              if (_draft.kind != AiProviderKind.local) ...[
+                TextField(
+                  controller: _apiKey,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: l10n.aiProviderApiKey,
+                    helperText: l10n.aiProviderApiKeyHint,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               for (final protocol in AiProtocol.values) ...[
                 Row(
                   children: [
@@ -671,10 +733,10 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
                 ),
                 const SizedBox(height: 8),
               ],
-              if (_fetchNote != null)
+              if (_note != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: HintText(_fetchNote!),
+                  child: HintText(_note!),
                 ),
               if (_draft.models.isNotEmpty) ...[
                 Text(
@@ -710,16 +772,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => unawaited(
-                          guarded(context, () async {
-                            await widget.onDelete();
-                            if (context.mounted) {
-                              Navigator.of(context).pop(true);
-                            }
-                          }),
-                        ),
+                  onPressed: _busy ? null : () => unawaited(_confirmDelete()),
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: Text(l10n.deleteMessage),
                 ),
@@ -758,11 +811,15 @@ class _GroupEditorDialog extends StatefulWidget {
     required this.config,
     required this.group,
     required this.onSave,
+    this.onDelete,
   });
 
   final AiConfig config;
   final AiRoutingGroup? group;
   final Future<void> Function(AiRoutingGroup next) onSave;
+
+  /// Removes the group outright; null while creating a new one.
+  final Future<void> Function()? onDelete;
 
   @override
   State<_GroupEditorDialog> createState() => _GroupEditorDialogState();
@@ -772,6 +829,7 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
   late final TextEditingController _name;
   late List<String> _members;
   bool _busy = false;
+  String? _note;
 
   @override
   void initState() {
@@ -819,9 +877,44 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
         ),
       );
       if (mounted) Navigator.of(context).pop(true);
-    } on Object {
-      if (mounted) setState(() => _busy = false);
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _note = '$error';
+        });
+      }
     }
+  }
+
+  /// Same courtesy as the provider delete: groups vanish from `/v1/models`
+  /// the moment they are gone, so the button asks first.
+  Future<void> _confirmDelete() async {
+    final l10n = AppLocalizations.of(context);
+    final onDelete = widget.onDelete;
+    if (onDelete == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.aiDeleteGroupTitle),
+        content: Text(l10n.aiDeleteGroupBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.deleteMessage),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await guarded(context, () async {
+      await onDelete();
+      if (mounted) Navigator.of(context).pop(true);
+    });
   }
 
   String _uniqueGroupId() {
@@ -905,6 +998,22 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
                     setState(() => _members.add(ref));
                   },
                 ),
+              if (_note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: HintText(_note!),
+                ),
+              if (widget.onDelete != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : () => unawaited(_confirmDelete()),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: Text(l10n.deleteMessage),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

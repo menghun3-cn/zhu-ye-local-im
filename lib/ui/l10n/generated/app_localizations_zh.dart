@@ -1516,4 +1516,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。';
+
+  @override
+  String get aiDeleteProviderTitle => '删除供应商？';
+
+  @override
+  String get aiDeleteProviderBody => '供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。';
+
+  @override
+  String get aiDeleteGroupTitle => '删除路由组？';
+
+  @override
+  String get aiDeleteGroupBody =>
+      '该路由组将从 /v1/models 中消失。把它列为成员的其他路由组会保留该引用，但将无法再解析。';
 }

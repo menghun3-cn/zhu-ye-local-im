@@ -122,11 +122,14 @@ final class OpenAiChatCodec implements AiCodec {
 
   @override
   Stream<AiStreamEvent> decodeStream(Stream<List<int>> bodyBytes) async* {
+    // OpenAI streams tool calls as fragments: each delta carries an `index`,
+    // an optional `id`/`name` on the first fragment, and a slice of the JSON
+    // `arguments` string. A fragment is not a call, so they accumulate per
+    // index and flush as complete calls before `done`.
+    final pendingCalls = <int, _PendingToolCall>{};
+
     await for (final frame in parseSse(bodyBytes)) {
-      if (frame.data == '[DONE]') {
-        yield AiStreamEvent.done();
-        return;
-      }
+      if (frame.data == '[DONE]') break;
       final json = jsonObjectOrEmpty(frame.data);
       if (json.isEmpty) continue;
 
@@ -137,8 +140,23 @@ final class OpenAiChatCodec implements AiCodec {
         if (content != null && content.isNotEmpty) {
           yield AiStreamEvent.textDelta(content);
         }
-        for (final call in _decodeToolCalls(asList(delta['tool_calls']))) {
-          yield AiStreamEvent.toolCall(call);
+        for (final raw in asList(delta['tool_calls'])) {
+          final entry = asObject(raw);
+          final index = entry['index'] is int ? entry['index'] as int : 0;
+          final call = pendingCalls.putIfAbsent(index, _PendingToolCall.new);
+          final id = jsonStringField(entry, 'id');
+          if (id != null && id.isNotEmpty) call.id = id;
+          final name = jsonStringField(asObject(entry['function']), 'name');
+          if (name != null && name.isNotEmpty) call.name = name;
+          final args = asObject(entry['function'])['arguments'];
+          if (args is String) {
+            call.arguments.write(args);
+          } else if (args != null) {
+            // A few compatible providers send the whole object at once.
+            call.arguments
+              ..clear()
+              ..write(jsonEncode(args));
+          }
         }
       }
       final usage = _decodeUsage(json['usage']);
@@ -147,6 +165,16 @@ final class OpenAiChatCodec implements AiCodec {
           usage.completionTokens != null) {
         yield AiStreamEvent.usage(usage);
       }
+    }
+    for (final call in pendingCalls.values) {
+      if (call.name.isEmpty) continue;
+      yield AiStreamEvent.toolCall(
+        AiToolCall(
+          id: call.id,
+          name: call.name,
+          arguments: call.arguments.isEmpty ? '{}' : call.arguments.toString(),
+        ),
+      );
     }
     yield AiStreamEvent.done();
   }
@@ -174,4 +202,12 @@ final class OpenAiChatCodec implements AiCodec {
         ?jsonStringField(asObject(entry), 'id'),
     ];
   }
+}
+
+/// Mutable accumulator for one streamed `tool_calls` entry while its
+/// fragments arrive. Records can't hold this because fields arrive piecemeal.
+final class _PendingToolCall {
+  String id = '';
+  String name = '';
+  final StringBuffer arguments = StringBuffer();
 }

@@ -197,7 +197,50 @@ void main() {
     expect(text, contains('chat.completion.chunk'));
     expect(text, contains('"Hel"'));
     expect(text, contains('"lo"'));
+    // OpenAI clients wait for the empty-delta finish chunk before treating
+    // the answer as complete.
+    expect(text, contains('"finish_reason":"stop"'));
     expect(text.trimRight().endsWith('data: [DONE]'), isTrue);
+  });
+
+  test('a tool-call reply finishes with tool_calls, not stop', () async {
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {
+            'role': 'assistant',
+            'content': null,
+            'tool_calls': [
+              {
+                'id': 'call_1',
+                'type': 'function',
+                'function': {'name': 'lookup', 'arguments': '{}'},
+              },
+            ],
+          },
+          'finish_reason': 'tool_calls',
+        },
+      ],
+    });
+    final response = await post('/v1/chat/completions', {
+      'model': 'deepseek/deepseek-chat',
+      'messages': [
+        {'role': 'user', 'content': 'hi'},
+      ],
+    });
+    expect(response.statusCode, 200);
+    final body = jsonDecode(await utf8.decodeStream(response));
+    expect(body['choices'][0]['finish_reason'], 'tool_calls');
+    expect(body['choices'][0]['message']['tool_calls'][0]['id'], 'call_1');
+  });
+
+  test('messages with no usable entries are a 400', () async {
+    final response = await post('/v1/chat/completions', {
+      'model': 'deepseek/deepseek-chat',
+      'messages': ['not a map', 42],
+    });
+    expect(response.statusCode, 400);
+    await response.drain<void>();
   });
 
   test('malformed JSON is a 400, not a crash', () async {

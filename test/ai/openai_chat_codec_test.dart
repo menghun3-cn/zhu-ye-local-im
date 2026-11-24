@@ -102,6 +102,34 @@ void main() {
       expect(events[1].text, 'lo');
       expect(events[2].usage?.totalTokens, 3);
     });
+
+    test(
+      'reassembles fragmented tool_calls into one call before done',
+      () async {
+        final sse =
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,'
+            '"id":"call_9","type":"function","function":{"name":"lookup",'
+            '"arguments":"{\\"ci"}}]}}]}\n\n'
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,'
+            '"function":{"arguments":"ty\\":\\"par"}}]}}]}\n\n'
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,'
+            '"function":{"arguments":"is\\"}"}}]}}]}\n\n'
+            'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n'
+            'data: [DONE]\n\n';
+        final events = await codec
+            .decodeStream(Stream.value(utf8.encode(sse)))
+            .toList();
+        final calls = [
+          for (final e in events)
+            if (e.kind == AiStreamKind.toolCall) e.toolCall!,
+        ];
+        expect(calls, hasLength(1));
+        expect(calls.single.id, 'call_9');
+        expect(calls.single.name, 'lookup');
+        expect(calls.single.arguments, '{"city":"paris"}');
+        expect(events.last.kind, AiStreamKind.done);
+      },
+    );
   });
 
   group('OpenAiChatCodec.classifyError', () {

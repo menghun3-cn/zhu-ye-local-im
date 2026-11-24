@@ -2772,6 +2772,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Point an OpenAI-compatible client at this endpoint with the token as its API key.'**
   String get aiGatewayHint;
+
+  /// No description provided for @aiDeleteProviderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete provider?'**
+  String get aiDeleteProviderTitle;
+
+  /// No description provided for @aiDeleteProviderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider\'s key and models are removed, and every routing-group member pointing at it is dropped.'**
+  String get aiDeleteProviderBody;
+
+  /// No description provided for @aiDeleteGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete routing group?'**
+  String get aiDeleteGroupTitle;
+
+  /// No description provided for @aiDeleteGroupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The group disappears from /v1/models. Groups that list it as a member keep the reference but it will no longer resolve.'**
+  String get aiDeleteGroupBody;
 }
 
 class _AppLocalizationsDelegate
