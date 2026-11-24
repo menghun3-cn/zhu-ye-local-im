@@ -84,6 +84,20 @@ void main() {
       expect(events[2].kind, AiStreamKind.usage);
       expect(events.last.kind, AiStreamKind.done);
     });
+
+    test('thought parts surface as reasoningDelta, not content', () async {
+      final sse =
+          'data: {"candidates":[{"content":{"parts":'
+          '[{"text":"thinking","thought":true},'
+          '{"text":"answer"}]}}]}\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(events[0].kind, AiStreamKind.reasoningDelta);
+      expect(events[0].text, 'thinking');
+      expect(events[1].kind, AiStreamKind.textDelta);
+      expect(events[1].text, 'answer');
+    });
   });
 
   group('GeminiCodec.classifyError', () {

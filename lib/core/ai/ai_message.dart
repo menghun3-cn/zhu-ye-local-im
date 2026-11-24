@@ -193,6 +193,11 @@ enum AiStreamKind {
   /// More assistant text arrived.
   textDelta,
 
+  /// More reasoning/thinking text arrived. Never part of the answer's
+  /// content, but it is still generated output — consumers measuring
+  /// time-to-first-token count it.
+  reasoningDelta,
+
   /// A complete tool call was assembled from the stream.
   toolCall,
 
@@ -209,14 +214,15 @@ enum AiStreamKind {
 /// One event on a streamed reply.
 ///
 /// A flat bag rather than a sealed hierarchy because every codec produces the
-/// same five shapes and the consumer (a chat view, a summariser) only ever
+/// same shapes and the consumer (a chat view, a summariser) only ever
 /// switches on [kind].
 final class AiStreamEvent {
   const AiStreamEvent._(this.kind, {this.text, this.toolCall, this.usage});
 
   final AiStreamKind kind;
 
-  /// Text payload for [AiStreamKind.textDelta] and [AiStreamKind.error].
+  /// Text payload for [AiStreamKind.textDelta],
+  /// [AiStreamKind.reasoningDelta], and [AiStreamKind.error].
   final String? text;
 
   /// The assembled call for [AiStreamKind.toolCall].
@@ -227,6 +233,9 @@ final class AiStreamEvent {
 
   factory AiStreamEvent.textDelta(String text) =>
       AiStreamEvent._(AiStreamKind.textDelta, text: text);
+
+  factory AiStreamEvent.reasoningDelta(String text) =>
+      AiStreamEvent._(AiStreamKind.reasoningDelta, text: text);
 
   factory AiStreamEvent.toolCall(AiToolCall call) =>
       AiStreamEvent._(AiStreamKind.toolCall, toolCall: call);

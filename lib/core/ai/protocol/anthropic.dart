@@ -200,6 +200,11 @@ final class AnthropicCodec implements AiCodec {
               if (text != null && text.isNotEmpty) {
                 yield AiStreamEvent.textDelta(text);
               }
+            case 'thinking_delta':
+              final thinking = jsonStringField(delta, 'thinking');
+              if (thinking != null && thinking.isNotEmpty) {
+                yield AiStreamEvent.reasoningDelta(thinking);
+              }
             case 'input_json_delta':
               final partial = jsonStringField(delta, 'partial_json');
               final index = json['index'] as int? ?? 0;

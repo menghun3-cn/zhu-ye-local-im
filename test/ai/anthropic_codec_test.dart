@@ -149,6 +149,19 @@ void main() {
       expect(events.first.text, 'hello');
       expect(events.last.kind, AiStreamKind.done);
     });
+
+    test('thinking_delta surfaces as reasoningDelta', () async {
+      final sse =
+          'event: content_block_delta\n'
+          'data: {"type":"content_block_delta","index":0,'
+          '"delta":{"type":"thinking_delta","thinking":"hmm"}}\n\n'
+          'event: message_stop\ndata: {}\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(events.first.kind, AiStreamKind.reasoningDelta);
+      expect(events.first.text, 'hmm');
+    });
   });
 
   group('AnthropicCodec.classifyError', () {

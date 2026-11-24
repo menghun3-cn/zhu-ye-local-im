@@ -390,6 +390,7 @@ final class AiRouter {
       await for (final event in inner) {
         if (firstContentAt == null &&
             (event.kind == AiStreamKind.textDelta ||
+                event.kind == AiStreamKind.reasoningDelta ||
                 event.kind == AiStreamKind.toolCall)) {
           firstContentAt = DateTime.now();
         }

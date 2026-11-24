@@ -144,6 +144,16 @@ final class OpenAiChatCodec implements AiCodec {
         if (content != null && content.isNotEmpty) {
           yield AiStreamEvent.textDelta(content);
         }
+        // Reasoning models stream their thinking under `reasoning_content`
+        // (DeepSeek) or `reasoning` (OpenRouter). It is generated output —
+        // surfaced as its own event so first-token timing sees it, but it
+        // never joins the answer's content.
+        final reasoning =
+            jsonStringField(delta, 'reasoning_content') ??
+            jsonStringField(delta, 'reasoning');
+        if (reasoning != null && reasoning.isNotEmpty) {
+          yield AiStreamEvent.reasoningDelta(reasoning);
+        }
         for (final raw in asList(delta['tool_calls'])) {
           final entry = asObject(raw);
           final index = entry['index'] is int ? entry['index'] as int : 0;

@@ -116,7 +116,12 @@ OpenAI shape. The gateway therefore asks every upstream for a stream
 even when the caller wants one folded response: only the stream shape
 carries a first-token mark and per-chunk usage, and `_fullReply`
 reassembles it — a non-stream upstream answer would leave TTFT and
-usage permanently blank. When an upstream reports only
+usage permanently blank. Reasoning output counts as first-token
+evidence: codecs surface thinking under a dedicated
+`AiStreamKind.reasoningDelta` (never folded into content), and the
+router's TTFT clock stops at the first text, reasoning, or tool-call
+event — otherwise reasoning models would show `—` for exactly the
+requests users wait longest on. When an upstream reports only
 total/completion, the prompt share is derived as their difference so
 the cache-hit math still renders. Recording is fire-and-forget: a log
 failure can never reach a request. The view reloads on `AiRequestLog.version`, polled by

@@ -84,6 +84,22 @@ void main() {
       expect(events.first.kind, AiStreamKind.error);
       expect(events.first.text, 'boom');
     });
+
+    test('reasoning summary deltas surface as reasoningDelta', () async {
+      final sse =
+          'event: response.reasoning_summary_text.delta\n'
+          'data: {"type":"response.reasoning_summary_text.delta",'
+          '"delta":"step 1"}\n\n'
+          'event: response.completed\n'
+          'data: {"type":"response.completed","response":'
+          '{"usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}}\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(events[0].kind, AiStreamKind.reasoningDelta);
+      expect(events[0].text, 'step 1');
+      expect(events[1].kind, AiStreamKind.usage);
+    });
   });
 
   group('OpenAiResponsesCodec.classifyError', () {

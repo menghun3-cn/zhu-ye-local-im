@@ -103,6 +103,28 @@ void main() {
       expect(events[2].usage?.totalTokens, 3);
     });
 
+    test('reasoning fields surface as reasoningDelta, not content', () async {
+      final sse =
+          'data: {"choices":[{"delta":{"reasoning_content":"think "}}]}\n\n'
+          'data: {"choices":[{"delta":{"reasoning":"more"}}]}\n\n'
+          'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n'
+          'data: [DONE]\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(
+        [for (final e in events) e.kind],
+        [
+          AiStreamKind.reasoningDelta,
+          AiStreamKind.reasoningDelta,
+          AiStreamKind.textDelta,
+          AiStreamKind.done,
+        ],
+      );
+      expect(events[0].text, 'think ');
+      expect(events[1].text, 'more');
+    });
+
     test(
       'reassembles fragmented tool_calls into one call before done',
       () async {

@@ -167,6 +167,12 @@ final class OpenAiResponsesCodec implements AiCodec {
           if (delta != null && delta.isNotEmpty) {
             yield AiStreamEvent.textDelta(delta);
           }
+        case 'response.reasoning_summary_text.delta':
+          final json = jsonObjectOrEmpty(frame.data);
+          final delta = jsonStringField(json, 'delta');
+          if (delta != null && delta.isNotEmpty) {
+            yield AiStreamEvent.reasoningDelta(delta);
+          }
         case 'response.output_item.done':
           final json = jsonObjectOrEmpty(frame.data);
           final item = asObject(json['item']);

@@ -375,6 +375,15 @@ final class AiGateway {
                 'content': event.text,
               }),
             );
+          case AiStreamKind.reasoningDelta:
+            // Reasoning is forwarded under the DeepSeek/OpenRouter delta
+            // field; clients that do not know it ignore the key.
+            _writeSse(
+              response,
+              _chunkJson(servedBy, completionId, created, {
+                'reasoning_content': event.text,
+              }),
+            );
           case AiStreamKind.toolCall:
             sawToolCall = true;
             _writeSse(
@@ -460,6 +469,9 @@ final class AiGateway {
       switch (event.kind) {
         case AiStreamKind.textDelta:
           text.write(event.text);
+        case AiStreamKind.reasoningDelta:
+          // Reasoning never joins a folded response's content.
+          break;
         case AiStreamKind.toolCall:
           calls.add(event.toolCall!);
         case AiStreamKind.usage:

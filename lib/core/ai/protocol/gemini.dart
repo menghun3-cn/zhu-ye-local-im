@@ -125,25 +125,40 @@ final class GeminiCodec implements AiCodec {
 
   /// One `generateContent` response body yields exactly one chunk; the list
   /// exists so the stream path can concatenate many.
-  List<({String content, List<AiToolCall> toolCalls, AiUsage? usage})> _chunks(
-    String body,
-  ) {
+  List<
+    ({
+      String content,
+      String reasoning,
+      List<AiToolCall> toolCalls,
+      AiUsage? usage,
+    })
+  >
+  _chunks(String body) {
     final json = jsonObjectOrEmpty(body);
     if (json.isEmpty) return const [];
     return [_decodeChunk(json)];
   }
 
-  ({String content, List<AiToolCall> toolCalls, AiUsage? usage}) _decodeChunk(
-    Map<String, Object?> json,
-  ) {
+  ({
+    String content,
+    String reasoning,
+    List<AiToolCall> toolCalls,
+    AiUsage? usage,
+  })
+  _decodeChunk(Map<String, Object?> json) {
     final text = StringBuffer();
+    final reasoning = StringBuffer();
     final calls = <AiToolCall>[];
     for (final candidate in asList(json['candidates'])) {
       final content = asObject(asObject(candidate)['content']);
       for (final part in asList(content['parts'])) {
         final p = asObject(part);
         final t = jsonStringField(p, 'text');
-        if (t != null) text.write(t);
+        // Gemini marks thinking parts with `thought: true`; they are
+        // generated output but never join the answer's content.
+        if (t != null) {
+          (p['thought'] == true ? reasoning : text).write(t);
+        }
         final functionCall = asObject(p['functionCall']);
         if (functionCall.isNotEmpty) {
           calls.add(
@@ -160,6 +175,7 @@ final class GeminiCodec implements AiCodec {
     }
     return (
       content: text.toString(),
+      reasoning: reasoning.toString(),
       toolCalls: calls,
       usage: _decodeUsage(json['usageMetadata']),
     );
@@ -186,6 +202,9 @@ final class GeminiCodec implements AiCodec {
       final json = jsonObjectOrEmpty(frame.data);
       if (json.isEmpty) continue;
       final chunk = _decodeChunk(json);
+      if (chunk.reasoning.isNotEmpty) {
+        yield AiStreamEvent.reasoningDelta(chunk.reasoning);
+      }
       if (chunk.content.isNotEmpty) {
         yield AiStreamEvent.textDelta(chunk.content);
       }
