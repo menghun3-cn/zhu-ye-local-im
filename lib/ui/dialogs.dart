@@ -267,7 +267,13 @@ class _PeerRemarkDialogState extends State<_PeerRemarkDialog> {
         autofocus: true,
         decoration: InputDecoration(
           labelText: l10n.remarkFieldLabel,
-          helperText: l10n.remarkHelper,
+          // `helperText` ellipsizes soft wraps unless `helperMaxLines` is
+          // set; this sentence is long enough to need real wrapping, so it
+          // goes through `helper`, a widget that wraps without a line cap.
+          helper: Text(
+            l10n.remarkHelper,
+            style: Theme.of(context).inputDecorationTheme.helperStyle,
+          ),
         ),
         onSubmitted: (_) => _save(),
       ),
