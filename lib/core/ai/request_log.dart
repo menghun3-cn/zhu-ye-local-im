@@ -3,7 +3,7 @@ import 'dart:io';
 
 /// One finished request, as the routing view lists it.
 ///
-/// Only requests that actually got an answer are recorded — a request that
+/// Only requests that actually got an answer are recorded —a request that
 /// failed on every member has no tokens or timings worth a row, and its
 /// failure already shows up as a red node on the graph.
 final class AiRequestRecord {
@@ -67,7 +67,7 @@ final class AiRequestRecord {
   }
 }
 
-/// A rolling file of recent requests — the routing view's "what just
+/// A rolling file of recent requests —the routing view's "what just
 /// happened" list.
 ///
 /// Records older than [retention] are dropped on every write, and the whole
@@ -80,7 +80,7 @@ final class AiRequestLog {
   final File file;
   final Duration retention;
 
-  /// Hard cap on kept records — the retention window is the real bound, this
+  /// Hard cap on kept records —the retention window is the real bound, this
   /// is the safety net for a pathological day.
   static const int maxRecords = 500;
 
@@ -90,10 +90,10 @@ final class AiRequestLog {
   int get version => _version;
 
   Future<List<AiRequestRecord>> load() async {
-    if (!await file.exists()) return const [];
+    if (!await file.exists()) return <AiRequestRecord>[];
     try {
       final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List) return const [];
+      if (decoded is! List) return <AiRequestRecord>[];
       final records = <AiRequestRecord>[];
       for (final entry in decoded) {
         if (entry is! Map) continue;
@@ -105,7 +105,7 @@ final class AiRequestLog {
       }
       return records;
     } on Object {
-      return const [];
+      return <AiRequestRecord>[];
     }
   }
 
@@ -116,7 +116,7 @@ final class AiRequestLog {
   /// the event loop closely enough for a diagnostic log.
   Future<void> record(AiRequestRecord record) async {
     _version++;
-    // load() may hand back an unmodifiable empty list — copy before adding.
+    // load() may hand back an unmodifiable empty list —copy before adding.
     final records = List<AiRequestRecord>.of(await load());
     records.add(record);
     final cutoff = DateTime.now().subtract(retention);
