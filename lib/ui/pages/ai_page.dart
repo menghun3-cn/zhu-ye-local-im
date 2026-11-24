@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/core.dart';
 import '../feedback.dart';
@@ -260,11 +261,17 @@ class _AiPageState extends State<AiPage> {
           for (final preset in aiProviderPresets)
             SimpleDialogOption(
               onPressed: () => Navigator.of(context).pop(preset),
-              child: Text(preset.label),
+              child: _PresetOption(preset: preset),
             ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(context).pop('custom'),
-            child: Text(l10n.aiProviderCustom),
+            child: Row(
+              children: [
+                const _OptionIcon(icon: Icons.tune),
+                const SizedBox(width: 12),
+                Text(AppLocalizations.of(context).aiProviderCustom),
+              ],
+            ),
           ),
         ],
       ),
@@ -918,6 +925,54 @@ class _ProviderTile extends StatelessWidget {
         AiProviderKind.custom => l10n.aiKindCustom,
         AiProviderKind.local => l10n.aiKindLocal,
       };
+}
+
+/// One row of the add-provider dialog: the vendor's bundled brand mark
+/// ahead of its label.
+class _PresetOption extends StatelessWidget {
+  const _PresetOption({required this.preset});
+
+  final AiProviderPreset preset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _OptionIcon(asset: preset.iconAsset),
+        const SizedBox(width: 12),
+        Text(preset.label),
+      ],
+    );
+  }
+}
+
+/// The leading mark of a picker row: a bundled brand SVG when the preset
+/// ships one, tinted to the theme's icon color, or a Material glyph for
+/// entries without a mark (the custom endpoint).
+class _OptionIcon extends StatelessWidget {
+  const _OptionIcon({this.asset, this.icon});
+
+  final String? asset;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = WeChatColors.of(context);
+    final asset = this.asset;
+    if (asset != null) {
+      return SvgPicture.asset(
+        asset,
+        width: 22,
+        height: 22,
+        colorFilter: ColorFilter.mode(colors.secondaryText, BlendMode.srcIn),
+      );
+    }
+    return Icon(
+      icon ?? Icons.dns_outlined,
+      size: 22,
+      color: colors.secondaryText,
+    );
+  }
 }
 
 /// The provider editor: identity, key, one base-URL row per protocol, and

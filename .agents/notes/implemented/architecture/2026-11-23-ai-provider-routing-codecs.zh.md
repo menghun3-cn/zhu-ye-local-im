@@ -18,7 +18,7 @@ Status: implemented
 
 - **`ai_message.dart`**——规范格式：角色、文本内容、工具调用（参数保留原始 JSON，让编解码器边界不必在转义上达成一致）、用量统计，以及五种流式事件。
 - **`protocol/`**——每协议一个 `AiCodec`（`openai_chat`、`openai_responses`、`anthropic`、`gemini`），加上能扛住多字节字符跨 chunk 边界的共享 SSE 解析器。每个编解码器拥有自己的 URL 路径、请求头与报文结构；`modelsSpec`/`decodeModels` 给设置 UI 一条拉取模型列表的路径，不需要第二套 HTTP 栈。
-- **`provider.dart` + `presets.dart`**——provider 按协议记录 base URL（模型条目记录自己讲哪种协议，因为一个自定义端点可能前置多个上游 API），key 落盘加密，模型目录需显式启用。引用语法沿用 magpie：`provider/model` 或 `group/<id>`。
+- **`provider.dart` + `presets.dart`**——provider 按协议记录 base URL（模型条目记录自己讲哪种协议，因为一个自定义端点可能前置多个上游 API），key 落盘加密，模型目录需显式启用。引用语法沿用 magpie：`provider/model` 或 `group/<id>`。每个预设还指向一枚内置品牌标记 SVG（`assets/ai_providers/<id>.svg`，LobeHub 图标集的单色 `currentColor` 路径，由主题着色），添加供应商对话框把它显示在名称前面。
 - **`secret_box.dart` + `provider_store.dart`**——用已在依赖中的 `cryptography` 包做 AES-256-GCM。每安装生成一次 32 字节随机密钥；`apiKey` 字段以 `v1:<nonce‖ct‖tag>` 形式落盘，读取时透明解封。加密前的明文值仍可读，并在下次保存时自动加封。文件机制——原子临时文件改名、损坏文件移开、写入排队——委托给与会话历史相同的 `MessageStore` 抽象。
 - **`ai_router.dart`**——把引用解析成具体成员（组可嵌套、环被剪断），按序尝试，仅在可重试错误（429/5xx/额度/网络）上做带冷却的故障转移。致命错误——key 错、模型不存在——立即抛出而不转移，因为下一个成员只会以同样方式失败，还会把真实原因藏起来。流式回复只在供应商开始应答之前允许转移；之后半截回复比诚实报错更糟。
 

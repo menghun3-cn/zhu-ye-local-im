@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_transfer/ui/app.dart';
 import 'package:local_transfer/core/core.dart';
@@ -147,5 +148,59 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('•' * 16), findsNothing);
     expect(find.textContaining('sk-'), findsWidgets);
+  });
+
+  testWidgets('the add-provider dialog shows a brand mark per preset', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    final seams = PlatformSeams(
+      store: MemoryProfileStore(),
+      profilePath: null,
+      messageStore: MemoryMessageStore(),
+      messagePath: null,
+      beacon: MemoryBeaconHub().a,
+      clipboard: MemorySystemClipboard(),
+      platform: DevicePlatform.windows,
+      defaultIncomingDirectory: null,
+      hostShell: ScriptedHostShell(),
+      controlsWindow: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: AiPage(
+            runtime: runtime,
+            seams: seams,
+            configLoader: () async => config!,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final l10n = lookupAppLocalizations(appLocale);
+
+    await tester.tap(find.widgetWithText(Tab, l10n.aiSectionProviders));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aiAddProvider));
+    await tester.pumpAndSettle();
+    // SVG bytes resolve through the real asset bundle; each load needs a
+    // real event-loop turn the fake-async clock cannot give it.
+    for (var i = 0; i < 6; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SvgPicture), findsNWidgets(aiProviderPresets.length));
+    expect(find.text('Anthropic'), findsOneWidget);
+    expect(find.text(l10n.aiProviderCustom), findsOneWidget);
   });
 }

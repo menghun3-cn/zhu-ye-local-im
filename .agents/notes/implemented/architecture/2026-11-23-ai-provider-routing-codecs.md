@@ -44,7 +44,10 @@ covers it end to end:
   URLs (a model entry records *which* protocol it speaks, since one custom
   endpoint can front several APIs), an encrypted-at-rest key, and a fetched
   model catalogue where enablement is explicit. References parse as
-  `provider/model` or `group/<id>`, magpie's syntax.
+  `provider/model` or `group/<id>`, magpie's syntax. Each preset names a
+  bundled brand-mark SVG (`assets/ai_providers/<id>.svg`, monochrome
+  `currentColor` paths from the LobeHub icon set, tinted by the theme)
+  that the add-provider dialog shows ahead of the label.
 - **`secret_box.dart` + `provider_store.dart`** — AES-256-GCM via the
   already-present `cryptography` package. A random 32-byte key is generated
   once per install; `apiKey` fields persist as `v1:<nonce‖ct‖tag>` and
