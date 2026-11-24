@@ -168,7 +168,11 @@ final class AiRouter {
   /// How long a member that failed retryably sits out.
   final Duration cooldown;
 
-  final _cooledDownUntil = <String, DateTime>{};
+  /// member → when it may be tried again, and the error that benched it.
+  /// The error is kept because "no member could serve" is a lie when the
+  /// truth is "every member is sitting out a failure we already saw" — the
+  /// caller needs the upstream's reason, not a cooldown bookkeeping note.
+  final _cooledDown = <String, ({DateTime until, AiRequestException error})>{};
 
   /// Route observability for the routing page: every attempt, serve and
   /// failure, broadcast so any number of listeners can watch. Best-effort —
@@ -194,9 +198,14 @@ final class AiRouter {
     final members = _expand(request.model, config);
     final callId = ++_nextCallId;
     AiRequestException? lastRetryable;
+    AiRequestException? lastCoolingError;
 
     for (final member in members) {
-      if (_isCoolingDown(member)) continue;
+      final cooling = _cooldownOf(member);
+      if (cooling != null) {
+        lastCoolingError ??= cooling.error;
+        continue;
+      }
       _emit(callId, AiRoutePhase.attempt, member, request.model);
       try {
         final reply = await _call(member, request, config);
@@ -212,7 +221,10 @@ final class AiRouter {
         return reply;
       } on _RetryableFailure catch (failure) {
         _emit(callId, AiRoutePhase.failed, member, request.model);
-        _cooledDownUntil[member] = DateTime.now().add(cooldown);
+        _cooledDown[member] = (
+          until: DateTime.now().add(cooldown),
+          error: failure.error,
+        );
         lastRetryable = failure.error;
       } on AiRequestException {
         _emit(callId, AiRoutePhase.failed, member, request.model);
@@ -225,10 +237,20 @@ final class AiRouter {
       }
     }
 
-    throw lastRetryable ??
-        AiRequestException(
-          'no member of "$request.model" could serve the request',
-        );
+    if (lastRetryable != null) throw lastRetryable;
+    if (lastCoolingError != null) {
+      throw AiRequestException(
+        'every member of "${request.model}" is cooling down after a '
+        'failure; last error: ${lastCoolingError.message}',
+        statusCode: lastCoolingError.statusCode,
+        cause: lastCoolingError.cause,
+      );
+    }
+    throw AiRequestException(
+      members.isEmpty
+          ? '"${request.model}" has no members to try'
+          : 'no member of "${request.model}" could serve the request',
+    );
   }
 
   /// Re-emits a member's stream while reporting its end as a route event.
@@ -331,14 +353,14 @@ final class AiRouter {
     return members;
   }
 
-  bool _isCoolingDown(String member) {
-    final until = _cooledDownUntil[member];
-    if (until == null) return false;
-    if (DateTime.now().isAfter(until)) {
-      _cooledDownUntil.remove(member);
-      return false;
+  ({DateTime until, AiRequestException error})? _cooldownOf(String member) {
+    final entry = _cooledDown[member];
+    if (entry == null) return null;
+    if (DateTime.now().isAfter(entry.until)) {
+      _cooledDown.remove(member);
+      return null;
     }
-    return true;
+    return entry;
   }
 
   Future<AiReply> _call(

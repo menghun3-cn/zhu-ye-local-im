@@ -188,6 +188,29 @@ void main() {
     expect(transport.sent, hasLength(2));
   });
 
+  test('a cooled-down member reports the error that benched it', () async {
+    transport.pushJson(503, {'error': 'overloaded'});
+    // First call fails retryably and benches the only member of the group
+    // reference; the second call must not pretend nobody exists — it has to
+    // repeat why the member is sitting out.
+    await expectLater(
+      router.chat(chat('a/m1')),
+      throwsA(isA<AiRequestException>()),
+    );
+    await expectLater(
+      router.chat(chat('a/m1')),
+      throwsA(
+        isA<AiRequestException>().having(
+          (e) => e.message,
+          'message',
+          contains('cooling down'),
+        ),
+      ),
+    );
+    // And the benched member was not asked again.
+    expect(transport.sent, hasLength(1));
+  });
+
   test('nested groups expand depth-first', () async {
     transport.pushJson(503, {});
     transport.pushJson(200, {
