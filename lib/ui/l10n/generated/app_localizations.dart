@@ -2502,6 +2502,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lilac'**
   String get bubbleSkinPresetLilac;
+
+  /// No description provided for @myCardAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI'**
+  String get myCardAi;
+
+  /// No description provided for @myCardAiSummaryOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway on'**
+  String get myCardAiSummaryOn;
+
+  /// No description provided for @myCardAiSummaryOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway off'**
+  String get myCardAiSummaryOff;
+
+  /// No description provided for @aiUnavailableHere.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.'**
+  String get aiUnavailableHere;
+
+  /// No description provided for @aiLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI configuration could not be read'**
+  String get aiLoadFailed;
+
+  /// No description provided for @aiPageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.'**
+  String get aiPageHint;
+
+  /// No description provided for @aiCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get aiCopied;
+
+  /// No description provided for @aiSectionProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers'**
+  String get aiSectionProviders;
+
+  /// No description provided for @aiAddProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add provider'**
+  String get aiAddProvider;
+
+  /// No description provided for @aiProviderCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom endpoint'**
+  String get aiProviderCustom;
+
+  /// No description provided for @aiProviderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get aiProviderName;
+
+  /// No description provided for @aiProviderApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get aiProviderApiKey;
+
+  /// No description provided for @aiProviderApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored encrypted on this Device; leave empty for local models'**
+  String get aiProviderApiKeyHint;
+
+  /// No description provided for @aiProviderModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Models'**
+  String get aiProviderModels;
+
+  /// No description provided for @aiProviderModelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 model on} other{{count} models on}}'**
+  String aiProviderModelCount(int count);
+
+  /// No description provided for @aiKindPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset'**
+  String get aiKindPreset;
+
+  /// No description provided for @aiKindCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get aiKindCustom;
+
+  /// No description provided for @aiKindLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get aiKindLocal;
+
+  /// No description provided for @aiEditProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get aiEditProvider;
+
+  /// No description provided for @aiEndpointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Base URL, e.g. https://api.example.com/v1'**
+  String get aiEndpointHint;
+
+  /// No description provided for @aiFetchModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch models'**
+  String get aiFetchModels;
+
+  /// No description provided for @aiFetchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider reported no models'**
+  String get aiFetchEmpty;
+
+  /// No description provided for @aiFetchAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {count} new model(s)'**
+  String aiFetchAdded(int count);
+
+  /// No description provided for @aiProtocolOpenaiChat.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Chat'**
+  String get aiProtocolOpenaiChat;
+
+  /// No description provided for @aiProtocolOpenaiResponses.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Responses'**
+  String get aiProtocolOpenaiResponses;
+
+  /// No description provided for @aiProtocolAnthropic.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic Messages'**
+  String get aiProtocolAnthropic;
+
+  /// No description provided for @aiProtocolGemini.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini'**
+  String get aiProtocolGemini;
+
+  /// No description provided for @aiSectionGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing groups'**
+  String get aiSectionGroups;
+
+  /// No description provided for @aiAddGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Add routing group'**
+  String get aiAddGroup;
+
+  /// No description provided for @aiEditGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing group'**
+  String get aiEditGroup;
+
+  /// No description provided for @aiGroupName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get aiGroupName;
+
+  /// No description provided for @aiGroupMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members, tried in order'**
+  String get aiGroupMembers;
+
+  /// No description provided for @aiGroupEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No members yet — add at least one model or group.'**
+  String get aiGroupEmpty;
+
+  /// No description provided for @aiGroupMemberCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 member} other{{count} members}}'**
+  String aiGroupMemberCount(int count);
+
+  /// No description provided for @aiAddMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member'**
+  String get aiAddMember;
+
+  /// No description provided for @aiMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get aiMoveUp;
+
+  /// No description provided for @aiMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get aiMoveDown;
+
+  /// No description provided for @aiGatewayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local AI gateway'**
+  String get aiGatewayTitle;
+
+  /// No description provided for @aiGatewayOn.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI-compatible tools on this machine can use the enabled models'**
+  String get aiGatewayOn;
+
+  /// No description provided for @aiGatewayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Local tools cannot reach the configured providers'**
+  String get aiGatewayOff;
+
+  /// No description provided for @aiGatewayEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get aiGatewayEndpoint;
+
+  /// No description provided for @aiGatewayToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Access token'**
+  String get aiGatewayToken;
+
+  /// No description provided for @aiGatewayNotListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Configured, but not listening right now'**
+  String get aiGatewayNotListening;
+
+  /// No description provided for @aiGatewayNotListeningHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway is enabled but did not bind — check that the port is free, then restart the app.'**
+  String get aiGatewayNotListeningHint;
+
+  /// No description provided for @aiGatewayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point an OpenAI-compatible client at this endpoint with the token as its API key.'**
+  String get aiGatewayHint;
+
+  /// No description provided for @aiDeleteProviderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete provider?'**
+  String get aiDeleteProviderTitle;
+
+  /// No description provided for @aiDeleteProviderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider\'s key and models are removed, and every routing-group member pointing at it is dropped.'**
+  String get aiDeleteProviderBody;
+
+  /// No description provided for @aiDeleteGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete routing group?'**
+  String get aiDeleteGroupTitle;
+
+  /// No description provided for @aiDeleteGroupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The group disappears from /v1/models. Groups that list it as a member keep the reference but it will no longer resolve.'**
+  String get aiDeleteGroupBody;
 }
 
 class _AppLocalizationsDelegate

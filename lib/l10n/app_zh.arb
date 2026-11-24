@@ -422,5 +422,69 @@
   "bubbleSkinPresetOcean": "海洋",
   "bubbleSkinPresetGraphite": "石墨",
   "bubbleSkinPresetApricot": "杏橙",
-  "bubbleSkinPresetLilac": "丁香"
+  "bubbleSkinPresetLilac": "丁香",
+
+  "myCardAi": "AI",
+  "myCardAiSummaryOn": "网关已开启",
+  "myCardAiSummaryOff": "网关已关闭",
+
+  "aiUnavailableHere": "这台设备没有可持久保存 AI 配置的位置，AI 功能在此不可用。",
+  "aiLoadFailed": "AI 配置读取失败",
+  "aiPageHint": "供应商及其密钥只保存在本设备上，不会与设备组共享。网关只监听本机。",
+  "aiCopied": "已复制",
+
+  "aiSectionProviders": "供应商",
+  "aiAddProvider": "添加供应商",
+  "aiProviderCustom": "自定义端点",
+  "aiProviderName": "名称",
+  "aiProviderApiKey": "API 密钥",
+  "aiProviderApiKeyHint": "加密保存在本设备；本地模型可留空",
+  "aiProviderModels": "模型",
+  "aiProviderModelCount": "{count, plural, other{已启用 {count} 个模型}}",
+  "@aiProviderModelCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiKindPreset": "预设",
+  "aiKindCustom": "自定义",
+  "aiKindLocal": "本地",
+  "aiEditProvider": "供应商",
+  "aiEndpointHint": "基础地址，例如 https://api.example.com/v1",
+  "aiFetchModels": "获取模型列表",
+  "aiFetchEmpty": "供应商没有返回模型",
+  "aiFetchAdded": "新增 {count} 个模型",
+  "@aiFetchAdded": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiProtocolOpenaiChat": "OpenAI Chat",
+  "aiProtocolOpenaiResponses": "OpenAI Responses",
+  "aiProtocolAnthropic": "Anthropic Messages",
+  "aiProtocolGemini": "Gemini",
+
+  "aiSectionGroups": "路由组",
+  "aiAddGroup": "添加路由组",
+  "aiEditGroup": "路由组",
+  "aiGroupName": "名称",
+  "aiGroupMembers": "成员，按顺序尝试",
+  "aiGroupEmpty": "还没有成员——至少添加一个模型或路由组。",
+  "aiGroupMemberCount": "{count, plural, other{{count} 个成员}}",
+  "@aiGroupMemberCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiAddMember": "添加成员",
+  "aiMoveUp": "上移",
+  "aiMoveDown": "下移",
+
+  "aiGatewayTitle": "本地 AI 网关",
+  "aiGatewayOn": "本机的 OpenAI 兼容工具可以使用已启用的模型",
+  "aiGatewayOff": "本地工具无法访问已配置的供应商",
+  "aiGatewayEndpoint": "端点",
+  "aiGatewayToken": "访问令牌",
+  "aiGatewayNotListening": "已配置，但当前未在监听",
+  "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
+  "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。",
+
+  "aiDeleteProviderTitle": "删除供应商？",
+  "aiDeleteProviderBody": "供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。",
+  "aiDeleteGroupTitle": "删除路由组？",
+  "aiDeleteGroupBody": "该路由组将从 /v1/models 中消失。把它列为成员的其他路由组会保留该引用，但将无法再解析。"
 }

@@ -1365,4 +1365,168 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bubbleSkinPresetLilac => '丁香';
+
+  @override
+  String get myCardAi => 'AI';
+
+  @override
+  String get myCardAiSummaryOn => '网关已开启';
+
+  @override
+  String get myCardAiSummaryOff => '网关已关闭';
+
+  @override
+  String get aiUnavailableHere => '这台设备没有可持久保存 AI 配置的位置，AI 功能在此不可用。';
+
+  @override
+  String get aiLoadFailed => 'AI 配置读取失败';
+
+  @override
+  String get aiPageHint => '供应商及其密钥只保存在本设备上，不会与设备组共享。网关只监听本机。';
+
+  @override
+  String get aiCopied => '已复制';
+
+  @override
+  String get aiSectionProviders => '供应商';
+
+  @override
+  String get aiAddProvider => '添加供应商';
+
+  @override
+  String get aiProviderCustom => '自定义端点';
+
+  @override
+  String get aiProviderName => '名称';
+
+  @override
+  String get aiProviderApiKey => 'API 密钥';
+
+  @override
+  String get aiProviderApiKeyHint => '加密保存在本设备；本地模型可留空';
+
+  @override
+  String get aiProviderModels => '模型';
+
+  @override
+  String aiProviderModelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已启用 $count 个模型',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiKindPreset => '预设';
+
+  @override
+  String get aiKindCustom => '自定义';
+
+  @override
+  String get aiKindLocal => '本地';
+
+  @override
+  String get aiEditProvider => '供应商';
+
+  @override
+  String get aiEndpointHint => '基础地址，例如 https://api.example.com/v1';
+
+  @override
+  String get aiFetchModels => '获取模型列表';
+
+  @override
+  String get aiFetchEmpty => '供应商没有返回模型';
+
+  @override
+  String aiFetchAdded(int count) {
+    return '新增 $count 个模型';
+  }
+
+  @override
+  String get aiProtocolOpenaiChat => 'OpenAI Chat';
+
+  @override
+  String get aiProtocolOpenaiResponses => 'OpenAI Responses';
+
+  @override
+  String get aiProtocolAnthropic => 'Anthropic Messages';
+
+  @override
+  String get aiProtocolGemini => 'Gemini';
+
+  @override
+  String get aiSectionGroups => '路由组';
+
+  @override
+  String get aiAddGroup => '添加路由组';
+
+  @override
+  String get aiEditGroup => '路由组';
+
+  @override
+  String get aiGroupName => '名称';
+
+  @override
+  String get aiGroupMembers => '成员，按顺序尝试';
+
+  @override
+  String get aiGroupEmpty => '还没有成员——至少添加一个模型或路由组。';
+
+  @override
+  String aiGroupMemberCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个成员',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiAddMember => '添加成员';
+
+  @override
+  String get aiMoveUp => '上移';
+
+  @override
+  String get aiMoveDown => '下移';
+
+  @override
+  String get aiGatewayTitle => '本地 AI 网关';
+
+  @override
+  String get aiGatewayOn => '本机的 OpenAI 兼容工具可以使用已启用的模型';
+
+  @override
+  String get aiGatewayOff => '本地工具无法访问已配置的供应商';
+
+  @override
+  String get aiGatewayEndpoint => '端点';
+
+  @override
+  String get aiGatewayToken => '访问令牌';
+
+  @override
+  String get aiGatewayNotListening => '已配置，但当前未在监听';
+
+  @override
+  String get aiGatewayNotListeningHint => '网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。';
+
+  @override
+  String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。';
+
+  @override
+  String get aiDeleteProviderTitle => '删除供应商？';
+
+  @override
+  String get aiDeleteProviderBody => '供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。';
+
+  @override
+  String get aiDeleteGroupTitle => '删除路由组？';
+
+  @override
+  String get aiDeleteGroupBody =>
+      '该路由组将从 /v1/models 中消失。把它列为成员的其他路由组会保留该引用，但将无法再解析。';
 }

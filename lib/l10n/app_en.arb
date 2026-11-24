@@ -596,5 +596,69 @@
   "bubbleSkinPresetOcean": "Ocean",
   "bubbleSkinPresetGraphite": "Graphite",
   "bubbleSkinPresetApricot": "Apricot",
-  "bubbleSkinPresetLilac": "Lilac"
+  "bubbleSkinPresetLilac": "Lilac",
+
+  "myCardAi": "AI",
+  "myCardAiSummaryOn": "Gateway on",
+  "myCardAiSummaryOff": "Gateway off",
+
+  "aiUnavailableHere": "This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.",
+  "aiLoadFailed": "The AI configuration could not be read",
+  "aiPageHint": "Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.",
+  "aiCopied": "Copied",
+
+  "aiSectionProviders": "Providers",
+  "aiAddProvider": "Add provider",
+  "aiProviderCustom": "Custom endpoint",
+  "aiProviderName": "Name",
+  "aiProviderApiKey": "API key",
+  "aiProviderApiKeyHint": "Stored encrypted on this Device; leave empty for local models",
+  "aiProviderModels": "Models",
+  "aiProviderModelCount": "{count, plural, =1{1 model on} other{{count} models on}}",
+  "@aiProviderModelCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiKindPreset": "Preset",
+  "aiKindCustom": "Custom",
+  "aiKindLocal": "Local",
+  "aiEditProvider": "Provider",
+  "aiEndpointHint": "Base URL, e.g. https://api.example.com/v1",
+  "aiFetchModels": "Fetch models",
+  "aiFetchEmpty": "The provider reported no models",
+  "aiFetchAdded": "Added {count} new model(s)",
+  "@aiFetchAdded": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiProtocolOpenaiChat": "OpenAI Chat",
+  "aiProtocolOpenaiResponses": "OpenAI Responses",
+  "aiProtocolAnthropic": "Anthropic Messages",
+  "aiProtocolGemini": "Gemini",
+
+  "aiSectionGroups": "Routing groups",
+  "aiAddGroup": "Add routing group",
+  "aiEditGroup": "Routing group",
+  "aiGroupName": "Name",
+  "aiGroupMembers": "Members, tried in order",
+  "aiGroupEmpty": "No members yet — add at least one model or group.",
+  "aiGroupMemberCount": "{count, plural, =1{1 member} other{{count} members}}",
+  "@aiGroupMemberCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiAddMember": "Add member",
+  "aiMoveUp": "Move up",
+  "aiMoveDown": "Move down",
+
+  "aiGatewayTitle": "Local AI gateway",
+  "aiGatewayOn": "OpenAI-compatible tools on this machine can use the enabled models",
+  "aiGatewayOff": "Local tools cannot reach the configured providers",
+  "aiGatewayEndpoint": "Endpoint",
+  "aiGatewayToken": "Access token",
+  "aiGatewayNotListening": "Configured, but not listening right now",
+  "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then restart the app.",
+  "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with the token as its API key.",
+
+  "aiDeleteProviderTitle": "Delete provider?",
+  "aiDeleteProviderBody": "The provider's key and models are removed, and every routing-group member pointing at it is dropped.",
+  "aiDeleteGroupTitle": "Delete routing group?",
+  "aiDeleteGroupBody": "The group disappears from /v1/models. Groups that list it as a member keep the reference but it will no longer resolve."
 }

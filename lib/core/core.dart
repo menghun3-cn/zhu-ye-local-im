@@ -6,6 +6,20 @@
 /// acceptance harness as in the app.
 library;
 
+export 'ai/ai_gateway.dart';
+export 'ai/ai_runtime.dart';
+export 'ai/ai_message.dart';
+export 'ai/ai_router.dart';
+export 'ai/gateway_token.dart';
+export 'ai/presets.dart';
+export 'ai/provider.dart';
+export 'ai/provider_store.dart';
+export 'ai/protocol/anthropic.dart';
+export 'ai/protocol/codec.dart';
+export 'ai/protocol/gemini.dart';
+export 'ai/protocol/openai_chat.dart';
+export 'ai/protocol/openai_responses.dart';
+export 'ai/secret_box.dart';
 export 'clipboard/clipboard_capability.dart';
 export 'clipboard/clipboard_channel.dart';
 export 'clipboard/clipboard_entry.dart';
