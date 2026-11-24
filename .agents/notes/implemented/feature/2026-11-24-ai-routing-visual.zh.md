@@ -75,6 +75,19 @@ magpie 的减弱动效降级同义。供应商启用/停用无需新工作：
 （每次 `save` 自增）与网关签名，使页面别处的编辑无需重载握手即可
 重绘画布。
 
+**画布之下是请求日志。** 状态行下方列出最近 7 天*已完成*的请求——
+每条两行：第一行 `MM-dd HH:mm:ss` 独占一列、旁边是实际应答的模型；
+第二行是耗时、首字耗时、总/缓存 token 与 token 速度。`AiRouter`
+把每个跑完的回复（流式以事件流结束为准；失败不留行——红色节点
+已经说明了）写进 `providers.json` 旁的 `requests.json`，每次写入
+按窗口裁剪并硬上限 500 行。计时用路由器自己的时钟，token 数来自
+`AiUsage`——新增 `cachedTokens`，按协议各自解码
+（`prompt_tokens_details`、`input_tokens_details`、
+`cache_read_input_tokens`、`cachedContentTokenCount`），并以
+OpenAI 形状回传给网关调用方。记录是 fire-and-forget：日志失败
+永远到不了请求路径。视图按 `AiRequestLog.version` 重载，由同一个
+1 秒心跳与 `configVersion` 一起轮询。
+
 **名称框先问再答。** 新建供应商的名称框初始为空——预设名降级为
 `hintText`——名称非空前保存按钮禁用。获取模型/测试连通不受影响：
 它们只读端点与密钥。
@@ -92,6 +105,10 @@ magpie 的减弱动效降级同义。供应商启用/停用无需新工作：
   聊天共用同一事件流，聊天落地时页面不需要第二套埋点。
 - 飞叶是每次飞行一个 `AnimationController`——用
   `TickerProviderStateMixin` 而非单 ticker 版本，因为并发请求是真的。
+- `requests.json` 是诊断日志而非计费账本：只有 served 的请求入账，
+  token 数字是供应商上报了什么就记什么（缺失保持缺失，显示 `—`），
+  速度是 completion tokens 除以首字之后的生成时长——没有首字
+  标记时用整个耗时。
 
 ## Alternatives considered
 

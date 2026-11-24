@@ -1565,6 +1565,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRoutingEmpty => '还没有供应商。';
 
   @override
+  String get aiRequestsTitle => '请求记录';
+
+  @override
+  String get aiRequestsWindow => '最近 7 天';
+
+  @override
+  String get aiRequestsEmpty => '暂无请求记录。';
+
+  @override
+  String get aiMetricDuration => '耗时';
+
+  @override
+  String get aiMetricFirstToken => '首字';
+
+  @override
+  String get aiMetricTokens => '总 Token';
+
+  @override
+  String get aiMetricCached => '缓存';
+
+  @override
+  String get aiMetricSpeed => '速度';
+
+  @override
   String get aiDeleteProviderTitle => '删除供应商？';
 
   @override

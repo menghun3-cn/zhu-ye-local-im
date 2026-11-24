@@ -496,6 +496,10 @@ final class AiGateway {
           'completion_tokens': response.usage.completionTokens,
         if (response.usage.totalTokens != null)
           'total_tokens': response.usage.totalTokens,
+        if (response.usage.cachedTokens != null)
+          'prompt_tokens_details': {
+            'cached_tokens': response.usage.cachedTokens,
+          },
       },
     };
   }
@@ -532,6 +536,8 @@ final class AiGateway {
       if (usage.completionTokens != null)
         'completion_tokens': usage.completionTokens,
       if (usage.totalTokens != null) 'total_tokens': usage.totalTokens,
+      if (usage.cachedTokens != null)
+        'prompt_tokens_details': {'cached_tokens': usage.cachedTokens},
     },
   };
 

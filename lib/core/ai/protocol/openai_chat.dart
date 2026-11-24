@@ -117,6 +117,10 @@ final class OpenAiChatCodec implements AiCodec {
       promptTokens: jsonIntField(json, 'prompt_tokens'),
       completionTokens: jsonIntField(json, 'completion_tokens'),
       totalTokens: jsonIntField(json, 'total_tokens'),
+      cachedTokens: jsonIntField(
+        asObject(json['prompt_tokens_details']),
+        'cached_tokens',
+      ),
     );
   }
 

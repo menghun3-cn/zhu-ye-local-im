@@ -1645,6 +1645,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingEmpty => 'No providers yet.';
 
   @override
+  String get aiRequestsTitle => 'Requests';
+
+  @override
+  String get aiRequestsWindow => 'Last 7 days';
+
+  @override
+  String get aiRequestsEmpty => 'No requests yet.';
+
+  @override
+  String get aiMetricDuration => 'Duration';
+
+  @override
+  String get aiMetricFirstToken => 'First token';
+
+  @override
+  String get aiMetricTokens => 'Total tokens';
+
+  @override
+  String get aiMetricCached => 'Cached';
+
+  @override
+  String get aiMetricSpeed => 'Speed';
+
+  @override
   String get aiDeleteProviderTitle => 'Delete provider?';
 
   @override

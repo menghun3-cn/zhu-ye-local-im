@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'ai_message.dart';
 import 'provider.dart';
 import 'provider_store.dart';
+import 'request_log.dart';
 import 'protocol/codec.dart';
 import 'protocol/openai_chat.dart';
 import 'protocol/openai_responses.dart';
@@ -170,11 +171,17 @@ final class AiRouter {
     required this.store,
     AiTransport? transport,
     this.cooldown = const Duration(minutes: 1),
+    this.requestLog,
   }) : _transport = transport ?? IoAiTransport();
 
   /// Where the configuration is read from on every [chat] call.
   final AiConfigStore store;
   final AiTransport _transport;
+
+  /// Optional sink for finished requests — the routing view's history list.
+  /// Null in tests and headless uses; recording is fire-and-forget and can
+  /// never slow or break a request.
+  final AiRequestLog? requestLog;
 
   /// How long a member that failed retryably sits out.
   final Duration cooldown;
@@ -235,6 +242,7 @@ final class AiRouter {
   /// member failed fatally, or every member failed retryably — the last case
   /// carries the most recent failure as its cause.
   Future<AiReply> chat(AiChatRequest request) async {
+    final startedAt = DateTime.now();
     final config = await store.load();
     final members = _expand(request.model, config);
     final callId = ++_nextCallId;
@@ -255,10 +263,23 @@ final class AiRouter {
           // the provider while tokens flow, which is the honest picture.
           return AiStreamReply(
             servedBy: member,
-            events: _observeStream(reply.events, callId, member, request.model),
+            events: _observeStream(
+              reply.events,
+              callId,
+              member,
+              request.model,
+              startedAt,
+            ),
           );
         }
         _emit(callId, AiRoutePhase.served, member, request.model);
+        _record(
+          startedAt,
+          request.model,
+          member,
+          (reply as AiFullReply).response.usage,
+          null,
+        );
         return reply;
       } on _RetryableFailure catch (failure) {
         _emit(
@@ -300,6 +321,37 @@ final class AiRouter {
     );
   }
 
+  /// Appends one finished request to [requestLog]. Fire-and-forget: a log
+  /// failure (disk full, corrupt file) must never reach the caller.
+  void _record(
+    DateTime startedAt,
+    String model,
+    String member,
+    AiUsage? usage,
+    int? ttftMs,
+  ) {
+    final log = requestLog;
+    if (log == null) return;
+    unawaited(() async {
+      try {
+        await log.record(
+          AiRequestRecord(
+            at: startedAt,
+            model: model,
+            servedBy: member,
+            durationMs: DateTime.now().difference(startedAt).inMilliseconds,
+            ttftMs: ttftMs,
+            totalTokens: usage?.totalTokens,
+            cachedTokens: usage?.cachedTokens,
+            completionTokens: usage?.completionTokens,
+          ),
+        );
+      } on Object {
+        // Diagnostic logging only.
+      }
+    }());
+  }
+
   /// Re-emits a member's stream while reporting its end as a route event.
   /// A listener that walks away mid-stream is a failure from the route's
   /// point of view — the provider never got to finish its answer.
@@ -308,14 +360,30 @@ final class AiRouter {
     int callId,
     String member,
     String model,
+    DateTime startedAt,
   ) async* {
     var settled = false;
+    DateTime? firstContentAt;
+    AiUsage? usage;
     try {
       await for (final event in inner) {
+        if (firstContentAt == null &&
+            (event.kind == AiStreamKind.textDelta ||
+                event.kind == AiStreamKind.toolCall)) {
+          firstContentAt = DateTime.now();
+        }
+        if (event.kind == AiStreamKind.usage) usage = event.usage;
         yield event;
       }
       settled = true;
       _emit(callId, AiRoutePhase.served, member, model);
+      _record(
+        startedAt,
+        model,
+        member,
+        usage,
+        firstContentAt?.difference(startedAt).inMilliseconds,
+      );
     } catch (_) {
       settled = true;
       _emit(callId, AiRoutePhase.failed, member, model);

@@ -162,6 +162,7 @@ final class AnthropicCodec implements AiCodec {
       totalTokens:
           (jsonIntField(json, 'input_tokens') ?? 0) +
           (jsonIntField(json, 'output_tokens') ?? 0),
+      cachedTokens: jsonIntField(json, 'cache_read_input_tokens'),
     );
   }
 

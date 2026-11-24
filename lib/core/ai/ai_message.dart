@@ -100,11 +100,22 @@ final class AiMessage {
 
 /// Token accounting, as much of it as the provider reported.
 final class AiUsage {
-  const AiUsage({this.promptTokens, this.completionTokens, this.totalTokens});
+  const AiUsage({
+    this.promptTokens,
+    this.completionTokens,
+    this.totalTokens,
+    this.cachedTokens,
+  });
 
   final int? promptTokens;
   final int? completionTokens;
   final int? totalTokens;
+
+  /// Prompt tokens the provider served from its cache — a subset of
+  /// [promptTokens], reported under a different name by each protocol
+  /// (OpenAI's `prompt_tokens_details.cached_tokens`, Anthropic's
+  /// `cache_read_input_tokens`, Gemini's `cachedContentTokenCount`).
+  final int? cachedTokens;
 
   static const AiUsage empty = AiUsage();
 
@@ -112,12 +123,14 @@ final class AiUsage {
     if (promptTokens != null) 'prompt_tokens': promptTokens,
     if (completionTokens != null) 'completion_tokens': completionTokens,
     if (totalTokens != null) 'total_tokens': totalTokens,
+    if (cachedTokens != null) 'cached_tokens': cachedTokens,
   };
 
   factory AiUsage.fromJson(Map<String, Object?> json) => AiUsage(
     promptTokens: json['prompt_tokens'] as int?,
     completionTokens: json['completion_tokens'] as int?,
     totalTokens: json['total_tokens'] as int?,
+    cachedTokens: json['cached_tokens'] as int?,
   );
 }
 

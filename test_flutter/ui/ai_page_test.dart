@@ -69,11 +69,13 @@ void main() {
     await tester.pump();
     final l10n = lookupAppLocalizations(appLocale);
 
-    // All four sub-pages exist as tabs.
+    // All four sub-pages exist as tabs. The gateway tab's label collides
+    // with the routing canvas's gateway node ("网关"/"Gateway"), so tabs
+    // are found inside Tab widgets rather than as bare text.
     expect(find.text(l10n.aiRoutingTitle), findsOneWidget);
-    expect(find.text(l10n.aiSectionProviders), findsOneWidget);
-    expect(find.text(l10n.aiNavGateway), findsOneWidget);
-    expect(find.text(l10n.aiSectionGroups), findsOneWidget);
+    expect(find.widgetWithText(Tab, l10n.aiSectionProviders), findsOneWidget);
+    expect(find.widgetWithText(Tab, l10n.aiNavGateway), findsOneWidget);
+    expect(find.widgetWithText(Tab, l10n.aiSectionGroups), findsOneWidget);
 
     // The default tab is routing: the canvas's source node is on screen
     // and the provider list is not.
@@ -81,7 +83,7 @@ void main() {
     expect(find.text('OpenCode Zen'), findsNothing);
 
     // Switching to providers shows the configured catalogue.
-    await tester.tap(find.text(l10n.aiSectionProviders));
+    await tester.tap(find.widgetWithText(Tab, l10n.aiSectionProviders));
     await tester.pumpAndSettle();
     expect(find.text('OpenCode Zen'), findsOneWidget);
     expect(find.text('Kilo'), findsOneWidget);
@@ -123,7 +125,7 @@ void main() {
     await tester.pump();
     final l10n = lookupAppLocalizations(appLocale);
 
-    await tester.tap(find.text(l10n.aiNavGateway));
+    await tester.tap(find.widgetWithText(Tab, l10n.aiNavGateway));
     await tester.pumpAndSettle();
 
     // The token field is the only obscured one on the tab. TextFormField

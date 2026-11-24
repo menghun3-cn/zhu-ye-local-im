@@ -91,6 +91,22 @@ dead. A 1s ticker expires marks, refreshes the countdown, and polls
 signature so edits made elsewhere on the page repaint the canvas without
 a reload handshake.
 
+**The canvas is answered by a request log.** Under the status line the
+view lists the last 7 days of *finished* requests — two lines each:
+`MM-dd HH:mm:ss` in its own column beside the model that served, then
+duration, time-to-first-token, total/cached tokens and token speed.
+`AiRouter` records every reply that completed (streams count when their
+event stream ends; failures leave no row — the red node already says
+that) into `requests.json` beside `providers.json`, pruned to the
+window on every write and hard-capped at 500 rows. Timing comes from
+the router's own clock, tokens from `AiUsage`, which gained
+`cachedTokens` — decoded per protocol (`prompt_tokens_details`,
+`input_tokens_details`, `cache_read_input_tokens`,
+`cachedContentTokenCount`) and re-emitted to gateway callers in the
+OpenAI shape. Recording is fire-and-forget: a log failure can never
+reach a request. The view reloads on `AiRequestLog.version`, polled by
+the same 1s ticker that watches `configVersion`.
+
 **The name field asks instead of answering.** A provider draft opens
 with an empty name field — the preset label demotes to `hintText` — and
 Save stays disabled until the name is non-empty. Fetch/test are
@@ -112,6 +128,11 @@ unaffected: they only read endpoints and key.
   second instrumentation when chat lands.
 - Leaves are per-flight `AnimationController`s — a `TickerProviderStateMixin`,
   not the single-ticker one, because concurrent requests are real.
+- `requests.json` is a diagnostic log, not accounting: only served
+  requests land in it, token figures are whatever the provider reported
+  (absent stays absent, shown as `—`), and speed is completion tokens
+  over the post-TTFT span — or the whole duration when there is no
+  first-token mark.
 
 ## Alternatives considered
 

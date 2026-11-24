@@ -14,6 +14,7 @@ export 'ai/gateway_token.dart';
 export 'ai/presets.dart';
 export 'ai/provider.dart';
 export 'ai/provider_store.dart';
+export 'ai/request_log.dart';
 export 'ai/protocol/anthropic.dart';
 export 'ai/protocol/codec.dart';
 export 'ai/protocol/gemini.dart';

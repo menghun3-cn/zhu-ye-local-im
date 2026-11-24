@@ -176,6 +176,7 @@ final class GeminiCodec implements AiCodec {
       totalTokens:
           jsonIntField(json, 'totalTokenCount') ??
           ((prompt ?? 0) + (completion ?? 0)),
+      cachedTokens: jsonIntField(json, 'cachedContentTokenCount'),
     );
   }
 

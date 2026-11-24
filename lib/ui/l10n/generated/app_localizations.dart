@@ -2857,6 +2857,54 @@ abstract class AppLocalizations {
   /// **'No providers yet.'**
   String get aiRoutingEmpty;
 
+  /// No description provided for @aiRequestsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests'**
+  String get aiRequestsTitle;
+
+  /// No description provided for @aiRequestsWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get aiRequestsWindow;
+
+  /// No description provided for @aiRequestsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No requests yet.'**
+  String get aiRequestsEmpty;
+
+  /// No description provided for @aiMetricDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get aiMetricDuration;
+
+  /// No description provided for @aiMetricFirstToken.
+  ///
+  /// In en, this message translates to:
+  /// **'First token'**
+  String get aiMetricFirstToken;
+
+  /// No description provided for @aiMetricTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tokens'**
+  String get aiMetricTokens;
+
+  /// No description provided for @aiMetricCached.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get aiMetricCached;
+
+  /// No description provided for @aiMetricSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get aiMetricSpeed;
+
   /// No description provided for @aiDeleteProviderTitle.
   ///
   /// In en, this message translates to:

@@ -55,6 +55,10 @@ class _AiRoutingViewState extends State<AiRoutingView>
   final List<_LeafFlight> _flights = [];
   AiRouteEvent? _last;
 
+  /// Finished requests, newest first — the log under the canvas.
+  List<AiRequestRecord> _records = const [];
+  int _seenLogVersion = 0;
+
   /// member ref → when its cooldown ends. Seeded from the router on load so
   /// a cooldown that began before the page opened still shows.
   final Map<String, DateTime> _coolingUntil = {};
@@ -79,9 +83,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   void initState() {
     super.initState();
     _seenVersion = widget.runtime.configVersion;
+    _seenLogVersion = widget.runtime.requestLog.version;
     _events = widget.runtime.router.events.listen(_onEvent);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     unawaited(_reload());
+    unawaited(_loadRecords());
   }
 
   @override
@@ -107,6 +113,20 @@ class _AiRoutingViewState extends State<AiRoutingView>
       }
     } on Object catch (error) {
       if (mounted) setState(() => _failure = error);
+    }
+  }
+
+  /// Reads the request log newest-first. [AiRequestLog.version] is the
+  /// cheap change signal — the file itself is only touched when it moves.
+  Future<void> _loadRecords() async {
+    final log = widget.runtime.requestLog;
+    final records = await log.load();
+    records.sort((a, b) => b.at.compareTo(a.at));
+    if (mounted) {
+      setState(() {
+        _records = records;
+        _seenLogVersion = log.version;
+      });
     }
   }
 
@@ -174,6 +194,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
     if (signature != _gatewaySignature) {
       _gatewaySignature = signature;
       dirty = true;
+    }
+    if (widget.runtime.requestLog.version != _seenLogVersion) {
+      unawaited(_loadRecords());
     }
     final hadMarks =
         _coolingUntil.isNotEmpty ||
@@ -340,6 +363,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     return Column(
       children: [
         Expanded(
+          flex: 3,
           child: _RoutingCanvas(
             config: config,
             flights: _flights,
@@ -352,6 +376,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
           ),
         ),
         _StatusBar(event: _last),
+        Expanded(flex: 2, child: _RequestLogSection(records: _records)),
       ],
     );
   }
@@ -839,6 +864,142 @@ class _Leaf extends StatelessWidget {
   Offset _bezierPoint(Offset from, Offset to, double t) {
     final points = _wirePoints(from, to);
     return _bezier(points[0], points[1], points[2], points[3], t);
+  }
+}
+
+/// The request history under the canvas: the last 7 days of finished
+/// requests, newest first. Each record is two lines — when and which model
+/// on the first, the timing and token metrics on the second — so a glance
+/// down the column reads like a table.
+class _RequestLogSection extends StatelessWidget {
+  const _RequestLogSection({required this.records});
+
+  final List<AiRequestRecord> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Row(
+            children: [
+              Text(
+                l10n.aiRequestsTitle,
+                style: TextStyle(
+                  fontSize: WeChat.fontSizePreview,
+                  fontWeight: FontWeight.w600,
+                  color: colors.brandStrong,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                l10n.aiRequestsWindow,
+                style: TextStyle(fontSize: 11, color: colors.secondaryText),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: records.isEmpty
+              ? Center(child: HintText(l10n.aiRequestsEmpty))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  itemCount: records.length,
+                  separatorBuilder: (_, index) => const SizedBox(height: 6),
+                  itemBuilder: (context, index) =>
+                      _RequestTile(record: records[index]),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One log row: `MM-dd HH:mm:ss  model` over the metric line. The timestamp
+/// gets its own fixed-width column so the models line up vertically.
+class _RequestTile extends StatelessWidget {
+  const _RequestTile({required this.record});
+
+  final AiRequestRecord record;
+
+  static String _pad(int v) => v.toString().padLeft(2, '0');
+
+  static String _dateTime(DateTime t) =>
+      '${_pad(t.month)}-${_pad(t.day)} '
+      '${_pad(t.hour)}:${_pad(t.minute)}:${_pad(t.second)}';
+
+  static String _duration(int ms) =>
+      ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
+
+  static String _tokens(int n) =>
+      n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = WeChatColors.of(context);
+    final caption = TextStyle(fontSize: 11, color: colors.secondaryText);
+    final body = TextStyle(fontSize: WeChat.fontSizePreview);
+
+    // Speed is completion tokens over generation time — the span after the
+    // first token. Without a TTFT (non-streamed replies) the whole
+    // duration is the generation span.
+    final ttft = record.ttftMs;
+    final genMs = ttft == null
+        ? record.durationMs
+        : math.max(1, record.durationMs - ttft);
+    final completion = record.completionTokens;
+    final speed = completion == null ? null : completion * 1000 / genMs;
+
+    final metrics = [
+      '${l10n.aiMetricDuration} ${_duration(record.durationMs)}',
+      '${l10n.aiMetricFirstToken} '
+          '${record.ttftMs == null ? '—' : _duration(record.ttftMs!)}',
+      '${l10n.aiMetricTokens} '
+          '${record.totalTokens == null ? '—' : _tokens(record.totalTokens!)}',
+      '${l10n.aiMetricCached} '
+          '${record.cachedTokens == null ? '—' : _tokens(record.cachedTokens!)}',
+      '${l10n.aiMetricSpeed} '
+          '${speed == null ? '—' : '${speed.toStringAsFixed(0)} tok/s'}',
+    ].join(' · ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 96,
+              child: Text(_dateTime(record.at), style: caption),
+            ),
+            Expanded(
+              child: Text(
+                record.servedBy ?? record.model,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: body,
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 96),
+          child: Text(
+            metrics,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: caption,
+          ),
+        ),
+      ],
+    );
   }
 }
 

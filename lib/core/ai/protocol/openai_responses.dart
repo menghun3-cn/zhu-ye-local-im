@@ -149,6 +149,10 @@ final class OpenAiResponsesCodec implements AiCodec {
       completionTokens: output,
       totalTokens:
           jsonIntField(json, 'total_tokens') ?? ((input ?? 0) + (output ?? 0)),
+      cachedTokens: jsonIntField(
+        asObject(json['input_tokens_details']),
+        'cached_tokens',
+      ),
     );
   }
 

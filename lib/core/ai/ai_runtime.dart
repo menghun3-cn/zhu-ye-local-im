@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'ai_gateway.dart';
 import 'ai_router.dart';
 import 'builtin_providers.dart';
 import 'gateway_token.dart';
 import 'provider.dart';
 import 'provider_store.dart';
+import 'request_log.dart';
 import 'secret_box.dart';
 import '../history/message_store.dart';
 
@@ -24,6 +27,7 @@ final class AiRuntime {
     required this.store,
     required this.router,
     required this.token,
+    required this.requestLog,
   });
 
   /// Where `providers.json`, `secrets.key` and `gateway_token` live.
@@ -37,6 +41,9 @@ final class AiRuntime {
 
   /// The bearer token the gateway asks callers for.
   final AiGatewayToken token;
+
+  /// Rolling history of finished requests — the routing view's bottom list.
+  final AiRequestLog requestLog;
 
   AiGateway? _gateway;
 
@@ -77,11 +84,13 @@ final class AiRuntime {
       secrets: secrets,
     );
     await _seedBuiltins(store);
+    final requestLog = AiRequestLog(file: File('$directory/requests.json'));
     return AiRuntime._(
       directory: directory,
       store: store,
-      router: AiRouter(store: store),
+      router: AiRouter(store: store, requestLog: requestLog),
       token: await AiGatewayToken.loadOrCreate('$directory/gateway_token'),
+      requestLog: requestLog,
     );
   }
 
