@@ -112,8 +112,14 @@ the router's own clock, tokens from `AiUsage`, which gained
 `cachedTokens` — decoded per protocol (`prompt_tokens_details`,
 `input_tokens_details`, `cache_read_input_tokens`,
 `cachedContentTokenCount`) and re-emitted to gateway callers in the
-OpenAI shape. Recording is fire-and-forget: a log failure can never
-reach a request. The view reloads on `AiRequestLog.version`, polled by
+OpenAI shape. The gateway therefore asks every upstream for a stream
+even when the caller wants one folded response: only the stream shape
+carries a first-token mark and per-chunk usage, and `_fullReply`
+reassembles it — a non-stream upstream answer would leave TTFT and
+usage permanently blank. When an upstream reports only
+total/completion, the prompt share is derived as their difference so
+the cache-hit math still renders. Recording is fire-and-forget: a log
+failure can never reach a request. The view reloads on `AiRequestLog.version`, polled by
 the same 1s ticker that watches `configVersion`.
 
 **The name field asks instead of answering.** A provider draft opens

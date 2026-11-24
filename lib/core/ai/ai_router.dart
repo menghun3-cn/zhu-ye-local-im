@@ -339,6 +339,16 @@ final class AiRouter {
   ) {
     final log = requestLog;
     if (log == null) return;
+    // Some upstreams report only total/completion; the prompt share is then
+    // derivable, and the log's cache-hit math needs it. Inconsistent totals
+    // derive to null rather than a negative count.
+    int? promptTokens;
+    if (usage?.promptTokens != null) {
+      promptTokens = usage!.promptTokens;
+    } else if (usage?.totalTokens != null && usage?.completionTokens != null) {
+      final derived = usage!.totalTokens! - usage.completionTokens!;
+      promptTokens = derived > 0 ? derived : null;
+    }
     unawaited(() async {
       try {
         await log.record(
@@ -350,7 +360,7 @@ final class AiRouter {
             durationMs: DateTime.now().difference(startedAt).inMilliseconds,
             ttftMs: ttftMs,
             totalTokens: usage?.totalTokens,
-            promptTokens: usage?.promptTokens,
+            promptTokens: promptTokens,
             cachedTokens: usage?.cachedTokens,
             cacheWriteTokens: usage?.cacheWriteTokens,
             completionTokens: usage?.completionTokens,

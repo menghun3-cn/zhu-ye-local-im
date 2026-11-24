@@ -185,14 +185,14 @@ void main() {
   });
 
   test('chat completions answers in OpenAI shape', () async {
-    transport.pushJson(200, {
-      'choices': [
-        {
-          'message': {'role': 'assistant', 'content': 'hi there'},
-        },
-      ],
-      'usage': {'prompt_tokens': 3, 'completion_tokens': 2, 'total_tokens': 5},
-    });
+    // The gateway always asks upstream for a stream (that's where TTFT and
+    // usage live) and folds it back for non-streaming callers.
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"hi "}}]}',
+      'data: {"choices":[{"delta":{"content":"there"}}]}',
+      'data: {"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}',
+      'data: [DONE]',
+    ]);
     final response = await post('/v1/chat/completions', {
       'model': 'deepseek/deepseek-chat',
       'messages': [
@@ -210,13 +210,10 @@ void main() {
   });
 
   test('a group reference routes through the router', () async {
-    transport.pushJson(200, {
-      'choices': [
-        {
-          'message': {'role': 'assistant', 'content': 'grouped'},
-        },
-      ],
-    });
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"grouped"}}]}',
+      'data: [DONE]',
+    ]);
     final response = await post('/v1/chat/completions', {
       'model': 'group/main',
       'messages': [
@@ -253,24 +250,10 @@ void main() {
   });
 
   test('a tool-call reply finishes with tool_calls, not stop', () async {
-    transport.pushJson(200, {
-      'choices': [
-        {
-          'message': {
-            'role': 'assistant',
-            'content': null,
-            'tool_calls': [
-              {
-                'id': 'call_1',
-                'type': 'function',
-                'function': {'name': 'lookup', 'arguments': '{}'},
-              },
-            ],
-          },
-          'finish_reason': 'tool_calls',
-        },
-      ],
-    });
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{}"}}]}}]}',
+      'data: [DONE]',
+    ]);
     final response = await post('/v1/chat/completions', {
       'model': 'deepseek/deepseek-chat',
       'messages': [

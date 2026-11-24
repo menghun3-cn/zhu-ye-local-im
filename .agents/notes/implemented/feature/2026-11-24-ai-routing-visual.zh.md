@@ -90,7 +90,11 @@ magpie 的减弱动效降级同义。供应商启用/停用无需新工作：
 `AiUsage`——新增 `cachedTokens`，按协议各自解码
 （`prompt_tokens_details`、`input_tokens_details`、
 `cache_read_input_tokens`、`cachedContentTokenCount`），并以
-OpenAI 形状回传给网关调用方。记录是 fire-and-forget：日志失败
+OpenAI 形状回传给网关调用方。网关因此对每个上游都请求流式——
+即使调用方要的是折叠后的整段回复：只有流式形状带首字标记与
+逐块 usage，`_fullReply` 再把它装回去；非流式上游应答会让
+TTFT 与 usage 永远空白。上游只报 total/completion 时，prompt
+部分按两者之差推导，缓存命中率照常渲染。记录是 fire-and-forget：日志失败
 永远到不了请求路径。视图按 `AiRequestLog.version` 重载，由同一个
 1 秒心跳与 `configVersion` 一起轮询。
 

@@ -278,9 +278,14 @@ final class AiGateway {
       _writeError(request, 400, '"messages" contains no usable entries');
       return;
     }
+    // Upstream is always asked for a stream, even when the caller wants a
+    // whole response: the stream is the only shape that carries a
+    // time-to-first-token and per-chunk usage, which the request log
+    // records. `_fullReply` folds the stream back into one completion, so
+    // the caller sees exactly what it asked for.
     final chatRequest = AiChatRequest(
       model: model,
-      stream: wantsStream,
+      stream: true,
       temperature: _number(body['temperature']),
       maxTokens: _int(body['max_tokens']),
       topP: _number(body['top_p']),

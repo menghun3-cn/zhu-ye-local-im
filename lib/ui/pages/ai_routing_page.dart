@@ -987,7 +987,16 @@ class _RequestTile extends StatelessWidget {
     String seconds(int ms) => l10n.aiLogSeconds((ms / 1000).toStringAsFixed(1));
 
     final ttft = record.ttftMs;
-    final prompt = record.promptTokens;
+    // Older rows (and upstreams that report only total/completion) lack a
+    // prompt count; derive it so cache-hit math still renders. Inconsistent
+    // totals derive to null rather than a negative count.
+    int? prompt;
+    if (record.promptTokens != null) {
+      prompt = record.promptTokens;
+    } else if (record.totalTokens != null && record.completionTokens != null) {
+      final derived = record.totalTokens! - record.completionTokens!;
+      prompt = derived > 0 ? derived : null;
+    }
     final cached = record.cachedTokens;
     final percent = prompt != null && prompt > 0 && cached != null
         ? '${(cached * 100 / prompt).round()}%'
