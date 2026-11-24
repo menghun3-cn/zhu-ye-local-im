@@ -255,7 +255,7 @@ final class AiGateway {
     try {
       reply = await router.chat(chatRequest);
     } on AiRequestException catch (error) {
-      _writeError(request, 502, error.message);
+      _writeError(request, 502, _errorDetail(error));
       return;
     }
 
@@ -277,7 +277,7 @@ final class AiGateway {
           response: await _collect(reply.events),
         );
       } on AiRequestException catch (error) {
-        _writeError(request, 502, error.message);
+        _writeError(request, 502, _errorDetail(error));
         return;
       }
     }
@@ -397,6 +397,15 @@ final class AiGateway {
     } on Object {
       // Client hung up mid-stream; nothing to do but let the socket die.
     }
+  }
+
+  /// The message a client sees for a failed route. [AiRequestException]
+  /// keeps the socket-level cause (DNS, timeout, refusal) separate from the
+  /// message; a bare "could not reach X" sends the caller debugging blind,
+  /// so the cause rides along when there is one.
+  static String _errorDetail(AiRequestException error) {
+    final cause = error.cause;
+    return cause == null ? error.message : '${error.message} ($cause)';
   }
 
   /// Folds a stream into one reply — the non-streaming path's fallback.
