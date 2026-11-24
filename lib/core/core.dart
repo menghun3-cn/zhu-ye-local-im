@@ -17,6 +17,7 @@ export 'ai/provider_store.dart';
 export 'ai/request_log.dart';
 export 'ai/protocol/anthropic.dart';
 export 'ai/protocol/codec.dart';
+export 'ai/protocol/common.dart';
 export 'ai/protocol/gemini.dart';
 export 'ai/protocol/openai_chat.dart';
 export 'ai/protocol/openai_responses.dart';

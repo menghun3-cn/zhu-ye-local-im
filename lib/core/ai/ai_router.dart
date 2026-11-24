@@ -11,6 +11,7 @@ import 'protocol/codec.dart';
 import 'protocol/openai_chat.dart';
 import 'protocol/openai_responses.dart';
 import 'protocol/anthropic.dart';
+import 'protocol/common.dart';
 import 'protocol/gemini.dart';
 
 /// The codec registry: one stateless instance per protocol.
@@ -566,7 +567,7 @@ final class AiRouter {
     if (request.stream) {
       return AiStreamReply(
         servedBy: member,
-        events: codec.decodeStream(response.bodyBytes),
+        events: sniffedDecodeStream(codec, response.bodyBytes),
       );
     }
     final body = await _readBody(response.bodyBytes);
