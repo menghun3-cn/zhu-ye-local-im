@@ -1,5 +1,6 @@
 import 'ai_gateway.dart';
 import 'ai_router.dart';
+import 'builtin_providers.dart';
 import 'gateway_token.dart';
 import 'provider.dart';
 import 'provider_store.dart';
@@ -69,11 +70,30 @@ final class AiRuntime {
       store: FileMessageStore('$directory/providers.json'),
       secrets: secrets,
     );
+    await _seedBuiltins(store);
     return AiRuntime._(
       directory: directory,
       store: store,
       router: AiRouter(store: store),
       token: await AiGatewayToken.loadOrCreate('$directory/gateway_token'),
+    );
+  }
+
+  /// Writes the built-in providers once, on the first configuration the
+  /// store ever loads. Ids already present are skipped rather than replaced
+  /// — a returning install that deleted one keeps it deleted — and the
+  /// flag flips either way so this never runs twice.
+  static Future<void> _seedBuiltins(AiConfigStore store) async {
+    final config = await store.load();
+    if (config.builtinsSeeded) return;
+    final providers = [...config.providers];
+    for (final builtin in aiBuiltinProviders) {
+      if (config.providerNamed(builtin.id) == null) {
+        providers.add(builtin);
+      }
+    }
+    await store.save(
+      config.copyWith(providers: providers, builtinsSeeded: true),
     );
   }
 

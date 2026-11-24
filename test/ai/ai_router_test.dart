@@ -277,4 +277,53 @@ void main() {
     expect(models, isEmpty);
     expect(transport.sent, isEmpty);
   });
+
+  test('route events trace a failover under one call id', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushJson(503, {});
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'from b'},
+        },
+      ],
+    });
+    await router.chat(chat('group/main'));
+    // Broadcast events are async: let the loop deliver them.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(seen.map((e) => e.phase), [
+      AiRoutePhase.attempt,
+      AiRoutePhase.failed,
+      AiRoutePhase.attempt,
+      AiRoutePhase.served,
+    ]);
+    expect(seen.map((e) => e.member), ['a/m1', 'a/m1', 'b/m2', 'b/m2']);
+    expect(seen.every((e) => e.callId == seen.first.callId), isTrue);
+    expect(seen.first.model, 'group/main');
+  });
+
+  test('a streamed reply reports served only when the stream ends', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"hi"}}]}',
+      'data: [DONE]',
+    ]);
+    final reply = await router.chat(chat('a/m1', stream: true));
+    await Future<void>.delayed(Duration.zero);
+    // Headers are in, but nobody has consumed the stream yet: the route
+    // is still "in flight", so served must not have fired.
+    expect(seen.map((e) => e.phase), isNot(contains(AiRoutePhase.served)));
+
+    await (reply as AiStreamReply).events.toList();
+    await Future<void>.delayed(Duration.zero);
+    expect(seen.last.phase, AiRoutePhase.served);
+    expect(seen.last.member, 'a/m1');
+  });
 }

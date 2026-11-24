@@ -620,6 +620,7 @@
   },
   "aiKindPreset": "Preset",
   "aiKindCustom": "Custom",
+  "aiKindBuiltin": "Built-in",
   "aiKindLocal": "Local",
   "aiEditProvider": "Provider",
   "aiEndpointHint": "Base URL, e.g. https://api.example.com/v1",
@@ -666,6 +667,11 @@
   "aiGatewayScopeLan": "Local network",
   "aiGatewayLanEndpoint": "LAN endpoint",
   "aiGatewayLanHint": "LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.",
+
+  "aiRoutingTitle": "Routing",
+  "aiRoutingSubtitle": "See which provider a request is heading to",
+  "aiRoutingSource": "Requests",
+  "aiRoutingEmpty": "No providers yet.",
 
   "aiDeleteProviderTitle": "Delete provider?",
   "aiDeleteProviderBody": "The provider's key and models are removed, and every routing-group member pointing at it is dropped.",

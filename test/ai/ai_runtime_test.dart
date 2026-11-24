@@ -17,9 +17,13 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  test('opens with defaults and persists providers', () async {
+  test('opens with defaults, seeds builtins and persists providers', () async {
     var config = await runtime.load();
-    expect(config.providers, isEmpty);
+    // First open seeds the public providers once: enabled, with their
+    // shared credentials already in place.
+    expect(config.builtinsSeeded, isTrue);
+    expect(config.providers.map((p) => p.id), ['opencode-zen', 'kilo']);
+    expect(config.providers.every((p) => p.enabled), isTrue);
     // The gateway defaults on: loopback is nil-risk behind the token, and
     // "configure once, use everywhere" needs it listening without a detour
     // through settings. `start()` was never called, so nothing is bound.
@@ -29,6 +33,7 @@ void main() {
 
     config = config.copyWith(
       providers: [
+        ...config.providers,
         AiProvider(
           id: 'local',
           name: 'Local',
@@ -47,8 +52,32 @@ void main() {
     await runtime.save(config);
 
     final reloaded = await runtime.load();
-    expect(reloaded.providers.single.id, 'local');
-    expect(reloaded.providers.single.models.single.enabled, isTrue);
+    expect(reloaded.providers.map((p) => p.id), [
+      'opencode-zen',
+      'kilo',
+      'local',
+    ]);
+    expect(reloaded.providers.last.models.single.enabled, isTrue);
+  });
+
+  test('builtins are seeded once and a deletion stays deleted', () async {
+    var config = await runtime.load();
+    expect(config.providers, hasLength(2));
+
+    // The user removes Kilo; the next open must not resurrect it.
+    await runtime.save(
+      config.copyWith(
+        providers: [
+          for (final p in config.providers)
+            if (p.id != 'kilo') p,
+        ],
+      ),
+    );
+    await runtime.dispose();
+    runtime = await AiRuntime.open(directory.path);
+    config = await runtime.load();
+    expect(config.providers.map((p) => p.id), ['opencode-zen']);
+    expect(config.builtinsSeeded, isTrue);
   });
 
   test('the gateway flag binds and releases the socket', () async {

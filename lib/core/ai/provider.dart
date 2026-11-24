@@ -5,6 +5,10 @@ enum AiProviderKind {
   /// A built-in vendor preset whose endpoints can still be overridden.
   preset,
 
+  /// A provider the app seeds on first run (OpenCode Zen, Kilo) — public
+  /// endpoints with a shared credential, enabled out of the box.
+  builtin,
+
   /// An arbitrary OpenAI/Anthropic/Gemini-compatible endpoint the user typed.
   custom,
 
@@ -254,11 +258,17 @@ final class AiConfig {
     this.providers = const <AiProvider>[],
     this.routingGroups = const <AiRoutingGroup>[],
     this.gateway = const AiGatewayConfig(),
+    this.builtinsSeeded = false,
   });
 
   final List<AiProvider> providers;
   final List<AiRoutingGroup> routingGroups;
   final AiGatewayConfig gateway;
+
+  /// Whether the first-run built-in providers were already written. Seeded
+  /// once and never again: a user who deletes one keeps it deleted, and a
+  /// user who edits its endpoints is not overwritten by the next launch.
+  final bool builtinsSeeded;
 
   AiProvider? providerNamed(String id) {
     for (final provider in providers) {
@@ -288,10 +298,12 @@ final class AiConfig {
     List<AiProvider>? providers,
     List<AiRoutingGroup>? routingGroups,
     AiGatewayConfig? gateway,
+    bool? builtinsSeeded,
   }) => AiConfig(
     providers: providers ?? this.providers,
     routingGroups: routingGroups ?? this.routingGroups,
     gateway: gateway ?? this.gateway,
+    builtinsSeeded: builtinsSeeded ?? this.builtinsSeeded,
   );
 
   Map<String, Object?> toJson() => {
@@ -299,6 +311,7 @@ final class AiConfig {
     'providers': [for (final p in providers) p.toJson()],
     'routingGroups': [for (final g in routingGroups) g.toJson()],
     'gateway': gateway.toJson(),
+    'builtinsSeeded': builtinsSeeded,
   };
 
   factory AiConfig.fromJson(Map<String, Object?> json) {
@@ -315,6 +328,7 @@ final class AiConfig {
             ? (json['gateway'] as Map).cast<String, Object?>()
             : null,
       ),
+      builtinsSeeded: json['builtinsSeeded'] as bool? ?? false,
     );
   }
 }

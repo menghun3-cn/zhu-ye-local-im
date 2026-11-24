@@ -1500,6 +1500,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiKindCustom => 'Custom';
 
   @override
+  String get aiKindBuiltin => 'Built-in';
+
+  @override
   String get aiKindLocal => 'Local';
 
   @override
@@ -1621,6 +1624,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiGatewayLanHint =>
       'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.';
+
+  @override
+  String get aiRoutingTitle => 'Routing';
+
+  @override
+  String get aiRoutingSubtitle => 'See which provider a request is heading to';
+
+  @override
+  String get aiRoutingSource => 'Requests';
+
+  @override
+  String get aiRoutingEmpty => 'No providers yet.';
 
   @override
   String get aiDeleteProviderTitle => 'Delete provider?';

@@ -446,6 +446,7 @@
   },
   "aiKindPreset": "预设",
   "aiKindCustom": "自定义",
+  "aiKindBuiltin": "内置",
   "aiKindLocal": "本地",
   "aiEditProvider": "供应商",
   "aiEndpointHint": "基础地址，例如 https://api.example.com/v1",
@@ -492,6 +493,11 @@
   "aiGatewayScopeLan": "局域网",
   "aiGatewayLanEndpoint": "局域网端点",
   "aiGatewayLanHint": "局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。",
+
+  "aiRoutingTitle": "路由",
+  "aiRoutingSubtitle": "查看请求正在走向哪个供应商",
+  "aiRoutingSource": "请求来源",
+  "aiRoutingEmpty": "还没有供应商。",
 
   "aiDeleteProviderTitle": "删除供应商？",
   "aiDeleteProviderBody": "供应商的密钥和模型将被删除，所有指向它的路由组成员也会被一并清除。",

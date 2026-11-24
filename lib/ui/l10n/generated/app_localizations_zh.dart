@@ -1425,6 +1425,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiKindCustom => '自定义';
 
   @override
+  String get aiKindBuiltin => '内置';
+
+  @override
   String get aiKindLocal => '本地';
 
   @override
@@ -1540,6 +1543,18 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get aiGatewayLanHint =>
       '局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。';
+
+  @override
+  String get aiRoutingTitle => '路由';
+
+  @override
+  String get aiRoutingSubtitle => '查看请求正在走向哪个供应商';
+
+  @override
+  String get aiRoutingSource => '请求来源';
+
+  @override
+  String get aiRoutingEmpty => '还没有供应商。';
 
   @override
   String get aiDeleteProviderTitle => '删除供应商？';

@@ -114,6 +114,38 @@ final class AiStreamReply extends AiReply {
   final Stream<AiStreamEvent> events;
 }
 
+/// Where a request is in its route through the failover list.
+enum AiRoutePhase {
+  /// A member is about to be called.
+  attempt,
+
+  /// The member produced the reply — for streams, when the stream ends.
+  served,
+
+  /// The member failed; the router either fails over or gives up.
+  failed,
+}
+
+/// One step of a [AiRouter.chat] call, broadcast for observers.
+///
+/// [callId] ties every event of one `chat` invocation together — failover
+/// emits several `attempt`/`failed` pairs under the same id, and concurrent
+/// requests never share one. [member] is the concrete `provider/model`
+/// being tried; [model] is the reference the caller asked for.
+final class AiRouteEvent {
+  const AiRouteEvent({
+    required this.callId,
+    required this.phase,
+    required this.member,
+    required this.model,
+  });
+
+  final int callId;
+  final AiRoutePhase phase;
+  final String member;
+  final String model;
+}
+
 /// Resolves `provider/model` and `group/<id>` references to concrete upstream
 /// calls, failing over across a routing group's members on retryable errors.
 ///
@@ -138,6 +170,20 @@ final class AiRouter {
 
   final _cooledDownUntil = <String, DateTime>{};
 
+  /// Route observability for the routing page: every attempt, serve and
+  /// failure, broadcast so any number of listeners can watch. Best-effort —
+  /// a listener that throws or a slow consumer must never slow a request.
+  final _events = StreamController<AiRouteEvent>.broadcast();
+  Stream<AiRouteEvent> get events => _events.stream;
+  int _nextCallId = 0;
+
+  void _emit(int callId, AiRoutePhase phase, String member, String model) {
+    if (_events.isClosed) return;
+    _events.add(
+      AiRouteEvent(callId: callId, phase: phase, member: member, model: model),
+    );
+  }
+
   /// Sends [request] and returns the reply from the first member that works.
   ///
   /// Throws [AiRequestException] when the reference is unresolvable, every
@@ -146,15 +192,36 @@ final class AiRouter {
   Future<AiReply> chat(AiChatRequest request) async {
     final config = await store.load();
     final members = _expand(request.model, config);
+    final callId = ++_nextCallId;
     AiRequestException? lastRetryable;
 
     for (final member in members) {
       if (_isCoolingDown(member)) continue;
+      _emit(callId, AiRoutePhase.attempt, member, request.model);
       try {
-        return await _call(member, request, config);
+        final reply = await _call(member, request, config);
+        if (reply is AiStreamReply) {
+          // A stream is "served" only when it finishes: the leaf stays at
+          // the provider while tokens flow, which is the honest picture.
+          return AiStreamReply(
+            servedBy: member,
+            events: _observeStream(reply.events, callId, member, request.model),
+          );
+        }
+        _emit(callId, AiRoutePhase.served, member, request.model);
+        return reply;
       } on _RetryableFailure catch (failure) {
+        _emit(callId, AiRoutePhase.failed, member, request.model);
         _cooledDownUntil[member] = DateTime.now().add(cooldown);
         lastRetryable = failure.error;
+      } on AiRequestException {
+        _emit(callId, AiRoutePhase.failed, member, request.model);
+        rethrow;
+      } on Object {
+        // Codec decode failures and anything else unexpected: the route
+        // still needs its closing event or the leaf never comes home.
+        _emit(callId, AiRoutePhase.failed, member, request.model);
+        rethrow;
       }
     }
 
@@ -162,6 +229,31 @@ final class AiRouter {
         AiRequestException(
           'no member of "$request.model" could serve the request',
         );
+  }
+
+  /// Re-emits a member's stream while reporting its end as a route event.
+  /// A listener that walks away mid-stream is a failure from the route's
+  /// point of view — the provider never got to finish its answer.
+  Stream<AiStreamEvent> _observeStream(
+    Stream<AiStreamEvent> inner,
+    int callId,
+    String member,
+    String model,
+  ) async* {
+    var settled = false;
+    try {
+      await for (final event in inner) {
+        yield event;
+      }
+      settled = true;
+      _emit(callId, AiRoutePhase.served, member, model);
+    } catch (_) {
+      settled = true;
+      _emit(callId, AiRoutePhase.failed, member, model);
+      rethrow;
+    } finally {
+      if (!settled) _emit(callId, AiRoutePhase.failed, member, model);
+    }
   }
 
   /// Every model reference callers may ask for: enabled provider models plus

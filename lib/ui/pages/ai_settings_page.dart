@@ -9,6 +9,7 @@ import '../seams.dart';
 import '../top_toast.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
+import 'ai_routing_page.dart';
 
 /// The AI surface: providers, routing groups and the local gateway.
 ///
@@ -165,6 +166,23 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                         unawaited(guarded(context, () => _editGroup(group))),
                   ),
               ],
+            ),
+          ),
+        ),
+        const SizedBox(height: WeChat.sectionGap),
+        Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            leading: const Icon(Icons.hub_outlined, size: 20),
+            title: Text(l10n.aiRoutingTitle),
+            subtitle: Text(l10n.aiRoutingSubtitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AiRoutingPage(runtime: runtime),
+                ),
+              ),
             ),
           ),
         ),
@@ -568,6 +586,7 @@ class _ProviderTile extends StatelessWidget {
   String _kindLabel(AppLocalizations l10n, AiProviderKind kind) =>
       switch (kind) {
         AiProviderKind.preset => l10n.aiKindPreset,
+        AiProviderKind.builtin => l10n.aiKindBuiltin,
         AiProviderKind.custom => l10n.aiKindCustom,
         AiProviderKind.local => l10n.aiKindLocal,
       };
@@ -609,7 +628,11 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
   void initState() {
     super.initState();
     _draft = widget.provider;
-    _name = TextEditingController(text: widget.provider.name);
+    // A draft opens unnamed — its provider.name is only the preset's
+    // suggestion, shown as the field's hint until the user types one.
+    _name = TextEditingController(
+      text: widget.onDelete == null ? '' : widget.provider.name,
+    );
     _apiKey = TextEditingController(text: widget.provider.apiKey);
     _endpoints = {
       for (final protocol in AiProtocol.values)
@@ -804,7 +827,15 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
             children: [
               TextField(
                 controller: _name,
-                decoration: InputDecoration(labelText: l10n.aiProviderName),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: l10n.aiProviderName,
+                  // A draft starts unnamed: the preset's label is a
+                  // suggestion, not an answer — the user names it.
+                  hintText: widget.onDelete == null
+                      ? widget.provider.name
+                      : null,
+                ),
               ),
               const SizedBox(height: 12),
               // One protocol per tab: four stacked URL rows read as a form
@@ -926,7 +957,9 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: _busy ? null : () => unawaited(_persist()),
+          onPressed: _busy || _name.text.trim().isEmpty
+              ? null
+              : () => unawaited(_persist()),
           child: Text(l10n.save),
         ),
       ],

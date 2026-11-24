@@ -2605,6 +2605,12 @@ abstract class AppLocalizations {
   /// **'Custom'**
   String get aiKindCustom;
 
+  /// No description provided for @aiKindBuiltin.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get aiKindBuiltin;
+
   /// No description provided for @aiKindLocal.
   ///
   /// In en, this message translates to:
@@ -2814,6 +2820,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.'**
   String get aiGatewayLanHint;
+
+  /// No description provided for @aiRoutingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing'**
+  String get aiRoutingTitle;
+
+  /// No description provided for @aiRoutingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'See which provider a request is heading to'**
+  String get aiRoutingSubtitle;
+
+  /// No description provided for @aiRoutingSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests'**
+  String get aiRoutingSource;
+
+  /// No description provided for @aiRoutingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No providers yet.'**
+  String get aiRoutingEmpty;
 
   /// No description provided for @aiDeleteProviderTitle.
   ///
