@@ -30,8 +30,9 @@ UI had already decided for the user.
 **Gateway scope is a persisted setting, on by default.**
 `AiGatewayConfig` gained `scope` (`AiGatewayScope.loopback` | `lan`) and
 `enabled` now defaults to `true` in both the constructor and
-`fromJson` — a fresh install binds loopback at startup with an ephemeral
-port, and an absent `gateway` section reads as on. Loopback exposure behind
+`fromJson` — a fresh install binds loopback at startup on the preferred
+port (`AiGatewayConfig.defaultPort`, with ephemeral fallback when busy),
+and an absent `gateway` section reads as on. Loopback exposure behind
 a generated bearer token is nil-risk; the token file already exists for
 exactly this.
 
@@ -86,7 +87,7 @@ dialog.
 
 - **Keep the gateway off by default.** Rejected by the requester: the
   feature exists to be used, and loopback+token is not an exposure. The
-  cost of "on" is one ephemeral port and one file.
+  cost of "on" is one listening port and one file.
 - **Bind each LAN interface separately.** Rejected: `0.0.0.0` already
   answers on all of them plus loopback; enumerating and binding per
   address adds failure modes (interface appearing after bind) for no

@@ -25,7 +25,8 @@ AI 设置界面的首次实际使用提出了两条修正。
 
 **网关 scope 是持久化设置，且默认开启。** `AiGatewayConfig` 新增
 `scope`（`AiGatewayScope.loopback` | `lan`），`enabled` 在构造函数与
-`fromJson` 中都默认 `true`——新装的应用启动即绑回环、用临时端口；
+`fromJson` 中都默认 `true`——新装的应用启动即绑回环、用首选端口
+（`AiGatewayConfig.defaultPort`，被占用时回退临时端口）；
 `gateway` 节缺失时按开处理。回环暴露在生成的 bearer token 之后风险
 为零，token 文件本来就是为此存在的。
 
@@ -69,7 +70,7 @@ AI 设置界面的首次实际使用提出了两条修正。
 ## Alternatives considered
 
 - **网关保持默认关闭。** 被需求方否决：这个功能存在的意义就是被使用，
-  回环+token 不构成暴露。代价只是一个临时端口和一个文件。
+  回环+token 不构成暴露。代价只是一个监听端口和一个文件。
 - **给每个局域网接口分别绑定。** 否决：`0.0.0.0` 已经应答全部接口加
   回环；枚举并逐个绑定引入了接口晚于绑定出现等失败模式，却没有行为
   收益。

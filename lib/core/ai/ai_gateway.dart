@@ -76,9 +76,10 @@ final class AiGateway {
   String? get endpoint =>
       _actualPort == null ? null : 'http://127.0.0.1:$_actualPort/v1';
 
-  /// Binds [scope]. [preferredPort] 0 — the default — takes any free port,
-  /// which is the honest answer for a service whose port is displayed in
-  /// the UI rather than written into configs.
+  /// Binds [scope]. [preferredPort] 0 — or any port already taken — falls
+  /// back to whatever the OS assigns; [AiGatewayConfig.defaultPort] is what
+  /// the persisted configuration asks for, so a configured client keeps a
+  /// stable endpoint across restarts.
   Future<void> start({
     int preferredPort = 0,
     AiGatewayScope scope = AiGatewayScope.loopback,

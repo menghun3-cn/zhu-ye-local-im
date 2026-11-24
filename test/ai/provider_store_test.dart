@@ -45,7 +45,7 @@ void main() {
         members: const ['deepseek/deepseek-chat'],
       ),
     ],
-    gateway: const AiGatewayConfig(enabled: true, port: 0),
+    gateway: const AiGatewayConfig(enabled: true),
   );
 
   test('save/load round-trips the whole config', () async {
@@ -99,10 +99,26 @@ void main() {
   test('load with nothing saved returns defaults', () async {
     final loaded = await store.load();
     expect(loaded.providers, isEmpty);
-    // Gateway on by default (loopback, ephemeral port) — see
+    // Gateway on by default (loopback, preferred port) — see
     // AiGatewayConfig's doc comment for why.
     expect(loaded.gateway.enabled, isTrue);
     expect(loaded.gateway.scope, AiGatewayScope.loopback);
+    expect(loaded.gateway.port, AiGatewayConfig.defaultPort);
+  });
+
+  test('a stored port of 0 migrates to the preferred port', () async {
+    // Files written before the fixed-port change carry "port": 0, which
+    // used to mean ephemeral. It now reads as the default so existing
+    // installs get the stable endpoint too.
+    final delegate = FileMessageStore('${tempDir.path}/providers.json');
+    await delegate.save({
+      'version': 1,
+      'providers': <Object?>[],
+      'routingGroups': <Object?>[],
+      'gateway': <String, Object?>{'enabled': true, 'port': 0},
+    });
+    final loaded = await store.load();
+    expect(loaded.gateway.port, AiGatewayConfig.defaultPort);
   });
 
   test('the gateway scope round-trips through providers.json', () async {

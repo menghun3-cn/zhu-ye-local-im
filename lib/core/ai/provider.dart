@@ -219,17 +219,25 @@ enum AiGatewayScope {
 final class AiGatewayConfig {
   const AiGatewayConfig({
     this.enabled = true,
-    this.port = 0,
+    this.port = defaultPort,
     this.scope = AiGatewayScope.loopback,
   });
+
+  /// The port the gateway asks for: fixed rather than ephemeral so a client
+  /// configured once keeps working across restarts. Below the Windows
+  /// ephemeral range (49152+), so it does not compete with OS-assigned
+  /// ports; a busy port still falls back to an ephemeral one, and callers
+  /// always read the bound port back from the running server.
+  static const int defaultPort = 47820;
 
   /// When true the gateway listens for as long as the app runs. On by
   /// default: the endpoint is how local tools discover the configured
   /// providers, and loopback exposure is nil-risk behind the token.
   final bool enabled;
 
-  /// Preferred port; 0 means "any free port" and the actual one is reported
-  /// back through the running server, never assumed.
+  /// Preferred port; [defaultPort] unless overridden. Not positive is read
+  /// as [defaultPort] — 0 used to mean "any free port" and is migrated
+  /// rather than honoured, because a stable endpoint is the point.
   final int port;
 
   /// Loopback-only or every interface.
@@ -244,7 +252,10 @@ final class AiGatewayConfig {
   factory AiGatewayConfig.fromJson(Map<String, Object?>? json) =>
       AiGatewayConfig(
         enabled: json?['enabled'] as bool? ?? true,
-        port: json?['port'] as int? ?? 0,
+        port: switch (json?['port']) {
+          final int port when port > 0 => port,
+          _ => defaultPort,
+        },
         scope: switch (json?['scope']) {
           'lan' => AiGatewayScope.lan,
           _ => AiGatewayScope.loopback,
