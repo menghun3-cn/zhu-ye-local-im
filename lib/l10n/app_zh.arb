@@ -446,7 +446,7 @@
   },
   "aiKindPreset": "预设",
   "aiKindCustom": "自定义",
-  "aiKindBuiltin": "内置",
+  "aiKindBuiltin": "内置免费",
   "aiKindLocal": "本地",
   "aiEditProvider": "供应商",
   "aiEndpointHint": "基础地址，例如 https://api.example.com/v1",

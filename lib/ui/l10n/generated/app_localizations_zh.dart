@@ -1425,7 +1425,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiKindCustom => '自定义';
 
   @override
-  String get aiKindBuiltin => '内置';
+  String get aiKindBuiltin => '内置免费';
 
   @override
   String get aiKindLocal => '本地';

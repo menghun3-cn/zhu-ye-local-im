@@ -1500,7 +1500,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiKindCustom => 'Custom';
 
   @override
-  String get aiKindBuiltin => 'Built-in';
+  String get aiKindBuiltin => 'Built-in free';
 
   @override
   String get aiKindLocal => 'Local';

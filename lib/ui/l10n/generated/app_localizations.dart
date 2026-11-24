@@ -2608,7 +2608,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiKindBuiltin.
   ///
   /// In en, this message translates to:
-  /// **'Built-in'**
+  /// **'Built-in free'**
   String get aiKindBuiltin;
 
   /// No description provided for @aiKindLocal.

@@ -620,7 +620,7 @@
   },
   "aiKindPreset": "Preset",
   "aiKindCustom": "Custom",
-  "aiKindBuiltin": "Built-in",
+  "aiKindBuiltin": "Built-in free",
   "aiKindLocal": "Local",
   "aiEditProvider": "Provider",
   "aiEndpointHint": "Base URL, e.g. https://api.example.com/v1",
