@@ -449,9 +449,23 @@ class _AiRoutingViewState extends State<AiRoutingView>
               ),
             ),
             _StatusBar(event: _last),
-            SizedBox(
-              height: logHeight,
-              child: _RequestLogSection(records: _records),
+            // The log sits in its own bordered panel so the record list
+            // reads as a bounded region under the canvas, not a bare
+            // strip bleeding into the page background.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                height: logHeight,
+                decoration: BoxDecoration(
+                  color: WeChatColors.of(context).surface,
+                  border: Border.all(
+                    color: WeChatColors.of(context).borderStrong,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _RequestLogSection(records: _records),
+              ),
             ),
           ],
         );

@@ -127,7 +127,10 @@ signature so edits made elsewhere on the page repaint the canvas without
 a reload handshake.
 
 **The canvas is answered by a request log.** Under the animation the
-view splits its height with a request list: the last 7 days of
+view splits its height with a request list — rendered inside its own
+rounded, `borderStrong`-outlined panel so the records read as a bounded
+region under the canvas rather than a bare strip on the page
+background: the last 7 days of
 *finished* requests, two lines each — `MM-dd HH:mm:ss` in its own
 column beside the model that served, then a compact metrics line
 (`2.3s · first token 2.1s · 37.4k tokens · 99% cached`) whose tooltip
