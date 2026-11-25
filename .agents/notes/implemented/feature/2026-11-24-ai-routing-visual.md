@@ -77,9 +77,15 @@ sequential exchange; queued attempts re-validate and launch once the
 last cart docks. Outbound carts still overlap freely, so genuine
 concurrency keeps its per-`callId` shades. The cart is a
 `CustomPaint` silhouette — `RouteCart`/`RouteCartPainter` in
-`lib/ui/route_cart.dart` — running **empty outbound and stacked with
-sacks on the return**, flipping to face the direction of travel, with
-a trotting bob and wheel spokes that turn with the trip's progress.
+`lib/ui/route_cart.dart`, drawn at double size — running **empty
+outbound and stacked with sacks on the return**, flipping to face the
+direction of travel. The gait is a trot: diagonal leg pairs share a
+stride phase (near-front with far-rear, near-rear with far-front), the
+hooves swing fore-aft on quadratic strokes and lift mid-stance, the
+far legs draw dimmer under the body, the tail sways counter-phase, and
+the body bounces once per stride. The stride clock is the shared dash
+controller's value — wall-clock, so the gait never plays backwards on
+the return leg — and the wheel spokes turn with the trip's progress.
 The wire a cart is riding turns dashed **on that leg only** — leg
 occupancy is read from each flight's live 0→1 progress each frame
 (t ≤ 0.5 rides agent→gateway, t > 0.5 rides gateway→provider, in both

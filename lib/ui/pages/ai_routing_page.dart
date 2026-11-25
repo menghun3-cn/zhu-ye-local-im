@@ -729,6 +729,7 @@ class _RoutingCanvas extends StatelessWidget {
                 agent: agentOut,
                 gateway: gatewayCenter,
                 target: anchorFor(flight.providerId),
+                dash: dash,
               ),
             // Provider nodes first so the cards sit on top of any wire
             // that happens to pass under them.
@@ -1165,12 +1166,18 @@ class _Leaf extends StatelessWidget {
     required this.agent,
     required this.gateway,
     required this.target,
+    this.dash,
   });
 
   final _LeafFlight flight;
   final Offset agent;
   final Offset gateway;
   final Offset target;
+
+  /// The shared dash clock — the cart's stride phase rides it so the
+  /// gait advances with wall-clock animation, never backwards on the
+  /// return leg. Null only in tests that build the canvas without it.
+  final Animation<double>? dash;
 
   @override
   Widget build(BuildContext context) {
@@ -1190,17 +1197,22 @@ class _Leaf extends StatelessWidget {
         final point = t <= 0.5
             ? _bezierPoint(agent, gateway, t * 2)
             : _bezierPoint(gateway, target, (t - 0.5) * 2);
-        // Trotting bob — two bounces per crossing — and a hair of sway,
-        // much calmer than the leaf's flutter: a cart does not dance.
-        final bob = math.sin(t * math.pi * 4) * 1.2;
-        final sway = math.sin(t * math.pi * 2) * 0.08;
+        // Stride clock: two gallop cycles per 800ms dash repeat — the
+        // phase wraps on a whole number of cycles so the repeat boundary
+        // is seamless. Falls back to trip progress when no dash clock.
+        final gallop = (dash?.value ?? t) * math.pi * 4;
+        // The body bounces once per stride — legs gather, body rises —
+        // plus a hair of sway, calmer than the leaf's flutter: a cart
+        // does not dance.
+        final bob = math.sin(gallop) * 1.6;
+        final sway = math.sin(t * math.pi * 2) * 0.05;
         // Outbound the bed is empty — the request going out — and on the
         // way home it comes back stacked with sacks — the reply. The
         // whole rig also turns around: a cart moving left must face left.
         final returning = flight.controller.status == AnimationStatus.reverse;
         return Positioned(
-          left: point.dx - 22,
-          top: point.dy - 14 + bob,
+          left: point.dx - 44,
+          top: point.dy - 28 + bob,
           child: Transform.rotate(
             angle: sway,
             child: Transform.flip(
@@ -1214,6 +1226,7 @@ class _Leaf extends StatelessWidget {
                 // Five wheel turns per crossing; reversing unwinds them,
                 // which is how wheels roll backward on the way home.
                 spin: t * math.pi * 10,
+                gallop: gallop,
               ),
             ),
           ),
