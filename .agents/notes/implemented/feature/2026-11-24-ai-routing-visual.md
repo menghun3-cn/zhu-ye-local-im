@@ -83,9 +83,16 @@ direction of travel. The gait is a trot: diagonal leg pairs share a
 stride phase (near-front with far-rear, near-rear with far-front), the
 hooves swing fore-aft on quadratic strokes and lift mid-stance, the
 far legs draw dimmer under the body, the tail sways counter-phase, and
-the body bounces once per stride. The stride clock is the shared dash
+the body bounces once per stride — one cycle per 800ms dash repeat.
+The stride clock is the shared dash
 controller's value — wall-clock, so the gait never plays backwards on
 the return leg — and the wheel spokes turn with the trip's progress.
+The silhouette itself was pushed toward "horse": an arched neck, an
+ear on the poll, and mane ticks along the crest. Departures queue
+behind homeward carts, and an attempt whose request already ended
+while queued is dropped on the end event — otherwise it would launch,
+fly out, and park at the provider forever with no second end event
+left to bring it home.
 The wire a cart is riding turns dashed **on that leg only** — leg
 occupancy is read from each flight's live 0→1 progress each frame
 (t ≤ 0.5 rides agent→gateway, t > 0.5 rides gateway→provider, in both

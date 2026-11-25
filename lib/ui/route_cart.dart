@@ -158,27 +158,42 @@ class RouteCartPainter extends CustomPainter {
       Rect.fromCenter(center: const Offset(29.5, 14.2), width: 13, height: 7.4),
       solid,
     );
-    canvas.drawLine(
-      const Offset(34, 11.8),
-      const Offset(39, 8.6),
+    // Curved neck — a horse's neck arches, it does not plank. The stroke
+    // runs from the chest into the poll so head and neck read as one.
+    canvas.drawPath(
+      Path()
+        ..moveTo(33.6, 12.6)
+        ..quadraticBezierTo(36.4, 10.0, 39.0, 8.0),
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.8
+        ..strokeWidth = 3.4
         ..strokeCap = StrokeCap.round,
     );
-    // Head as a forward wedge — poll, nose, jaw — so the silhouette
-    // reads "animal facing the direction of travel", not a blob.
+    // Head wedge with an ear — poll, face, nose, chin, jaw — so the
+    // silhouette reads "animal facing the direction of travel", not a
+    // blob.
     canvas.drawPath(
       Path()
-        ..moveTo(37.5, 10.6)
-        ..lineTo(40.8, 6.6)
-        ..lineTo(43.6, 7.4)
-        ..lineTo(44.2, 9.0)
-        ..lineTo(40.2, 11.6)
+        ..moveTo(38.4, 10.6)
+        ..lineTo(39.3, 7.9)
+        ..lineTo(40.1, 5.8)
+        ..lineTo(40.9, 7.0)
+        ..lineTo(44.3, 8.7)
+        ..lineTo(42.7, 10.1)
         ..close(),
       solid,
     );
+    // Mane ticks along the crest — short strokes pointing back, the
+    // cheapest "horse" tell there is.
+    for (final m in [
+      const Offset(35.0, 10.9),
+      const Offset(36.3, 9.8),
+      const Offset(37.6, 8.8),
+      const Offset(38.6, 8.0),
+    ]) {
+      canvas.drawLine(m, Offset(m.dx - 1.1, m.dy - 1.5), line);
+    }
 
     _leg(canvas, const Offset(27.5, 17.45), gallop + math.pi + 0.3, nearLeg);
     _leg(canvas, const Offset(32.5, 17.45), gallop, nearLeg);

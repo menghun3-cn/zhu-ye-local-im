@@ -369,6 +369,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// Flies every leaf of [event]'s call home. Failover produces one leaf per
   /// member, so the match is on the member, not just the call.
   void _returnHome(AiRouteEvent event) {
+    // A request that ended while its attempt still sat in the departure
+    // queue never earned a cart — launching it now would fly out and
+    // park at the provider forever, no second end event is coming.
+    _pendingDepartures.removeWhere(
+      (e) => e.callId == event.callId && e.member == event.member,
+    );
     // A copy: reverse() on a leaf that never left completes synchronously,
     // and its dismissal listener removes it from _flights mid-iteration.
     for (final flight in [..._flights]) {
@@ -1197,10 +1203,10 @@ class _Leaf extends StatelessWidget {
         final point = t <= 0.5
             ? _bezierPoint(agent, gateway, t * 2)
             : _bezierPoint(gateway, target, (t - 0.5) * 2);
-        // Stride clock: two gallop cycles per 800ms dash repeat — the
+        // Stride clock: one gallop cycle per 800ms dash repeat — the
         // phase wraps on a whole number of cycles so the repeat boundary
         // is seamless. Falls back to trip progress when no dash clock.
-        final gallop = (dash?.value ?? t) * math.pi * 4;
+        final gallop = (dash?.value ?? t) * math.pi * 2;
         // The body bounces once per stride — legs gather, body rises —
         // plus a hair of sway, calmer than the leaf's flutter: a cart
         // does not dance.

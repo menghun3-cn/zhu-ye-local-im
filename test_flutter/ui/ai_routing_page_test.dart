@@ -406,4 +406,69 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(carts('empty'), 1);
   });
+
+  testWidgets('a request that ends while queued never flies', (tester) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    int carts(String state) =>
+        find.byKey(ValueKey('cart-$state')).evaluate().length;
+
+    // Request 1 out and back; mid-return request 2 queues.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 1100));
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    runtime.router.emitRouteEventForTest(
+      2,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Request 2 finishes before its cart ever launched — the queued
+    // attempt must be dropped, or it would fly out and park at the
+    // provider forever with no end event left to bring it home.
+    runtime.router.emitRouteEventForTest(
+      2,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 900));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(carts('empty'), 0);
+    expect(carts('loaded'), 0);
+  });
 }
