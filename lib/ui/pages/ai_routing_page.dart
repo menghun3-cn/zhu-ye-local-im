@@ -100,9 +100,21 @@ class _AiRoutingViewState extends State<AiRoutingView>
   int _seenVersion = 0;
   String _gatewaySignature = '';
 
+  /// Drives the marching-dash flow on in-flight wires. Repeats only while
+  /// a leaf is flying — an idle canvas does not burn frames.
+  late final AnimationController _dashController;
+
+  /// provider id → the model id its latest route event named, so a node
+  /// can say *which* model is being asked, not just which provider.
+  final Map<String, String> _modelByProvider = {};
+
   @override
   void initState() {
     super.initState();
+    _dashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _seenVersion = widget.runtime.configVersion;
     _seenLogVersion = widget.runtime.requestLog.version;
     _events = widget.runtime.router.events.listen(_onEvent);
@@ -115,6 +127,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
   void dispose() {
     unawaited(_events?.cancel() ?? Future.value());
     _ticker?.cancel();
+    _dashController.dispose();
     for (final flight in _flights) {
       flight.controller.dispose();
     }
@@ -132,6 +145,10 @@ class _AiRoutingViewState extends State<AiRoutingView>
           // Deleted providers leave stale slots behind; pruning keeps the
           // spacing honest without moving live nodes.
           _slotOrder.removeWhere((id) => config.providerNamed(id) == null);
+          _modelByProvider.removeWhere((providerId, modelId) {
+            final provider = config.providerNamed(providerId);
+            return provider == null || provider.modelNamed(modelId) == null;
+          });
           _seedHealth(config);
         });
       }
@@ -181,8 +198,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// Every route event — attempt, served or failed — is proof the provider
   /// was asked for, so it earns (or renews) its node's place on the canvas.
   void _noteNodeActivity(AiRouteEvent event) {
-    final providerId = AiModelRef.parse(event.member)?.providerId;
+    final ref = AiModelRef.parse(event.member);
+    final providerId = ref?.providerId;
     if (providerId == null) return;
+    final modelId = ref?.modelId;
+    if (modelId != null) _modelByProvider[providerId] = modelId;
     _nodeVisibleUntil[providerId] = DateTime.now().add(_nodeVisibleFor);
     if (!_slotOrder.contains(providerId) && _slotOrder.length < _maxSlots) {
       _slotOrder.add(providerId);
@@ -232,6 +252,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     _coolingUntil.removeWhere((_, until) => until.isBefore(now));
     _erroredAt.removeWhere((_, at) => now.difference(at) > _errorVisibleFor);
     _nodeVisibleUntil.removeWhere((_, until) => until.isBefore(now));
+    if (_flights.isEmpty) _dashController.stop();
     // Rebuild while marks live (the countdown needs a fresh second), and
     // once more when the last mark expires so the badge actually clears.
     if (dirty ||
@@ -302,10 +323,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
     controller.addStatusListener((status) {
       if (status == AnimationStatus.dismissed) {
         setState(() => _flights.remove(flight));
+        if (_flights.isEmpty) _dashController.stop();
         controller.dispose();
       }
     });
     _flights.add(flight);
+    _dashController.repeat();
     unawaited(controller.forward());
   }
 
@@ -414,6 +437,8 @@ class _AiRoutingViewState extends State<AiRoutingView>
                 slotOrder: _slotOrder,
                 providers: orderedProviders,
                 flights: _flights,
+                dash: _dashController,
+                modelByProvider: _modelByProvider,
                 sourceLabel: l10n.aiRoutingSource,
                 gatewayLabel: l10n.aiRoutingGateway,
                 gatewayAddress: _gatewayAddress(l10n),
@@ -479,6 +504,8 @@ class _RoutingCanvas extends StatelessWidget {
     required this.gatewayAddress,
     required this.gatewayOnline,
     required this.health,
+    this.dash,
+    this.modelByProvider = const {},
     this.onProviderTap,
   });
 
@@ -494,6 +521,14 @@ class _RoutingCanvas extends StatelessWidget {
   final String gatewayAddress;
   final bool gatewayOnline;
   final Map<String, _NodeHealth> health;
+
+  /// Repeating 0→1 phase that slides the dash pattern on in-flight wires.
+  /// Null keeps the dashes static (tests, or a host that never flies leaves).
+  final Animation<double>? dash;
+
+  /// provider id → model id from its latest route event; the node shows
+  /// that model's name while the provider is on the canvas.
+  final Map<String, String> modelByProvider;
 
   /// Tap on a provider node — forwarded from [AiRoutingView.onProviderTap].
   final void Function(String providerId)? onProviderTap;
@@ -563,28 +598,39 @@ class _RoutingCanvas extends StatelessWidget {
         bool wireActive(String providerId) =>
             flights.any((f) => f.providerId == providerId);
 
+        final wireSegments = <_WireSegment>[
+          _WireSegment(
+            from: agentOut,
+            to: gatewayIn,
+            dashed: flights.isNotEmpty,
+          ),
+          for (final provider in providers)
+            if (provider.enabled)
+              _WireSegment(
+                from: gatewayOut,
+                to: anchorFor(provider.id),
+                dashed: wireActive(provider.id),
+              ),
+        ];
+        final wireColor = WeChatColors.of(context).brandLine;
+        CustomPaint wires(double phase) => CustomPaint(
+          painter: _WirePainter(
+            segments: wireSegments,
+            color: wireColor,
+            dashPhase: phase,
+          ),
+        );
+        final dashAnimation = dash;
+
         final stack = Stack(
           children: [
             Positioned.fill(
-              child: CustomPaint(
-                painter: _WirePainter(
-                  segments: [
-                    _WireSegment(
-                      from: agentOut,
-                      to: gatewayIn,
-                      dashed: flights.isNotEmpty,
+              child: dashAnimation == null
+                  ? wires(0)
+                  : AnimatedBuilder(
+                      animation: dashAnimation,
+                      builder: (context, _) => wires(dashAnimation.value),
                     ),
-                    for (final provider in providers)
-                      if (provider.enabled)
-                        _WireSegment(
-                          from: gatewayOut,
-                          to: anchorFor(provider.id),
-                          dashed: wireActive(provider.id),
-                        ),
-                  ],
-                  color: WeChatColors.of(context).brandLine,
-                ),
-              ),
             ),
             // Leaves under the cards: a leaf crossing the gateway node
             // slips beneath it, which reads as "through" rather than
@@ -611,6 +657,7 @@ class _RoutingCanvas extends StatelessWidget {
                   provider: provider,
                   enabled: provider.enabled,
                   health: health[provider.id],
+                  activeModelId: modelByProvider[provider.id],
                   onTap: onProviderTap == null
                       ? null
                       : () => onProviderTap!(provider.id),
@@ -687,10 +734,19 @@ final class _WireSegment {
 }
 
 class _WirePainter extends CustomPainter {
-  _WirePainter({required this.segments, required this.color});
+  _WirePainter({
+    required this.segments,
+    required this.color,
+    this.dashPhase = 0,
+  });
 
   final List<_WireSegment> segments;
   final Color color;
+
+  /// 0→1 loop position of the dash pattern. Each cycle slides the dashes
+  /// one period (9px) toward the provider, so a wire carrying a request
+  /// reads as flowing rather than merely dashed.
+  final double dashPhase;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -719,15 +775,19 @@ class _WirePainter extends CustomPainter {
   }
 
   /// 5px dash, 4px gap, extracted along the path's own metrics so the dashes
-  /// follow the curve instead of a straight bounding box.
+  /// follow the curve instead of a straight bounding box. [dashPhase] shifts
+  /// the whole pattern along the path — increasing it moves the dashes
+  /// toward `to`, which is the direction the request travels.
   void _drawDashed(Canvas canvas, Path path, Paint paint) {
+    final shift = (dashPhase * 9) % 9;
     for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
+      var distance = shift - 9;
       while (distance < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(distance, math.min(distance + 5, metric.length)),
-          paint,
-        );
+        final start = math.max(0.0, distance);
+        final end = math.min(distance + 5, metric.length);
+        if (end > start) {
+          canvas.drawPath(metric.extractPath(start, end), paint);
+        }
         distance += 9;
       }
     }
@@ -735,7 +795,9 @@ class _WirePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WirePainter old) =>
-      old.color != color || !_sameSegments(old.segments, segments);
+      old.color != color ||
+      old.dashPhase != dashPhase ||
+      !_sameSegments(old.segments, segments);
 
   bool _sameSegments(List<_WireSegment> a, List<_WireSegment> b) {
     if (a.length != b.length) return false;
@@ -847,12 +909,18 @@ class _ProviderNode extends StatelessWidget {
     required this.provider,
     required this.enabled,
     this.health,
+    this.activeModelId,
     this.onTap,
   });
 
   final AiProvider provider;
   final bool enabled;
   final _NodeHealth? health;
+
+  /// The model id from this provider's latest route event. When set, the
+  /// node's headline names that concrete model — "which model answered" —
+  /// and the provider name drops to the second line.
+  final String? activeModelId;
 
   /// Opens the provider's editor on the host page; null makes the node
   /// inert (used by callers that embed the canvas without a page).
@@ -874,6 +942,9 @@ class _ProviderNode extends StatelessWidget {
     final statusColor = nodeHealth != null && nodeHealth.cooling
         ? colors.warning
         : colors.danger;
+    final modelId = activeModelId;
+    final model = modelId == null ? null : provider.modelNamed(modelId);
+    final modelLabel = model == null ? modelId : (model.label ?? model.id);
     final card = Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Container(
@@ -897,7 +968,7 @@ class _ProviderNode extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    provider.name,
+                    modelLabel ?? provider.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -910,7 +981,10 @@ class _ProviderNode extends StatelessWidget {
               ],
             ),
             Text(
-              status ?? l10n.aiProviderModelCount(enabledModels),
+              status ??
+                  (modelLabel == null
+                      ? l10n.aiProviderModelCount(enabledModels)
+                      : provider.name),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -925,7 +999,9 @@ class _ProviderNode extends StatelessWidget {
     final onTap = this.onTap;
     if (onTap == null) return card;
     return Tooltip(
-      message: provider.name,
+      message: modelLabel == null
+          ? provider.name
+          : '${provider.name} · $modelLabel',
       child: GestureDetector(onTap: onTap, child: card),
     );
   }
@@ -967,12 +1043,28 @@ class _Leaf extends StatelessWidget {
             ? _bezierPoint(agent, gateway, t * 2)
             : _bezierPoint(gateway, target, (t - 0.5) * 2);
         final sway = math.sin(t * math.pi * 2) * 0.35;
+        // Magpie's convention: outbound the leaf carries a solid bead —
+        // the request going out — and on the way home a hollow one —
+        // the answer coming back. "Completed" still counts as outbound:
+        // a leaf parked at its provider is holding the request, not the
+        // reply.
+        final returning = flight.controller.status == AnimationStatus.reverse;
         return Positioned(
           left: point.dx - 11,
           top: point.dy - 11,
           child: Transform.rotate(
             angle: sway,
-            child: Icon(Icons.eco, size: 22, color: leafColor),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(Icons.eco, size: 22, color: leafColor),
+                Positioned(
+                  left: 14,
+                  top: -1,
+                  child: _CargoBead(color: leafColor, hollow: returning),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1003,6 +1095,29 @@ class _Leaf extends StatelessWidget {
   Offset _bezierPoint(Offset from, Offset to, double t) {
     final points = _wirePoints(from, to);
     return _bezier(points[0], points[1], points[2], points[3], t);
+  }
+}
+
+/// The bead a leaf carries: filled on the way out (the request), a ring
+/// on the way back (the reply). Same colour as its leaf so the pairing
+/// survives the per-callId shading.
+class _CargoBead extends StatelessWidget {
+  const _CargoBead({required this.color, required this.hollow});
+
+  final Color color;
+  final bool hollow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hollow ? null : color,
+        border: hollow ? Border.all(color: color, width: 1.4) : null,
+      ),
+    );
   }
 }
 

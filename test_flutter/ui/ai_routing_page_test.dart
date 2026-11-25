@@ -187,4 +187,73 @@ void main() {
     // leaves share a shade, callId-2's differs — three distinct colours.
     expect(leafColors.length, greaterThanOrEqualTo(3));
   });
+
+  testWidgets('a leaf carries a solid bead out and a hollow one back', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // The 7px cargo bead: filled decoration on the way out, a bare ring
+    // on the way back — magpie's solid-out / hollow-home convention.
+    int beads({required bool hollow}) => tester
+        .widgetList<Container>(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration! as BoxDecoration).shape == BoxShape.circle,
+          ),
+        )
+        .where(
+          (c) => ((c.decoration! as BoxDecoration).color == null) == hollow,
+        )
+        .length;
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    // The broadcast event lands a microtask later, and a leaf's ticker
+    // needs a frame to establish its baseline before elapsed time counts
+    // — three pumps carry it well into its outbound leg. (The bead renders
+    // at any progress, but the return leg only exists once value > 0.)
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(beads(hollow: false), 1);
+    expect(beads(hollow: true), 0);
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    // Mid-return the leaf still exists and now carries the hollow bead;
+    // the reverse leg is proportional to remaining progress, so a short
+    // pump keeps it on screen.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(beads(hollow: true), 1);
+    expect(beads(hollow: false), 0);
+  });
 }

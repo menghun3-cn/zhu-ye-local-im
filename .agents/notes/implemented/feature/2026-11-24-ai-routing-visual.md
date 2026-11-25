@@ -69,11 +69,16 @@ agent→gateway and gateway→provider — each hop deliberately short so the
 three columns read as one pipeline, not three islands. One `Icons.eco`
 leaf per in-flight request flies agent→gateway→provider on `attempt`
 and back on `served`/`failed` at a readable 1s per hop; the wire a
-leaf is riding turns dashed while the flight exists. Each leaf's shade
+leaf is riding turns dashed while the flight exists, and the dash
+pattern itself slides toward the provider — a repeating controller
+that only runs while a leaf is airborne, so an idle canvas burns no
+frames. Each leaf's shade
 is a pure function of its `callId` (four lightness × two saturation
 steps around the brand green), so concurrent requests are tellable
 apart while a failover's members — same call, different providers —
-keep one colour. Position is
+keep one colour. A leaf also carries a cargo bead in magpie's
+convention: filled on the outbound leg (the request going out), a
+hollow ring on the return (the reply coming back). Position is
 a pure function of layout and the controller's 0→1 progress, so resizes
 re-anchor for free. `MediaQuery.disableAnimations` drops the flights
 and keeps the status line — magpie's reduced-motion degradation, same
@@ -91,7 +96,12 @@ Providers tab, "what is being asked" lives here. Nodes claim a fixed
 slot in first-requested order (capped at 10) rather than packing
 vertically, so a node arriving or expiring never slides its neighbours
 — appear/disappear jitter was the difference between "alive" and
-"seasick".
+"seasick". While a provider is on the canvas its headline names the
+concrete model its latest route event asked for (`provider → modelId`
+from the member ref, resolved through `model.label ?? id`), with the
+provider name dropping to the second line — "which model answered" is
+readable without opening the log; the entry is pruned on reload when
+the provider or model disappears.
 
 **Member health is per-node, not global.** A `failed` event now carries
 `cooling`: true when the member entered its cooldown rather than dying
