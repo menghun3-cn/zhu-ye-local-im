@@ -123,7 +123,9 @@ final class AiStreamReply extends AiReply {
 
 /// Where a request is in its route through the failover list.
 enum AiRoutePhase {
-  /// A member is about to be called.
+  /// The member's request is about to hit the network — emitted after
+  /// preflight validation, so observers never see an attempt for a call
+  /// that was rejected before a single byte was sent.
   attempt,
 
   /// The member produced the reply — for streams, when the stream ends.
@@ -260,9 +262,8 @@ final class AiRouter {
         lastCoolingError ??= cooling.error;
         continue;
       }
-      _emit(callId, AiRoutePhase.attempt, member, request.model);
       try {
-        final reply = await _call(member, request, config);
+        final reply = await _call(callId, member, request, config);
         if (reply is AiStreamReply) {
           // A stream is "served" only when it finishes: the leaf stays at
           // the provider while tokens flow, which is the honest picture.
@@ -512,6 +513,7 @@ final class AiRouter {
   }
 
   Future<AiReply> _call(
+    int callId,
     String member,
     AiChatRequest request,
     AiConfig config,
@@ -541,6 +543,12 @@ final class AiRouter {
       model: parsed.modelId!,
       apiKey: provider.apiKey.isEmpty ? null : provider.apiKey,
     );
+    // `attempt` means "bytes are about to leave for this upstream", so it is
+    // emitted here — after every preflight check — rather than in [chat]'s
+    // member loop. A member rejected for a disabled model or a missing
+    // endpoint never produced a request, and the routing leaf should not
+    // pretend it did.
+    _emit(callId, AiRoutePhase.attempt, member, request.model);
     final AiHttpResponse response;
     try {
       response = await _transport.send(spec);

@@ -371,4 +371,23 @@ void main() {
     expect(seen.last.phase, AiRoutePhase.served);
     expect(seen.last.member, 'a/m1');
   });
+
+  test('a member rejected before dispatch emits failed, not attempt', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    // 'a/nope' names a model the provider does not have enabled: the router
+    // rejects it before a single byte is sent, so the route trace must not
+    // claim an attempt — the canvas leaf means "request went upstream".
+    await expectLater(
+      router.chat(chat('a/nope')),
+      throwsA(isA<AiRequestException>()),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transport.sent, isEmpty);
+    expect(seen.map((e) => e.phase), [AiRoutePhase.failed]);
+    expect(seen.single.member, 'a/nope');
+  });
 }

@@ -50,7 +50,11 @@ seeded — it speaks Zen's own model-path shape, not the Google-native
 **The router broadcasts its route.** `AiRouter` gained
 `Stream<AiRouteEvent> events` — `attempt`/`served`/`failed` per concrete
 `provider/model` member, tagged with a per-`chat`-call id so failover
-steps and concurrent requests never cross wires. A streamed reply counts
+steps and concurrent requests never cross wires. `attempt` is emitted
+inside `_call` immediately before `transport.send`, after every
+preflight check — a member rejected for a disabled model or a missing
+endpoint produces `failed` only, because no request ever left the
+device and the leaf must not pretend it did. A streamed reply counts
 as served only when its event stream ends; a listener that walks away
 mid-stream reports `failed`, because the provider never finished its
 answer. Emission is best-effort: broadcast controller, no awaiting, a
@@ -76,7 +80,7 @@ tile's switch was already there.
 **Provider nodes are earned, not listed — and they linger.** The
 catalogue can hold dozens of providers; drawing all of them would push
 the column off-screen, so a node appears only when a route event names
-its provider and stays for 60 seconds after its last request (or while
+its provider and stays for five minutes after its last request (or while
 a leaf is still flying to it, however long a stream runs). Idle canvas
 shows Agent and gateway only — "what can be asked" lives on the
 Providers tab, "what is being asked" lives here. Nodes claim a fixed

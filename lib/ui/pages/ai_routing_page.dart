@@ -23,9 +23,9 @@ import '../widgets.dart';
 /// first tab, at full height. It needs a bounded height from its parent.
 ///
 /// Provider nodes are earned, not listed: a node appears when a request
-/// actually targets its provider and stays for a short while after, so a
-/// catalogue of dozens does not have to fit — the canvas only ever draws
-/// the nodes a request is using.
+/// actually targets its provider and stays for five minutes after the
+/// last one, so a catalogue of dozens does not have to fit — the canvas
+/// only ever draws the nodes a request is using.
 class AiRoutingView extends StatefulWidget {
   /// Builds the surface over [runtime]'s router and configuration.
   const AiRoutingView({
@@ -80,8 +80,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
 
   /// provider id → when its node stops being drawn. See the class doc: the
   /// canvas shows only providers a request has actually used recently.
+  /// Five minutes, not seconds: a node that vanishes the moment a reply
+  /// lands reads as "the request never happened" — the linger is what lets
+  /// the log row and the picture agree about the same request.
   final Map<String, DateTime> _nodeVisibleUntil = {};
-  static const _nodeVisibleFor = Duration(seconds: 60);
+  static const _nodeVisibleFor = Duration(minutes: 5);
 
   /// provider ids in first-requested order — each keeps a fixed slot on the
   /// canvas so a node appearing or expiring never slides its neighbours.
@@ -272,6 +275,10 @@ class _AiRoutingViewState extends State<AiRoutingView>
     final config = _config;
     if (providerId == null || config == null) return;
     if (config.providerNamed(providerId) == null) return;
+    // A provider past the slot cap earns its visibility mark but no canvas
+    // position — a leaf with no node to land on would fly invisible while
+    // still tripping the "request in flight" dashed wire.
+    if (!_slotOrder.contains(providerId)) return;
     // A retry to the same member reuses its leaf rather than stacking a
     // second one on the same pixels. The match needs the member too: one
     // callId covers a whole failover chain, and the next member's attempt
