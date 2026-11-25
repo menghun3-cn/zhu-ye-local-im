@@ -1,4 +1,4 @@
-# Agent Note: Built-in public providers, a routing page with a flying leaf, and a named-provider editor
+# Agent Note: Built-in public providers, a routing page with a flying cart, and a named-provider editor
 
 Status: implemented
 
@@ -54,33 +54,34 @@ steps and concurrent requests never cross wires. `attempt` is emitted
 inside `_call` immediately before `transport.send`, after every
 preflight check — a member rejected for a disabled model or a missing
 endpoint produces `failed` only, because no request ever left the
-device and the leaf must not pretend it did. A streamed reply counts
+device and the cart must not pretend it did. A streamed reply counts
 as served only when its event stream ends; a listener that walks away
 mid-stream reports `failed`, because the provider never finished its
 answer. Emission is best-effort: broadcast controller, no awaiting, a
 throwing listener cannot slow a request.
 
-**The routing view draws the wires and flies a leaf.**
+**The routing view draws the wires and flies a cart.**
 `AiRoutingView` is the AI page's first tab, at full height — the live
 route is what the page is *for*, so it leads rather than sits embedded
 in a scrolling list. It draws three columns — Agent, the 竹叶网关 node
 showing its `ip:port`, and provider nodes — with bezier wires for
 agent→gateway and gateway→provider — each hop deliberately short so the
-three columns read as one pipeline, not three islands. One `Icons.eco`
-leaf per in-flight request flies agent→gateway→provider on `attempt`
-and back on `served`/`failed` at a readable 1s per hop; the wire a
-leaf is riding turns dashed while the flight exists, and the dash
-pattern itself slides toward the provider — a repeating controller
-that only runs while a leaf is airborne, so an idle canvas burns no
-frames. Each leaf's shade
+three columns read as one pipeline, not three islands. One horse-drawn
+cart per in-flight request flies agent→gateway→provider on `attempt`
+and back on `served`/`failed` at a readable 1s per hop (the leaf stays
+as the gateway and brand mark; only the flyer changed). The cart is a
+`CustomPaint` silhouette — `RouteCart`/`RouteCartPainter` in
+`lib/ui/route_cart.dart` — running **empty outbound and stacked with
+sacks on the return**, flipping to face the direction of travel, with
+a trotting bob and wheel spokes that turn with the trip's progress.
+The wire a cart is riding turns dashed while the flight exists, and
+the dash pattern itself slides toward the provider — a repeating
+controller that only runs while a cart is airborne, so an idle canvas
+burns no frames. Each cart's shade
 is a pure function of its `callId` (four lightness × two saturation
 steps around the brand green), so concurrent requests are tellable
 apart while a failover's members — same call, different providers —
-keep one colour. A leaf also carries a cargo bead in magpie's
-convention: filled on the outbound leg (the request going out), a
-hollow ring on the return (the reply coming back) — both drawn at 10px
-with a page-background keyline so the bead reads against the leaf, the
-wires, and the node cards it passes. Position is
+keep one colour. Position is
 a pure function of layout and the controller's 0→1 progress, so resizes
 re-anchor for free. `MediaQuery.disableAnimations` drops the flights
 and keeps the status line — magpie's reduced-motion degradation, same
@@ -92,7 +93,7 @@ tile's switch was already there.
 catalogue can hold dozens of providers; drawing all of them would push
 the column off-screen, so a node appears only when a route event names
 its provider and stays for five minutes after its last request (or while
-a leaf is still flying to it, however long a stream runs). Idle canvas
+a cart is still flying to it, however long a stream runs). Idle canvas
 shows Agent and gateway only — "what can be asked" lives on the
 Providers tab, "what is being asked" lives here. Nodes claim a fixed
 slot in first-requested order (capped at 10) rather than packing
@@ -103,10 +104,10 @@ headline row, and — while healthy — the concrete model its latest route
 event asked for on the second line (`provider → modelId` from the member
 ref, resolved through `model.label ?? id`), falling back to the
 enabled-model count and yielding the line to a cooling/failed status
-when health demands it. A node with a leaf in flight also breathes — a
+when health demands it. A node with a cart in flight also breathes — a
 soft brand-coloured glow swelling and fading on the shared dash
 controller's 800ms cycle, so "being asked right now" needs no badge and
-stops the moment the last leaf docks. Stale `provider → modelId`
+stops the moment the last cart docks. Stale `provider → modelId`
 entries are pruned on reload when either side disappears.
 
 **Member health is per-node, not global.** A `failed` event now carries

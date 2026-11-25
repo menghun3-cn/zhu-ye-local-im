@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/core.dart';
 import '../ai_provider_mark.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../route_cart.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -1053,10 +1054,11 @@ class _ProviderNode extends StatelessWidget {
   }
 }
 
-/// The flying leaf: an [Icons.eco] glyph positioned each frame along its
-/// route — agent → gateway → provider on the way out, back again on
-/// return. Position comes from the controller's value; rotation sways
-/// gently so the leaf reads as fluttering rather than sliding.
+/// The flying request: a horse-drawn cart riding the route — agent →
+/// gateway → provider on the way out, back again on return. The cart
+/// runs empty outbound and stacked with sacks on the way home, wheels
+/// turning with the trip's progress; the leaf survives only as the
+/// gateway and brand mark, not as the flyer.
 class _Leaf extends StatelessWidget {
   const _Leaf({
     required this.flight,
@@ -1074,11 +1076,11 @@ class _Leaf extends StatelessWidget {
   Widget build(BuildContext context) {
     if (target == Offset.zero) return const SizedBox.shrink();
     final colors = WeChatColors.of(context);
-    // Concurrent requests each get their own leaf, and identical green
-    // leaves made two in-flight calls look like one. The shade is a pure
+    // Concurrent requests each get their own cart, and identical green
+    // carts made two in-flight calls look like one. The shade is a pure
     // function of callId, so a failover's members — same call, different
     // providers — stay the same colour while unrelated calls differ.
-    final leafColor = _leafColor(colors.brandStrong, flight.callId);
+    final cartColor = _cartColor(colors.brandStrong, flight.callId);
     return AnimatedBuilder(
       animation: flight.controller,
       builder: (context, _) {
@@ -1088,28 +1090,31 @@ class _Leaf extends StatelessWidget {
         final point = t <= 0.5
             ? _bezierPoint(agent, gateway, t * 2)
             : _bezierPoint(gateway, target, (t - 0.5) * 2);
-        final sway = math.sin(t * math.pi * 2) * 0.35;
-        // Magpie's convention: outbound the leaf carries a solid bead —
-        // the request going out — and on the way home a hollow one —
-        // the answer coming back. "Completed" still counts as outbound:
-        // a leaf parked at its provider is holding the request, not the
-        // reply.
+        // Trotting bob — two bounces per crossing — and a hair of sway,
+        // much calmer than the leaf's flutter: a cart does not dance.
+        final bob = math.sin(t * math.pi * 4) * 1.2;
+        final sway = math.sin(t * math.pi * 2) * 0.08;
+        // Outbound the bed is empty — the request going out — and on the
+        // way home it comes back stacked with sacks — the reply. The
+        // whole rig also turns around: a cart moving left must face left.
         final returning = flight.controller.status == AnimationStatus.reverse;
         return Positioned(
-          left: point.dx - 11,
-          top: point.dy - 11,
+          left: point.dx - 22,
+          top: point.dy - 14 + bob,
           child: Transform.rotate(
             angle: sway,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(Icons.eco, size: 22, color: leafColor),
-                Positioned(
-                  left: 15,
-                  top: -4,
-                  child: _CargoBead(color: leafColor, hollow: returning),
-                ),
-              ],
+            child: Transform.flip(
+              flipX: returning,
+              child: RouteCart(
+                // The key doubles as the test hook: 'cart-empty' outbound,
+                // 'cart-loaded' on the way home.
+                key: ValueKey(returning ? 'cart-loaded' : 'cart-empty'),
+                color: cartColor,
+                loaded: returning,
+                // Five wheel turns per crossing; reversing unwinds them,
+                // which is how wheels roll backward on the way home.
+                spin: t * math.pi * 10,
+              ),
             ),
           ),
         );
@@ -1119,12 +1124,12 @@ class _Leaf extends StatelessWidget {
 
   /// Distinct-but-related shades of the brand green, indexed by callId:
   /// four lightness steps crossed with two saturation steps gives eight
-  /// combinations before a repeat. Hue stays brand so a crowd of leaves
-  /// still reads as "the app's leaf", just tellable apart.
+  /// combinations before a repeat. Hue stays brand so a crowd of carts
+  /// still reads as "the app's flyer", just tellable apart.
   static const _lightnessSteps = [-0.09, 0.09, -0.18, 0.18];
   static const _saturationSteps = [-0.12, 0.12];
 
-  static Color _leafColor(Color base, int callId) {
+  static Color _cartColor(Color base, int callId) {
     final hsl = HSLColor.fromColor(base);
     final slot = callId % (_lightnessSteps.length * _saturationSteps.length);
     final lightness =
@@ -1141,35 +1146,6 @@ class _Leaf extends StatelessWidget {
   Offset _bezierPoint(Offset from, Offset to, double t) {
     final points = _wirePoints(from, to);
     return _bezier(points[0], points[1], points[2], points[3], t);
-  }
-}
-
-/// The bead a leaf carries: filled on the way out (the request), a ring
-/// on the way back (the reply). Same colour as its leaf so the pairing
-/// survives the per-callId shading. Both variants get a keyline in the
-/// page background — a same-colour bead against a same-colour leaf and
-/// wires was nearly invisible at 7px.
-class _CargoBead extends StatelessWidget {
-  const _CargoBead({required this.color, required this.hollow});
-
-  final Color color;
-  final bool hollow;
-
-  @override
-  Widget build(BuildContext context) {
-    final keyline = WeChatColors.of(context).pageBackground;
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: hollow ? null : color,
-        border: Border.all(
-          color: hollow ? color : keyline,
-          width: hollow ? 2.4 : 1.4,
-        ),
-      ),
-    );
   }
 }
 

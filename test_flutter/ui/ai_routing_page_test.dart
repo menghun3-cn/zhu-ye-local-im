@@ -177,20 +177,26 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    final leafColors = tester
-        .widgetList<Icon>(
-          find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.eco),
+    // Each in-flight cart is a CustomPaint whose painter carries the
+    // per-callId shade; read it back through dynamic since the painter
+    // type is private to the page.
+    Set<Color> cartColors() => tester
+        .widgetList<CustomPaint>(
+          find.byWidgetPredicate(
+            (w) =>
+                w is CustomPaint &&
+                w.painter.toString().contains('RouteCartPainter'),
+          ),
         )
-        .map((icon) => icon.color)
+        .map((cp) => (cp.painter as dynamic).color as Color)
         .toSet();
-    // Gateway node + three leaves across two callIds: the two callId-1
-    // leaves share a shade, callId-2's differs — three distinct colours.
-    expect(leafColors.length, greaterThanOrEqualTo(3));
+
+    // Three carts across two callIds: the two callId-1 carts share a
+    // shade, callId-2's differs — exactly two distinct colours.
+    expect(cartColors().length, 2);
   });
 
-  testWidgets('a leaf carries a solid bead out and a hollow one back', (
-    tester,
-  ) async {
+  testWidgets('the cart runs empty out and comes back loaded', (tester) async {
     final config = await tester.runAsync(() => runtime.load());
     await tester.pumpWidget(
       MaterialApp(
@@ -212,48 +218,37 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    // The 7px cargo bead: filled decoration on the way out, a bare ring
-    // on the way back — magpie's solid-out / hollow-home convention.
-    int beads({required bool hollow}) => tester
-        .widgetList<Container>(
-          find.byWidgetPredicate(
-            (w) =>
-                w is Container &&
-                w.decoration is BoxDecoration &&
-                (w.decoration! as BoxDecoration).shape == BoxShape.circle,
-          ),
-        )
-        .where(
-          (c) => ((c.decoration! as BoxDecoration).color == null) == hollow,
-        )
-        .length;
+    // The cart keys double as state markers: 'cart-empty' outbound,
+    // 'cart-loaded' (sacks in the bed) on the way home.
+    int carts(String state) =>
+        find.byKey(ValueKey('cart-$state')).evaluate().length;
 
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.attempt,
       'opencode-zen/mimo-v2.6-flash-free',
     );
-    // The broadcast event lands a microtask later, and a leaf's ticker
-    // needs a frame to establish its baseline before elapsed time counts
-    // — three pumps carry it well into its outbound leg. (The bead renders
+    // The broadcast event lands a microtask later, and a cart's ticker
+    // needs frames to establish its baseline before elapsed time counts
+    // — three pumps carry it well into its outbound leg. (The cart renders
     // at any progress, but the return leg only exists once value > 0.)
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(beads(hollow: false), 1);
-    expect(beads(hollow: true), 0);
+    expect(carts('empty'), 1);
+    expect(carts('loaded'), 0);
 
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.served,
       'opencode-zen/mimo-v2.6-flash-free',
     );
-    // Mid-return the leaf still exists and now carries the hollow bead;
-    // the reverse leg is proportional to remaining progress, so a short
-    // pump keeps it on screen.
+    // Mid-return the cart still exists and now shows its load — sacks
+    // in the bed; the reverse leg is proportional to remaining progress,
+    // so a short pump keeps it on screen.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(beads(hollow: true), 1);
-    expect(beads(hollow: false), 0);
+    expect(carts('loaded'), 1);
+    expect(carts('empty'), 0);
   });
 }
