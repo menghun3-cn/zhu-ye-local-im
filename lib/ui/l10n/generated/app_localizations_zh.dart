@@ -1570,7 +1570,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayNotListening => '已配置，但当前未在监听';
 
   @override
-  String get aiGatewayNotListeningHint => '网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。';
+  String get aiGatewayNotListeningHint =>
+      '网关已启用但绑定失败——请检查端口是否被占用，然后把网关关掉再打开（或重启应用）。';
 
   @override
   String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把网关密钥作为 API 密钥。';
@@ -1589,7 +1590,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiGatewayLanHint =>
-      '局域网模式会监听所有网卡，网络内任何拿到令牌的设备都能使用已配置的供应商。请妥善保管令牌。';
+      '局域网模式会通过明文 HTTP 响应所有网卡，网络内任何拿到网关密钥的设备都能使用已配置的供应商。请妥善保管密钥，并仅在可信网络中启用。';
+
+  @override
+  String get aiGatewayLanConfirmTitle => '在局域网中开放网关？';
+
+  @override
+  String get aiGatewayLanConfirmBody =>
+      '局域网模式将监听所有网卡并以明文 HTTP 提供服务——网关密钥可能在网络中被窃听。仅在可信网络中启用。';
+
+  @override
+  String get aiGatewayLanConfirmAction => '启用';
+
+  @override
+  String get aiGatewayKeysCorrupt => '网关密钥文件已损坏，无法读取——在文件修复前现有密钥不可用。';
 
   @override
   String get aiRoutingTitle => '路由';

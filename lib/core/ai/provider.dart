@@ -280,7 +280,11 @@ final class AiGatewayConfig {
 
   factory AiGatewayConfig.fromJson(Map<String, Object?>? json) =>
       AiGatewayConfig(
-        enabled: json?['enabled'] as bool? ?? true,
+        // Absent section means an older configuration file — the gateway
+        // did not exist for it, so it stays off rather than silently
+        // opening a listener on upgrade. Fresh installs never come through
+        // here: AiConfig's default constructor carries enabled: true.
+        enabled: json?['enabled'] as bool? ?? false,
         port: switch (json?['port']) {
           final int port when port > 0 => port,
           _ => defaultPort,

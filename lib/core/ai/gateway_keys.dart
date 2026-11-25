@@ -38,6 +38,19 @@ final class AiGatewayKey {
   );
 }
 
+/// Thrown when `gateway_keys.json` exists but cannot be read as a key
+/// list. The file holds credentials: minting a fresh keyring over it
+/// would lock every configured client out with no trace, so corruption
+/// surfaces as an error the UI can show instead of a silent rotation.
+final class AiGatewayKeyStoreException implements Exception {
+  const AiGatewayKeyStoreException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'AiGatewayKeyStoreException: $message';
+}
+
 /// The gateway's keyring: `gateway_keys.json` beside `providers.json`.
 ///
 /// First open migrates the single `gateway_token` file into a key named
@@ -52,19 +65,24 @@ final class AiGatewayKeyStore {
   /// The pre-keys credential file, read once as the `default` seed.
   final String? legacyTokenPath;
 
+  /// Reads the keyring. A missing file is an empty ring; a file that
+  /// exists but does not parse throws [AiGatewayKeyStoreException] —
+  /// callers must not mistake corruption for "no keys" and mint new ones.
   Future<List<AiGatewayKey>> load() async {
     if (!await file.exists()) return const [];
+    final Object? decoded;
     try {
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List) return const [];
-      return [
-        for (final entry in decoded)
-          if (entry is Map)
-            AiGatewayKey.fromJson(entry.cast<String, Object?>()),
-      ];
-    } on Object {
-      return const [];
+      decoded = jsonDecode(await file.readAsString());
+    } on Object catch (error) {
+      throw AiGatewayKeyStoreException('unreadable JSON: $error');
     }
+    if (decoded is! List) {
+      throw const AiGatewayKeyStoreException('not a JSON list');
+    }
+    return [
+      for (final entry in decoded)
+        if (entry is Map) AiGatewayKey.fromJson(entry.cast<String, Object?>()),
+    ];
   }
 
   Future<void> save(List<AiGatewayKey> keys) async {
@@ -74,12 +92,14 @@ final class AiGatewayKeyStore {
     await tmp.rename(file.path);
   }
 
-  /// Loads the keyring, seeding `default` on first run. The legacy token
-  /// file is left in place — deleting it would break a downgrade, and it
-  /// holds nothing the keyring does not already know.
+  /// Loads the keyring, seeding `default` on first run — first run means
+  /// *the file does not exist*. An existing file is returned as-is, even
+  /// when empty: a deliberately emptied ring must not resurrect `default`,
+  /// and a corrupt one throws rather than rotating credentials. The
+  /// legacy token file is left in place — deleting it would break a
+  /// downgrade, and it holds nothing the keyring does not already know.
   Future<List<AiGatewayKey>> loadOrCreate() async {
-    final existing = await load();
-    if (existing.isNotEmpty) return existing;
+    if (await file.exists()) return load();
     var secret = '';
     final legacy = legacyTokenPath;
     if (legacy != null) {

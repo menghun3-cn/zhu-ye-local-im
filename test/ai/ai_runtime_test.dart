@@ -158,6 +158,38 @@ void main() {
     expect(again.single.secret, keys.single.secret);
   });
 
+  test('a corrupt keyring throws instead of rotating credentials', () async {
+    final file = File('${directory.path}/gateway_keys.json');
+    await file.writeAsString('{not json');
+    final store = AiGatewayKeyStore(file: file);
+
+    await expectLater(store.load(), throwsA(isA<AiGatewayKeyStoreException>()));
+    // loadOrCreate must not "help" by minting a fresh default key — that
+    // would lock every configured client out silently.
+    await expectLater(
+      store.loadOrCreate(),
+      throwsA(isA<AiGatewayKeyStoreException>()),
+    );
+    expect(await file.readAsString(), '{not json');
+    // The live runtime surfaces the same error rather than rotating.
+    await expectLater(
+      runtime.keys.load(),
+      throwsA(isA<AiGatewayKeyStoreException>()),
+    );
+  });
+
+  test('an emptied keyring stays empty across reopen', () async {
+    // A user who deletes every key must not get `default` resurrected on
+    // the next launch — an empty ring is a deliberate state, not a seed
+    // signal. (The UI currently refuses to delete the last key, so this
+    // guards the file-level contract.)
+    final file = File('${directory.path}/gateway_keys.json');
+    await file.writeAsString('[]');
+    final store = AiGatewayKeyStore(file: file);
+    expect(await store.loadOrCreate(), isEmpty);
+    expect(await file.readAsString(), '[]');
+  });
+
   test('a legacy gateway_token file migrates into the default key', () async {
     await File('${directory.path}/gateway_token').writeAsString('lt-ai-old');
     final store = AiGatewayKeyStore(

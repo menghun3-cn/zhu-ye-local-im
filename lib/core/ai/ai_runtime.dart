@@ -90,7 +90,15 @@ final class AiRuntime {
       file: File('$directory/gateway_keys.json'),
       legacyTokenPath: '$directory/gateway_token',
     );
-    await keys.loadOrCreate();
+    // A corrupt keyring must not take the whole AI stack down: the store
+    // still opens, every keys.load() rethrows for the settings surface to
+    // report, and the gateway refuses requests rather than rotating
+    // credentials behind the user's back.
+    try {
+      await keys.loadOrCreate();
+    } on AiGatewayKeyStoreException {
+      // Swallowed on purpose — see above.
+    }
     return AiRuntime._(
       directory: directory,
       store: store,

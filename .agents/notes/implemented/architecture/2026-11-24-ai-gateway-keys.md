@@ -31,6 +31,18 @@ keeps working with zero re-pasting — or a freshly generated
 file they replace: they are bearer credentials shown in the UI by
 design, and sealing them would only move the plaintext somewhere else.
 
+**Corruption is an error, never a rotation.** `load()` throws
+`AiGatewayKeyStoreException` when the file exists but does not parse —
+the previous `catch → []` read corruption as "no keys", after which
+`loadOrCreate` minted a fresh `default` and silently locked every
+configured client out. `loadOrCreate` now seeds only when the file is
+absent: an existing file is returned as-is, even an empty list, so a
+deliberately emptied ring cannot resurrect `default`. `AiRuntime.open`
+swallows the exception so the rest of the AI stack still comes up; the
+gateway's per-request `keySource` rethrows (requests fail rather than
+authenticate against rotated credentials) and the settings surface shows
+a "key file corrupted" hint until the file is repaired.
+
 **The gateway accepts any key in the ring.** `AiGateway` takes a
 `keySource` callback re-read on every request, so adding or deleting a
 key in settings is live immediately — no rebind, no restart. The
@@ -38,6 +50,15 @@ matched key's *name* (never its secret) is passed to
 `AiRouter.chat(clientKey:)`, which stamps it on the `AiRequestRecord`;
 the request log's per-key usage rollup is then a plain count over
 `record.key`, with pre-key rows attributed to `default`.
+
+**Authentication follows RFC 7235 and does not leak internals.** The
+`Bearer` scheme is matched case-insensitively (`bearer`, `BEARER` and
+`Bearer` all authenticate; other schemes do not), and secrets compare in
+constant time — XOR-accumulated over the UTF-8 bytes so neither content
+nor length shows in response timing on a LAN where the token is the only
+credential. Handler failures answer a generic `internal gateway error` /
+`stream interrupted` rather than echoing the exception text to the
+caller.
 
 **The UI is a list, not a field.** The gateway tab shows each key as a
 tile — name, masked secret behind an eye toggle, copy, per-key usage
@@ -63,9 +84,11 @@ length reads honestly.
 - The old `lt-ai-` prefix is gone for new keys (`sk-` prefix, the same
   convention magpie uses); migrated `default` keys keep whatever secret
   they had, prefix included.
-- Key comparison is a plaintext string match per request — fine at
-  keyring sizes (a handful), and constant-time comparison was rejected
-  as ceremony for a loopback/LAN bearer check.
+- Key comparison is constant-time over the UTF-8 bytes — cheap at any
+  keyring size, and the LAN scope makes timing a real (if minor) signal.
+- A corrupt `gateway_keys.json` leaves the gateway refusing every request
+  until the file is fixed — the honest failure, versus silently rotating
+  credentials every client depends on.
 
 ## Alternatives considered
 

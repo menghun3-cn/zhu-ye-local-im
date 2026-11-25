@@ -462,4 +462,133 @@ void main() {
     expect(find.byType(SvgPicture), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('switching to LAN scope asks before widening the bind', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    final seams = PlatformSeams(
+      store: MemoryProfileStore(),
+      profilePath: null,
+      messageStore: MemoryMessageStore(),
+      messagePath: null,
+      beacon: MemoryBeaconHub().a,
+      clipboard: MemorySystemClipboard(),
+      platform: DevicePlatform.windows,
+      defaultIncomingDirectory: null,
+      hostShell: ScriptedHostShell(),
+      controlsWindow: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: AiPage(
+            runtime: runtime,
+            seams: seams,
+            configLoader: () async => config!,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final l10n = lookupAppLocalizations(appLocale);
+
+    await tester.tap(find.widgetWithText(Tab, l10n.aiNavGateway));
+    await tester.pumpAndSettle();
+
+    // Picking LAN opens the warning dialog instead of applying at once.
+    await tester.tap(find.text(l10n.aiGatewayScopeLan));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.aiGatewayLanConfirmTitle), findsOneWidget);
+
+    // Cancelling leaves the scope where it was.
+    await tester.tap(find.text(l10n.cancel));
+    await tester.pumpAndSettle();
+    var stored = await tester.runAsync(() => runtime.load());
+    expect(stored!.gateway.scope, AiGatewayScope.loopback);
+
+    // Confirming applies it — the save and rebind are real file/socket IO
+    // the fake-async clock cannot advance. The config file flips before
+    // the bind finishes, so wait on the runtime's gateway, not the file.
+    await tester.tap(find.text(l10n.aiGatewayScopeLan));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aiGatewayLanConfirmAction));
+    for (var i = 0; i < 30; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+      if (runtime.gateway?.scope == AiGatewayScope.lan) break;
+    }
+    await tester.pumpAndSettle();
+    stored = await tester.runAsync(() => runtime.load());
+    expect(stored!.gateway.scope, AiGatewayScope.lan);
+    expect(runtime.gateway?.scope, AiGatewayScope.lan);
+
+    // The rebind left a real HttpServer — and its idle-timeout timer —
+    // alive inside the fake-async zone. Release it before the widget
+    // tree's invariant check; tearDown's dispose() is then a no-op.
+    await tester.runAsync(() => runtime.dispose());
+    await tester.pump();
+  });
+
+  testWidgets('a corrupt keyring is reported instead of silently emptied', (
+    tester,
+  ) async {
+    // Corrupt the file after open() seeded it — the next load must surface
+    // the damage rather than read as "zero keys". Real file IO needs
+    // runAsync: the fake-async clock cannot advance it.
+    await tester.runAsync(
+      () =>
+          File('${directory.path}/gateway_keys.json')
+              .writeAsString('{not json'),
+    );
+    final config = await tester.runAsync(() => runtime.load());
+    final seams = PlatformSeams(
+      store: MemoryProfileStore(),
+      profilePath: null,
+      messageStore: MemoryMessageStore(),
+      messagePath: null,
+      beacon: MemoryBeaconHub().a,
+      clipboard: MemorySystemClipboard(),
+      platform: DevicePlatform.windows,
+      defaultIncomingDirectory: null,
+      hostShell: ScriptedHostShell(),
+      controlsWindow: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: AiPage(
+            runtime: runtime,
+            seams: seams,
+            configLoader: () async => config!,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final l10n = lookupAppLocalizations(appLocale);
+
+    await tester.tap(find.widgetWithText(Tab, l10n.aiNavGateway));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.aiGatewayKeysCorrupt), findsOneWidget);
+  });
 }

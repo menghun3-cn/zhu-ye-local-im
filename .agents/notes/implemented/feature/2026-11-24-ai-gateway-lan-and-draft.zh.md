@@ -28,11 +28,13 @@ AI 设置界面的首次实际使用提出了两条修正。
 ## Decision
 
 **网关 scope 是持久化设置，且默认开启。** `AiGatewayConfig` 新增
-`scope`（`AiGatewayScope.loopback` | `lan`），`enabled` 在构造函数与
-`fromJson` 中都默认 `true`——新装的应用启动即绑回环、用首选端口
-（`AiGatewayConfig.defaultPort`，被占用时回退临时端口）；
-`gateway` 节缺失时按开处理。回环暴露在生成的 bearer token 之后风险
-为零，token 文件本来就是为此存在的。
+`scope`（`AiGatewayScope.loopback` | `lan`），`enabled` 在构造函数中
+默认 `true`——新装的应用启动即绑回环、用首选端口
+（`AiGatewayConfig.defaultPort`，被占用时回退临时端口）。
+`fromJson` 则刻意不同：网关出现之前写入的 `providers.json` 没有
+`gateway` 节，升级不应静默启动一个用户从未要求的监听——节缺失按
+**关**处理；只有本功能写入的文件才带显式 `enabled`。回环暴露在生
+成的 bearer token 之后风险为零，密钥环本来就是为此存在的。
 
 **局域网是可选项，且指 `0.0.0.0`，不是第二个 socket。** 绑定
 `InternetAddress.anyIPv4` 用一个监听者同时应答 `127.0.0.1` 和所有
@@ -48,8 +50,10 @@ AI 设置界面的首次实际使用提出了两条修正。
 排在最前，而局域网对端真正拨打的是私网地址；第一条就是路由节点
 对外宣称的网关地址。卡片提供回环/局域网
 `SegmentedButton`，始终显示本机端点，局域网 scope 下为每个发现的
-地址追加一行 `http://<lan-ip>:<port>/v1`，并提示令牌是链路上唯一的
-凭据。
+地址追加一行 `http://<lan-ip>:<port>/v1`，并提示网关密钥是链路上唯
+一的凭据。**切换到**局域网会先弹确认：`0.0.0.0` 加明文 HTTP 意味着
+密钥可能在网络中被窃听，对话框先把这点写明再应用 scope——与其他破
+坏性操作同样的礼遇。
 
 **scope 或端口变化会触发重绑。** `AiRuntime` 现在记住运行中服务器所
 绑定的 `AiGatewayConfig`；`enabled`/`port`/`scope` 任一不同的保存会
@@ -70,8 +74,8 @@ AI 设置界面的首次实际使用提出了两条修正。
 - 局域网模式把端点发布到所有接口，包括 `0.0.0.0` 覆盖的 VPN 与虚拟
   网卡。这是该模式的明示代价；按接口分别绑定因没有消费者而被否决。
 - `providers.json` 的 `gateway` 节新增 `scope` 字符串；此前写入的
-  文件读回为 `loopback` 及其存储的 `enabled`——除了整个节缺失的情况，
-  现在按开处理。功能尚未交付用户，无需迁移。
+  文件读回为 `loopback` 及其存储的 `enabled`——整个节缺失时按关处
+  理，升级不会静默打开监听。只有全新安装（无文件）才得到默认开。
 - 取消添加供应商对话框不再改动 `providers.json`；`_uniqueProviderId`
   的 slug 只在保存时占用，两个被取消的草稿不会互相冲突。
 

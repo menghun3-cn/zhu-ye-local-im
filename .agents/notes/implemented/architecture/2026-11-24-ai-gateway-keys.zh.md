@@ -26,12 +26,28 @@ Status: implemented
 新的 `sk-<随机>`。密钥明文存储，与它替代的令牌文件一致：它们是按
 设计要展示给用户的 bearer 凭据，封装只是把明文挪到别处。
 
+**损坏是错误，绝不是轮换。** `load()` 在文件存在但无法解析时抛出
+`AiGatewayKeyStoreException`——此前的 `catch → []` 会把损坏读成
+"没有密钥"，随后 `loadOrCreate` 铸造新的 `default`，让所有已配置客
+户端静默失联。`loadOrCreate` 现在只在文件不存在时播种：已存在的文
+件原样返回，即使是空列表，因此被刻意清空的密钥环不会复活
+`default`。`AiRuntime.open` 吞掉该异常让 AI 栈其余部分照常启动；
+网关每请求的 `keySource` 会重新抛出（请求失败而不是对轮换后的凭据
+放行），设置界面在文件修复前显示"密钥文件已损坏"提示。
+
 **网关接受密钥环中的任意密钥。** `AiGateway` 接收 `keySource` 回调，
 每个请求重新读取，因此在设置里增删密钥即时生效——不需要重绑端口、
 不需要重启。匹配到的密钥的**名称**（永远不是秘密本身）传给
 `AiRouter.chat(clientKey:)`，盖在 `AiRequestRecord` 上；请求日志的
 按密钥用量统计于是变成对 `record.key` 的一次分组计数，密钥出现之
 前的旧记录归入 `default`。
+
+**认证遵循 RFC 7235，且不泄漏内部信息。** `Bearer` scheme 按大小写
+不敏感匹配（`bearer`、`BEARER`、`Bearer` 均可认证；其它 scheme 不
+行），密钥比较为常数时间——对 UTF-8 字节做异或累积，局域网下 token
+是唯一凭据，响应时序不应泄漏内容或长度。处理器异常统一回答通用
+的 `internal gateway error` / `stream interrupted`，而不是把异常
+文本回显给调用方。
 
 **界面是列表，不是单个输入框。** 网关 tab 把每个密钥显示为一行卡
 片——名称、眼睛切换的掩码秘密、复制、按密钥用量
@@ -51,9 +67,10 @@ Status: implemented
 - `gateway_token` 只剩迁移来源的角色——新装机不再写它。
 - 新密钥不再用旧的 `lt-ai-` 前缀（改用 `sk-` 前缀，与 magpie 的约定
   一致）；迁移来的 `default` 密钥保留原有秘密，前缀照旧。
-- 密钥比对是每请求一次明文字符串比较——密钥环规模（几个）下完全
-  够用，对 loopback/LAN 的 bearer 校验而言常数时间比较只是过度
-  设计。
+- 密钥比较对 UTF-8 字节做常数时间累积——任何密钥环规模下成本都
+  可忽略，而 LAN 模式让时序成为一个（虽小但真实的）信号。
+- `gateway_keys.json` 损坏时网关拒绝所有请求直到文件修复——这是
+  诚实的失败方式，好过静默轮换所有客户端依赖的凭据。
 
 ## Alternatives considered
 

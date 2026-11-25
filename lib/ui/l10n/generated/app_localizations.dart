@@ -2872,7 +2872,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiGatewayNotListeningHint.
   ///
   /// In en, this message translates to:
-  /// **'The gateway is enabled but did not bind — check that the port is free, then restart the app.'**
+  /// **'The gateway is enabled but did not bind — check that the port is free, then turn the gateway off and on again (or restart the app).'**
   String get aiGatewayNotListeningHint;
 
   /// No description provided for @aiGatewayHint.
@@ -2908,8 +2908,32 @@ abstract class AppLocalizations {
   /// No description provided for @aiGatewayLanHint.
   ///
   /// In en, this message translates to:
-  /// **'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.'**
+  /// **'LAN mode answers on every network interface over plain HTTP, so any device on the network that has the gateway key can use the configured providers. Keep the key private and only enable this on networks you trust.'**
   String get aiGatewayLanHint;
+
+  /// No description provided for @aiGatewayLanConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Expose the gateway on the local network?'**
+  String get aiGatewayLanConfirmTitle;
+
+  /// No description provided for @aiGatewayLanConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN mode binds to all interfaces and serves plain HTTP — the gateway key can be observed on the network. Only enable this on networks you trust.'**
+  String get aiGatewayLanConfirmBody;
+
+  /// No description provided for @aiGatewayLanConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get aiGatewayLanConfirmAction;
+
+  /// No description provided for @aiGatewayKeysCorrupt.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway key file is corrupted and could not be read — existing keys are unavailable until the file is repaired.'**
+  String get aiGatewayKeysCorrupt;
 
   /// No description provided for @aiRoutingTitle.
   ///

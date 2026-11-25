@@ -124,10 +124,7 @@ final class AiGateway {
       // (Tailscale's 100.64/10, VPNs) routinely come first — but the
       // address a LAN peer actually dials is the RFC1918 one. Rank
       // private ranges ahead so "the" gateway address is the LAN's.
-      return addresses..sort((a, b) {
-        final byRank = _lanAddressRank(a).compareTo(_lanAddressRank(b));
-        return byRank != 0 ? byRank : a.compareTo(b);
-      });
+      return addresses..sort(compareLanAddresses);
     } on Object {
       return const [];
     }
@@ -144,6 +141,15 @@ final class AiGateway {
     r'tap-|tun|vpn|loopback|bluetooth|teredo|isatap|npcap|wan miniport',
     caseSensitive: false,
   );
+
+  /// The LAN endpoint ordering: RFC1918 space a LAN peer would dial
+  /// before overlay/CGNAT and anything else, alphabetically within a
+  /// rank. Public because it is a pure function — the settings surface
+  /// and tests exercise it without needing real interfaces.
+  static int compareLanAddresses(String a, String b) {
+    final byRank = _lanAddressRank(a).compareTo(_lanAddressRank(b));
+    return byRank != 0 ? byRank : a.compareTo(b);
+  }
 
   /// 0 for RFC1918 space a LAN peer would dial, 1 for overlay/CGNAT and
   /// anything else — the sort key that keeps Tailscale from outranking the
@@ -197,13 +203,13 @@ final class AiGateway {
       } else {
         _writeError(request, 404, 'unknown endpoint: ${request.method} $path');
       }
-    } on Object catch (error) {
+    } on Object {
       // A handler that throws must still answer: a hung socket looks like a
-      // dead gateway, and the caller cannot tell the difference. The write
-      // itself can fail — the client may already be gone — so it is guarded
-      // rather than allowed to escape as an unhandled async error.
+      // dead gateway, and the caller cannot tell the difference. The body
+      // stays generic — under LAN scope the exception text is internal
+      // detail a stranger does not need.
       try {
-        _writeError(request, 500, '$error');
+        _writeError(request, 500, 'internal gateway error');
       } on Object {
         // Nothing left to tell the caller; the socket is the only witness.
       }
@@ -214,13 +220,34 @@ final class AiGateway {
   /// keyring is re-read per request so a settings edit is live immediately.
   Future<AiGatewayKey?> _authorizedKey(HttpRequest request) async {
     final auth = request.headers.value('authorization');
-    if (auth == null || !auth.startsWith('Bearer ')) return null;
-    final secret = auth.substring('Bearer '.length).trim();
+    if (auth == null) return null;
+    // RFC 7235: the auth scheme is case-insensitive — `bearer`, `BEARER`
+    // and `Bearer` are the same credential.
+    final space = auth.indexOf(' ');
+    if (space <= 0 || auth.substring(0, space).toLowerCase() != 'bearer') {
+      return null;
+    }
+    final secret = auth.substring(space + 1).trim();
     if (secret.isEmpty) return null;
     for (final key in await keySource()) {
-      if (key.secret == secret) return key;
+      if (_secretsEqual(key.secret, secret)) return key;
     }
     return null;
+  }
+
+  /// Constant-time secret comparison: `==` short-circuits on the first
+  /// differing byte, which leaks prefix length to a LAN observer timing
+  /// responses. XOR-accumulate over the longer input so neither length
+  /// nor content shows in the timing.
+  static bool _secretsEqual(String a, String b) {
+    final ab = utf8.encode(a);
+    final bb = utf8.encode(b);
+    var diff = ab.length ^ bb.length;
+    final n = ab.length > bb.length ? ab.length : bb.length;
+    for (var i = 0; i < n; i++) {
+      diff |= (i < ab.length ? ab[i] : 0) ^ (i < bb.length ? bb[i] : 0);
+    }
+    return diff == 0;
   }
 
   Future<void> _models(HttpRequest request) async {
@@ -417,12 +444,13 @@ final class AiGateway {
         await response.flush();
       }
       finished = true;
-    } on Object catch (error) {
+    } on Object {
       // The status line is already gone; the only honest signal left is an
-      // error frame before DONE.
+      // error frame before DONE — generic, same as the 500 path: the raw
+      // exception is internal detail, not something a LAN peer should read.
       try {
         _writeSse(response, {
-          'error': {'message': '$error'},
+          'error': {'message': 'stream interrupted'},
         });
       } on Object {
         // The peer is gone; there is nowhere left to report it.
@@ -638,12 +666,28 @@ final class AiGateway {
   }
 
   /// Reads the request body, or null when it exceeds [maxRequestBytes].
+  /// Once over the limit the rest is drained up to one more budget's
+  /// worth: answering 413 while unread request bytes are still in flight
+  /// resets the socket, and the client never sees the status. Past the
+  /// drain budget the peer is abusive — the connection is allowed to
+  /// reset instead of being read forever.
   Future<String?> _readBody(HttpRequest request) async {
     final builder = BytesBuilder(copy: false);
+    var tooLarge = false;
+    var discarded = 0;
     await for (final chunk in request) {
+      if (tooLarge) {
+        discarded += chunk.length;
+        if (discarded > maxRequestBytes) return null;
+        continue;
+      }
       builder.add(chunk);
-      if (builder.length > maxRequestBytes) return null;
+      if (builder.length > maxRequestBytes) {
+        tooLarge = true;
+        builder.clear();
+      }
     }
+    if (tooLarge) return null;
     return utf8.decode(builder.takeBytes(), allowMalformed: true);
   }
 

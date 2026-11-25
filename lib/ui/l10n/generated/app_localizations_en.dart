@@ -1650,7 +1650,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiGatewayNotListeningHint =>
-      'The gateway is enabled but did not bind — check that the port is free, then restart the app.';
+      'The gateway is enabled but did not bind — check that the port is free, then turn the gateway off and on again (or restart the app).';
 
   @override
   String get aiGatewayHint =>
@@ -1670,7 +1670,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiGatewayLanHint =>
-      'LAN mode answers on every network interface, so any device on the network that has the token can use the configured providers. Keep the token private.';
+      'LAN mode answers on every network interface over plain HTTP, so any device on the network that has the gateway key can use the configured providers. Keep the key private and only enable this on networks you trust.';
+
+  @override
+  String get aiGatewayLanConfirmTitle =>
+      'Expose the gateway on the local network?';
+
+  @override
+  String get aiGatewayLanConfirmBody =>
+      'LAN mode binds to all interfaces and serves plain HTTP — the gateway key can be observed on the network. Only enable this on networks you trust.';
+
+  @override
+  String get aiGatewayLanConfirmAction => 'Enable';
+
+  @override
+  String get aiGatewayKeysCorrupt =>
+      'The gateway key file is corrupted and could not be read — existing keys are unavailable until the file is repaired.';
 
   @override
   String get aiRoutingTitle => 'Routing';

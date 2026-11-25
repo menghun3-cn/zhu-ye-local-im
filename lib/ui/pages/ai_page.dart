@@ -382,8 +382,7 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
   /// opened the editor: a fetch or a second edit may have landed while the
   /// dialog was up, and saving a stale copy would silently drop it.
   Future<void> _saveProvider(AiProvider next) async {
-    final config = _config;
-    if (config == null) return;
+    final config = await widget.runtime.load();
     final providers = [
       for (final p in config.providers) p.id == next.id ? next : p,
     ];
@@ -482,6 +481,34 @@ class _GatewayCard extends StatelessWidget {
   final ValueChanged<AiGatewayConfig> onChanged;
   final ValueChanged<String> onCopy;
 
+  /// LAN scope binds `0.0.0.0` and serves plain HTTP — the gateway key is
+  /// the only credential, and it can be sniffed on the wire. The switch
+  /// asks before widening the exposure.
+  Future<void> _confirmLanScope(
+    BuildContext context,
+    VoidCallback apply,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.aiGatewayLanConfirmTitle),
+        content: Text(l10n.aiGatewayLanConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.aiGatewayLanConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) apply();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -530,13 +557,25 @@ class _GatewayCard extends StatelessWidget {
                   ),
                 ],
                 selected: {gatewayConfig.scope},
-                onSelectionChanged: (selection) => onChanged(
-                  AiGatewayConfig(
-                    enabled: enabled,
-                    port: gatewayConfig.port,
-                    scope: selection.first,
-                  ),
-                ),
+                onSelectionChanged: (selection) {
+                  if (selection.isEmpty) return;
+                  final scope = selection.first;
+                  void apply() => onChanged(
+                    AiGatewayConfig(
+                      enabled: enabled,
+                      port: gatewayConfig.port,
+                      scope: scope,
+                    ),
+                  );
+                  // Widening the bind to every interface is destructive in
+                  // the same sense as deleting a key — it asks first.
+                  if (scope == AiGatewayScope.lan &&
+                      gatewayConfig.scope != AiGatewayScope.lan) {
+                    unawaited(_confirmLanScope(context, apply));
+                  } else {
+                    apply();
+                  }
+                },
               ),
               const SizedBox(height: 8),
               _CopyableField(
@@ -595,6 +634,10 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
   final Map<String, int> _requests = {};
   final Map<String, int> _tokens = {};
   bool _adding = false;
+  // A corrupt gateway_keys.json must be visible, not silently treated as
+  // "no keys" — the store refuses to rotate credentials, so the honest
+  // answer here is to say the file needs repair.
+  bool _keysCorrupt = false;
   final _name = TextEditingController();
   final _secret = TextEditingController();
 
@@ -614,7 +657,14 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
   /// Keys and per-key usage come from two files; both are tiny, so this is
   /// two reads, not a query.
   Future<void> _reload() async {
-    final keys = await widget.runtime.keys.load();
+    List<AiGatewayKey> keys;
+    var corrupt = false;
+    try {
+      keys = await widget.runtime.keys.load();
+    } on AiGatewayKeyStoreException {
+      keys = const [];
+      corrupt = true;
+    }
     final records = await widget.runtime.requestLog.load();
     final requests = <String, int>{};
     final tokens = <String, int>{};
@@ -627,6 +677,7 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
     if (mounted) {
       setState(() {
         _keys = keys;
+        _keysCorrupt = corrupt;
         _requests
           ..clear()
           ..addAll(requests);
@@ -715,6 +766,11 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
             color: colors.secondaryText,
           ),
         ),
+        if (_keysCorrupt)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: HintText(l10n.aiGatewayKeysCorrupt),
+          ),
         const SizedBox(height: 6),
         for (final key in _keys)
           _GatewayKeyTile(

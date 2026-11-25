@@ -128,6 +128,24 @@ void main() {
     expect(loaded.gateway.port, AiGatewayConfig.defaultPort);
   });
 
+  test(
+    'a config file without a gateway section keeps the gateway off',
+    () async {
+      // Files written before the gateway existed have no 'gateway' key at
+      // all — upgrading must not silently start a listener the user never
+      // asked for. Only a fresh install (no file) gets the on-by-default.
+      final delegate = FileMessageStore('${tempDir.path}/providers.json');
+      await delegate.save({
+        'version': 1,
+        'providers': <Object?>[],
+        'routingGroups': <Object?>[],
+      });
+      final loaded = await store.load();
+      expect(loaded.gateway.enabled, isFalse);
+      expect(loaded.gateway.scope, AiGatewayScope.loopback);
+    },
+  );
+
   test('the gateway scope round-trips through providers.json', () async {
     final config = sampleConfig().copyWith(
       gateway: const AiGatewayConfig(enabled: true, scope: AiGatewayScope.lan),

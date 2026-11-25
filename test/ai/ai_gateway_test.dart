@@ -128,28 +128,71 @@ void main() {
     expect(gateway.endpoint, endsWith('/v1'));
   });
 
-  test('LAN scope lists RFC1918 addresses before overlay space', () async {
-    await gateway.stop();
-    await gateway.start(scope: AiGatewayScope.lan);
-    final addresses = gateway.lanAddresses;
-    bool isPrivate(String address) {
-      final parts = address.split('.').map(int.tryParse).toList();
-      if (parts.length != 4 || parts.any((p) => p == null)) return false;
-      final a = parts[0]!;
-      final b = parts[1]!;
-      return a == 10 || a == 192 && b == 168 || a == 172 && b >= 16 && b <= 31;
-    }
-
-    // The list must be a partition: once an overlay address (Tailscale's
-    // 100.64/10, a VPN) appears, no private one may follow it — the first
-    // entry is what the routing node advertises as "the" LAN address.
-    final firstOverlay = addresses.indexWhere((a) => !isPrivate(a));
-    if (firstOverlay == -1) return;
+  test('LAN endpoints rank RFC1918 ahead of overlay space', () {
+    // Deterministic check of the comparator the interface list is sorted
+    // by — no dependence on which adapters this machine happens to have.
     expect(
-      addresses.skip(firstOverlay).every((a) => !isPrivate(a)),
-      isTrue,
-      reason: 'addresses: $addresses',
+      AiGateway.compareLanAddresses('192.168.1.20', '100.64.0.1'),
+      lessThan(0),
     );
+    expect(
+      AiGateway.compareLanAddresses('10.0.0.5', '100.64.0.1'),
+      lessThan(0),
+    );
+    expect(
+      AiGateway.compareLanAddresses('172.16.0.9', '100.64.0.1'),
+      lessThan(0),
+    );
+    expect(
+      AiGateway.compareLanAddresses('100.64.0.1', '192.168.1.20'),
+      greaterThan(0),
+    );
+    // Same rank falls back to plain string order (not numeric IP order).
+    expect(AiGateway.compareLanAddresses('10.0.0.2', '10.0.0.3'), lessThan(0));
+    expect(AiGateway.compareLanAddresses('10.0.0.10', '10.0.0.2'), lessThan(0));
+    // Malformed input ranks as overlay rather than crashing the sort.
+    expect(
+      AiGateway.compareLanAddresses('not-an-ip', '192.168.1.20'),
+      greaterThan(0),
+    );
+  });
+
+  test('the bearer scheme is case-insensitive per RFC 7235', () async {
+    for (final scheme in ['Bearer', 'bearer', 'BEARER', 'BeArEr']) {
+      final request = await client.getUrl(Uri.parse('$base/v1/models'));
+      request.headers.set('authorization', '$scheme ${keys.first.secret}');
+      final response = await request.close();
+      expect(response.statusCode, 200, reason: 'scheme: $scheme');
+      await response.drain<void>();
+    }
+    // A different scheme is not a bearer credential.
+    final basic = await client.getUrl(Uri.parse('$base/v1/models'));
+    basic.headers.set(
+      'authorization',
+      'Basic ${base64Encode(utf8.encode('u:p'))}',
+    );
+    final denied = await basic.close();
+    expect(denied.statusCode, 401);
+    await denied.drain<void>();
+    // 'Bearer' with no credential at all is refused too.
+    final empty = await client.getUrl(Uri.parse('$base/v1/models'));
+    empty.headers.set('authorization', 'Bearer');
+    final refused = await empty.close();
+    expect(refused.statusCode, 401);
+    await refused.drain<void>();
+  });
+
+  test('a body over the limit is a 413', () async {
+    final response = await post('/v1/chat/completions', {
+      'model': 'deepseek/deepseek-chat',
+      'messages': [
+        // Just over the 1 MiB cap — inside the server's drain budget, so
+        // the 413 arrives on a clean socket rather than a reset.
+        {'role': 'user', 'content': 'x' * (1 << 20)},
+      ],
+    });
+    expect(response.statusCode, 413);
+    await response.drain<void>();
   });
 
   test('requests without the token are refused', () async {

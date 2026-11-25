@@ -34,12 +34,15 @@ UI had already decided for the user.
 
 **Gateway scope is a persisted setting, on by default.**
 `AiGatewayConfig` gained `scope` (`AiGatewayScope.loopback` | `lan`) and
-`enabled` now defaults to `true` in both the constructor and
-`fromJson` — a fresh install binds loopback at startup on the preferred
-port (`AiGatewayConfig.defaultPort`, with ephemeral fallback when busy),
-and an absent `gateway` section reads as on. Loopback exposure behind
-a generated bearer token is nil-risk; the token file already exists for
-exactly this.
+`enabled` now defaults to `true` in the constructor — a fresh install
+binds loopback at startup on the preferred port
+(`AiGatewayConfig.defaultPort`, with ephemeral fallback when busy).
+`fromJson` is deliberately different: a `providers.json` written before
+the gateway existed has no `gateway` section, and an upgrade must not
+silently start a listener the user never asked for — absent reads as
+*off*; only files this feature wrote carry an explicit `enabled`. Loopback
+exposure behind a generated bearer token is nil-risk; the keyring already
+exists for exactly this.
 
 **LAN is opt-in, and it means `0.0.0.0`, not a second socket.** Binding
 `InternetAddress.anyIPv4` answers on `127.0.0.1` *and* every LAN address
@@ -57,9 +60,12 @@ interface enumeration order is arbitrary and an overlay NIC (Tailscale's
 100.64/10, a VPN) routinely wins it, while the address a LAN peer
 actually dials is the private one; the first entry is what the routing
 node advertises as the gateway's address. The card shows a
-loopback/LAN `SegmentedButton`, the local endpoint always, and one
+`loopback`/`LAN` `SegmentedButton`, the local endpoint always, and one
 `http://<lan-ip>:<port>/v1` field per discovered address under LAN scope,
-plus a hint that the token is the only credential on the wire.
+plus a hint that the gateway key is the only credential on the wire.
+Switching *to* LAN asks first: `0.0.0.0` plus plain HTTP means the key
+can be sniffed on the network, so a confirmation dialog spells that out
+before the scope is applied — the same courtesy destructive actions get.
 
 **A scope or port change rebinds.** `AiRuntime` now remembers the
 `AiGatewayConfig` the running server was bound with; a save whose
@@ -86,9 +92,10 @@ dialog.
   mode; per-interface binding was rejected as complexity without a
   consumer.
 - `providers.json`'s `gateway` section gains a `scope` string; files
-  written before this change read back as `loopback` and whatever `enabled`
-  they stored — except an absent section, which now reads enabled. No
-  migration was needed because the feature had not shipped to users.
+  written before this change read back as `loopback`, keep their stored
+  `enabled`, and — when they have no `gateway` section at all — read as
+  disabled rather than silently opening a listener on upgrade. Only a
+  fresh install (no file) gets the on-by-default.
 - Cancelling the add-provider dialog leaves `providers.json` untouched;
   the `_uniqueProviderId` slug is only claimed on save, so two cancelled
   drafts cannot collide.
