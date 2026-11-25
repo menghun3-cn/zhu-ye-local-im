@@ -1,8 +1,8 @@
-﻿# Bilingual-pair consistency record: the git blob hash of each side as of the
+# Bilingual-pair consistency record: the git blob hash of each side as of the
 # last confirmed-consistent state. Both languages carry equal authority; after
 # editing either side, bring the other along and re-record with the project's
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-24-ai-routing-visual.md
 #   git hash-object -- 2026-11-24-ai-routing-visual.zh.md
-2026-11-24-ai-routing-visual.md: d2445da1ca214c5695967afd29b8bf66acb87bf7
-2026-11-24-ai-routing-visual.zh.md: f61888aca2a8d800f0c18955d6fc5d896ab681dd
+2026-11-24-ai-routing-visual.md: 2667c30e70ad743105e21ce495ab176e82ac8854
+2026-11-24-ai-routing-visual.zh.md: 33d9255ec041bf1cbc0da55667efa77d1132af6d

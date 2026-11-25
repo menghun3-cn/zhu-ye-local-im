@@ -74,10 +74,14 @@ as the gateway and brand mark; only the flyer changed). The cart is a
 `lib/ui/route_cart.dart` — running **empty outbound and stacked with
 sacks on the return**, flipping to face the direction of travel, with
 a trotting bob and wheel spokes that turn with the trip's progress.
-The wire a cart is riding turns dashed while the flight exists, and
-the dash pattern itself slides toward the provider — a repeating
-controller that only runs while a cart is airborne, so an idle canvas
-burns no frames. Each cart's shade
+The wire a cart is riding turns dashed **on that leg only** — leg
+occupancy is read from each flight's live 0→1 progress each frame
+(t ≤ 0.5 rides agent→gateway, t > 0.5 rides gateway→provider, in both
+directions), so a parked or homeward cart never leaves the other leg
+animating as if traffic still flowed there. The dash pattern slides
+toward the direction the cart is actually travelling — reversed on the
+return leg — driven by a repeating controller that only runs while a
+cart is airborne, so an idle canvas burns no frames. Each cart's shade
 is a pure function of its `callId` (four lightness × two saturation
 steps around the brand green), so concurrent requests are tellable
 apart while a failover's members — same call, different providers —

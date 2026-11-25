@@ -599,38 +599,78 @@ class _RoutingCanvas extends StatelessWidget {
         bool wireActive(String providerId) =>
             flights.any((f) => f.providerId == providerId);
 
-        final wireSegments = <_WireSegment>[
-          _WireSegment(
-            from: agentOut,
-            to: gatewayIn,
-            dashed: flights.isNotEmpty,
-          ),
-          for (final provider in providers)
-            if (provider.enabled)
-              _WireSegment(
-                from: gatewayOut,
-                to: anchorFor(provider.id),
-                dashed: wireActive(provider.id),
-              ),
-        ];
         final wireColor = WeChatColors.of(context).brandLine;
-        CustomPaint wires(double phase) => CustomPaint(
-          painter: _WirePainter(
-            segments: wireSegments,
-            color: wireColor,
-            dashPhase: phase,
-          ),
-        );
         final dashAnimation = dash;
+        // The wire layer rebuilds on every animation tick: the dash
+        // phase for the flow, and each cart's live 0→1 progress for
+        // which leg it is actually on — a dashed wire must mean "a cart
+        // is on this segment right now", not merely "some request
+        // targets this provider".
+        final wireTicks = <Listenable>[
+          ?dashAnimation,
+          for (final flight in flights) flight.controller,
+        ];
+
+        CustomPaint wires(double phase) {
+          // Leg occupancy from live controller values: t ≤ 0.5 rides
+          // agent→gateway, t > 0.5 rides gateway→provider, on both the
+          // outbound and the return trip. A segment flows forward only
+          // while every cart on it travels forward.
+          var agentGwFwd = false;
+          var agentGwBack = false;
+          final providerFwd = <String>{};
+          final providerBack = <String>{};
+          for (final flight in flights) {
+            final returning =
+                flight.controller.status == AnimationStatus.reverse;
+            if (flight.controller.value <= 0.5) {
+              if (returning) {
+                agentGwBack = true;
+              } else {
+                agentGwFwd = true;
+              }
+            } else if (returning) {
+              providerBack.add(flight.providerId);
+            } else {
+              providerFwd.add(flight.providerId);
+            }
+          }
+          return CustomPaint(
+            painter: _WirePainter(
+              segments: [
+                _WireSegment(
+                  from: agentOut,
+                  to: gatewayIn,
+                  dashed: agentGwFwd || agentGwBack,
+                  reverse: agentGwBack && !agentGwFwd,
+                ),
+                for (final provider in providers)
+                  if (provider.enabled)
+                    _WireSegment(
+                      from: gatewayOut,
+                      to: anchorFor(provider.id),
+                      dashed:
+                          providerFwd.contains(provider.id) ||
+                          providerBack.contains(provider.id),
+                      reverse:
+                          providerBack.contains(provider.id) &&
+                          !providerFwd.contains(provider.id),
+                    ),
+              ],
+              color: wireColor,
+              dashPhase: phase,
+            ),
+          );
+        }
 
         final stack = Stack(
           children: [
             Positioned.fill(
-              child: dashAnimation == null
+              child: wireTicks.isEmpty
                   ? wires(0)
                   : AnimatedBuilder(
-                      animation: dashAnimation,
-                      builder: (context, _) => wires(dashAnimation.value),
+                      animation: Listenable.merge(wireTicks),
+                      builder: (context, _) => wires(dashAnimation?.value ?? 0),
                     ),
             ),
             // Leaves under the cards: a leaf crossing the gateway node
@@ -723,17 +763,21 @@ List<Offset> _wirePoints(Offset from, Offset to) {
 }
 
 /// One wire: [from] → [to], drawn dashed while [dashed] — the in-flight
-/// marker, so the route a request is taking reads at a glance.
+/// marker, so the route a request is taking reads at a glance. [reverse]
+/// flips the dash flow: a cart on the way home travels the segment
+/// backwards, and the dashes should march the way it does.
 final class _WireSegment {
   const _WireSegment({
     required this.from,
     required this.to,
     required this.dashed,
+    this.reverse = false,
   });
 
   final Offset from;
   final Offset to;
   final bool dashed;
+  final bool reverse;
 }
 
 class _WirePainter extends CustomPainter {
@@ -770,7 +814,7 @@ class _WirePainter extends CustomPainter {
           points[3].dy,
         );
       if (segment.dashed) {
-        _drawDashed(canvas, path, paint);
+        _drawDashed(canvas, path, paint, reversed: segment.reverse);
       } else {
         canvas.drawPath(path, paint);
       }
@@ -780,9 +824,15 @@ class _WirePainter extends CustomPainter {
   /// 5px dash, 4px gap, extracted along the path's own metrics so the dashes
   /// follow the curve instead of a straight bounding box. [dashPhase] shifts
   /// the whole pattern along the path — increasing it moves the dashes
-  /// toward `to`, which is the direction the request travels.
-  void _drawDashed(Canvas canvas, Path path, Paint paint) {
-    final shift = (dashPhase * 9) % 9;
+  /// toward `to`; [reversed] runs the flow the other way, for carts on the
+  /// way home.
+  void _drawDashed(
+    Canvas canvas,
+    Path path,
+    Paint paint, {
+    bool reversed = false,
+  }) {
+    final shift = reversed ? ((-dashPhase * 9) % 9) : ((dashPhase * 9) % 9);
     for (final metric in path.computeMetrics()) {
       var distance = shift - 9;
       while (distance < metric.length) {
@@ -807,7 +857,10 @@ class _WirePainter extends CustomPainter {
     for (var i = 0; i < a.length; i++) {
       final x = a[i];
       final y = b[i];
-      if (x.from != y.from || x.to != y.to || x.dashed != y.dashed) {
+      if (x.from != y.from ||
+          x.to != y.to ||
+          x.dashed != y.dashed ||
+          x.reverse != y.reverse) {
         return false;
       }
     }

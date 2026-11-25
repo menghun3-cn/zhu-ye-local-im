@@ -251,4 +251,90 @@ void main() {
     expect(carts('loaded'), 1);
     expect(carts('empty'), 0);
   });
+
+  testWidgets('a dashed wire means a cart is on that leg right now', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // The wire painter's segments are private to the page; read the flags
+    // back through dynamic. Segment 0 is agent→gateway, segment 1 is
+    // gateway→the one provider node on screen.
+    ({bool agentDashed, bool agentRev, bool providerDashed, bool providerRev})
+    wireState() {
+      final painter = tester
+          .widgetList<CustomPaint>(
+            find.byWidgetPredicate(
+              (w) =>
+                  w is CustomPaint &&
+                  w.painter.toString().contains('_WirePainter'),
+            ),
+          )
+          .single
+          .painter;
+      final segments = (painter as dynamic).segments as List;
+      return (
+        agentDashed: segments[0].dashed as bool,
+        agentRev: segments[0].reverse as bool,
+        providerDashed: segments[1].dashed as bool,
+        providerRev: segments[1].reverse as bool,
+      );
+    }
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    // Let the cart finish its outbound leg: parked at the provider, only
+    // the gateway→provider wire may be dashed — the agent→gateway wire
+    // must be solid because no cart is on it.
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 1100));
+    var state = wireState();
+    expect(state.agentDashed, isFalse);
+    expect(state.providerDashed, isTrue);
+    expect(state.providerRev, isFalse);
+
+    // On the way home the provider-leg dash must flow backwards.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    state = wireState();
+    expect(state.providerDashed, isTrue);
+    expect(state.providerRev, isTrue);
+    expect(state.agentDashed, isFalse);
+
+    // Late in the return the cart crosses onto the agent→gateway leg,
+    // and that wire takes over — still flowing backwards.
+    await tester.pump(const Duration(milliseconds: 400));
+    state = wireState();
+    expect(state.agentDashed, isTrue);
+    expect(state.agentRev, isTrue);
+    expect(state.providerDashed, isFalse);
+  });
 }
