@@ -337,4 +337,73 @@ void main() {
     expect(state.agentRev, isTrue);
     expect(state.providerDashed, isFalse);
   });
+
+  testWidgets('a serial request queues behind the homeward cart', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    int carts(String state) =>
+        find.byKey(ValueKey('cart-$state')).evaluate().length;
+
+    // Request 1 flies out and parks at the provider.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 1100));
+
+    // It is served and its cart turns for home; mid-return it is the
+    // loaded cart on the provider leg.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(carts('loaded'), 1);
+
+    // The next serial request arrives while the first cart is still
+    // flying home. It must queue: a serial caller should see one round
+    // trip at a time, not a homeward cart overlapping a fresh departure
+    // in the opposite direction.
+    runtime.router.emitRouteEventForTest(
+      2,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(carts('loaded'), 1);
+    expect(carts('empty'), 0);
+
+    // Once the homeward cart docks, the queued request departs.
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(carts('empty'), 1);
+  });
 }

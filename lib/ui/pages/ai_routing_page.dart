@@ -64,6 +64,14 @@ class _AiRoutingViewState extends State<AiRoutingView>
   Object? _failure;
   StreamSubscription<AiRouteEvent>? _events;
   final List<_LeafFlight> _flights = [];
+
+  /// Attempts that arrived while a cart was still flying home. A serial
+  /// caller fires its next request the moment the reply lands — during
+  /// the homeward leg — and launching then would put two carts on screen
+  /// travelling opposite ways for what reads as one sequential exchange.
+  /// They wait for the last homeward cart to dock; outbound carts may
+  /// still overlap freely, so genuine concurrency is unaffected.
+  final List<AiRouteEvent> _pendingDepartures = [];
   AiRouteEvent? _last;
 
   /// Finished requests, newest first — the log under the canvas.
@@ -310,6 +318,15 @@ class _AiRoutingViewState extends State<AiRoutingView>
     )) {
       return;
     }
+    // Queue behind any homeward cart — see _pendingDepartures.
+    if (_flights.any((f) => f.controller.status == AnimationStatus.reverse)) {
+      _pendingDepartures.add(event);
+      return;
+    }
+    _launch(event, providerId);
+  }
+
+  void _launch(AiRouteEvent event, String providerId) {
     final controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -326,11 +343,27 @@ class _AiRoutingViewState extends State<AiRoutingView>
         setState(() => _flights.remove(flight));
         if (_flights.isEmpty) _dashController.stop();
         controller.dispose();
+        _flushDepartures();
       }
     });
     _flights.add(flight);
     _dashController.repeat();
     unawaited(controller.forward());
+  }
+
+  /// Runs queued departures once no cart is flying home. Each queued event
+  /// goes back through [_depart] so provider/slot/dedup checks re-run —
+  /// the config may have changed while the cart was airborne.
+  void _flushDepartures() {
+    if (_pendingDepartures.isEmpty ||
+        _flights.any((f) => f.controller.status == AnimationStatus.reverse)) {
+      return;
+    }
+    final pending = List<AiRouteEvent>.of(_pendingDepartures);
+    _pendingDepartures.clear();
+    for (final event in pending) {
+      _depart(event);
+    }
   }
 
   /// Flies every leaf of [event]'s call home. Failover produces one leaf per

@@ -69,7 +69,13 @@ agent→gateway and gateway→provider — each hop deliberately short so the
 three columns read as one pipeline, not three islands. One horse-drawn
 cart per in-flight request flies agent→gateway→provider on `attempt`
 and back on `served`/`failed` at a readable 1s per hop (the leaf stays
-as the gateway and brand mark; only the flyer changed). The cart is a
+as the gateway and brand mark; only the flyer changed). Departures
+queue behind any homeward cart: a serial caller fires its next request
+the moment the reply lands — mid-return — and launching then would put
+two carts on screen travelling opposite ways for what reads as one
+sequential exchange; queued attempts re-validate and launch once the
+last cart docks. Outbound carts still overlap freely, so genuine
+concurrency keeps its per-`callId` shades. The cart is a
 `CustomPaint` silhouette — `RouteCart`/`RouteCartPainter` in
 `lib/ui/route_cart.dart` — running **empty outbound and stacked with
 sacks on the return**, flipping to face the direction of travel, with
