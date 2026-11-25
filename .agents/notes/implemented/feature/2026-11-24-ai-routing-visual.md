@@ -131,7 +131,8 @@ view splits its height with a request list — rendered inside its own
 rounded, `borderStrong`-outlined panel so the records read as a bounded
 region under the canvas rather than a bare strip on the page
 background: the last 7 days of
-*finished* requests, two lines each — `MM-dd HH:mm:ss` in its own
+*finished* requests, two lines each on its own `surfaceSunken` card
+with a hairline `divider` border — `MM-dd HH:mm:ss` in its own
 column beside the model that served, then a compact metrics line
 (`2.3s · first token 2.1s · 37.4k tokens · 99% cached`) whose tooltip
 expands the exact uncached-input/output/cache-read/cache-write counts.

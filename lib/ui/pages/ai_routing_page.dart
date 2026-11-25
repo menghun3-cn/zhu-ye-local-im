@@ -1264,7 +1264,7 @@ class _RequestLogSection extends StatelessWidget {
                     vertical: 4,
                   ),
                   itemCount: records.length,
-                  separatorBuilder: (_, index) => const SizedBox(height: 6),
+                  separatorBuilder: (_, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) =>
                       _RequestTile(record: records[index]),
                 ),
@@ -1349,38 +1349,48 @@ class _RequestTile extends StatelessWidget {
           '${_grouped(record.cacheWriteTokens ?? 0)}',
     ].join('\n');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 96,
-              child: Text(_dateTime(record.at), style: caption),
-            ),
-            Expanded(
+    // Each record is its own card inside the log panel: sunken fill and a
+    // hairline border keep rows readable as separate entries at a glance.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.surfaceSunken,
+        border: Border.all(color: colors.divider),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 96,
+                child: Text(_dateTime(record.at), style: caption),
+              ),
+              Expanded(
+                child: Text(
+                  record.servedBy ?? record.model,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: body,
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 96),
+            child: Tooltip(
+              message: tooltip,
               child: Text(
-                record.servedBy ?? record.model,
+                metrics,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: body,
+                style: caption,
               ),
             ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 96),
-          child: Tooltip(
-            message: tooltip,
-            child: Text(
-              metrics,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: caption,
-            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
