@@ -433,6 +433,9 @@
   "aiSectionProviders": "供应商",
   "aiAddProvider": "添加供应商",
   "aiProviderCustom": "自定义端点",
+  "aiProviderGroupCloud": "云端服务",
+  "aiProviderGroupLocal": "本地运行",
+  "aiProviderGroupCustom": "自定义",
   "aiProviderName": "名称",
   "aiProviderApiKey": "API 密钥",
   "aiProviderApiKeyHint": "加密保存在本设备；本地模型可留空",
@@ -471,6 +474,7 @@
   "aiGroupName": "名称",
   "aiGroupMembers": "成员，按顺序尝试",
   "aiGroupEmpty": "还没有成员——至少添加一个模型或路由组。",
+  "aiGroupsEmpty": "还没有路由组。",
   "aiGroupMemberCount": "{count, plural, other{{count} 个成员}}",
   "@aiGroupMemberCount": {
     "placeholders": { "count": { "type": "int" } }
@@ -499,6 +503,8 @@
   "aiGatewayKeyDuplicate": "该密钥已存在",
   "aiGatewayKeyReveal": "显示密钥",
   "aiGatewayKeyHide": "隐藏密钥",
+  "aiDeleteKeyTitle": "删除网关密钥？",
+  "aiDeleteKeyBody": "使用该密钥的客户端会立即失去访问权限。最后一个密钥无法删除。",
   "aiGatewayNotListening": "已配置，但当前未在监听",
   "aiGatewayNotListeningHint": "网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。",
   "aiGatewayHint": "把 OpenAI 兼容客户端的地址指向此端点，并把网关密钥作为 API 密钥。",

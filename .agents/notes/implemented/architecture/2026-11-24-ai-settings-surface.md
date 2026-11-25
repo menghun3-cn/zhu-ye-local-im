@@ -82,6 +82,15 @@ Concretely the surface covers:
 - **Delete** removes the provider *and* every group member prefixed
   `provider/` — a dangling reference would fail every request it was ordered
   into.
+- **Brand marks everywhere.** `AiProvider.iconAsset` persists the preset's
+  bundled SVG so the provider row, the editor header, and the routing node
+  all render the same mark; it is copied from the preset at creation and
+  carried through `copyWith`, so endpoint edits never lose it. Custom
+  providers keep the generic glyph. The preset picker is grouped by kind
+  (cloud / local / custom) with non-interactive section headers, and the
+  editor title says "add" for an unsaved draft rather than always
+  "provider". Fetch/test probing has its own busy flag so a slow network
+  never traps Cancel — only an in-flight save does.
 
 ## Consequences
 

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/core.dart';
+import '../ai_provider_mark.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
@@ -27,7 +28,12 @@ import '../widgets.dart';
 /// the nodes a request is using.
 class AiRoutingView extends StatefulWidget {
   /// Builds the surface over [runtime]'s router and configuration.
-  const AiRoutingView({super.key, required this.runtime, this.configLoader});
+  const AiRoutingView({
+    super.key,
+    required this.runtime,
+    this.configLoader,
+    this.onProviderTap,
+  });
 
   final AiRuntime runtime;
 
@@ -35,6 +41,10 @@ class AiRoutingView extends StatefulWidget {
   /// Injectable so a widget test can answer from memory instead of real
   /// file IO, which the fake-async test clock cannot advance.
   final Future<AiConfig> Function()? configLoader;
+
+  /// Called with a provider id when its canvas node is tapped — the host
+  /// page uses it to jump to that provider's editor.
+  final void Function(String providerId)? onProviderTap;
 
   @override
   State<AiRoutingView> createState() => _AiRoutingViewState();
@@ -380,24 +390,39 @@ class _AiRoutingViewState extends State<AiRoutingView>
       for (final id in _slotOrder)
         if (visibleIds.contains(id)) config.providerNamed(id),
     ].whereType<AiProvider>().toList();
-    return Column(
-      children: [
-        Expanded(
-          flex: 3,
-          child: _RoutingCanvas(
-            slotOrder: _slotOrder,
-            providers: orderedProviders,
-            flights: _flights,
-            sourceLabel: l10n.aiRoutingSource,
-            gatewayLabel: l10n.aiRoutingGateway,
-            gatewayAddress: _gatewayAddress(l10n),
-            gatewayOnline: widget.runtime.gateway != null,
-            health: _healthByProvider(config),
-          ),
-        ),
-        _StatusBar(event: _last),
-        Expanded(flex: 2, child: _RequestLogSection(records: _records)),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The log keeps a usable floor: on a short window the canvas gives
+        // way first (it is the flex child), but the request list never
+        // shrinks to a sliver — below ~120px its two-line rows are unreadable.
+        final logHeight = math.min(
+          math.max(constraints.maxHeight * 0.4, 120.0),
+          math.max(120.0, constraints.maxHeight * 0.6),
+        );
+        return Column(
+          children: [
+            Expanded(
+              flex: 3,
+              child: _RoutingCanvas(
+                slotOrder: _slotOrder,
+                providers: orderedProviders,
+                flights: _flights,
+                sourceLabel: l10n.aiRoutingSource,
+                gatewayLabel: l10n.aiRoutingGateway,
+                gatewayAddress: _gatewayAddress(l10n),
+                gatewayOnline: widget.runtime.gateway != null,
+                health: _healthByProvider(config),
+                onProviderTap: widget.onProviderTap,
+              ),
+            ),
+            _StatusBar(event: _last),
+            SizedBox(
+              height: logHeight,
+              child: _RequestLogSection(records: _records),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -447,6 +472,7 @@ class _RoutingCanvas extends StatelessWidget {
     required this.gatewayAddress,
     required this.gatewayOnline,
     required this.health,
+    this.onProviderTap,
   });
 
   /// provider ids in fixed slot order — a node's vertical position is its
@@ -462,18 +488,31 @@ class _RoutingCanvas extends StatelessWidget {
   final bool gatewayOnline;
   final Map<String, _NodeHealth> health;
 
+  /// Tap on a provider node — forwarded from [AiRoutingView.onProviderTap].
+  final void Function(String providerId)? onProviderTap;
+
   static const double _agentWidth = 104;
   static const double _gatewayWidth = 150;
   static const double _nodeWidth = 168;
   static const double _nodeHeight = 48;
-  static const double _cardHeight = 76;
+  static const double _cardHeight = 80;
   static const double _margin = 16;
+
+  /// The narrowest canvas that still fits all three columns with the
+  /// fallback (tight) segment spacing — below it the view scrolls
+  /// horizontally instead of squeezing nodes into each other.
+  static const double _minContentWidth =
+      2 * _margin + _agentWidth + 2 * 8 + _gatewayWidth + _nodeWidth;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
+        // Three columns need a floor: below it the fallback spacing would
+        // squeeze the provider column into the gateway node. Rather than
+        // overlap, the canvas keeps its minimum width and scrolls.
+        final width = math.max(size.width, _minContentWidth);
         final slots = slotOrder.length;
         // Slots divide the height *between* the margins, so the first and
         // last nodes keep their breathing room at any count.
@@ -487,11 +526,11 @@ class _RoutingCanvas extends StatelessWidget {
         // the right edge.
         final midY = size.height / 2;
         final span =
-            size.width - 2 * _margin - _agentWidth - _gatewayWidth - _nodeWidth;
+            width - 2 * _margin - _agentWidth - _gatewayWidth - _nodeWidth;
         var segment = math.max(24.0, span / 4);
         var groupWidth = _agentWidth + 2 * segment + _gatewayWidth + _nodeWidth;
-        var startX = (size.width - groupWidth) / 2;
-        if (startX < _margin || groupWidth > size.width - 2 * _margin) {
+        var startX = (width - groupWidth) / 2;
+        if (startX < _margin || groupWidth > width - 2 * _margin) {
           // Too narrow for the airy layout — fall back to edge-to-edge.
           segment = math.max(8.0, (span - _gatewayWidth) / 2);
           groupWidth = _agentWidth + 2 * segment + _gatewayWidth + _nodeWidth;
@@ -500,7 +539,7 @@ class _RoutingCanvas extends StatelessWidget {
         // Never let a squeezed layout push the provider column off-canvas.
         final providerLeft = math.min(
           startX + groupWidth - _nodeWidth,
-          size.width - _margin - _nodeWidth,
+          width - _margin - _nodeWidth,
         );
         Offset anchorFor(String providerId) {
           final index = slotOrder.indexOf(providerId);
@@ -517,7 +556,7 @@ class _RoutingCanvas extends StatelessWidget {
         bool wireActive(String providerId) =>
             flights.any((f) => f.providerId == providerId);
 
-        return Stack(
+        final stack = Stack(
           children: [
             Positioned.fill(
               child: CustomPaint(
@@ -565,6 +604,9 @@ class _RoutingCanvas extends StatelessWidget {
                   provider: provider,
                   enabled: provider.enabled,
                   health: health[provider.id],
+                  onTap: onProviderTap == null
+                      ? null
+                      : () => onProviderTap!(provider.id),
                 ),
               ),
             Positioned(
@@ -587,6 +629,15 @@ class _RoutingCanvas extends StatelessWidget {
             ),
           ],
         );
+        // Below the minimum content width the canvas scrolls sideways —
+        // overlapping nodes would be a worse answer than a scrollbar.
+        if (width > size.width) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(width: width, height: size.height, child: stack),
+          );
+        }
+        return stack;
       },
     );
   }
@@ -756,7 +807,7 @@ class _GatewayNode extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.eco, size: 22, color: const Color(0xFF2E9E5B)),
+            Icon(Icons.eco, size: 22, color: colors.brandStrong),
             const SizedBox(height: 2),
             Text(
               label,
@@ -772,7 +823,10 @@ class _GatewayNode extends StatelessWidget {
               address,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: colors.secondaryText),
+              style: TextStyle(
+                fontSize: WeChat.fontSizeMeta,
+                color: colors.secondaryText,
+              ),
             ),
           ],
         ),
@@ -786,11 +840,16 @@ class _ProviderNode extends StatelessWidget {
     required this.provider,
     required this.enabled,
     this.health,
+    this.onTap,
   });
 
   final AiProvider provider;
   final bool enabled;
   final _NodeHealth? health;
+
+  /// Opens the provider's editor on the host page; null makes the node
+  /// inert (used by callers that embed the canvas without a page).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -806,12 +865,12 @@ class _ProviderNode extends StatelessWidget {
         ? l10n.aiRoutingFailed
         : null;
     final statusColor = nodeHealth != null && nodeHealth.cooling
-        ? const Color(0xFFB26A00)
+        ? colors.warning
         : colors.danger;
-    return Opacity(
+    final card = Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(WeChat.controlRadius),
@@ -821,28 +880,46 @@ class _ProviderNode extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              provider.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: WeChat.fontSizePreview,
-                fontWeight: FontWeight.w600,
-                color: colors.brandStrong,
-              ),
+            Row(
+              children: [
+                AiProviderMark(
+                  provider: provider,
+                  color: colors.brandStrong,
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    provider.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizePreview,
+                      fontWeight: FontWeight.w600,
+                      color: colors.brandStrong,
+                    ),
+                  ),
+                ),
+              ],
             ),
             Text(
               status ?? l10n.aiProviderModelCount(enabledModels),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: WeChat.fontSizeMeta,
                 color: status == null ? colors.secondaryText : statusColor,
               ),
             ),
           ],
         ),
       ),
+    );
+    final onTap = this.onTap;
+    if (onTap == null) return card;
+    return Tooltip(
+      message: provider.name,
+      child: GestureDetector(onTap: onTap, child: card),
     );
   }
 }
@@ -867,6 +944,7 @@ class _Leaf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (target == Offset.zero) return const SizedBox.shrink();
+    final colors = WeChatColors.of(context);
     return AnimatedBuilder(
       animation: flight.controller,
       builder: (context, _) {
@@ -882,7 +960,7 @@ class _Leaf extends StatelessWidget {
           top: point.dy - 11,
           child: Transform.rotate(
             angle: sway,
-            child: const Icon(Icons.eco, size: 22, color: Color(0xFF2E9E5B)),
+            child: Icon(Icons.eco, size: 22, color: colors.brandStrong),
           ),
         );
       },
@@ -925,7 +1003,10 @@ class _RequestLogSection extends StatelessWidget {
               const Spacer(),
               Text(
                 l10n.aiRequestsWindow,
-                style: TextStyle(fontSize: 11, color: colors.secondaryText),
+                style: TextStyle(
+                  fontSize: WeChat.fontSizeMeta,
+                  color: colors.secondaryText,
+                ),
               ),
             ],
           ),
@@ -981,7 +1062,10 @@ class _RequestTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
-    final caption = TextStyle(fontSize: 11, color: colors.secondaryText);
+    final caption = TextStyle(
+      fontSize: WeChat.fontSizeMeta,
+      color: colors.secondaryText,
+    );
     final body = TextStyle(fontSize: WeChat.fontSizePreview);
 
     String seconds(int ms) => l10n.aiLogSeconds((ms / 1000).toStringAsFixed(1));
@@ -1074,7 +1158,7 @@ class _StatusBar extends StatelessWidget {
       AiRoutePhase.attempt => ('→', colors.secondaryText),
       AiRoutePhase.served => ('✓', colors.brandStrong),
       AiRoutePhase.failed =>
-        (event.cooling ? ('⏳', const Color(0xFFB26A00)) : ('✗', colors.danger)),
+        (event.cooling ? ('⏳', colors.warning) : ('✗', colors.danger)),
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

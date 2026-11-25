@@ -47,7 +47,12 @@ shows the convention, e.g. 笔记本） and an optional secret field —
 empty means generate `sk-…` — with create/cancel. The last key cannot
 be deleted: a gateway with zero credentials refuses every caller, which
 is a locked door with no key under the mat. Duplicate names or secrets
-are rejected with a toast.
+are rejected with a toast. Deleting a key asks for confirmation first —
+revoking a credential is the same weight as deleting a provider — and
+the create button stays disabled until the name field has content, so
+an empty name can no longer be a silent no-op. The masked secret shows
+one dot per character instead of a fixed count, so a custom secret's
+length reads honestly.
 
 ## Consequences
 

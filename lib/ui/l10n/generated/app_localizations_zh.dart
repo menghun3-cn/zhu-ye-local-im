@@ -1391,6 +1391,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiProviderCustom => '自定义端点';
 
   @override
+  String get aiProviderGroupCloud => '云端服务';
+
+  @override
+  String get aiProviderGroupLocal => '本地运行';
+
+  @override
+  String get aiProviderGroupCustom => '自定义';
+
+  @override
   String get aiProviderName => '名称';
 
   @override
@@ -1486,6 +1495,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGroupEmpty => '还没有成员——至少添加一个模型或路由组。';
 
   @override
+  String get aiGroupsEmpty => '还没有路由组。';
+
+  @override
   String aiGroupMemberCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1547,6 +1559,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiGatewayKeyHide => '隐藏密钥';
+
+  @override
+  String get aiDeleteKeyTitle => '删除网关密钥？';
+
+  @override
+  String get aiDeleteKeyBody => '使用该密钥的客户端会立即失去访问权限。最后一个密钥无法删除。';
 
   @override
   String get aiGatewayNotListening => '已配置，但当前未在监听';

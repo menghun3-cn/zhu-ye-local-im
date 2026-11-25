@@ -80,4 +80,46 @@ void main() {
     expect(find.text('OpenCode Zen'), findsOneWidget);
     expect(find.text('Kilo'), findsNothing);
   });
+
+  testWidgets('tapping a provider node reports its id', (tester) async {
+    final config = await tester.runAsync(() => runtime.load());
+    String? tapped;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+              onProviderTap: (id) => tapped = id,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.text('OpenCode Zen'));
+    await tester.pump();
+    expect(tapped, 'opencode-zen');
+  });
 }

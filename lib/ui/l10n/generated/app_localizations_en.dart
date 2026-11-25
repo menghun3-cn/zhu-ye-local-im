@@ -1463,6 +1463,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiProviderCustom => 'Custom endpoint';
 
   @override
+  String get aiProviderGroupCloud => 'Cloud providers';
+
+  @override
+  String get aiProviderGroupLocal => 'Local runtimes';
+
+  @override
+  String get aiProviderGroupCustom => 'Custom';
+
+  @override
   String get aiProviderName => 'Name';
 
   @override
@@ -1561,6 +1570,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'No members yet — add at least one model or group.';
 
   @override
+  String get aiGroupsEmpty => 'No routing groups yet.';
+
+  @override
   String aiGroupMemberCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1625,6 +1637,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiGatewayKeyHide => 'Hide key';
+
+  @override
+  String get aiDeleteKeyTitle => 'Delete gateway key?';
+
+  @override
+  String get aiDeleteKeyBody =>
+      'Clients using this key lose access immediately. The last remaining key cannot be deleted.';
 
   @override
   String get aiGatewayNotListening => 'Configured, but not listening right now';

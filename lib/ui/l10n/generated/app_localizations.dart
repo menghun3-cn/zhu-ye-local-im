@@ -2551,6 +2551,24 @@ abstract class AppLocalizations {
   /// **'Custom endpoint'**
   String get aiProviderCustom;
 
+  /// No description provided for @aiProviderGroupCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud providers'**
+  String get aiProviderGroupCloud;
+
+  /// No description provided for @aiProviderGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local runtimes'**
+  String get aiProviderGroupLocal;
+
+  /// No description provided for @aiProviderGroupCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get aiProviderGroupCustom;
+
   /// No description provided for @aiProviderName.
   ///
   /// In en, this message translates to:
@@ -2719,6 +2737,12 @@ abstract class AppLocalizations {
   /// **'No members yet — add at least one model or group.'**
   String get aiGroupEmpty;
 
+  /// No description provided for @aiGroupsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No routing groups yet.'**
+  String get aiGroupsEmpty;
+
   /// No description provided for @aiGroupMemberCount.
   ///
   /// In en, this message translates to:
@@ -2826,6 +2850,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide key'**
   String get aiGatewayKeyHide;
+
+  /// No description provided for @aiDeleteKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete gateway key?'**
+  String get aiDeleteKeyTitle;
+
+  /// No description provided for @aiDeleteKeyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Clients using this key lose access immediately. The last remaining key cannot be deleted.'**
+  String get aiDeleteKeyBody;
 
   /// No description provided for @aiGatewayNotListening.
   ///

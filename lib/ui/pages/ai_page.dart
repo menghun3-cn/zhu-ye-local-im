@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/core.dart';
+import '../ai_provider_mark.dart';
 import '../feedback.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../seams.dart';
@@ -48,14 +50,22 @@ class AiPage extends StatefulWidget {
   State<AiPage> createState() => _AiPageState();
 }
 
-class _AiPageState extends State<AiPage> {
+class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
   AiConfig? _config;
   Object? _failure;
+  late final TabController _tab;
 
   @override
   void initState() {
     super.initState();
+    _tab = TabController(length: 4, vsync: this);
     unawaited(_reload());
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -94,45 +104,59 @@ class _AiPageState extends State<AiPage> {
     // Routing first: "what is being asked right now" is the question the
     // other three tabs configure the answer to, and it is also the only tab
     // with something live to show — a fresh install lands on an idle canvas
-    // rather than an empty form.
-    return DefaultTabController(
-      length: 4,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TabBar(
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              tabs: [
-                Tab(text: l10n.aiRoutingTitle),
-                Tab(text: l10n.aiSectionProviders),
-                Tab(text: l10n.aiNavGateway),
-                Tab(text: l10n.aiSectionGroups),
-              ],
-            ),
+    // rather than an empty form. The controller is explicit (not a
+    // DefaultTabController) so the routing canvas can jump to the provider
+    // editor when one of its nodes is tapped.
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: TabBar(
+            controller: _tab,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              Tab(text: l10n.aiRoutingTitle),
+              Tab(text: l10n.aiSectionProviders),
+              Tab(text: l10n.aiNavGateway),
+              Tab(text: l10n.aiSectionGroups),
+            ],
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                // Full height, no card: the canvas wants every pixel it can
-                // get, and the status line sits on its bottom edge.
-                _routingPane(),
-                _providersPane(l10n, config),
-                _gatewayPane(l10n, config),
-                _groupsPane(l10n, config),
-              ],
-            ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              // Full height, no card: the canvas wants every pixel it can
+              // get, and the status line sits on its bottom edge.
+              _routingPane(),
+              _providersPane(l10n, config),
+              _gatewayPane(l10n, config),
+              _groupsPane(l10n, config),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   /// The routing pane is just the view — it owns its own status line and
   /// needs no scrolling chrome of its own.
-  Widget _routingPane() =>
-      AiRoutingView(runtime: widget.runtime, configLoader: widget.configLoader);
+  Widget _routingPane() => AiRoutingView(
+    runtime: widget.runtime,
+    configLoader: widget.configLoader,
+    onProviderTap: _openProviderFromCanvas,
+  );
+
+  /// A canvas node is a shortcut into the provider it draws: switch to the
+  /// Providers tab and open that provider's editor, so "why is this node
+  /// cooling" has a one-click path to the answer.
+  void _openProviderFromCanvas(String providerId) {
+    final provider = _config?.providerNamed(providerId);
+    if (provider == null) return;
+    _tab.animateTo(1);
+    unawaited(guarded(context, () => _editProvider(provider)));
+  }
 
   Widget _providersPane(AppLocalizations l10n, AiConfig config) {
     return ListView(
@@ -216,22 +240,25 @@ class _AiPageState extends State<AiPage> {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(WeChat.cardPadding),
-            child: Column(
-              children: [
-                for (final group in config.routingGroups)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.alt_route, size: 20),
-                    title: Text(group.name),
-                    subtitle: Text(
-                      l10n.aiGroupMemberCount(group.members.length),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () =>
-                        unawaited(guarded(context, () => _editGroup(group))),
+            child: config.routingGroups.isEmpty
+                ? HintText(l10n.aiGroupsEmpty)
+                : Column(
+                    children: [
+                      for (final group in config.routingGroups)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.alt_route, size: 20),
+                          title: Text(group.name),
+                          subtitle: Text(
+                            l10n.aiGroupMemberCount(group.members.length),
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => unawaited(
+                            guarded(context, () => _editGroup(group)),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
           ),
         ),
       ],
@@ -258,11 +285,19 @@ class _AiPageState extends State<AiPage> {
       builder: (context) => SimpleDialog(
         title: Text(l10n.aiAddProvider),
         children: [
-          for (final preset in aiProviderPresets)
+          // Section headers mark where the catalogue changes character —
+          // hosted vendors, then local runtimes, then a custom endpoint —
+          // so a fourteen-row list scans as three short ones.
+          for (var i = 0; i < aiProviderPresets.length; i++) ...[
+            if (i == 0 ||
+                aiProviderPresets[i].kind != aiProviderPresets[i - 1].kind)
+              _PickerHeader(_presetGroupLabel(l10n, aiProviderPresets[i].kind)),
             SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(preset),
-              child: _PresetOption(preset: preset),
+              onPressed: () => Navigator.of(context).pop(aiProviderPresets[i]),
+              child: _PresetOption(preset: aiProviderPresets[i]),
             ),
+          ],
+          _PickerHeader(l10n.aiProviderGroupCustom),
           SimpleDialogOption(
             onPressed: () => Navigator.of(context).pop('custom'),
             child: Row(
@@ -285,6 +320,7 @@ class _AiPageState extends State<AiPage> {
         name: choice.label,
         kind: choice.kind,
         endpoints: choice.endpoints,
+        iconAsset: choice.iconAsset,
       );
     } else {
       provider = AiProvider(
@@ -300,6 +336,13 @@ class _AiPageState extends State<AiPage> {
     if (!mounted) return;
     await _editProvider(provider);
   }
+
+  /// The section label above a run of same-kind presets in the picker.
+  String _presetGroupLabel(AppLocalizations l10n, AiProviderKind kind) =>
+      switch (kind) {
+        AiProviderKind.local => l10n.aiProviderGroupLocal,
+        _ => l10n.aiProviderGroupCloud,
+      };
 
   /// A slug no existing provider already owns — references point at ids, so
   /// a collision would merge two providers into one name.
@@ -617,10 +660,30 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
     await _reload();
   }
 
-  /// The last key cannot go — a gateway with no credential refuses every
-  /// caller, which is a locked door with no key under the mat.
+  /// Revoking a key cuts a client's access immediately — the same weight
+  /// as deleting a provider, so it asks first like the other destructive
+  /// actions on this page.
   Future<void> _remove(AiGatewayKey key) async {
     if (_keys.length <= 1) return;
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.aiDeleteKeyTitle),
+        content: Text(l10n.aiDeleteKeyBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.deleteMessage),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     await widget.runtime.keys.save([
       for (final k in _keys)
         if (k.name != key.name || k.secret != key.secret) k,
@@ -670,6 +733,7 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
               children: [
                 TextField(
                   controller: _name,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: l10n.aiGatewayKeyNameHint,
                     isDense: true,
@@ -693,7 +757,9 @@ class _GatewayKeysSectionState extends State<_GatewayKeysSection> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () => unawaited(_create()),
+                      onPressed: _name.text.trim().isEmpty
+                          ? null
+                          : () => unawaited(_create()),
                       child: Text(l10n.aiGatewayKeyCreate),
                     ),
                   ],
@@ -760,16 +826,24 @@ class _GatewayKeyTileState extends State<_GatewayKeyTile> {
                   ),
                 ),
                 Text(
-                  _revealed ? widget.secret : '•' * 16,
+                  // One dot per secret character: a fixed-width mask would
+                  // misreport how long the credential actually is.
+                  _revealed ? widget.secret : '•' * widget.secret.length,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: colors.secondaryText),
+                  style: TextStyle(
+                    fontSize: WeChat.fontSizeMeta,
+                    color: colors.secondaryText,
+                  ),
                 ),
                 Text(
                   widget.usage,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: colors.secondaryText),
+                  style: TextStyle(
+                    fontSize: WeChat.fontSizeMeta,
+                    color: colors.secondaryText,
+                  ),
                 ),
               ],
             ),
@@ -778,6 +852,7 @@ class _GatewayKeyTileState extends State<_GatewayKeyTile> {
             tooltip: _revealed
                 ? l10n.aiGatewayKeyHide
                 : l10n.aiGatewayKeyReveal,
+            visualDensity: VisualDensity.compact,
             onPressed: () => setState(() => _revealed = !_revealed),
             icon: Icon(
               _revealed
@@ -788,11 +863,13 @@ class _GatewayKeyTileState extends State<_GatewayKeyTile> {
           ),
           IconButton(
             tooltip: l10n.copySelection,
+            visualDensity: VisualDensity.compact,
             onPressed: () => widget.onCopy(widget.secret),
             icon: const Icon(Icons.copy_outlined, size: 18),
           ),
           IconButton(
             tooltip: l10n.deleteMessage,
+            visualDensity: VisualDensity.compact,
             onPressed: widget.canDelete ? widget.onDelete : null,
             icon: const Icon(Icons.delete_outline, size: 18),
           ),
@@ -892,7 +969,16 @@ class _ProviderTile extends StatelessWidget {
             color: colors.brandSoft,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(Icons.dns_outlined, size: 20, color: colors.brand),
+          // The brand mark persisted from the preset — the same logo the
+          // picker showed, so the row reads as the vendor it talks to.
+          // Custom providers keep the generic glyph.
+          child: Center(
+            child: AiProviderMark(
+              provider: provider,
+              color: colors.brand,
+              size: 20,
+            ),
+          ),
         ),
         title: Text(
           provider.name,
@@ -925,6 +1011,29 @@ class _ProviderTile extends StatelessWidget {
         AiProviderKind.custom => l10n.aiKindCustom,
         AiProviderKind.local => l10n.aiKindLocal,
       };
+}
+
+/// A non-interactive section label inside the add-provider dialog — the
+/// presets are grouped by kind, and the header is what says where one
+/// group ends and the next begins.
+class _PickerHeader extends StatelessWidget {
+  const _PickerHeader(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: WeChat.fontSizeMeta,
+          color: WeChatColors.of(context).secondaryText,
+        ),
+      ),
+    );
+  }
 }
 
 /// One row of the add-provider dialog: the vendor's bundled brand mark
@@ -1004,7 +1113,12 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
   late final Map<AiProtocol, TextEditingController> _endpoints;
   late final TabController _tab;
   late AiProvider _draft;
+
+  /// True while a save is in flight — the only state that should hold the
+  /// dialog open. Probing (fetch/test) is a read-only wait the user may
+  /// walk away from, so it gets its own flag and never traps Cancel.
   bool _busy = false;
+  bool _probing = false;
   int _shownIndex = 0;
 
   @override
@@ -1056,6 +1170,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     apiKey: _apiKey.text.trim(),
     models: _draft.models,
     enabled: _draft.enabled,
+    iconAsset: _draft.iconAsset,
   );
 
   Future<void> _persist() async {
@@ -1114,7 +1229,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
   /// the window jittering.
   Future<void> _fetchModels() async {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    setState(() => _busy = true);
+    setState(() => _probing = true);
     try {
       // Fetch against the *draft's* endpoints, not the persisted ones: the
       // user may have just corrected a URL and expects the fetch to use it.
@@ -1184,7 +1299,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         unawaited(TopToast.showIn(overlay, '$error'));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _probing = false);
     }
   }
 
@@ -1192,7 +1307,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
   /// is "does this URL + key + protocol answer", not the catalogue.
   Future<void> _testConnection() async {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    setState(() => _busy = true);
+    setState(() => _probing = true);
     try {
       final ids = await widget.runtime.router.fetchModels(
         _collect(),
@@ -1212,7 +1327,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         unawaited(TopToast.showIn(overlay, '$error'));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _probing = false);
     }
   }
 
@@ -1237,9 +1352,19 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     return AlertDialog(
-      title: Text(l10n.aiEditProvider),
+      // A draft (nothing persisted to delete) is being *added*, not edited —
+      // the title says which verb the dialog is about to perform.
+      title: Text(
+        widget.onDelete == null ? l10n.aiAddProvider : l10n.aiEditProvider,
+      ),
       content: SizedBox(
-        width: 640,
+        // A fixed 640 overflows on narrow windows (phones): cap it at the
+        // space the dialog insets actually leave, floored at the dialog
+        // minimum so fields never collapse below readable.
+        width: math.max(
+          280,
+          math.min(640, MediaQuery.sizeOf(context).width - 96),
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1306,7 +1431,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                     spacing: 8,
                     children: [
                       TextButton.icon(
-                        onPressed: _busy || !hasUrl
+                        onPressed: _busy || _probing || !hasUrl
                             ? null
                             : () => unawaited(_fetchModels()),
                         icon: const Icon(
@@ -1316,7 +1441,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                         label: Text(l10n.aiFetchModels),
                       ),
                       TextButton.icon(
-                        onPressed: _busy || !hasUrl
+                        onPressed: _busy || _probing || !hasUrl
                             ? null
                             : () => unawaited(_testConnection()),
                         icon: const Icon(Icons.wifi_tethering, size: 18),
@@ -1376,12 +1501,16 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         ),
       ),
       actions: [
+        // Cancel stays live while a fetch/test probe is in flight — those
+        // are read-only waits, and trapping the user behind a slow network
+        // is worse than letting them walk away. Only an in-flight *save*
+        // holds the dialog, because closing mid-write would lose the answer.
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(false),
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: _busy || _name.text.trim().isEmpty
+          onPressed: _busy || _probing || _name.text.trim().isEmpty
               ? null
               : () => unawaited(_persist()),
           child: Text(l10n.save),
@@ -1418,9 +1547,15 @@ class _ModelCapsule extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     final selected = model.enabled;
-    final ink = selected ? colors.brand : colors.bubbleText;
+    final ink = selected ? colors.brandStrong : colors.bubbleText;
+    final name = model.label ?? model.id;
     return Tooltip(
-      message: '${model.id} · $protocolLabel',
+      // The tooltip names what the capsule shows — label first — and adds
+      // the raw id only when the two differ, so it never contradicts the
+      // visible text.
+      message: name == model.id
+          ? '$name · $protocolLabel'
+          : '$name · ${model.id} · $protocolLabel',
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
@@ -1444,11 +1579,11 @@ class _ModelCapsule extends StatelessWidget {
               ],
               Flexible(
                 child: Text(
-                  model.label ?? model.id,
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: WeChat.fontSizeMeta,
                     color: ink,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                   ),
@@ -1458,7 +1593,7 @@ class _ModelCapsule extends StatelessWidget {
                 const SizedBox(width: 6),
                 _ModelTag(
                   text: l10n.aiModelFree,
-                  color: const Color(0xFF1E9E50),
+                  color: colors.brandStrong,
                   background: colors.brandSoft,
                 ),
               ],
@@ -1511,7 +1646,11 @@ class _ModelTag extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, color: color, height: 1.4),
+        style: TextStyle(
+          fontSize: WeChat.fontSizeMeta,
+          color: color,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -1645,9 +1784,12 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
     final colors = WeChatColors.of(context);
     final choices = _choices;
     return AlertDialog(
-      title: Text(l10n.aiEditGroup),
+      title: Text(widget.group == null ? l10n.aiAddGroup : l10n.aiEditGroup),
       content: SizedBox(
-        width: 480,
+        width: math.max(
+          280,
+          math.min(480, MediaQuery.sizeOf(context).width - 96),
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1672,7 +1814,11 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.subdirectory_arrow_right, size: 18),
-                  title: Text(_members[i]),
+                  title: Text(
+                    _members[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1697,15 +1843,30 @@ class _GroupEditorDialogState extends State<_GroupEditorDialog> {
                   ),
                 ),
               if (choices.isNotEmpty)
+                // The key forces a fresh field whenever the member list
+                // changes: a FormField keeps its last picked value, and a
+                // value that has dropped out of [choices] trips
+                // DropdownButton's "value must be in items" assertion.
+                // isExpanded bounds the selected item's width so a long
+                // `provider/model` ref ellipsizes instead of overflowing.
                 DropdownButtonFormField<String>(
+                  key: ValueKey(_members.join('|')),
                   initialValue: null,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: l10n.aiAddMember,
                     isDense: true,
                   ),
                   items: [
                     for (final ref in choices)
-                      DropdownMenuItem(value: ref, child: Text(ref)),
+                      DropdownMenuItem(
+                        value: ref,
+                        child: Text(
+                          ref,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                   onChanged: (ref) {
                     if (ref == null) return;

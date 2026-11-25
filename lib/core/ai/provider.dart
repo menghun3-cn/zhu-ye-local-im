@@ -96,6 +96,7 @@ final class AiProvider {
     this.apiKey = '',
     this.models = const <AiProviderModel>[],
     this.enabled = true,
+    this.iconAsset,
   });
 
   /// Stable slug used in `provider/model` references. Once persisted it must
@@ -121,6 +122,11 @@ final class AiProvider {
   final List<AiProviderModel> models;
 
   final bool enabled;
+
+  /// Bundled brand mark (`assets/ai_providers/*.svg`) shown beside the
+  /// provider's name — carried over from the preset it was created from,
+  /// so the mark survives endpoint edits. Null for custom providers.
+  final String? iconAsset;
 
   /// The base URL for [protocol], or null when this provider does not speak it.
   String? endpointFor(AiProtocol protocol) {
@@ -150,6 +156,7 @@ final class AiProvider {
     apiKey: apiKey ?? this.apiKey,
     models: models ?? this.models,
     enabled: enabled ?? this.enabled,
+    iconAsset: iconAsset,
   );
 
   Map<String, Object?> toJson() => {
@@ -162,6 +169,7 @@ final class AiProvider {
     'apiKey': apiKey,
     'models': [for (final model in models) model.toJson()],
     'enabled': enabled,
+    'iconAsset': iconAsset,
   };
 
   factory AiProvider.fromJson(Map<String, Object?> json) {
@@ -191,6 +199,7 @@ final class AiProvider {
               AiProviderModel.fromJson(entry.cast<String, Object?>()),
       ],
       enabled: json['enabled'] as bool? ?? true,
+      iconAsset: json['iconAsset'] as String?,
     );
   }
 }

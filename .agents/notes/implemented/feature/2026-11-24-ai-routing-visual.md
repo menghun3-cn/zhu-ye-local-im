@@ -132,6 +132,14 @@ with an empty name field — the preset label demotes to `hintText` — and
 Save stays disabled until the name is non-empty. Fetch/test are
 unaffected: they only read endpoints and key.
 
+**The canvas is a shortcut, not just a picture.** Tapping a provider node
+jumps to that provider's editor (the page owns an explicit
+`TabController` for this). Below a minimum content width the canvas
+scrolls horizontally rather than squeezing nodes together, and the
+request log keeps a ~40% floor (min 120px) so a short window never
+reduces it to a sliver. Cooldown uses the theme's new `warning` token —
+amber for "wait", red stays for "failed".
+
 ## Consequences
 
 - Fresh installs get two working providers with zero configuration. Both

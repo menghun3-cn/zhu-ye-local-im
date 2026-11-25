@@ -607,6 +607,9 @@
   "aiSectionProviders": "Providers",
   "aiAddProvider": "Add provider",
   "aiProviderCustom": "Custom endpoint",
+  "aiProviderGroupCloud": "Cloud providers",
+  "aiProviderGroupLocal": "Local runtimes",
+  "aiProviderGroupCustom": "Custom",
   "aiProviderName": "Name",
   "aiProviderApiKey": "API key",
   "aiProviderApiKeyHint": "Stored encrypted on this Device; leave empty for local models",
@@ -645,6 +648,7 @@
   "aiGroupName": "Name",
   "aiGroupMembers": "Members, tried in order",
   "aiGroupEmpty": "No members yet — add at least one model or group.",
+  "aiGroupsEmpty": "No routing groups yet.",
   "aiGroupMemberCount": "{count, plural, =1{1 member} other{{count} members}}",
   "@aiGroupMemberCount": {
     "placeholders": { "count": { "type": "int" } }
@@ -673,6 +677,8 @@
   "aiGatewayKeyDuplicate": "That key already exists",
   "aiGatewayKeyReveal": "Show key",
   "aiGatewayKeyHide": "Hide key",
+  "aiDeleteKeyTitle": "Delete gateway key?",
+  "aiDeleteKeyBody": "Clients using this key lose access immediately. The last remaining key cannot be deleted.",
   "aiGatewayNotListening": "Configured, but not listening right now",
   "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then restart the app.",
   "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.",
