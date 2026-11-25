@@ -658,6 +658,8 @@ class _RoutingCanvas extends StatelessWidget {
                   enabled: provider.enabled,
                   health: health[provider.id],
                   activeModelId: modelByProvider[provider.id],
+                  breathing: dash != null && wireActive(provider.id),
+                  breath: dash,
                   onTap: onProviderTap == null
                       ? null
                       : () => onProviderTap!(provider.id),
@@ -910,6 +912,8 @@ class _ProviderNode extends StatelessWidget {
     required this.enabled,
     this.health,
     this.activeModelId,
+    this.breathing = false,
+    this.breath,
     this.onTap,
   });
 
@@ -917,9 +921,18 @@ class _ProviderNode extends StatelessWidget {
   final bool enabled;
   final _NodeHealth? health;
 
-  /// The model id from this provider's latest route event. When set, the
-  /// node's headline names that concrete model — "which model answered" —
-  /// and the provider name drops to the second line.
+  /// A request is in flight to this provider right now — the card breathes
+  /// (a soft pulsing glow) until the leaf comes home.
+  final bool breathing;
+
+  /// The shared 0→1 phase driving the breathing pulse; the same controller
+  /// that marches the dashes, so glow and flow share one "requests live"
+  /// clock and both stop when the last leaf docks.
+  final Animation<double>? breath;
+
+  /// The model id from this provider's latest route event. When set and
+  /// the node is healthy, the second line names that concrete model —
+  /// "which model answered" — under the provider's own name.
   final String? activeModelId;
 
   /// Opens the provider's editor on the host page; null makes the node
@@ -945,7 +958,11 @@ class _ProviderNode extends StatelessWidget {
     final modelId = activeModelId;
     final model = modelId == null ? null : provider.modelNamed(modelId);
     final modelLabel = model == null ? modelId : (model.label ?? model.id);
-    final card = Opacity(
+    // Breathing: while a leaf is flying to this provider, a soft glow
+    // swells and fades on an ~800ms sine — "being asked right now" reads
+    // at a glance without a badge. The phase comes from the shared dash
+    // controller, so the pulse and the marching dashes stay in step.
+    Widget card = Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -968,7 +985,7 @@ class _ProviderNode extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    modelLabel ?? provider.name,
+                    provider.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -980,11 +997,12 @@ class _ProviderNode extends StatelessWidget {
                 ),
               ],
             ),
+            // Health outranks the model name: a cooling or failed node
+            // says so even while a model is on it. Healthy nodes show
+            // the concrete model that was last asked, falling back to
+            // the enabled-model count.
             Text(
-              status ??
-                  (modelLabel == null
-                      ? l10n.aiProviderModelCount(enabledModels)
-                      : provider.name),
+              status ?? modelLabel ?? l10n.aiProviderModelCount(enabledModels),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -996,6 +1014,34 @@ class _ProviderNode extends StatelessWidget {
         ),
       ),
     );
+    final breathAnimation = breath;
+    if (breathing && breathAnimation != null) {
+      final still = card;
+      card = AnimatedBuilder(
+        animation: breathAnimation,
+        builder: (context, _) {
+          // Sine over one dash cycle: 0→1→0, eased so the swell reads as
+          // a breath rather than a blink.
+          final pulse =
+              0.5 - 0.5 * math.cos(breathAnimation.value * 2 * math.pi);
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(WeChat.controlRadius + 3),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.brandStrong.withValues(
+                    alpha: 0.12 + 0.30 * pulse,
+                  ),
+                  blurRadius: 4 + 8 * pulse,
+                  spreadRadius: 0.5 + pulse,
+                ),
+              ],
+            ),
+            child: still,
+          );
+        },
+      );
+    }
     final onTap = this.onTap;
     if (onTap == null) return card;
     return Tooltip(
@@ -1059,8 +1105,8 @@ class _Leaf extends StatelessWidget {
               children: [
                 Icon(Icons.eco, size: 22, color: leafColor),
                 Positioned(
-                  left: 14,
-                  top: -1,
+                  left: 15,
+                  top: -4,
                   child: _CargoBead(color: leafColor, hollow: returning),
                 ),
               ],
@@ -1100,7 +1146,9 @@ class _Leaf extends StatelessWidget {
 
 /// The bead a leaf carries: filled on the way out (the request), a ring
 /// on the way back (the reply). Same colour as its leaf so the pairing
-/// survives the per-callId shading.
+/// survives the per-callId shading. Both variants get a keyline in the
+/// page background — a same-colour bead against a same-colour leaf and
+/// wires was nearly invisible at 7px.
 class _CargoBead extends StatelessWidget {
   const _CargoBead({required this.color, required this.hollow});
 
@@ -1109,13 +1157,17 @@ class _CargoBead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyline = WeChatColors.of(context).pageBackground;
     return Container(
-      width: 7,
-      height: 7,
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: hollow ? null : color,
-        border: hollow ? Border.all(color: color, width: 1.4) : null,
+        border: Border.all(
+          color: hollow ? color : keyline,
+          width: hollow ? 2.4 : 1.4,
+        ),
       ),
     );
   }
