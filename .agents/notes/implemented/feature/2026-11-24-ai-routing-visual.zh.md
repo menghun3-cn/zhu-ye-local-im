@@ -57,7 +57,9 @@ provider 节点——agent→网关与网关→provider 各画一条贝塞尔连
 每段刻意画短，让三列读起来像一条管线而不是三个孤岛。每个在途
 请求一片 `Icons.eco` 竹叶按 attempt 从 agent→网关→provider 飞出、
 served/failed 时飞回，每段 1 秒、慢到能看清；叶子所在的连线在
-飞行期间变虚线。位置是布局与控制器 0→1 进度的纯函数，窗口缩放免费
+飞行期间变虚线。叶片颜色是其 `callId` 的纯函数（品牌绿周围
+4 档明度 × 2 档饱和度），并发请求可以区分，而 failover 的各
+成员——同一次调用、不同 provider——保持同一颜色。位置是布局与控制器 0→1 进度的纯函数，窗口缩放免费
 重锚。`MediaQuery.disableAnimations` 时不飞叶子、只留状态行——与
 magpie 的减弱动效降级同义。供应商启用/停用无需新工作：
 `AiProvider.enabled` 本来就管着路由与网关暴露面，设置页列表的开关

@@ -952,6 +952,11 @@ class _Leaf extends StatelessWidget {
   Widget build(BuildContext context) {
     if (target == Offset.zero) return const SizedBox.shrink();
     final colors = WeChatColors.of(context);
+    // Concurrent requests each get their own leaf, and identical green
+    // leaves made two in-flight calls look like one. The shade is a pure
+    // function of callId, so a failover's members — same call, different
+    // providers — stay the same colour while unrelated calls differ.
+    final leafColor = _leafColor(colors.brandStrong, flight.callId);
     return AnimatedBuilder(
       animation: flight.controller,
       builder: (context, _) {
@@ -967,11 +972,32 @@ class _Leaf extends StatelessWidget {
           top: point.dy - 11,
           child: Transform.rotate(
             angle: sway,
-            child: Icon(Icons.eco, size: 22, color: colors.brandStrong),
+            child: Icon(Icons.eco, size: 22, color: leafColor),
           ),
         );
       },
     );
+  }
+
+  /// Distinct-but-related shades of the brand green, indexed by callId:
+  /// four lightness steps crossed with two saturation steps gives eight
+  /// combinations before a repeat. Hue stays brand so a crowd of leaves
+  /// still reads as "the app's leaf", just tellable apart.
+  static const _lightnessSteps = [-0.09, 0.09, -0.18, 0.18];
+  static const _saturationSteps = [-0.12, 0.12];
+
+  static Color _leafColor(Color base, int callId) {
+    final hsl = HSLColor.fromColor(base);
+    final slot = callId % (_lightnessSteps.length * _saturationSteps.length);
+    final lightness =
+        (hsl.lightness + _lightnessSteps[slot % _lightnessSteps.length]).clamp(
+          0.0,
+          1.0,
+        );
+    final saturation =
+        (hsl.saturation + _saturationSteps[slot ~/ _lightnessSteps.length])
+            .clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).withSaturation(saturation).toColor();
   }
 
   Offset _bezierPoint(Offset from, Offset to, double t) {

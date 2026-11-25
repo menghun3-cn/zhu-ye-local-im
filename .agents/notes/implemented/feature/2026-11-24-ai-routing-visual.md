@@ -69,7 +69,11 @@ agent→gateway and gateway→provider — each hop deliberately short so the
 three columns read as one pipeline, not three islands. One `Icons.eco`
 leaf per in-flight request flies agent→gateway→provider on `attempt`
 and back on `served`/`failed` at a readable 1s per hop; the wire a
-leaf is riding turns dashed while the flight exists. Position is
+leaf is riding turns dashed while the flight exists. Each leaf's shade
+is a pure function of its `callId` (four lightness × two saturation
+steps around the brand green), so concurrent requests are tellable
+apart while a failover's members — same call, different providers —
+keep one colour. Position is
 a pure function of layout and the controller's 0→1 progress, so resizes
 re-anchor for free. `MediaQuery.disableAnimations` drops the flights
 and keeps the status line — magpie's reduced-motion degradation, same

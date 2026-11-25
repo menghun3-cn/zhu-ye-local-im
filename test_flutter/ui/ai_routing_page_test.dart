@@ -122,4 +122,69 @@ void main() {
     await tester.pump();
     expect(tapped, 'opencode-zen');
   });
+
+  testWidgets('concurrent requests fly leaves in different shades', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // Two in-flight requests: leaves must be tellable apart, and a
+    // failover's second member (same callId) keeps the first member's
+    // shade — same request, same colour.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.failed,
+      'opencode-zen/mimo-v2.6-flash-free',
+      '',
+      true,
+    );
+    // Same callId, next failover member: same request, same shade.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'kilo/kilo-auto/free',
+    );
+    // A second, unrelated call gets its own shade.
+    runtime.router.emitRouteEventForTest(
+      2,
+      AiRoutePhase.attempt,
+      'opencode-zen/deepseek-v4.1-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final leafColors = tester
+        .widgetList<Icon>(
+          find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.eco),
+        )
+        .map((icon) => icon.color)
+        .toSet();
+    // Gateway node + three leaves across two callIds: the two callId-1
+    // leaves share a shade, callId-2's differs — three distinct colours.
+    expect(leafColors.length, greaterThanOrEqualTo(3));
+  });
 }
