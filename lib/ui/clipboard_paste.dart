@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:pasteboard/pasteboard.dart';
 
+import 'android_files.dart';
+
 /// What the composer can lift out of the system clipboard.
 ///
 /// Flutter's own `Clipboard` reads and writes *text* on every platform and
@@ -35,6 +37,16 @@ abstract interface class ClipboardPaste {
   /// answers nothing at all. Both have to reach the user as "it did not
   /// happen" rather than as a stack trace or, worse, as silence.
   Future<bool> writeImage(Uint8List bytes);
+
+  /// Replaces the clipboard with the files at [paths], and answers whether it
+  /// managed to.
+  ///
+  /// The same direction as [writeImage] and the same `bool` for the same
+  /// reason: a platform that will not let the app put a file on its clipboard
+  /// is an ordinary condition, not an error. On Windows the clipboard gets the
+  /// `CF_HDROP` list Explorer writes; on Android the file goes as a
+  /// `content://` URI the receiving application may be granted to read.
+  Future<bool> writeFiles(List<String> paths);
 }
 
 /// The real clipboard, through the platform plugin.
@@ -81,6 +93,35 @@ final class SystemClipboardPaste implements ClipboardPaste {
     if (!supported) return false;
     try {
       await Pasteboard.writeImage(bytes);
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> writeFiles(List<String> paths) async {
+    if (paths.isEmpty) return false;
+    // Android's plugin `writeFiles` expects content URIs, not the filesystem
+    // paths this app holds, so the platform's own channel does that half. The
+    // desktop platforms take the paths as they are: Windows turns them into
+    // the `CF_HDROP` list a file manager writes, and macOS/Linux write the
+    // same kind of file list through the plugin.
+    if (Platform.isAndroid) return copyAndroidFiles(paths);
+    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isLinux) {
+      return false;
+    }
+    try {
+      if (!await Pasteboard.writeFiles(paths)) return false;
+      // The plugin's Windows writeFiles reports success without checking
+      // SetClipboardData's result, so "the call did not throw" is not proof
+      // the clipboard holds the files. Reading the CF_HDROP list back is the
+      // only honest answer; the other desktops' implementations validate
+      // their own writes.
+      if (Platform.isWindows) {
+        final landed = await Pasteboard.files();
+        return landed.length == paths.length && landed.every(paths.contains);
+      }
       return true;
     } on Object {
       return false;

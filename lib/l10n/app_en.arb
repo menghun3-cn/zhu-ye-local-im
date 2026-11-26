@@ -249,6 +249,8 @@
   "cannotOpenFolder": "Could not open that folder.",
   "openFile": "Open",
   "cannotOpenFile": "Could not open that file.",
+  "copyFile": "Copy file",
+  "cannotCopyFile": "Could not copy that file.",
   "copyImage": "Copy image",
   "cannotCopyImage": "Could not copy that image.",
   "copyText": "Copy text",

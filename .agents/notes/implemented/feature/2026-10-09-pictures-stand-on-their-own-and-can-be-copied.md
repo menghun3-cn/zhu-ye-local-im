@@ -81,12 +81,12 @@ is the confirmation.
 
 **One menu, and the predicates decide what is on it.** `TransferContextMenu`
 already took a `TransferView` and wrapped both a conversation message and a
-Transfers card; it now asks `canRevealTransfer` and `canCopyImage` rather than one
-predicate, lists an item per answer, and switches on which one came back. So a
-picture offers both — the folder it is in and the clipboard it can go back to, two
-things that are not alternatives — and no surface can drift from another, because
-no surface decides. The two are read once before the `await`, so the list cannot
-change under the menu the user is looking at.
+Transfers card; it asks the predicates for the actions a Transfer offers rather
+than one predicate, lists an item per answer, and switches on which one came
+back. So a picture offers both — the folder it is in and the clipboard it can
+go back to, two things that are not alternatives — and no surface can drift
+from another, because no surface decides. The answers are read once before the
+`await`, so the list cannot change under the menu the user is looking at.
 
 **The bytes are read back from disk.** The file the Transfer points at is the one
 copy of the picture, and reading it back is what keeps a conversation holding a
@@ -128,10 +128,13 @@ the desktop client reports with the same bar as everything else. The bar is also
 what a file's bubble already shows, so a send in flight looks the same whichever
 kind it is.
 
-**Offer Copy on files as well.** Rejected: "copy" would then mean two different
-things — a file list to Explorer, a bitmap to everything else — and the menu would
-have to guess which the user meant. A file already has a folder to be shown in,
-which is the question a file raises.
+**Offer Copy on files as well.** Rejected for pictures: "copy" would then mean
+two different things — a file list to Explorer, a bitmap to everything else —
+and the menu would have to guess which the user meant. A file already has a
+folder to be shown in, which is the question a file raises. File messages later
+gained their own 「复制文件」, which copies the file rather than borrowing the
+picture's meaning — see
+[a file message copies as a file](2026-11-26-a-file-message-copies-as-a-file.md).
 
 ## Consequences
 

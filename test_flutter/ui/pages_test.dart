@@ -3674,6 +3674,154 @@ void main() {
     );
   });
 
+  group('copying a landed file', () {
+    testWidgets('a completed file copies itself from its menu', (tester) async {
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      final home = tempDirectory('local-transfer-copy-out-');
+      final source = File('${home.path}${Platform.pathSeparator}report.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      final inbox = tempDirectory('local-transfer-copy-in-');
+
+      await offerFile(tester, alice, source);
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(
+        () => bob.controller.acceptInto(bob.offers.single, inbox),
+      );
+      await pumpUntil(
+        tester,
+        () => bob.controller.transfers.any((view) => view.localPath != null),
+        description: 'the file to land on Bob',
+      );
+      final landed = bob.controller.transfers.single.localPath;
+      expect(landed, isNotNull);
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Alice');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('report.bin'),
+        ).evaluate().isNotEmpty,
+        description: 'the landed file to be a message',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.text('report.bin')),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.text(l10n.copyFile)).evaluate().isNotEmpty,
+        description: 'the context menu to offer copying the file',
+      );
+      await tester.tap(windowA.within(find.text(l10n.copyFile)));
+      await pumpUntil(
+        tester,
+        () => clipboard.copiedFiles.isNotEmpty,
+        description: 'the file to reach the clipboard',
+      );
+
+      // The landed path itself, not its name or its bytes: what a file
+      // manager's copy puts on the clipboard is the file, and that is what a
+      // paste into Explorer or a chat window has to be able to find.
+      expect(clipboard.copiedFiles.single, [landed]);
+      expect(
+        find.text(l10n.cannotCopyFile),
+        findsNothing,
+        reason: 'a copy that happened says nothing',
+      );
+
+      await shutdown(tester, [alice, bob]);
+    });
+
+    testWidgets('says so when the file copy could not happen', (tester) async {
+      final clipboard = ScriptedClipboard.install();
+      addTearDown(PasteResolution.reset);
+      // A platform that will not let the app write its clipboard is an
+      // ordinary answer, not an error — and it must not be told as a success.
+      clipboard.answersWrites = false;
+      final hub = MemoryBeaconHub();
+      final alice = await startUiDevice(tester, hub.a, 'Alice');
+      final bob = await startUiDevice(tester, hub.b, 'Bob');
+      await pairDevices(tester, alice, bob);
+      await connectDevices(tester, alice, bob);
+
+      final home = tempDirectory('local-transfer-copy-fail-out-');
+      final source = File('${home.path}${Platform.pathSeparator}report.bin');
+      source.writeAsBytesSync([for (var i = 0; i < 64; i++) i]);
+      final inbox = tempDirectory('local-transfer-copy-fail-in-');
+
+      await offerFile(tester, alice, source);
+      await pumpUntil(
+        tester,
+        () => bob.offers.isNotEmpty,
+        description: 'Bob to be offered the file',
+      );
+      await tester.runAsync(
+        () => bob.controller.acceptInto(bob.offers.single, inbox),
+      );
+      await pumpUntil(
+        tester,
+        () => bob.controller.transfers.any((view) => view.localPath != null),
+        description: 'the file to land on Bob',
+      );
+
+      await pumpWindow(tester, bob);
+      await openTab(tester, l10n.tabConversation, window: windowA);
+      await pumpUntil(
+        tester,
+        () => conversationListed(windowA, 'Alice'),
+        description: 'the conversation to be listed',
+      );
+      await openConversation(tester, windowA, name: 'Alice');
+      await pumpUntil(
+        tester,
+        () => onConversation(
+          windowA,
+          find.text('report.bin'),
+        ).evaluate().isNotEmpty,
+        description: 'the landed file to be a message',
+      );
+
+      await rightClick(
+        tester,
+        onConversation(windowA, find.text('report.bin')),
+      );
+      await pumpUntil(
+        tester,
+        () => windowA.within(find.text(l10n.copyFile)).evaluate().isNotEmpty,
+        description: 'the context menu to offer copying the file',
+      );
+      await tester.tap(windowA.within(find.text(l10n.copyFile)));
+      await pumpUntil(
+        tester,
+        () => find.text(l10n.cannotCopyFile).evaluate().isNotEmpty,
+        description: 'the failure to be said out loud',
+      );
+      expect(clipboard.copiedFiles, isEmpty);
+
+      await shutdown(tester, [alice, bob]);
+    });
+  });
+
   group('a picture on a conversation', () {
     /// Alice sends Bob a picture, and Bob's window ends up looking at it.
     ///
@@ -3790,6 +3938,11 @@ void main() {
       expect(
         windowA.within(find.text(l10n.openContainingFolder)),
         findsOneWidget,
+      );
+      expect(
+        windowA.within(find.text(l10n.copyFile)),
+        findsNothing,
+        reason: 'a picture copies its content, not a file',
       );
 
       await shutdown(tester, [sent.alice, sent.bob]);
