@@ -662,6 +662,27 @@ class _RoutingCanvas extends StatelessWidget {
         bool wireActive(String providerId) =>
             flights.any((f) => f.providerId == providerId);
 
+        // "Answering" means the request is still being served: any
+        // flight that has not started its way home — outbound leg and
+        // the parked stretch at the provider both count. Once the leaf
+        // turns around the reply already arrived, so the mark lifts.
+        bool answering(String providerId) => flights.any(
+          (f) =>
+              f.providerId == providerId &&
+              f.controller.status != AnimationStatus.reverse,
+        );
+
+        // The leaf's mid-route waypoint arcs over the gateway card
+        // instead of crossing its face: the waypoint sits one card
+        // half-height plus margin above or below the gateway centre —
+        // the side the provider node is on — so both hops keep their
+        // horizontal end tangents and the path crests clear of the card.
+        Offset gatewayWaypoint(Offset target) {
+          if (target == Offset.zero) return gatewayCenter;
+          final side = target.dy >= midY ? 1.0 : -1.0;
+          return Offset(gatewayCenter.dx, midY + side * (_cardHeight / 2 + 48));
+        }
+
         final wireColor = WeChatColors.of(context).brandLine;
         final dashAnimation = dash;
         // The wire layer rebuilds on every animation tick: the dash
@@ -738,7 +759,7 @@ class _RoutingCanvas extends StatelessWidget {
             ),
             // Provider nodes first so the cards sit on top of any wire
             // that happens to pass under them.
-            for (final provider in providers)
+            for (final provider in providers) ...[
               Positioned(
                 left: providerLeft,
                 top:
@@ -759,6 +780,30 @@ class _RoutingCanvas extends StatelessWidget {
                       : () => onProviderTap!(provider.id),
                 ),
               ),
+              // A live "answering" mark beside the card — a long stream
+              // must not read as an unresponsive node. Sits just right
+              // of the card, vertically centered on it.
+              if (answering(provider.id))
+                Positioned(
+                  left: providerLeft + _nodeWidth + 8,
+                  top:
+                      _margin +
+                      slot * slotOrder.indexOf(provider.id) +
+                      (slot - _nodeHeight) / 2,
+                  height: _nodeHeight,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      AppLocalizations.of(context).aiRoutingAnswering,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizeMeta,
+                        fontWeight: FontWeight.w600,
+                        color: WeChatColors.of(context).brandStrong,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
             Positioned(
               left: gatewayLeft,
               top: midY - _cardHeight / 2,
@@ -784,7 +829,7 @@ class _RoutingCanvas extends StatelessWidget {
               _Leaf(
                 flight: flight,
                 agent: agentOut,
-                gateway: gatewayCenter,
+                gateway: gatewayWaypoint(anchorFor(flight.providerId)),
                 target: anchorFor(flight.providerId),
               ),
             if (overflowLabel != null)

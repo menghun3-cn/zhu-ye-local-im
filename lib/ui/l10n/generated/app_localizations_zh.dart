@@ -1626,6 +1626,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRoutingFailed => '上次请求失败';
 
   @override
+  String get aiRoutingAnswering => '回答中…';
+
+  @override
   String get aiRoutingEmpty => '还没有供应商。';
 
   @override

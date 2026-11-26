@@ -2971,6 +2971,12 @@ abstract class AppLocalizations {
   /// **'Last request failed'**
   String get aiRoutingFailed;
 
+  /// No description provided for @aiRoutingAnswering.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering…'**
+  String get aiRoutingAnswering;
+
   /// No description provided for @aiRoutingEmpty.
   ///
   /// In en, this message translates to:

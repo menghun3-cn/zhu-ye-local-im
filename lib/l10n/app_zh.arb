@@ -527,6 +527,7 @@
     "placeholders": { "seconds": { "type": "int" } }
   },
   "aiRoutingFailed": "上次请求失败",
+  "aiRoutingAnswering": "回答中…",
   "aiRoutingEmpty": "还没有供应商。",
   "aiRoutingMoreProviders": "另有 {count} 个供应商在请求",
   "@aiRoutingMoreProviders": {

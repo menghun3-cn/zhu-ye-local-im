@@ -701,6 +701,7 @@
     "placeholders": { "seconds": { "type": "int" } }
   },
   "aiRoutingFailed": "Last request failed",
+  "aiRoutingAnswering": "Answering…",
   "aiRoutingEmpty": "No providers yet.",
   "aiRoutingMoreProviders": "{count} more providers active",
   "@aiRoutingMoreProviders": {

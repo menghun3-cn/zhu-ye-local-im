@@ -1708,6 +1708,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingFailed => 'Last request failed';
 
   @override
+  String get aiRoutingAnswering => 'Answering…';
+
+  @override
   String get aiRoutingEmpty => 'No providers yet.';
 
   @override

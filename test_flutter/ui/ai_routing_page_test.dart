@@ -261,6 +261,58 @@ void main() {
     expect(leaves('out'), 0);
   });
 
+  testWidgets('an in-flight request marks its provider node as answering', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final l10n = lookupAppLocalizations(appLocale);
+    expect(find.text(l10n.aiRoutingAnswering), findsNothing);
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    // Outbound leg: the request is on its way, the mark is already up.
+    expect(find.text(l10n.aiRoutingAnswering), findsOneWidget);
+
+    // Parked at the provider mid-stream: still answering.
+    await tester.pump(const Duration(milliseconds: 1100));
+    expect(find.text(l10n.aiRoutingAnswering), findsOneWidget);
+
+    // Served and heading home: the reply already arrived, mark lifts.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.served,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text(l10n.aiRoutingAnswering), findsNothing);
+  });
+
   testWidgets('a dashed wire means a leaf is on that leg right now', (
     tester,
   ) async {
