@@ -587,11 +587,11 @@ class _RoutingCanvas extends StatelessWidget {
   /// Tap on a provider node — forwarded from [AiRoutingView.onProviderTap].
   final void Function(String providerId)? onProviderTap;
 
-  static const double _agentWidth = 104;
-  static const double _gatewayWidth = 150;
-  static const double _nodeWidth = 168;
-  static const double _nodeHeight = 48;
-  static const double _cardHeight = 80;
+  static const double _agentWidth = 139;
+  static const double _gatewayWidth = 200;
+  static const double _nodeWidth = 224;
+  static const double _nodeHeight = 64;
+  static const double _cardHeight = 107;
   static const double _margin = 16;
 
   /// The narrowest canvas that still fits all three columns with the
@@ -614,7 +614,7 @@ class _RoutingCanvas extends StatelessWidget {
         // last nodes keep their breathing room at any count.
         final slot = slots == 0
             ? size.height
-            : math.max(44.0, (size.height - 2 * _margin) / slots);
+            : math.max(_nodeHeight + 8.0, (size.height - 2 * _margin) / slots);
 
         // Three columns with each hop half the length it used to be: the
         // whole agent→gateway→provider group is centered, so shrinking the
@@ -931,7 +931,7 @@ class _SourceNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       decoration: BoxDecoration(
         color: colors.brandSoft,
         borderRadius: BorderRadius.circular(WeChat.controlRadius),
@@ -940,7 +940,7 @@ class _SourceNode extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.bolt_outlined, size: 22, color: colors.brandStrong),
+          Icon(Icons.bolt_outlined, size: 29, color: colors.brandStrong),
           const SizedBox(height: 2),
           Text(
             label,
@@ -977,7 +977,7 @@ class _GatewayNode extends StatelessWidget {
     return Opacity(
       opacity: online ? 1 : 0.45,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(WeChat.controlRadius),
@@ -986,7 +986,7 @@ class _GatewayNode extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.eco, size: 22, color: colors.brandStrong),
+            Icon(Icons.eco, size: 29, color: colors.brandStrong),
             const SizedBox(height: 2),
             Text(
               label,
@@ -1073,7 +1073,7 @@ class _ProviderNode extends StatelessWidget {
     Widget card = Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(WeChat.controlRadius),
@@ -1088,7 +1088,7 @@ class _ProviderNode extends StatelessWidget {
                 AiProviderMark(
                   provider: provider,
                   color: colors.brandStrong,
-                  size: 14,
+                  size: 19,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
