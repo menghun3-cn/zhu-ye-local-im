@@ -150,14 +150,18 @@ stops the moment the last leaf docks. A long stream must not read as an
 unresponsive node either: while any flight to the provider has not yet
 turned for home — outbound leg and the held stretch at the node both
 count — the card's second line ends in a live mark. Bare "Answering…"
-until the first content lands, then live numbers — reply chars and
-chars/sec, fed by throttled `AiRoutePhase.progress` events the router
-emits from `_observeStream` (chars, not tokens: providers only report
-token accounting at the end) — and after 15s without new content the
+until the first content lands, then live numbers — estimated tokens and
+tokens/sec (chars ÷ 4, shown with ≈: providers only report real token
+usage once at the end, so mid-stream the honest figure is a rough
+conversion, not a billed count), fed by throttled
+`AiRoutePhase.progress` events the router emits from `_observeStream`
+(chars, not tokens) — and after 15s without new content the
 mark drops the claim and shows the numbers alone in the warning colour:
 a quiet reply is not a failed one. The numbers repaint on a 15fps timer
 that runs only while a flight exists — magpie's own cadence, fast enough
-to read as live without repainting every frame. The mark lifts the
+to read as live without repainting every frame. The provider card is
+360px wide — up from 299 — so the mark fits whole beside the model
+line instead of ellipsizing. The mark lifts the
 moment the return leg starts since the reply already arrived.
 Stale `provider → modelId`
 entries are pruned on reload when either side disappears.

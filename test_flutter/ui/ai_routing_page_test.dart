@@ -302,7 +302,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
     expect(find.text(l10n.aiRoutingAnswering), findsOneWidget);
 
-    // Content flowing: the mark gains live numbers on the 15fps clock.
+    // Content flowing: the mark gains live numbers on the 15fps clock —
+    // 1234 chars read as ≈309 estimated tokens.
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.progress,
@@ -312,7 +313,7 @@ void main() {
       1234,
     );
     await tester.pump(const Duration(milliseconds: 70));
-    expect(find.textContaining('1.2K'), findsOneWidget);
+    expect(find.textContaining('309'), findsOneWidget);
     expect(find.text(l10n.aiRoutingAnswering), findsNothing);
 
     // Served and heading home: the reply already arrived, mark lifts.

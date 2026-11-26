@@ -706,11 +706,11 @@
   "@aiRoutingLiveAnswering": {
     "placeholders": { "stats": { "type": "String" } }
   },
-  "aiRoutingLiveChars": "{chars} chars",
-  "@aiRoutingLiveChars": {
-    "placeholders": { "chars": { "type": "String" } }
+  "aiRoutingLiveTokens": "≈{tokens} tok",
+  "@aiRoutingLiveTokens": {
+    "placeholders": { "tokens": { "type": "String" } }
   },
-  "aiRoutingLiveRate": "{rate}/s",
+  "aiRoutingLiveRate": "≈{rate} tok/s",
   "@aiRoutingLiveRate": {
     "placeholders": { "rate": { "type": "String" } }
   },

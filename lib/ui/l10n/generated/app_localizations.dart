@@ -2983,16 +2983,16 @@ abstract class AppLocalizations {
   /// **'Answering… · {stats}'**
   String aiRoutingLiveAnswering(String stats);
 
-  /// No description provided for @aiRoutingLiveChars.
+  /// No description provided for @aiRoutingLiveTokens.
   ///
   /// In en, this message translates to:
-  /// **'{chars} chars'**
-  String aiRoutingLiveChars(String chars);
+  /// **'≈{tokens} tok'**
+  String aiRoutingLiveTokens(String tokens);
 
   /// No description provided for @aiRoutingLiveRate.
   ///
   /// In en, this message translates to:
-  /// **'{rate}/s'**
+  /// **'≈{rate} tok/s'**
   String aiRoutingLiveRate(String rate);
 
   /// No description provided for @aiRoutingEmpty.

@@ -1634,13 +1634,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String aiRoutingLiveChars(String chars) {
-    return '$chars字';
+  String aiRoutingLiveTokens(String tokens) {
+    return '≈$tokens token';
   }
 
   @override
   String aiRoutingLiveRate(String rate) {
-    return '$rate字/s';
+    return '≈$rate token/s';
   }
 
   @override

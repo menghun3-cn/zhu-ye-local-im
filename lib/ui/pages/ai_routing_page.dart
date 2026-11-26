@@ -653,7 +653,7 @@ class _RoutingCanvas extends StatelessWidget {
 
   static const double _agentWidth = 185;
   static const double _gatewayWidth = 267;
-  static const double _nodeWidth = 299;
+  static const double _nodeWidth = 360;
   static const double _nodeHeight = 85;
   static const double _cardHeight = 143;
   static const double _margin = 16;
@@ -722,8 +722,11 @@ class _RoutingCanvas extends StatelessWidget {
         // already arrived, so the mark lifts. [quiet] mirrors magpie's
         // 15s rule: no new content for that long and the "answering"
         // claim drops to just the numbers — a quiet reply is not a
-        // failed one.
-        ({int chars, int? rate, bool quiet})? liveFor(String providerId) {
+        // failed one. Units are estimated tokens (chars ÷ 4): providers
+        // only report real usage once at the end, so mid-stream the
+        // honest live figure is a rough conversion, not a billed count.
+        ({int tokens, int? rate, bool quiet})? liveFor(String providerId) {
+          const charsPerToken = 4;
           final now = DateTime.now();
           for (final f in flights) {
             if (f.providerId != providerId ||
@@ -738,9 +741,15 @@ class _RoutingCanvas extends StatelessWidget {
             int? rate;
             if (first != null) {
               final span = now.difference(first).inMilliseconds;
-              if (span >= 1000) rate = (f.contentChars * 1000 / span).round();
+              if (span >= 1000) {
+                rate = (f.contentChars * 1000 / span / charsPerToken).round();
+              }
             }
-            return (chars: f.contentChars, rate: rate, quiet: quiet);
+            return (
+              tokens: (f.contentChars / charsPerToken).round(),
+              rate: rate,
+              quiet: quiet,
+            );
           }
           return null;
         }
@@ -1204,13 +1213,13 @@ class _ProviderNode extends StatelessWidget {
   /// "which model answered" — under the provider's own name.
   final String? activeModelId;
 
-  /// Live reply stats while this provider is answering — chars seen,
-  /// chars/sec once a second of content has flowed, and [quiet] when no
-  /// new content arrived for 15s. Null when no request is being served.
-  /// The second line's right end shows the mark so a long stream does
-  /// not read as an unresponsive node; it lifts when the reply starts
-  /// home.
-  final ({int chars, int? rate, bool quiet})? live;
+  /// Live reply stats while this provider is answering — estimated
+  /// tokens seen, tokens/sec once a second of content has flowed, and
+  /// [quiet] when no new content arrived for 15s. Null when no request
+  /// is being served. The second line's right end shows the mark so a
+  /// long stream does not read as an unresponsive node; it lifts when
+  /// the reply starts home.
+  final ({int tokens, int? rate, bool quiet})? live;
 
   /// Opens the provider's editor on the host page; null makes the node
   /// inert (used by callers that embed the canvas without a page).
@@ -1236,23 +1245,24 @@ class _ProviderNode extends StatelessWidget {
     final model = modelId == null ? null : provider.modelNamed(modelId);
     final modelLabel = model == null ? modelId : (model.label ?? model.id);
     // The answering mark: bare "Answering…" until the first content
-    // lands, then live numbers (chars and chars/sec) like magpie's row —
-    // and after 15s of silence it drops the claim and shows the numbers
-    // alone in the warning colour: quiet is not failed.
+    // lands, then live numbers (estimated tokens and tokens/sec) like
+    // magpie's row — and after 15s of silence it drops the claim and
+    // shows the numbers alone in the warning colour: quiet is not
+    // failed.
     final liveStats = live;
     String? markText;
     var markColor = colors.brandStrong;
     if (liveStats != null) {
-      if (liveStats.chars == 0) {
+      if (liveStats.tokens == 0) {
         markText = l10n.aiRoutingAnswering;
       } else {
-        final charsText = l10n.aiRoutingLiveChars(
-          _compactCount(liveStats.chars),
+        final tokensText = l10n.aiRoutingLiveTokens(
+          _compactCount(liveStats.tokens),
         );
         final rate = liveStats.rate;
         final stats = rate == null
-            ? charsText
-            : '$charsText · ${l10n.aiRoutingLiveRate('$rate')}';
+            ? tokensText
+            : '$tokensText · ${l10n.aiRoutingLiveRate('$rate')}';
         if (liveStats.quiet) {
           markText = stats;
           markColor = colors.warning;

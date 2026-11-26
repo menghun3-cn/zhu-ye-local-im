@@ -532,11 +532,11 @@
   "@aiRoutingLiveAnswering": {
     "placeholders": { "stats": { "type": "String" } }
   },
-  "aiRoutingLiveChars": "{chars}字",
-  "@aiRoutingLiveChars": {
-    "placeholders": { "chars": { "type": "String" } }
+  "aiRoutingLiveTokens": "≈{tokens} token",
+  "@aiRoutingLiveTokens": {
+    "placeholders": { "tokens": { "type": "String" } }
   },
-  "aiRoutingLiveRate": "{rate}字/s",
+  "aiRoutingLiveRate": "≈{rate} token/s",
   "@aiRoutingLiveRate": {
     "placeholders": { "rate": { "type": "String" } }
   },

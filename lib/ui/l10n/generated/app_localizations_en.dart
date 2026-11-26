@@ -1716,13 +1716,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String aiRoutingLiveChars(String chars) {
-    return '$chars chars';
+  String aiRoutingLiveTokens(String tokens) {
+    return '≈$tokens tok';
   }
 
   @override
   String aiRoutingLiveRate(String rate) {
-    return '$rate/s';
+    return '≈$rate tok/s';
   }
 
   @override
