@@ -1334,16 +1334,17 @@ class _ProviderNode extends StatelessWidget {
                 ),
                 if (markText != null) ...[
                   const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      markText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: WeChat.fontSizeMeta,
-                        fontWeight: FontWeight.w600,
-                        color: markColor,
-                      ),
+                  // The mark keeps its intrinsic width — the live numbers
+                  // must never ellipsize; the status text to its left is
+                  // the one that shrinks.
+                  Text(
+                    markText,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizeMeta,
+                      fontWeight: FontWeight.w600,
+                      color: markColor,
                     ),
                   ),
                 ],
