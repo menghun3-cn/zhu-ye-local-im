@@ -2977,6 +2977,24 @@ abstract class AppLocalizations {
   /// **'Answering…'**
   String get aiRoutingAnswering;
 
+  /// No description provided for @aiRoutingLiveAnswering.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering… · {stats}'**
+  String aiRoutingLiveAnswering(String stats);
+
+  /// No description provided for @aiRoutingLiveChars.
+  ///
+  /// In en, this message translates to:
+  /// **'{chars} chars'**
+  String aiRoutingLiveChars(String chars);
+
+  /// No description provided for @aiRoutingLiveRate.
+  ///
+  /// In en, this message translates to:
+  /// **'{rate}/s'**
+  String aiRoutingLiveRate(String rate);
+
   /// No description provided for @aiRoutingEmpty.
   ///
   /// In en, this message translates to:

@@ -84,23 +84,29 @@ the moment the reply lands — mid-return — and launching then would put
 two leaves on screen travelling opposite ways for what reads as one
 sequential exchange; queued attempts re-validate and launch once the
 last leaf docks. Outbound leaves still overlap freely, so genuine
-concurrency keeps its per-`callId` shades. Progress along the wires is
+concurrency keeps its per-`callId` shades. The trip's last slice is the
+arrival "away" — magpie's own exit: the leaf drifts up and off the
+provider node, shrinking and fading, instead of parking invisible on the
+card. What stays behind is a **held dot** at the node's wire end,
+breathing opacity 1→0.45→1 on a 1.2s cosine for as long as the reply is
+out — the request is still visibly "there" without a bird loitering.
+Progress along the wires is
 cosine-eased — launch and dock gently rather than sliding at constant
 speed — and the leaf sways as it flies. The leaf **dissolves into each
 end node**: opacity follows the eased trip progress, so it fades out
-as it lands on the provider and stays invisible while the request is
-being served — a leaf parked at its node would read as a stuck request
-— then fades back in as the return leg pulls away, and fades out again
-as it reaches the agent. Departures queue
+as it reaches the agent on the way home — and on the way out it arrives
+at the provider still visible, then spends its last slice flying the
+away. The return leg fades it back in as it pulls away from the held
+dot, and fades out again as it reaches the agent. Departures queue
 behind homeward leaves, and an attempt whose request already ended
 while queued is dropped on the end event — otherwise it would launch,
 fly out, and dissolve at the provider forever with no second end event
 left to bring it home.
 The wire a leaf is riding turns dashed **on that leg only** — leg
-occupancy is read from each flight's live 0→1 progress each frame
-(t ≤ 0.5 rides agent→gateway, t > 0.5 rides gateway→provider, in both
-directions), so a parked or homeward leaf never leaves the other leg
-animating as if traffic still flowed there. The dash pattern slides
+occupancy is read from each flight's live eased progress each frame —
+the same te the leaf positions itself with, scaled by the shared
+[_leafPathEnd] trip layout — so a held or homeward leaf never leaves
+the other leg animating as if traffic still flowed there. The dash pattern slides
 toward the direction the leaf is actually travelling — reversed on the
 return leg — driven by a repeating controller that only runs while a
 leaf is airborne, so an idle canvas burns no frames. Each leaf's shade
@@ -138,10 +144,17 @@ soft brand-coloured glow swelling and fading on the shared dash
 controller's 800ms cycle, so "being asked right now" needs no badge and
 stops the moment the last leaf docks. A long stream must not read as an
 unresponsive node either: while any flight to the provider has not yet
-turned for home — outbound leg and the parked stretch at the node both
-count — a live "Answering…" mark sits at the right end of the card's
-second line, inside the card, and lifts the moment the return leg
-starts since the reply already arrived.
+turned for home — outbound leg and the held stretch at the node both
+count — the card's second line ends in a live mark. Bare "Answering…"
+until the first content lands, then live numbers — reply chars and
+chars/sec, fed by throttled `AiRoutePhase.progress` events the router
+emits from `_observeStream` (chars, not tokens: providers only report
+token accounting at the end) — and after 15s without new content the
+mark drops the claim and shows the numbers alone in the warning colour:
+a quiet reply is not a failed one. The numbers repaint on a 15fps timer
+that runs only while a flight exists — magpie's own cadence, fast enough
+to read as live without repainting every frame. The mark lifts the
+moment the return leg starts since the reply already arrived.
 Stale `provider → modelId`
 entries are pruned on reload when either side disappears.
 

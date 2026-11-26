@@ -372,6 +372,31 @@ void main() {
     expect(seen.last.member, 'a/m1');
   });
 
+  test('stream progress events carry cumulative content chars', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"hello"}}]}',
+      'data: {"choices":[{"delta":{"content":" world"}}]}',
+      'data: [DONE]',
+    ]);
+    final reply = await router.chat(chat('a/m1', stream: true));
+    await (reply as AiStreamReply).events.toList();
+    await Future<void>.delayed(Duration.zero);
+
+    final progress = seen
+        .where((e) => e.phase == AiRoutePhase.progress)
+        .toList();
+    // The first content event always reports — the live mark needs to
+    // appear with the first token, not 250ms later.
+    expect(progress, isNotEmpty);
+    expect(progress.first.contentChars, 5);
+    expect(progress.every((e) => e.contentChars != null), isTrue);
+    expect(seen.last.phase, AiRoutePhase.served);
+  });
+
   test('a member rejected before dispatch emits failed, not attempt', () async {
     final seen = <AiRouteEvent>[];
     final sub = router.events.listen(seen.add);

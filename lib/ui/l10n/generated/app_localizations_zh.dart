@@ -1629,6 +1629,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRoutingAnswering => '回答中…';
 
   @override
+  String aiRoutingLiveAnswering(String stats) {
+    return '回答中… · $stats';
+  }
+
+  @override
+  String aiRoutingLiveChars(String chars) {
+    return '$chars字';
+  }
+
+  @override
+  String aiRoutingLiveRate(String rate) {
+    return '$rate字/s';
+  }
+
+  @override
   String get aiRoutingEmpty => '还没有供应商。';
 
   @override

@@ -702,6 +702,18 @@
   },
   "aiRoutingFailed": "Last request failed",
   "aiRoutingAnswering": "Answering…",
+  "aiRoutingLiveAnswering": "Answering… · {stats}",
+  "@aiRoutingLiveAnswering": {
+    "placeholders": { "stats": { "type": "String" } }
+  },
+  "aiRoutingLiveChars": "{chars} chars",
+  "@aiRoutingLiveChars": {
+    "placeholders": { "chars": { "type": "String" } }
+  },
+  "aiRoutingLiveRate": "{rate}/s",
+  "@aiRoutingLiveRate": {
+    "placeholders": { "rate": { "type": "String" } }
+  },
   "aiRoutingEmpty": "No providers yet.",
   "aiRoutingMoreProviders": "{count} more providers active",
   "@aiRoutingMoreProviders": {

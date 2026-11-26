@@ -112,6 +112,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// a leaf is flying — an idle canvas does not burn frames.
   late final AnimationController _dashController;
 
+  /// 15fps repaint clock for the live stats on answering nodes and the
+  /// held dot's breathing — magpie's own cadence: fast enough to read as
+  /// live, slow enough that a busy canvas does not repaint every frame.
+  /// Runs only while a flight exists, same lifecycle as [_dashController].
+  Timer? _liveTimer;
+
   /// provider id → the model id its latest route event named, so a node
   /// can say *which* model is being asked, not just which provider.
   final Map<String, String> _modelByProvider = {};
@@ -135,6 +141,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
   void dispose() {
     unawaited(_events?.cancel() ?? Future.value());
     _ticker?.cancel();
+    _liveTimer?.cancel();
     _dashController.dispose();
     for (final flight in _flights) {
       flight.controller.dispose();
@@ -233,6 +240,8 @@ class _AiRoutingViewState extends State<AiRoutingView>
         } else {
           _erroredAt[event.member] = DateTime.now();
         }
+      case AiRoutePhase.progress:
+        break;
     }
   }
 
@@ -260,7 +269,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
     _coolingUntil.removeWhere((_, until) => until.isBefore(now));
     _erroredAt.removeWhere((_, at) => now.difference(at) > _errorVisibleFor);
     _nodeVisibleUntil.removeWhere((_, until) => until.isBefore(now));
-    if (_flights.isEmpty) _dashController.stop();
+    if (_flights.isEmpty) {
+      _dashController.stop();
+      _liveTimer?.cancel();
+      _liveTimer = null;
+    }
     // Rebuild while marks live (the countdown needs a fresh second), and
     // once more when the last mark expires so the badge actually clears.
     if (dirty ||
@@ -281,6 +294,13 @@ class _AiRoutingViewState extends State<AiRoutingView>
 
   void _onEvent(AiRouteEvent event) {
     if (!mounted) return;
+    // Progress events are high-cadence liveness ticks: they update the
+    // flight's live stats and let the 15fps timer repaint — they must not
+    // touch _last (the status line) or run the departure/return logic.
+    if (event.phase == AiRoutePhase.progress) {
+      _noteProgress(event);
+      return;
+    }
     setState(() {
       _last = event;
       _noteNodeActivity(event);
@@ -293,6 +313,25 @@ class _AiRoutingViewState extends State<AiRoutingView>
       case AiRoutePhase.served:
       case AiRoutePhase.failed:
         _returnHome(event);
+      case AiRoutePhase.progress:
+        break;
+    }
+  }
+
+  /// Folds a `progress` event into its flight's live stats. Events for a
+  /// member with no flight (provider past the slot cap, animations
+  /// disabled) are dropped — there is nothing on screen to feed.
+  void _noteProgress(AiRouteEvent event) {
+    final chars = event.contentChars;
+    if (chars == null) return;
+    for (final flight in _flights) {
+      if (flight.callId == event.callId && flight.member == event.member) {
+        flight.contentChars = chars;
+        final now = DateTime.now();
+        flight.firstContentAt ??= now;
+        flight.lastContentAt = now;
+        return;
+      }
     }
   }
 
@@ -340,13 +379,20 @@ class _AiRoutingViewState extends State<AiRoutingView>
     controller.addStatusListener((status) {
       if (status == AnimationStatus.dismissed) {
         setState(() => _flights.remove(flight));
-        if (_flights.isEmpty) _dashController.stop();
+        if (_flights.isEmpty) {
+          _dashController.stop();
+          _liveTimer?.cancel();
+          _liveTimer = null;
+        }
         controller.dispose();
         _flushDepartures();
       }
     });
     _flights.add(flight);
     _dashController.repeat();
+    _liveTimer ??= Timer.periodic(const Duration(milliseconds: 66), (_) {
+      if (mounted) setState(() {});
+    });
     unawaited(controller.forward());
   }
 
@@ -545,6 +591,14 @@ final class _LeafFlight {
   final String member;
   final String providerId;
   final AnimationController controller;
+
+  /// Live reply stats fed by `AiRoutePhase.progress` events — chars of
+  /// reply content seen so far and when content last arrived. Both null
+  /// until the first progress event; the answering mark shows bare
+  /// "Answering…" until then.
+  int contentChars = 0;
+  DateTime? firstContentAt;
+  DateTime? lastContentAt;
 }
 
 /// The wires and the nodes they join: Agent → gateway → each provider. The
@@ -661,15 +715,35 @@ class _RoutingCanvas extends StatelessWidget {
         bool wireActive(String providerId) =>
             flights.any((f) => f.providerId == providerId);
 
-        // "Answering" means the request is still being served: any
-        // flight that has not started its way home — outbound leg and
-        // the parked stretch at the provider both count. Once the leaf
-        // turns around the reply already arrived, so the mark lifts.
-        bool answering(String providerId) => flights.any(
-          (f) =>
-              f.providerId == providerId &&
-              f.controller.status != AnimationStatus.reverse,
-        );
+        // Live stats for the flight serving [providerId], or null. Any
+        // flight that has not started its way home counts — outbound leg
+        // and the held stretch at the node both — since the request is
+        // still being answered. Once the leaf turns around the reply
+        // already arrived, so the mark lifts. [quiet] mirrors magpie's
+        // 15s rule: no new content for that long and the "answering"
+        // claim drops to just the numbers — a quiet reply is not a
+        // failed one.
+        ({int chars, int? rate, bool quiet})? liveFor(String providerId) {
+          final now = DateTime.now();
+          for (final f in flights) {
+            if (f.providerId != providerId ||
+                f.controller.status == AnimationStatus.reverse) {
+              continue;
+            }
+            final first = f.firstContentAt;
+            final last = f.lastContentAt;
+            final quiet =
+                last != null &&
+                now.difference(last) > const Duration(seconds: 15);
+            int? rate;
+            if (first != null) {
+              final span = now.difference(first).inMilliseconds;
+              if (span >= 1000) rate = (f.contentChars * 1000 / span).round();
+            }
+            return (chars: f.contentChars, rate: rate, quiet: quiet);
+          }
+          return null;
+        }
 
         // How far the leaf's arc crests above the gateway wire while it
         // crosses the card: the apex lands just clear of the card's top
@@ -690,11 +764,12 @@ class _RoutingCanvas extends StatelessWidget {
 
         CustomPaint wires(double phase) {
           // Leg occupancy from live eased progress — the same te the leaf
-          // positions itself with. te < 0.45 rides agent→gatewayIn,
-          // te > 0.55 rides gatewayOut→provider; the slice between is the
-          // arc over the gateway card, where the leaf is on no wire at
-          // all, so neither segment claims it. Direction flips on the
-          // return leg exactly as before.
+          // positions itself with, scaled by the same [_leafPathEnd]:
+          // below the leg split the leaf rides agent→gatewayIn, past the
+          // arc end it rides gatewayOut→provider; between them it is on
+          // the arc over the gateway card — on no wire — and past
+          // [_leafPathEnd] it is drifting away at the provider, which the
+          // provider leg still claims as "request held here".
           var agentGwFwd = false;
           var agentGwBack = false;
           final providerFwd = <String>{};
@@ -703,13 +778,13 @@ class _RoutingCanvas extends StatelessWidget {
             final returning =
                 flight.controller.status == AnimationStatus.reverse;
             final te = (1 - math.cos(math.pi * flight.controller.value)) / 2;
-            if (te < 0.45) {
+            if (te < _leafPathEnd * _leafLegSplit) {
               if (returning) {
                 agentGwBack = true;
               } else {
                 agentGwFwd = true;
               }
-            } else if (te > 0.55) {
+            } else if (te > _leafPathEnd * _leafArcEnd) {
               if (returning) {
                 providerBack.add(flight.providerId);
               } else {
@@ -771,7 +846,7 @@ class _RoutingCanvas extends StatelessWidget {
                   enabled: provider.enabled,
                   health: health[provider.id],
                   activeModelId: modelByProvider[provider.id],
-                  answering: answering(provider.id),
+                  live: liveFor(provider.id),
                   breathing: dash != null && wireActive(provider.id),
                   breath: dash,
                   onTap: onProviderTap == null
@@ -809,6 +884,26 @@ class _RoutingCanvas extends StatelessWidget {
                 arcLift: arcLift,
                 target: anchorFor(flight.providerId),
               ),
+            // Once the leaf has flown its away, the request still sits at
+            // the provider: a held dot keeps it visible, breathing in
+            // place until the return leaf comes for it — magpie's "held"
+            // packet, same 1.2s fade cycle.
+            for (final flight in flights)
+              if (flight.controller.status == AnimationStatus.completed &&
+                  anchorFor(flight.providerId) != Offset.zero)
+                () {
+                  final anchor = anchorFor(flight.providerId);
+                  return Positioned(
+                    left: anchor.dx - 16,
+                    top: anchor.dy - 5,
+                    child: _HeldDot(
+                      color: _Leaf._leafColor(
+                        WeChatColors.of(context).brandStrong,
+                        flight.callId,
+                      ),
+                    ),
+                  );
+                }(),
             if (overflowLabel != null)
               Positioned(
                 right: _margin,
@@ -837,6 +932,16 @@ class _RoutingCanvas extends StatelessWidget {
   }
 }
 
+/// Leaf trip layout, shared by the leaf's path math and the wire painter's
+/// leg-occupancy read so they can never disagree: the eased trip spends
+/// its first 45% on the agent→gateway wire, the next 10% arcing over the
+/// gateway card, the next 45% on the gateway→provider wire — all inside
+/// the first [_leafPathEnd] of te — and the last slice drifting away off
+/// the provider node (magpie's exit: fly off up-and-away, then gone).
+const double _leafPathEnd = 0.88;
+const double _leafLegSplit = 0.45;
+const double _leafArcEnd = 0.55;
+
 /// Cubic bezier point at [t], shared by the wire painter and the leaf so
 /// the leaf rides exactly on the line it is flying.
 Offset _bezier(Offset p0, Offset c1, Offset c2, Offset p3, double t) {
@@ -850,6 +955,11 @@ Offset _bezier(Offset p0, Offset c1, Offset c2, Offset p3, double t) {
     a * p0.dy + b * c1.dy + c * c2.dy + d * p3.dy,
   );
 }
+
+/// `1,433`-style grouping is for the log's exact counts; live stats want
+/// compact — `1.2K` reads at a glance on a node card.
+String _compactCount(int n) =>
+    n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}K' : '$n';
 
 /// The four control points of a wire's cubic: start, two handles at the
 /// horizontal thirds, end. Shared by the painter and the leaf so the leaf
@@ -1063,7 +1173,7 @@ class _ProviderNode extends StatelessWidget {
     required this.enabled,
     this.health,
     this.activeModelId,
-    this.answering = false,
+    this.live,
     this.breathing = false,
     this.breath,
     this.onTap,
@@ -1087,11 +1197,13 @@ class _ProviderNode extends StatelessWidget {
   /// "which model answered" — under the provider's own name.
   final String? activeModelId;
 
-  /// A request is still being served by this provider — any flight that
-  /// has not turned for home counts. The second line's right end shows a
-  /// live "Answering…" mark so a long stream does not read as an
-  /// unresponsive node; it lifts the moment the reply starts home.
-  final bool answering;
+  /// Live reply stats while this provider is answering — chars seen,
+  /// chars/sec once a second of content has flowed, and [quiet] when no
+  /// new content arrived for 15s. Null when no request is being served.
+  /// The second line's right end shows the mark so a long stream does
+  /// not read as an unresponsive node; it lifts when the reply starts
+  /// home.
+  final ({int chars, int? rate, bool quiet})? live;
 
   /// Opens the provider's editor on the host page; null makes the node
   /// inert (used by callers that embed the canvas without a page).
@@ -1116,6 +1228,32 @@ class _ProviderNode extends StatelessWidget {
     final modelId = activeModelId;
     final model = modelId == null ? null : provider.modelNamed(modelId);
     final modelLabel = model == null ? modelId : (model.label ?? model.id);
+    // The answering mark: bare "Answering…" until the first content
+    // lands, then live numbers (chars and chars/sec) like magpie's row —
+    // and after 15s of silence it drops the claim and shows the numbers
+    // alone in the warning colour: quiet is not failed.
+    final liveStats = live;
+    String? markText;
+    var markColor = colors.brandStrong;
+    if (liveStats != null) {
+      if (liveStats.chars == 0) {
+        markText = l10n.aiRoutingAnswering;
+      } else {
+        final charsText = l10n.aiRoutingLiveChars(
+          _compactCount(liveStats.chars),
+        );
+        final rate = liveStats.rate;
+        final stats = rate == null
+            ? charsText
+            : '$charsText · ${l10n.aiRoutingLiveRate('$rate')}';
+        if (liveStats.quiet) {
+          markText = stats;
+          markColor = colors.warning;
+        } else {
+          markText = l10n.aiRoutingLiveAnswering(stats);
+        }
+      }
+    }
     // Breathing: while a leaf is flying to this provider, a soft glow
     // swells and fades on an ~800ms sine — "being asked right now" reads
     // at a glance without a badge. The phase comes from the shared dash
@@ -1177,15 +1315,18 @@ class _ProviderNode extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (answering) ...[
+                if (markText != null) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    l10n.aiRoutingAnswering,
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: WeChat.fontSizeMeta,
-                      fontWeight: FontWeight.w600,
-                      color: colors.brandStrong,
+                  Flexible(
+                    child: Text(
+                      markText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: WeChat.fontSizeMeta,
+                        fontWeight: FontWeight.w600,
+                        color: markColor,
+                      ),
                     ),
                   ),
                 ],
@@ -1277,18 +1418,34 @@ class _Leaf extends StatelessWidget {
       builder: (context, _) {
         final t = flight.controller.value;
         // Cosine ease-in-out: the leaf launches and docks gently rather
-        // than sliding at constant speed. The leg boundaries read the
-        // eased value too, matching what the wire painter calls a leg.
+        // than sliding at constant speed. Leg boundaries read the eased
+        // value too, matching what the wire painter calls a leg.
         final te = (1 - math.cos(math.pi * t)) / 2;
-        // Three hops: ride the agent→gateway wire, arc over the gateway
-        // card (te 0.45–0.55, the same dead zone the wires leave
-        // undashed), then ride the gateway→provider wire. Both outer
-        // hops keep the wire's own cubic so the leaf stays on the line.
-        final point = te <= 0.45
-            ? _bezierPoint(agent, gatewayIn, te / 0.45)
-            : te <= 0.55
-            ? _arcPoint(gatewayIn, gatewayOut, (te - 0.45) / 0.1)
-            : _bezierPoint(gatewayOut, target, (te - 0.55) / 0.45);
+        // Three hops inside the first [_leafPathEnd] of the trip: ride
+        // the agent→gateway wire, arc over the gateway card (the same
+        // dead zone the wires leave undashed), then ride the
+        // gateway→provider wire. The last slice is the arrival "away" —
+        // the leaf drifts up and off the node, shrinking and fading,
+        // while the held dot keeps the request alive at the provider.
+        final pathT = (te / _leafPathEnd).clamp(0.0, 1.0);
+        final awayT = ((te - _leafPathEnd) / (1 - _leafPathEnd)).clamp(
+          0.0,
+          1.0,
+        );
+        var point = pathT <= _leafLegSplit
+            ? _bezierPoint(agent, gatewayIn, pathT / _leafLegSplit)
+            : pathT <= _leafArcEnd
+            ? _arcPoint(
+                gatewayIn,
+                gatewayOut,
+                (pathT - _leafLegSplit) / (_leafArcEnd - _leafLegSplit),
+              )
+            : _bezierPoint(
+                gatewayOut,
+                target,
+                (pathT - _leafArcEnd) / (1 - _leafArcEnd),
+              );
+        point += Offset(awayT * 36, -awayT * 28);
         final sway = math.sin(t * math.pi * 2) * 0.35;
         final returning = flight.controller.status == AnimationStatus.reverse;
         // Dissolve at both ends of the trip: fully transparent at the
@@ -1301,25 +1458,28 @@ class _Leaf extends StatelessWidget {
           top: point.dy - 11,
           child: Opacity(
             opacity: opacity,
-            child: Transform.rotate(
-              angle: sway,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // The key doubles as the test hook: 'leaf-out' outbound,
-                  // 'leaf-back' (hollow bead) on the way home.
-                  Icon(
-                    Icons.eco,
-                    key: ValueKey(returning ? 'leaf-back' : 'leaf-out'),
-                    size: 22,
-                    color: leafColor,
-                  ),
-                  Positioned(
-                    left: 15,
-                    top: -4,
-                    child: _CargoBead(color: leafColor, hollow: returning),
-                  ),
-                ],
+            child: Transform.scale(
+              scale: 1 - 0.25 * awayT,
+              child: Transform.rotate(
+                angle: sway,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // The key doubles as the test hook: 'leaf-out' outbound,
+                    // 'leaf-back' (hollow bead) on the way home.
+                    Icon(
+                      Icons.eco,
+                      key: ValueKey(returning ? 'leaf-back' : 'leaf-out'),
+                      size: 22,
+                      color: leafColor,
+                    ),
+                    Positioned(
+                      left: 15,
+                      top: -4,
+                      child: _CargoBead(color: leafColor, hollow: returning),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1367,6 +1527,30 @@ class _Leaf extends StatelessWidget {
       Offset(to.dx - span / 3, to.dy - arcLift),
       to,
       t,
+    );
+  }
+}
+
+/// The dot a provider holds while it answers: it stays at the node's
+/// wire end and breathes — opacity 1→0.45→1 on magpie's 1.2s cosine —
+/// for as long as the reply is out. Repaints on the view's 15fps live
+/// clock, which only runs while a flight exists.
+class _HeldDot extends StatelessWidget {
+  const _HeldDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final phase = (DateTime.now().millisecondsSinceEpoch % 1200) / 1200;
+    final c = math.cos(math.pi * phase);
+    return Opacity(
+      opacity: 0.45 + 0.55 * c * c,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      ),
     );
   }
 }
@@ -1614,6 +1798,9 @@ class _StatusBar extends StatelessWidget {
       AiRoutePhase.served => ('✓', colors.brandStrong),
       AiRoutePhase.failed =>
         (event.cooling ? ('⏳', colors.warning) : ('✗', colors.danger)),
+      // Progress events never reach _last — the early return in _onEvent
+      // keeps them off the status line — but the switch must be exhaustive.
+      AiRoutePhase.progress => ('·', colors.secondaryText),
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

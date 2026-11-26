@@ -528,6 +528,18 @@
   },
   "aiRoutingFailed": "上次请求失败",
   "aiRoutingAnswering": "回答中…",
+  "aiRoutingLiveAnswering": "回答中… · {stats}",
+  "@aiRoutingLiveAnswering": {
+    "placeholders": { "stats": { "type": "String" } }
+  },
+  "aiRoutingLiveChars": "{chars}字",
+  "@aiRoutingLiveChars": {
+    "placeholders": { "chars": { "type": "String" } }
+  },
+  "aiRoutingLiveRate": "{rate}字/s",
+  "@aiRoutingLiveRate": {
+    "placeholders": { "rate": { "type": "String" } }
+  },
   "aiRoutingEmpty": "还没有供应商。",
   "aiRoutingMoreProviders": "另有 {count} 个供应商在请求",
   "@aiRoutingMoreProviders": {

@@ -133,6 +133,12 @@ enum AiRoutePhase {
 
   /// The member failed; the router either fails over or gives up.
   failed,
+
+  /// Content is still arriving on an in-flight stream — emitted at a
+  /// throttled cadence (never per chunk) so observers can show live
+  /// progress without the event stream becoming a firehose. Carries
+  /// [AiRouteEvent.contentChars].
+  progress,
 }
 
 /// One step of a [AiRouter.chat] call, broadcast for observers.
@@ -148,6 +154,7 @@ final class AiRouteEvent {
     required this.member,
     required this.model,
     this.cooling = false,
+    this.contentChars,
   });
 
   final int callId;
@@ -159,6 +166,12 @@ final class AiRouteEvent {
   /// routing view marks the node "cooling down" rather than "error", which
   /// is the honest picture: it will be tried again shortly.
   final bool cooling;
+
+  /// Cumulative reply characters seen so far — set on `progress` events
+  /// only. Characters, not tokens: providers only report token accounting
+  /// once at the end, while deltas arrive continuously, so chars are the
+  /// honest live unit (magpie counts reply bytes the same way).
+  final int? contentChars;
 }
 
 /// Resolves `provider/model` and `group/<id>` references to concrete upstream
@@ -208,6 +221,7 @@ final class AiRouter {
     String member,
     String model, {
     bool cooling = false,
+    int? contentChars,
   }) {
     if (_events.isClosed) return;
     _events.add(
@@ -217,6 +231,7 @@ final class AiRouter {
         member: member,
         model: model,
         cooling: cooling,
+        contentChars: contentChars,
       ),
     );
   }
@@ -237,7 +252,15 @@ final class AiRouter {
     String member, [
     String model = '',
     bool cooling = false,
-  ]) => _emit(callId, phase, member, model, cooling: cooling);
+    int? contentChars,
+  ]) => _emit(
+    callId,
+    phase,
+    member,
+    model,
+    cooling: cooling,
+    contentChars: contentChars,
+  );
 
   /// Sends [request] and returns the reply from the first member that works.
   ///
@@ -388,14 +411,40 @@ final class AiRouter {
     var settled = false;
     var streamFailed = false;
     DateTime? firstContentAt;
+    DateTime? lastProgressAt;
+    var contentChars = 0;
     AiUsage? usage;
     try {
       await for (final event in inner) {
-        if (firstContentAt == null &&
-            (event.kind == AiStreamKind.textDelta ||
-                event.kind == AiStreamKind.reasoningDelta ||
-                event.kind == AiStreamKind.toolCall)) {
-          firstContentAt = DateTime.now();
+        final isContent =
+            event.kind == AiStreamKind.textDelta ||
+            event.kind == AiStreamKind.reasoningDelta ||
+            event.kind == AiStreamKind.toolCall;
+        if (isContent) {
+          contentChars += switch (event.kind) {
+            AiStreamKind.textDelta ||
+            AiStreamKind.reasoningDelta => event.text?.length ?? 0,
+            AiStreamKind.toolCall =>
+              event.toolCall!.name.length + event.toolCall!.arguments.length,
+            _ => 0,
+          };
+          final now = DateTime.now();
+          firstContentAt ??= now;
+          // Progress goes out at most every 250ms — enough for a live
+          // readout, never a per-chunk firehose. The first content event
+          // always emits so the mark appears with the first token.
+          if (lastProgressAt == null ||
+              now.difference(lastProgressAt) >=
+                  const Duration(milliseconds: 250)) {
+            lastProgressAt = now;
+            _emit(
+              callId,
+              AiRoutePhase.progress,
+              member,
+              model,
+              contentChars: contentChars,
+            );
+          }
         }
         if (event.kind == AiStreamKind.usage) usage = event.usage;
         // An upstream error frame means the answer died mid-flight:

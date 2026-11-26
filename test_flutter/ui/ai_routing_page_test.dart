@@ -302,6 +302,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
     expect(find.text(l10n.aiRoutingAnswering), findsOneWidget);
 
+    // Content flowing: the mark gains live numbers on the 15fps clock.
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.progress,
+      'opencode-zen/mimo-v2.6-flash-free',
+      '',
+      false,
+      1234,
+    );
+    await tester.pump(const Duration(milliseconds: 70));
+    expect(find.textContaining('1.2K'), findsOneWidget);
+    expect(find.text(l10n.aiRoutingAnswering), findsNothing);
+
     // Served and heading home: the reply already arrived, mark lifts.
     runtime.router.emitRouteEventForTest(
       1,

@@ -1711,6 +1711,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRoutingAnswering => 'Answering…';
 
   @override
+  String aiRoutingLiveAnswering(String stats) {
+    return 'Answering… · $stats';
+  }
+
+  @override
+  String aiRoutingLiveChars(String chars) {
+    return '$chars chars';
+  }
+
+  @override
+  String aiRoutingLiveRate(String rate) {
+    return '$rate/s';
+  }
+
+  @override
   String get aiRoutingEmpty => 'No providers yet.';
 
   @override
