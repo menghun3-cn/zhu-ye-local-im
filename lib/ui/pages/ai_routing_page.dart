@@ -751,6 +751,7 @@ class _RoutingCanvas extends StatelessWidget {
         const arcLift = _cardHeight / 2 + 40;
 
         final wireColor = WeChatColors.of(context).brandLine;
+        final wireActiveColor = WeChatColors.of(context).brandStrong;
         final dashAnimation = dash;
         // The wire layer rebuilds on every animation tick: the dash
         // phase for the flow, and each leaf's live 0→1 progress for
@@ -763,13 +764,13 @@ class _RoutingCanvas extends StatelessWidget {
         ];
 
         CustomPaint wires(double phase) {
-          // Leg occupancy from live eased progress — the same te the leaf
-          // positions itself with, scaled by the same [_leafPathEnd]:
-          // below the leg split the leaf rides agent→gatewayIn, past the
-          // arc end it rides gatewayOut→provider; between them it is on
-          // the arc over the gateway card — on no wire — and past
-          // [_leafPathEnd] it is drifting away at the provider, which the
-          // provider leg still claims as "request held here".
+          // The whole route lights up for the whole flight — magpie's
+          // own read: agent→gateway and gateway→provider both dash and
+          // flow while a request is out, outbound and held included, so
+          // the path being asked reads at a glance rather than a single
+          // busy-looking segment. Direction still follows the leaf: a
+          // returning flight marches both wires backwards, and forward
+          // wins when flights disagree.
           var agentGwFwd = false;
           var agentGwBack = false;
           final providerFwd = <String>{};
@@ -777,23 +778,17 @@ class _RoutingCanvas extends StatelessWidget {
           for (final flight in flights) {
             final returning =
                 flight.controller.status == AnimationStatus.reverse;
-            final te = (1 - math.cos(math.pi * flight.controller.value)) / 2;
-            if (te < _leafPathEnd * _leafLegSplit) {
-              if (returning) {
-                agentGwBack = true;
-              } else {
-                agentGwFwd = true;
-              }
-            } else if (te > _leafPathEnd * _leafArcEnd) {
-              if (returning) {
-                providerBack.add(flight.providerId);
-              } else {
-                providerFwd.add(flight.providerId);
-              }
+            if (returning) {
+              agentGwBack = true;
+              providerBack.add(flight.providerId);
+            } else {
+              agentGwFwd = true;
+              providerFwd.add(flight.providerId);
             }
           }
           return CustomPaint(
             painter: _WirePainter(
+              activeColor: wireActiveColor,
               segments: [
                 _WireSegment(
                   from: agentOut,
@@ -991,11 +986,17 @@ class _WirePainter extends CustomPainter {
   _WirePainter({
     required this.segments,
     required this.color,
+    required this.activeColor,
     this.dashPhase = 0,
   });
 
   final List<_WireSegment> segments;
   final Color color;
+
+  /// Colour for segments carrying a request — magpie lights live wires
+  /// in the agent's own colour while idle wires stay the faint line
+  /// colour, so "this route is being asked" reads at a glance.
+  final Color activeColor;
 
   /// 0→1 loop position of the dash pattern. Each cycle slides the dashes
   /// one period (9px) toward the provider, so a wire carrying a request
@@ -1009,6 +1010,7 @@ class _WirePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     for (final segment in segments) {
+      paint.color = segment.dashed ? activeColor : color;
       final points = _wirePoints(segment.from, segment.to);
       final path = Path()
         ..moveTo(points[0].dx, points[0].dy)
@@ -1028,27 +1030,31 @@ class _WirePainter extends CustomPainter {
     }
   }
 
-  /// 5px dash, 4px gap, extracted along the path's own metrics so the dashes
-  /// follow the curve instead of a straight bounding box. [dashPhase] shifts
-  /// the whole pattern along the path — increasing it moves the dashes
-  /// toward `to`; [reversed] runs the flow the other way, for leaves on the
-  /// way home.
+  /// 4px dash, 4px gap — magpie's dense rhythm — extracted along the
+  /// path's own metrics so the dashes follow the curve instead of a
+  /// straight bounding box. [dashPhase] shifts the whole pattern along
+  /// the path two periods per cycle (~20px/s), clearly visible flow;
+  /// [reversed] runs it the other way, for leaves on the way home.
   void _drawDashed(
     Canvas canvas,
     Path path,
     Paint paint, {
     bool reversed = false,
   }) {
-    final shift = reversed ? ((-dashPhase * 9) % 9) : ((dashPhase * 9) % 9);
+    const period = 8.0;
+    const dash = 4.0;
+    final shift = reversed
+        ? ((-dashPhase * 16) % period)
+        : ((dashPhase * 16) % period);
     for (final metric in path.computeMetrics()) {
-      var distance = shift - 9;
+      var distance = shift - period;
       while (distance < metric.length) {
         final start = math.max(0.0, distance);
-        final end = math.min(distance + 5, metric.length);
+        final end = math.min(distance + dash, metric.length);
         if (end > start) {
           canvas.drawPath(metric.extractPath(start, end), paint);
         }
-        distance += 9;
+        distance += period;
       }
     }
   }
@@ -1056,6 +1062,7 @@ class _WirePainter extends CustomPainter {
   @override
   bool shouldRepaint(_WirePainter old) =>
       old.color != color ||
+      old.activeColor != activeColor ||
       old.dashPhase != dashPhase ||
       !_sameSegments(old.segments, segments);
 

@@ -102,14 +102,18 @@ behind homeward leaves, and an attempt whose request already ended
 while queued is dropped on the end event — otherwise it would launch,
 fly out, and dissolve at the provider forever with no second end event
 left to bring it home.
-The wire a leaf is riding turns dashed **on that leg only** — leg
-occupancy is read from each flight's live eased progress each frame —
-the same te the leaf positions itself with, scaled by the shared
-[_leafPathEnd] trip layout — so a held or homeward leaf never leaves
-the other leg animating as if traffic still flowed there. The dash pattern slides
-toward the direction the leaf is actually travelling — reversed on the
-return leg — driven by a repeating controller that only runs while a
-leaf is airborne, so an idle canvas burns no frames. Each leaf's shade
+The whole route lights up for the whole flight — magpie's own read:
+agent→gateway and gateway→provider both dash **and flow** while a
+request is out, outbound and held stretches included, so the path being
+asked reads at a glance rather than a single busy-looking segment.
+Dashed segments paint in the brand colour while idle wires keep the
+faint line colour, the dash rhythm is a dense 4-on/4-off and the pattern
+slides two periods per dash cycle (~20px/s) — visibly flowing, not
+breathing. Direction still follows the leaf: a returning flight marches
+both wires backwards, and forward wins when flights disagree. The dash
+pattern slides toward the direction the leaf is actually travelling —
+reversed on the return leg — driven by a repeating controller that only
+runs while a leaf is airborne, so an idle canvas burns no frames. Each leaf's shade
 is a pure function of its `callId` (four lightness × two saturation
 steps around the brand green), so concurrent requests are tellable
 apart while a failover's members — same call, different providers —

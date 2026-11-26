@@ -380,17 +380,19 @@ void main() {
       'opencode-zen/mimo-v2.6-flash-free',
     );
     await tester.pump();
-    // Let the leaf finish its outbound leg: parked at the provider, only
-    // the gateway→provider wire may be dashed — the agent→gateway wire
-    // must be solid because no leaf is on it.
+    // Let the leaf finish its outbound leg and park at the provider: the
+    // whole route stays lit — both wires dashed and flowing forward for
+    // as long as the request is out, held stretch included.
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 1100));
     var state = wireState();
-    expect(state.agentDashed, isFalse);
+    expect(state.agentDashed, isTrue);
+    expect(state.agentRev, isFalse);
     expect(state.providerDashed, isTrue);
     expect(state.providerRev, isFalse);
 
-    // On the way home the provider-leg dash must flow backwards.
+    // On the way home both wires march backwards — the whole route, not
+    // just the leg the leaf is on.
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.served,
@@ -401,15 +403,18 @@ void main() {
     state = wireState();
     expect(state.providerDashed, isTrue);
     expect(state.providerRev, isTrue);
-    expect(state.agentDashed, isFalse);
+    expect(state.agentDashed, isTrue);
+    expect(state.agentRev, isTrue);
 
-    // Late in the return the leaf crosses onto the agent→gateway leg,
-    // and that wire takes over — still flowing backwards.
+    // Late in the return the route is still lit — both wires dashed,
+    // both flowing backwards — until the leaf docks and the flight is
+    // dismissed.
     await tester.pump(const Duration(milliseconds: 400));
     state = wireState();
     expect(state.agentDashed, isTrue);
     expect(state.agentRev, isTrue);
-    expect(state.providerDashed, isFalse);
+    expect(state.providerDashed, isTrue);
+    expect(state.providerRev, isTrue);
   });
 
   testWidgets('a serial request queues behind the homeward leaf', (
