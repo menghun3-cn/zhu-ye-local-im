@@ -69,10 +69,12 @@ showing its `ip:port`, and provider nodes, all scaled to roughly
 bezier wires for
 agent→gateway and gateway→provider — each hop deliberately short so the
 three columns read as one pipeline, not three islands. The leaf never
-crosses the gateway card's face: its mid-route waypoint sits one card
-half-height plus margin above or below the gateway centre — on the side
-the provider node is on — so the path crests clear of the card while the
-wires still terminate at the card edges. One bamboo leaf
+crosses the gateway card's face: it rides each wire right up to the
+card's edges, then arcs over the card's top — a short cubic whose
+handles sit just above the card — for the middle slice of the trip
+(eased progress 0.45–0.55), then picks the next wire back up. While the
+leaf is on that arc it is on no wire at all, so neither segment claims
+the dash. One bamboo leaf
 (`Icons.eco`) per in-flight request flies agent→gateway→provider on
 `attempt` and back on `served`/`failed` — magpie's own convention:
 a **solid bead** rides on the leaf outbound (the request going out) and
@@ -137,8 +139,9 @@ controller's 800ms cycle, so "being asked right now" needs no badge and
 stops the moment the last leaf docks. A long stream must not read as an
 unresponsive node either: while any flight to the provider has not yet
 turned for home — outbound leg and the parked stretch at the node both
-count — a live "Answering…" label sits just right of the card, and lifts
-the moment the return leg starts since the reply already arrived.
+count — a live "Answering…" mark sits at the right end of the card's
+second line, inside the card, and lifts the moment the return leg
+starts since the reply already arrived.
 Stale `provider → modelId`
 entries are pruned on reload when either side disappears.
 

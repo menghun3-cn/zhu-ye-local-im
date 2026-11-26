@@ -656,7 +656,6 @@ class _RoutingCanvas extends StatelessWidget {
         final agentOut = Offset(startX + _agentWidth, midY);
         final gatewayLeft = agentOut.dx + segment;
         final gatewayIn = Offset(gatewayLeft, midY);
-        final gatewayCenter = Offset(gatewayLeft + _gatewayWidth / 2, midY);
         final gatewayOut = Offset(gatewayLeft + _gatewayWidth, midY);
 
         bool wireActive(String providerId) =>
@@ -672,16 +671,10 @@ class _RoutingCanvas extends StatelessWidget {
               f.controller.status != AnimationStatus.reverse,
         );
 
-        // The leaf's mid-route waypoint arcs over the gateway card
-        // instead of crossing its face: the waypoint sits one card
-        // half-height plus margin above or below the gateway centre —
-        // the side the provider node is on — so both hops keep their
-        // horizontal end tangents and the path crests clear of the card.
-        Offset gatewayWaypoint(Offset target) {
-          if (target == Offset.zero) return gatewayCenter;
-          final side = target.dy >= midY ? 1.0 : -1.0;
-          return Offset(gatewayCenter.dx, midY + side * (_cardHeight / 2 + 48));
-        }
+        // How far the leaf's arc crests above the gateway wire while it
+        // crosses the card: the apex lands just clear of the card's top
+        // edge with room for the leaf glyph.
+        const arcLift = _cardHeight / 2 + 40;
 
         final wireColor = WeChatColors.of(context).brandLine;
         final dashAnimation = dash;
@@ -696,10 +689,12 @@ class _RoutingCanvas extends StatelessWidget {
         ];
 
         CustomPaint wires(double phase) {
-          // Leg occupancy from live controller values: t ≤ 0.5 rides
-          // agent→gateway, t > 0.5 rides gateway→provider, on both the
-          // outbound and the return trip. A segment flows forward only
-          // while every leaf on it travels forward.
+          // Leg occupancy from live eased progress — the same te the leaf
+          // positions itself with. te < 0.45 rides agent→gatewayIn,
+          // te > 0.55 rides gatewayOut→provider; the slice between is the
+          // arc over the gateway card, where the leaf is on no wire at
+          // all, so neither segment claims it. Direction flips on the
+          // return leg exactly as before.
           var agentGwFwd = false;
           var agentGwBack = false;
           final providerFwd = <String>{};
@@ -707,16 +702,19 @@ class _RoutingCanvas extends StatelessWidget {
           for (final flight in flights) {
             final returning =
                 flight.controller.status == AnimationStatus.reverse;
-            if (flight.controller.value <= 0.5) {
+            final te = (1 - math.cos(math.pi * flight.controller.value)) / 2;
+            if (te < 0.45) {
               if (returning) {
                 agentGwBack = true;
               } else {
                 agentGwFwd = true;
               }
-            } else if (returning) {
-              providerBack.add(flight.providerId);
-            } else {
-              providerFwd.add(flight.providerId);
+            } else if (te > 0.55) {
+              if (returning) {
+                providerBack.add(flight.providerId);
+              } else {
+                providerFwd.add(flight.providerId);
+              }
             }
           }
           return CustomPaint(
@@ -759,7 +757,7 @@ class _RoutingCanvas extends StatelessWidget {
             ),
             // Provider nodes first so the cards sit on top of any wire
             // that happens to pass under them.
-            for (final provider in providers) ...[
+            for (final provider in providers)
               Positioned(
                 left: providerLeft,
                 top:
@@ -773,6 +771,7 @@ class _RoutingCanvas extends StatelessWidget {
                   enabled: provider.enabled,
                   health: health[provider.id],
                   activeModelId: modelByProvider[provider.id],
+                  answering: answering(provider.id),
                   breathing: dash != null && wireActive(provider.id),
                   breath: dash,
                   onTap: onProviderTap == null
@@ -780,30 +779,6 @@ class _RoutingCanvas extends StatelessWidget {
                       : () => onProviderTap!(provider.id),
                 ),
               ),
-              // A live "answering" mark beside the card — a long stream
-              // must not read as an unresponsive node. Sits just right
-              // of the card, vertically centered on it.
-              if (answering(provider.id))
-                Positioned(
-                  left: providerLeft + _nodeWidth + 8,
-                  top:
-                      _margin +
-                      slot * slotOrder.indexOf(provider.id) +
-                      (slot - _nodeHeight) / 2,
-                  height: _nodeHeight,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      AppLocalizations.of(context).aiRoutingAnswering,
-                      style: TextStyle(
-                        fontSize: WeChat.fontSizeMeta,
-                        fontWeight: FontWeight.w600,
-                        color: WeChatColors.of(context).brandStrong,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
             Positioned(
               left: gatewayLeft,
               top: midY - _cardHeight / 2,
@@ -822,14 +797,16 @@ class _RoutingCanvas extends StatelessWidget {
               height: _cardHeight,
               child: _SourceNode(label: sourceLabel),
             ),
-            // Leaves ride on top of every node: the waypoint is the
-            // gateway's center, so a leaf crosses the card's face —
-            // under the cards it would vanish mid-trip.
+            // Leaves ride on top of every node: the arc over the gateway
+            // card peaks above the card's top edge, so the leaf stays
+            // visible for the whole trip.
             for (final flight in flights)
               _Leaf(
                 flight: flight,
                 agent: agentOut,
-                gateway: gatewayWaypoint(anchorFor(flight.providerId)),
+                gatewayIn: gatewayIn,
+                gatewayOut: gatewayOut,
+                arcLift: arcLift,
                 target: anchorFor(flight.providerId),
               ),
             if (overflowLabel != null)
@@ -1086,6 +1063,7 @@ class _ProviderNode extends StatelessWidget {
     required this.enabled,
     this.health,
     this.activeModelId,
+    this.answering = false,
     this.breathing = false,
     this.breath,
     this.onTap,
@@ -1108,6 +1086,12 @@ class _ProviderNode extends StatelessWidget {
   /// the node is healthy, the second line names that concrete model —
   /// "which model answered" — under the provider's own name.
   final String? activeModelId;
+
+  /// A request is still being served by this provider — any flight that
+  /// has not turned for home counts. The second line's right end shows a
+  /// live "Answering…" mark so a long stream does not read as an
+  /// unresponsive node; it lifts the moment the reply starts home.
+  final bool answering;
 
   /// Opens the provider's editor on the host page; null makes the node
   /// inert (used by callers that embed the canvas without a page).
@@ -1174,15 +1158,38 @@ class _ProviderNode extends StatelessWidget {
             // Health outranks the model name: a cooling or failed node
             // says so even while a model is on it. Healthy nodes show
             // the concrete model that was last asked, falling back to
-            // the enabled-model count.
-            Text(
-              status ?? modelLabel ?? l10n.aiProviderModelCount(enabledModels),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: WeChat.fontSizeMeta,
-                color: status == null ? colors.secondaryText : statusColor,
-              ),
+            // the enabled-model count. The answering mark pins to the
+            // row's right end inside the card.
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    status ??
+                        modelLabel ??
+                        l10n.aiProviderModelCount(enabledModels),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizeMeta,
+                      color: status == null
+                          ? colors.secondaryText
+                          : statusColor,
+                    ),
+                  ),
+                ),
+                if (answering) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.aiRoutingAnswering,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: WeChat.fontSizeMeta,
+                      fontWeight: FontWeight.w600,
+                      color: colors.brandStrong,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -1229,22 +1236,31 @@ class _ProviderNode extends StatelessWidget {
 
 /// The flying leaf: an [Icons.eco] glyph riding the route — agent →
 /// gateway → provider on the way out, back again on return. The leaf
-/// carries a solid bead outbound (the request) and a hollow one home
-/// (the reply), sways as it flies, and dissolves into each end node:
-/// opacity follows the eased trip progress so it fades out as it lands
-/// on the provider and fades back in as the return leg pulls away —
-/// a leaf parked at its node would read as a stuck request.
+/// follows each wire right up to the gateway card's edges, then arcs
+/// over the card's top while crossing it, then picks the next wire back
+/// up. It carries a solid bead outbound (the request) and a hollow one
+/// home (the reply), sways as it flies, and dissolves into each end
+/// node: opacity follows the eased trip progress so it fades out as it
+/// lands on the provider and fades back in as the return leg pulls
+/// away — a leaf parked at its node would read as a stuck request.
 class _Leaf extends StatelessWidget {
   const _Leaf({
     required this.flight,
     required this.agent,
-    required this.gateway,
+    required this.gatewayIn,
+    required this.gatewayOut,
+    required this.arcLift,
     required this.target,
   });
 
   final _LeafFlight flight;
   final Offset agent;
-  final Offset gateway;
+  final Offset gatewayIn;
+  final Offset gatewayOut;
+
+  /// How far the arc's control points sit above the gateway wire; the
+  /// apex crests at ~3/4 of that, just clear of the card's top edge.
+  final double arcLift;
   final Offset target;
 
   @override
@@ -1261,14 +1277,18 @@ class _Leaf extends StatelessWidget {
       builder: (context, _) {
         final t = flight.controller.value;
         // Cosine ease-in-out: the leaf launches and docks gently rather
-        // than sliding at constant speed. The leg split still reads the
-        // raw controller value, which crosses 0.5 at the same instant.
+        // than sliding at constant speed. The leg boundaries read the
+        // eased value too, matching what the wire painter calls a leg.
         final te = (1 - math.cos(math.pi * t)) / 2;
-        // Two hops: the first half of the trip ends at the gateway's
-        // center, the second half continues to the provider.
-        final point = te <= 0.5
-            ? _bezierPoint(agent, gateway, te * 2)
-            : _bezierPoint(gateway, target, (te - 0.5) * 2);
+        // Three hops: ride the agent→gateway wire, arc over the gateway
+        // card (te 0.45–0.55, the same dead zone the wires leave
+        // undashed), then ride the gateway→provider wire. Both outer
+        // hops keep the wire's own cubic so the leaf stays on the line.
+        final point = te <= 0.45
+            ? _bezierPoint(agent, gatewayIn, te / 0.45)
+            : te <= 0.55
+            ? _arcPoint(gatewayIn, gatewayOut, (te - 0.45) / 0.1)
+            : _bezierPoint(gatewayOut, target, (te - 0.55) / 0.45);
         final sway = math.sin(t * math.pi * 2) * 0.35;
         final returning = flight.controller.status == AnimationStatus.reverse;
         // Dissolve at both ends of the trip: fully transparent at the
@@ -1332,6 +1352,22 @@ class _Leaf extends StatelessWidget {
   Offset _bezierPoint(Offset from, Offset to, double t) {
     final points = _wirePoints(from, to);
     return _bezier(points[0], points[1], points[2], points[3], t);
+  }
+
+  /// The gateway crossing: a cubic from the card's left edge to its
+  /// right edge whose handles ride [arcLift] above the wire, so the
+  /// path crests over the card instead of crossing its face. Endpoints
+  /// stay on the wire line, keeping the join with both outer hops
+  /// tangent-smooth.
+  Offset _arcPoint(Offset from, Offset to, double t) {
+    final span = to.dx - from.dx;
+    return _bezier(
+      from,
+      Offset(from.dx + span / 3, from.dy - arcLift),
+      Offset(to.dx - span / 3, to.dy - arcLift),
+      to,
+      t,
+    );
   }
 }
 
