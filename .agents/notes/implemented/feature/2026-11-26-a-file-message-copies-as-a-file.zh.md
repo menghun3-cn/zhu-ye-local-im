@@ -17,7 +17,10 @@ Status: implemented
 增 `writeFiles(List<String> paths)`。在 Windows 和其他桌面平台上它调用
 `Pasteboard.writeFiles`，写入的是文件管理器写的 `CF_HDROP` 列表；在 Android
 上则走应用自己的 `cn.hnasct.local_transfer/files` 通道，因为 pasteboard 插
-件的 `writeFiles` 要的是 content URI，而不是本应用持有的文件系统路径。
+件的 `writeFiles` 要的是 content URI，而不是本应用持有的文件系统路径。插
+件的 Windows 实现不检查 `SetClipboardData` 的返回值就报成功，所以在
+Windows 上写完会把文件列表读回来比对，确认剪贴板真的拿到了 —— 一个只代
+表"调用没抛异常"的 `true`，正是这个 `bool` 要防的那种谎话。
 Android 侧把每个存在的文件经现有的 `update_file_provider` 转成
 `content://` URI，组成一个 `ClipData` 交给 `ClipboardManager`；读权限由
 Android 的 `ClipboardService` 在其它应用拉取 `getPrimaryClip` 时授予，与图片

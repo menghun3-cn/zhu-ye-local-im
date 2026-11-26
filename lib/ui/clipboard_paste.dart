@@ -112,7 +112,17 @@ final class SystemClipboardPaste implements ClipboardPaste {
       return false;
     }
     try {
-      return await Pasteboard.writeFiles(paths);
+      if (!await Pasteboard.writeFiles(paths)) return false;
+      // The plugin's Windows writeFiles reports success without checking
+      // SetClipboardData's result, so "the call did not throw" is not proof
+      // the clipboard holds the files. Reading the CF_HDROP list back is the
+      // only honest answer; the other desktops' implementations validate
+      // their own writes.
+      if (Platform.isWindows) {
+        final landed = await Pasteboard.files();
+        return landed.length == paths.length && landed.every(paths.contains);
+      }
+      return true;
     } on Object {
       return false;
     }

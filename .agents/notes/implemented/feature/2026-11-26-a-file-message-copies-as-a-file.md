@@ -21,7 +21,11 @@ Windows and the other desktop platforms it calls `Pasteboard.writeFiles`,
 which writes the `CF_HDROP` list a file manager writes; on Android it goes
 through the app's own `cn.hnasct.local_transfer/files` channel instead,
 because the pasteboard plugin's `writeFiles` expects content URIs rather than
-the filesystem paths this app holds. The Android side turns each existing
+the filesystem paths this app holds. The plugin's Windows implementation
+reports success without checking `SetClipboardData`'s result, so on Windows
+the file list is read back and compared before the copy is called done — a
+`true` that only means "the call did not throw" would be the same lie the
+`bool` exists to prevent. The Android side turns each existing
 file into a `content://` URI through the existing `update_file_provider` and
 sets one `ClipData` on the `ClipboardManager`; read permission is granted by
 Android's `ClipboardService` to each package that pulls `getPrimaryClip`, the
