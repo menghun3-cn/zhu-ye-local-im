@@ -375,6 +375,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
       member: event.member,
       providerId: providerId,
       controller: controller,
+      launchedAt: DateTime.now(),
     );
     controller.addStatusListener((status) {
       if (status == AnimationStatus.dismissed) {
@@ -585,12 +586,18 @@ final class _LeafFlight {
     required this.member,
     required this.providerId,
     required this.controller,
+    required this.launchedAt,
   });
 
   final int callId;
   final String member;
   final String providerId;
   final AnimationController controller;
+
+  /// When the leaf launched — the freshness key for flights that have not
+  /// seen content yet, so a just-departed request outranks an older one
+  /// still waiting on its first token.
+  final DateTime launchedAt;
 
   /// Live reply stats fed by `AiRoutePhase.progress` events — chars of
   /// reply content seen so far and when content last arrived. Both null
@@ -718,8 +725,10 @@ class _RoutingCanvas extends StatelessWidget {
         // Live stats for the flight serving [providerId], or null. Any
         // flight that has not started its way home counts — outbound leg
         // and the held stretch at the node both — since the request is
-        // still being answered. Once the leaf turns around the reply
-        // already arrived, so the mark lifts. [quiet] mirrors magpie's
+        // still being answered; once the leaf turns around the reply
+        // already arrived, so the mark lifts. With several flights on
+        // one provider the freshest-activity one speaks (see below).
+        // [quiet] mirrors magpie's
         // 15s rule: no new content for that long and the "answering"
         // claim drops to just the numbers — a quiet reply is not a
         // failed one. Units are estimated tokens (chars ÷ 4): providers
@@ -728,16 +737,14 @@ class _RoutingCanvas extends StatelessWidget {
         ({int tokens, int? rate, bool quiet})? liveFor(String providerId) {
           const charsPerToken = 4;
           final now = DateTime.now();
-          for (final f in flights) {
-            if (f.providerId != providerId ||
-                f.controller.status == AnimationStatus.reverse) {
-              continue;
-            }
-            final first = f.firstContentAt;
+          const quietFor = Duration(seconds: 15);
+          bool isQuiet(_LeafFlight f) {
             final last = f.lastContentAt;
-            final quiet =
-                last != null &&
-                now.difference(last) > const Duration(seconds: 15);
+            return last != null && now.difference(last) > quietFor;
+          }
+
+          ({int tokens, int? rate, bool quiet}) statsOf(_LeafFlight f) {
+            final first = f.firstContentAt;
             int? rate;
             if (first != null) {
               final span = now.difference(first).inMilliseconds;
@@ -748,10 +755,54 @@ class _RoutingCanvas extends StatelessWidget {
             return (
               tokens: (f.contentChars / charsPerToken).round(),
               rate: rate,
-              quiet: quiet,
+              quiet: isQuiet(f),
             );
           }
-          return null;
+
+          // A provider can hold several flights at once, and list order is
+          // launch order — so "first match" would let an old stalled
+          // stream mask every newer request behind its frozen quiet
+          // numbers. Pick the flight that best represents "answering
+          // right now": a non-quiet flight with content wins (freshest
+          // content first), then any non-quiet flight (latest launch —
+          // still waiting on its first token), and only when every
+          // flight has gone quiet does the freshest quiet one speak.
+          _LeafFlight? pick(
+            bool Function(_LeafFlight) where,
+            int Function(_LeafFlight) rank,
+          ) {
+            _LeafFlight? best;
+            var bestRank = -1;
+            for (final f in flights) {
+              if (f.providerId != providerId ||
+                  f.controller.status == AnimationStatus.reverse ||
+                  !where(f)) {
+                continue;
+              }
+              final r = rank(f);
+              if (r > bestRank) {
+                best = f;
+                bestRank = r;
+              }
+            }
+            return best;
+          }
+
+          final serving = pick(
+            (f) => !isQuiet(f) && f.lastContentAt != null,
+            (f) => f.lastContentAt!.millisecondsSinceEpoch,
+          );
+          final chosen =
+              serving ??
+              pick(
+                (f) => !isQuiet(f),
+                (f) => f.launchedAt.millisecondsSinceEpoch,
+              ) ??
+              pick(
+                (f) => isQuiet(f),
+                (f) => f.lastContentAt!.millisecondsSinceEpoch,
+              );
+          return chosen == null ? null : statsOf(chosen);
         }
 
         // How far the leaf's arc crests above the gateway wire while it

@@ -157,7 +157,15 @@ conversion, not a billed count), fed by throttled
 `AiRoutePhase.progress` events the router emits from `_observeStream`
 (chars, not tokens) — and after 15s without new content the
 mark drops the claim and shows the numbers alone in the warning colour:
-a quiet reply is not a failed one. The numbers repaint on a 15fps timer
+a quiet reply is not a failed one. One provider can hold several
+flights, and `_flights` is in launch order, so the mark picks the
+flight that best represents "answering right now" — a non-quiet flight
+with content first (freshest content wins), then any non-quiet flight
+(latest launch, still waiting on its first token), and only when every
+flight has gone quiet does the freshest quiet one speak. Without that,
+a stalled upstream stream — the body has no idle timeout once headers
+arrive — would sit `completed` forever and mask every newer request
+behind its frozen quiet numbers. The numbers repaint on a 15fps timer
 that runs only while a flight exists — magpie's own cadence, fast enough
 to read as live without repainting every frame. The provider card is
 360px wide — up from 299 — so the mark fits whole beside the model
