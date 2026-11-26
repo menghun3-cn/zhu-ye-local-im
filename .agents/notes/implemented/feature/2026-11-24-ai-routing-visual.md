@@ -154,8 +154,10 @@ background: the last 7 days of
 with a hairline `divider` border — `MM-dd HH:mm:ss` in its own
 column beside the model that served, then a compact metrics line
 (`2.3s · first token 2.1s · 37.4k tokens · 99% cached · 16.3 tok/s` —
-the speed figure is completion tokens over wall-clock duration, falling
-back to the total when the upstream reports no split) whose tooltip
+the speed figure is completion tokens over the post-first-token span,
+so a slow-thinking upstream does not read as a slow generator; rows
+without a completion split show `—` rather than dividing the prompt-
+inflated total) whose tooltip
 expands the exact uncached-input/output/cache-read/cache-write counts.
 `AiRouter` records every reply that completed (streams count only when
 their event stream ends cleanly — an upstream error event closes the
@@ -218,8 +220,8 @@ amber for "wait", red stays for "failed".
 - `requests.json` is a diagnostic log, not accounting: only served
   requests land in it, token figures are whatever the provider reported
   (absent stays absent, shown as `—`), and speed is completion tokens
-  over the post-TTFT span — or the whole duration when there is no
-  first-token mark.
+  over the post-first-token span (the whole duration when there is no
+  first-token mark) — `—` when the upstream reports no split.
 
 ## Alternatives considered
 

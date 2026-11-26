@@ -1394,14 +1394,20 @@ class _RequestTile extends StatelessWidget {
   static String _tokens(int n) =>
       n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
 
-  /// Output tokens per second over the request's wall time — the number
-  /// that says whether the provider is fast, not just whether it answered.
-  /// Completion tokens are the honest numerator; upstreams that report
-  /// only a total fall back to it.
+  /// Output tokens per second over the *decode* span — completion
+  /// tokens divided by the time after the first token arrived, so a
+  /// slow-thinking upstream does not read as a slow generator. Rows
+  /// without a completion split (or without any post-TTFT time) show
+  /// `—`: totalTokens would count the prompt and wildly overstate it.
   String _speed() {
-    final tokens = record.completionTokens ?? record.totalTokens;
-    if (tokens == null || record.durationMs <= 0) return '—';
-    return (tokens / (record.durationMs / 1000)).toStringAsFixed(1);
+    final tokens = record.completionTokens;
+    if (tokens == null) return '—';
+    final ttft = record.ttftMs;
+    final decodeMs = ttft != null
+        ? record.durationMs - ttft
+        : record.durationMs;
+    if (decodeMs <= 0) return '—';
+    return (tokens / (decodeMs / 1000)).toStringAsFixed(1);
   }
 
   /// `1,433` — the tooltip's exact counts read better grouped than compact.
