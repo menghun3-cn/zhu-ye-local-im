@@ -602,6 +602,7 @@
   "aiLoadFailed": "The AI configuration could not be read",
   "aiPageHint": "Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.",
   "aiCopied": "Copied",
+  "aiCopyFailed": "Copy failed — the clipboard refused the write",
 
   "aiNavGateway": "Gateway",
   "aiSectionProviders": "Providers",
@@ -701,6 +702,10 @@
   },
   "aiRoutingFailed": "Last request failed",
   "aiRoutingEmpty": "No providers yet.",
+  "aiRoutingMoreProviders": "{count} more providers active",
+  "@aiRoutingMoreProviders": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "aiRequestsTitle": "Requests",
   "aiRequestsWindow": "Last 7 days",
   "aiRequestsEmpty": "No requests yet.",

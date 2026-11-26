@@ -133,6 +133,19 @@ void main() {
     expect(records.single.totalTokens, 12);
   });
 
+  test('a stream that dies with an error event leaves no log row', () async {
+    // A 200 whose body is neither SSE nor JSON: the codec reports an
+    // error event mid-stream rather than a clean finish.
+    transport.pushJson(200, 'this is not a stream or a document');
+    final reply = await router.chat(chat(stream: true));
+    final events = await (reply as AiStreamReply).events.toList();
+    expect(events.any((e) => e.kind == AiStreamKind.error), isTrue);
+    // The route closes as failed, not served — a half-answer is not a
+    // request that got an answer.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(await log.load(), isEmpty);
+  });
+
   test('a failed request leaves no log row', () async {
     transport.pushJson(401, {'error': 'bad key'});
     await expectLater(router.chat(chat()), throwsA(isA<AiRequestException>()));

@@ -478,14 +478,11 @@ final class AiGateway {
     }
   }
 
-  /// The message a client sees for a failed route. [AiRequestException]
-  /// keeps the socket-level cause (DNS, timeout, refusal) separate from the
-  /// message; a bare "could not reach X" sends the caller debugging blind,
-  /// so the cause rides along when there is one.
-  static String _errorDetail(AiRequestException error) {
-    final cause = error.cause;
-    return cause == null ? error.message : '${error.message} ($cause)';
-  }
+  /// The message a client sees for a failed route: the provider-facing
+  /// text only. The socket-level cause (upstream host, errno, timeout
+  /// detail) stays home — under LAN scope a stranger dialing the gateway
+  /// does not get to read this machine's network internals.
+  static String _errorDetail(AiRequestException error) => error.message;
 
   /// Folds a stream into one reply — the non-streaming path's fallback.
   Future<AiChatResponse> _collect(Stream<AiStreamEvent> events) async {

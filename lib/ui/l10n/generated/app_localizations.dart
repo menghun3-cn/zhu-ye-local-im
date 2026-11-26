@@ -2527,6 +2527,12 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get aiCopied;
 
+  /// No description provided for @aiCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy failed — the clipboard refused the write'**
+  String get aiCopyFailed;
+
   /// No description provided for @aiNavGateway.
   ///
   /// In en, this message translates to:
@@ -2970,6 +2976,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No providers yet.'**
   String get aiRoutingEmpty;
+
+  /// No description provided for @aiRoutingMoreProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} more providers active'**
+  String aiRoutingMoreProviders(int count);
 
   /// No description provided for @aiRequestsTitle.
   ///

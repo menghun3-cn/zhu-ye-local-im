@@ -127,7 +127,10 @@ Providers tab, "what is being asked" lives here. Nodes claim a fixed
 slot in first-requested order (capped at 10) rather than packing
 vertically, so a node arriving or expiring never slides its neighbours
 — appear/disappear jitter was the difference between "alive" and
-"seasick". A node card names both parties: the provider's name on the
+"seasick". Past the cap an active provider still earns its visibility
+mark and a request, but no node: the canvas answers with a small
+"N more providers active" caption rather than letting those requests
+look ignored. A node card names both parties: the provider's name on the
 headline row, and — while healthy — the concrete model its latest route
 event asked for on the second line (`provider → modelId` from the member
 ref, resolved through `model.label ?? id`), falling back to the
@@ -162,9 +165,11 @@ column beside the model that served, then a compact metrics line
 the speed figure is completion tokens over wall-clock duration, falling
 back to the total when the upstream reports no split) whose tooltip
 expands the exact uncached-input/output/cache-read/cache-write counts.
-`AiRouter` records every reply that completed (streams count when their
-event stream ends; failures leave no row — the red node already says
-that) into `requests.json` beside `providers.json`, stamped with the
+`AiRouter` records every reply that completed (streams count only when
+their event stream ends cleanly — an upstream error event closes the
+route as failed and leaves no row; failures leave no row — the red
+node already says that) into `requests.json` beside `providers.json`,
+stamped with the
 gateway key name when the request arrived through one, pruned to the
 window on every write and hard-capped at 500 rows. Timing comes from
 the router's own clock, tokens from `AiUsage`, which gained
@@ -182,7 +187,10 @@ router's TTFT clock stops at the first text, reasoning, or tool-call
 event — otherwise reasoning models would show `—` for exactly the
 requests users wait longest on. When an upstream reports only
 total/completion, the prompt share is derived as their difference so
-the cache-hit math still renders. Recording is fire-and-forget: a log
+the cache-hit math still renders. Recording is fire-and-forget and
+serialized through a write queue with a unique temp name per write —
+concurrent completions (the LAN gateway makes them real) cannot lose
+each other's rows or collide on `requests.json.tmp`. A log
 failure can never reach a request. The view reloads on `AiRequestLog.version`, polled by
 the same 1s ticker that watches `configVersion`.
 

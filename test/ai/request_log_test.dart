@@ -88,4 +88,15 @@ void main() {
     final records = await log.load();
     expect(records, hasLength(AiRequestLog.maxRecords));
   });
+
+  test('concurrent records all land — writes are serialized', () async {
+    // Two requests finishing together must not lose each other's row:
+    // the read-modify-write runs one at a time through the write queue.
+    await Future.wait([
+      for (var i = 0; i < 20; i++) log.record(record(model: 'a/m$i')),
+    ]);
+    final records = await log.load();
+    expect(records, hasLength(20));
+    expect(records.map((r) => r.model).toSet(), hasLength(20));
+  });
 }

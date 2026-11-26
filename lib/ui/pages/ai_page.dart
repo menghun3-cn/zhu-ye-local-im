@@ -270,9 +270,17 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
     // takes it: the page may be gone by the time the write answers.
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     final l10n = AppLocalizations.of(context);
-    await widget.seams.clipboard.write(text);
+    // A refused write must not claim success — the toast names the
+    // failure instead of congratulating a copy that never happened.
+    String message;
+    try {
+      await widget.seams.clipboard.write(text);
+      message = l10n.aiCopied;
+    } on Object {
+      message = l10n.aiCopyFailed;
+    }
     if (overlay != null) {
-      await TopToast.showIn(overlay, l10n.aiCopied);
+      await TopToast.showIn(overlay, message);
     }
   }
 

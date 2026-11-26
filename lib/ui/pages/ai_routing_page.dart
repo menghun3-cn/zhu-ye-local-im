@@ -460,6 +460,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
       for (final id in _slotOrder)
         if (visibleIds.contains(id)) config.providerNamed(id),
     ].whereType<AiProvider>().toList();
+    // Active providers past the slot cap get no node and no cart — the
+    // canvas says so rather than letting their requests look ignored.
+    final overflow = visibleIds.where((id) => !_slotOrder.contains(id)).length;
     return LayoutBuilder(
       builder: (context, constraints) {
         // The log keeps a usable floor: on a short window the canvas gives
@@ -484,6 +487,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
                 gatewayAddress: _gatewayAddress(l10n),
                 gatewayOnline: widget.runtime.gateway != null,
                 health: _healthByProvider(config),
+                overflowLabel: overflow == 0
+                    ? null
+                    : l10n.aiRoutingMoreProviders(overflow),
                 onProviderTap: widget.onProviderTap,
               ),
             ),
@@ -564,6 +570,7 @@ class _RoutingCanvas extends StatelessWidget {
     required this.health,
     this.dash,
     this.modelByProvider = const {},
+    this.overflowLabel,
     this.onProviderTap,
   });
 
@@ -590,6 +597,10 @@ class _RoutingCanvas extends StatelessWidget {
 
   /// Tap on a provider node — forwarded from [AiRoutingView.onProviderTap].
   final void Function(String providerId)? onProviderTap;
+
+  /// Caption for providers that were asked recently but hold no canvas
+  /// slot (past [_maxSlots]) — null when every active provider is drawn.
+  final String? overflowLabel;
 
   static const double _agentWidth = 185;
   static const double _gatewayWidth = 267;
@@ -781,6 +792,18 @@ class _RoutingCanvas extends StatelessWidget {
                 gateway: gatewayCenter,
                 target: anchorFor(flight.providerId),
                 dash: dash,
+              ),
+            if (overflowLabel != null)
+              Positioned(
+                right: _margin,
+                bottom: 4,
+                child: Text(
+                  overflowLabel!,
+                  style: TextStyle(
+                    fontSize: WeChat.fontSizeMeta,
+                    color: WeChatColors.of(context).secondaryText,
+                  ),
+                ),
               ),
           ],
         );

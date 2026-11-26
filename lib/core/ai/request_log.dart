@@ -124,14 +124,26 @@ final class AiRequestLog {
     }
   }
 
+  /// Serializes [record]: two requests finishing together would otherwise
+  /// run read-modify-write against the same file at once — one row lost,
+  /// or a torn write if they also collided on the temp name.
+  Future<void> _writing = Future.value();
+
+  /// Distinguishes temp files even if a caller ever bypasses the queue.
+  static int _tmpSeq = 0;
+
   /// Appends [record] and rewrites the file pruned to the retention window.
-  ///
-  /// Read-modify-write is not atomic against a concurrent writer, but the
-  /// only writers are this app's own router calls, which serialize through
-  /// the event loop closely enough for a diagnostic log.
-  Future<void> record(AiRequestRecord record) async {
+  Future<void> record(AiRequestRecord record) {
     _version++;
     // load() may hand back an unmodifiable empty list —copy before adding.
+    final run = _writing.then((_) => _recordNow(record));
+    // The chain survives a failed link: a disk error must not poison
+    // every later record.
+    _writing = run.catchError((_) {});
+    return run;
+  }
+
+  Future<void> _recordNow(AiRequestRecord record) async {
     final records = List<AiRequestRecord>.of(await load());
     records.add(record);
     final cutoff = DateTime.now().subtract(retention);
@@ -140,7 +152,7 @@ final class AiRequestLog {
       records.removeRange(0, records.length - maxRecords);
     }
     await file.parent.create(recursive: true);
-    final tmp = File('${file.path}.tmp');
+    final tmp = File('${file.path}.${_tmpSeq++}.tmp');
     await tmp.writeAsString(jsonEncode([for (final r in records) r.toJson()]));
     await tmp.rename(file.path);
   }

@@ -1379,6 +1379,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiCopied => '已复制';
 
   @override
+  String get aiCopyFailed => '复制失败——剪贴板拒绝了写入';
+
+  @override
   String get aiNavGateway => '网关';
 
   @override
@@ -1624,6 +1627,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiRoutingEmpty => '还没有供应商。';
+
+  @override
+  String aiRoutingMoreProviders(int count) {
+    return '另有 $count 个供应商在请求';
+  }
 
   @override
   String get aiRequestsTitle => '请求记录';

@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-24-ai-gateway-keys.md
 #   git hash-object -- 2026-11-24-ai-gateway-keys.zh.md
-2026-11-24-ai-gateway-keys.md: e7723c2b6effdb4c9a3968dc2590bef0bc022fce
-2026-11-24-ai-gateway-keys.zh.md: 869bd2ae80ef19aaadf3b7cc81c371ba420ee2ca
+2026-11-24-ai-gateway-keys.md: 5e3844811dad4fe3a1050f3a883c34a286b1d347
+2026-11-24-ai-gateway-keys.zh.md: 0709d0bed13adc6b2e9101c2209acdaba182318e

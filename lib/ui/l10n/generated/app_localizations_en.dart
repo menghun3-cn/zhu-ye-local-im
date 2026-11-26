@@ -1451,6 +1451,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiCopied => 'Copied';
 
   @override
+  String get aiCopyFailed => 'Copy failed — the clipboard refused the write';
+
+  @override
   String get aiNavGateway => 'Gateway';
 
   @override
@@ -1706,6 +1709,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiRoutingEmpty => 'No providers yet.';
+
+  @override
+  String aiRoutingMoreProviders(int count) {
+    return '$count more providers active';
+  }
 
   @override
   String get aiRequestsTitle => 'Requests';

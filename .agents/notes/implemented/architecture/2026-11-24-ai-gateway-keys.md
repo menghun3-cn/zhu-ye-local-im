@@ -58,7 +58,9 @@ constant time — XOR-accumulated over the UTF-8 bytes so neither content
 nor length shows in response timing on a LAN where the token is the only
 credential. Handler failures answer a generic `internal gateway error` /
 `stream interrupted` rather than echoing the exception text to the
-caller.
+caller, and a 502 carries only the provider-facing message — the
+socket-level cause (upstream host, errno) stays on this machine, since
+under LAN scope the caller is a stranger, not the user debugging.
 
 **The UI is a list, not a field.** The gateway tab shows each key as a
 tile — name, masked secret behind an eye toggle, copy, per-key usage

@@ -386,6 +386,7 @@ final class AiRouter {
     String? clientKey,
   ) async* {
     var settled = false;
+    var streamFailed = false;
     DateTime? firstContentAt;
     AiUsage? usage;
     try {
@@ -397,9 +398,18 @@ final class AiRouter {
           firstContentAt = DateTime.now();
         }
         if (event.kind == AiStreamKind.usage) usage = event.usage;
+        // An upstream error frame means the answer died mid-flight:
+        // yielding it lets the gateway write the error chunk, but the
+        // route closes as failed and nothing lands in the request log —
+        // a half-answer is not a served request.
+        if (event.kind == AiStreamKind.error) streamFailed = true;
         yield event;
       }
       settled = true;
+      if (streamFailed) {
+        _emit(callId, AiRoutePhase.failed, member, model);
+        return;
+      }
       _emit(callId, AiRoutePhase.served, member, model);
       _record(
         startedAt,

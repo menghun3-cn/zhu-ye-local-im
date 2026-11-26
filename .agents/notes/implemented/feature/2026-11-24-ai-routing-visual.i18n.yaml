@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-24-ai-routing-visual.md
 #   git hash-object -- 2026-11-24-ai-routing-visual.zh.md
-2026-11-24-ai-routing-visual.md: 8e2929b6ef7bdddd6695be50f360368dbc117c76
-2026-11-24-ai-routing-visual.zh.md: 71d2cd1359b9c0222c45a5576bfe7c115a2a8314
+2026-11-24-ai-routing-visual.md: dd4553730b9d6a0c9caf5b998e563884b5b7981e
+2026-11-24-ai-routing-visual.zh.md: 444c54ae0e0b3d2899ae3336c10a04359d9702fd
