@@ -1194,9 +1194,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick a conversation on the left, or wait for a nearby Device to connect automatically.';
 
   @override
-  String get conversationDisconnected => 'Offline';
-
-  @override
   String conversationUnread(int count) {
     return '[$count]';
   }

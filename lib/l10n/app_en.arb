@@ -502,7 +502,6 @@
   "remarkFieldLabel": "Remark",
   "remarkHelper": "Shown on this Device instead of the announced name or address. The other Device never sees it. Leave empty to clear.",
   "conversationPickOne": "Pick a conversation on the left, or wait for a nearby Device to connect automatically.",
-  "conversationDisconnected": "Offline",
   "conversationUnread": "[{count}]",
   "@conversationUnread": {
     "description": "The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.",

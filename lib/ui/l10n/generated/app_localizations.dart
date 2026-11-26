@@ -2059,12 +2059,6 @@ abstract class AppLocalizations {
   /// **'Pick a conversation on the left, or wait for a nearby Device to connect automatically.'**
   String get conversationPickOne;
 
-  /// No description provided for @conversationDisconnected.
-  ///
-  /// In en, this message translates to:
-  /// **'Offline'**
-  String get conversationDisconnected;
-
   /// The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.
   ///
   /// In en, this message translates to:

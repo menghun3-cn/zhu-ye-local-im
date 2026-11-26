@@ -307,11 +307,11 @@ class _ConversationsPageState extends State<ConversationsPage> {
             title: describePeerTitle(current.peer),
             subtitle: describePeerConnection(current.peer, l10n),
             peer: current.peer.fingerprint,
+            presence: current.peer.presence,
             onBack: () => setState(() {
               _selected = null;
               _untouched = false;
             }),
-            offline: !current.peer.isConnected,
           ),
           Expanded(
             child: ConversationView(
@@ -385,7 +385,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
                         // reach anybody.
                         subtitle: describePeerConnection(current.peer, l10n),
                         peer: current.peer.fingerprint,
-                        offline: !current.peer.isConnected,
+                        presence: current.peer.presence,
                       ),
                     ),
             ),
@@ -1212,7 +1212,7 @@ class _PaneHeader extends StatelessWidget {
     this.subtitle,
     this.peer,
     this.onBack,
-    this.offline = false,
+    required this.presence,
   });
 
   final String title;
@@ -1225,13 +1225,16 @@ class _PaneHeader extends StatelessWidget {
   /// conversation are the same screen.
   final VoidCallback? onBack;
 
-  /// Whether to mark the peer as unreachable. Drawn as a muted icon beside the
-  /// name rather than as colour alone, so that it reads without colour vision.
-  final bool offline;
+  /// The peer's reachability, drawn as a word beside the title. It lives on
+  /// the title line rather than in [subtitle] because the subtitle is the
+  /// Session detail — the port — and folding "离线" into it made the same
+  /// state say two different things in two different places.
+  final PeerPresence presence;
 
   @override
   Widget build(BuildContext context) {
     final colors = WeChatColors.of(context);
+    final l10n = AppLocalizations.of(context);
     final subtitle = this.subtitle;
     return Material(
       color: colors.toolbarBackground,
@@ -1267,14 +1270,19 @@ class _PaneHeader extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (offline) ...[
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.link_off,
-                          size: 16,
-                          color: colors.secondaryText,
+                      const SizedBox(width: 6),
+                      Text(
+                        labelForPresenceState(presence, l10n),
+                        style: TextStyle(
+                          fontSize: WeChat.fontSizeMeta,
+                          color: presence == PeerPresence.online
+                              ? colors.brandStrong
+                              : colors.secondaryText,
+                          fontWeight: presence == PeerPresence.online
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
-                      ],
+                      ),
                     ],
                   ),
                   if (subtitle != null)

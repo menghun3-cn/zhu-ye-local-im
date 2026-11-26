@@ -160,6 +160,33 @@ void main() {
       expect(connection, isNot(contains('10.0.0.7')));
     });
 
+    test('says nothing once presence and the title have spoken', () {
+      // The complaint this pins down: the line under the title used to read
+      // "10.0.0.7，不接受连接 · 离线" — the address a second time, a claim
+      // about the peer's configuration that a quiet LAN cannot support, and
+      // the state the title line's presence word already carries.
+      expect(
+        describePeerConnection(peer(address: '10.0.0.7'), l10n),
+        isNull,
+        reason: 'a placed peer with no Session port has no detail left to say',
+      );
+      expect(
+        describePeerConnection(
+          peer(address: '10.0.0.7', connected: true),
+          l10n,
+        ),
+        isNull,
+        reason: '在线 already says the Session is open',
+      );
+    });
+
+    test('still says never seen for a peer Discovery has not placed', () {
+      expect(describePeerConnection(peer(), l10n), l10n.neverSeen);
+      // Unless a Session is open anyway: the connection is the stronger fact,
+      // and "从未出现" beside 在线 would contradict it.
+      expect(describePeerConnection(peer(connected: true), l10n), isNull);
+    });
+
     test('does not wear the peer platform', () {
       // The row used to be drawn with the platform icon, which in a list of
       // conversations reads as "which app is this" — a question nobody is

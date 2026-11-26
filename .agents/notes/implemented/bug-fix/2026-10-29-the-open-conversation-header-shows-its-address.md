@@ -21,10 +21,13 @@ when there is no address to show. `describePeerTitle` owns that rule, and both
 the pane header and the pushed `ConversationPage` use it.
 
 The supporting line no longer repeats the address. `describePeerConnection`
-shows the listening port, then adds whether the peer is reconnecting or offline
-when no Session is open. A peer with no address still says that it has never
-been seen. This keeps the two lines distinct: the title identifies the machine,
-and the line beneath it describes the current connection.
+shows the listening port — or 从未出现 for a peer Discovery has not placed —
+and nothing else; reachability moved to the presence word beside the title,
+per
+[The conversation header carries presence once](2026-11-26-conversation-header-presence.md).
+This keeps the two lines distinct: the title identifies the machine, and the
+line beneath it describes the Session detail neither the title nor the
+presence word already says.
 
 This extends the rule recorded in
 [A conversation row leads with its address](2026-10-23-a-conversation-row-leads-with-its-address.md)
@@ -57,5 +60,5 @@ opened.
   known.
 - The alias remains available on Devices and in conversation controls, but it
   is no longer the primary identifier at the top of a conversation.
-- The connection line keeps the port and reachability state without printing
-  the title address twice.
+- The connection line keeps the port without printing the title address
+  twice; reachability is the presence word on the title line.

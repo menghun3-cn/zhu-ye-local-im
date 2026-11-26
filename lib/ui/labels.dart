@@ -114,25 +114,25 @@ String describePeerTitle(PeerView peer) {
   return address == null || address.isEmpty ? peer.displayName : address;
 }
 
-/// The supporting line under [describePeerTitle].
+/// The supporting line under [describePeerTitle], or null when there is
+/// nothing left to say.
 ///
-/// The title already carries the address, so this line carries the Session
-/// detail instead of repeating it: the listening port and, when there is no
-/// Session, whether the peer is being redialled or is offline.
-String describePeerConnection(PeerView peer, AppLocalizations l10n) {
+/// The title already carries the address and the header's first line carries
+/// the presence, so this line carries only the Session detail neither of them
+/// says: the listening port, and "never seen" for a peer Discovery has not
+/// placed. Reachability is deliberately not repeated here — "离线" beside an
+/// offline mark and a "不接受连接" beside a peer that is simply away both read
+/// as claims about the peer rather than about this instant, and the presence
+/// mark is the one place that claim is allowed to live.
+String? describePeerConnection(PeerView peer, AppLocalizations l10n) {
   final address = peer.address;
-  final placedAddress = address == null || address.isEmpty ? null : address;
-  final detail = switch ((placedAddress, peer.sessionPort, peer.isConnected)) {
-    (null, _, _) => l10n.neverSeen,
-    (_, final port?, _) => l10n.onPort(port),
-    (_, null, true) => l10n.sessionOpen,
-    (final address?, null, false) => l10n.peerNotAccepting(address),
-  };
-  if (peer.isConnected) return detail;
-  final state = peer.isConnecting
-      ? l10n.connectingAutomatically
-      : l10n.conversationDisconnected;
-  return '$detail · $state';
+  if (address == null || address.isEmpty) {
+    // A peer this Device is talking to right now is not "never seen" even if
+    // the Session named no address: the connection is the stronger fact.
+    return peer.isConnected ? null : l10n.neverSeen;
+  }
+  final port = peer.sessionPort;
+  return port == null ? null : l10n.onPort(port);
 }
 
 /// Everything known about a peer, as one line under its name.

@@ -1131,9 +1131,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get conversationPickOne => '从左边选一个对话，或等待附近设备自动连接。';
 
   @override
-  String get conversationDisconnected => '离线';
-
-  @override
   String conversationUnread(int count) {
     return '[$count]';
   }
