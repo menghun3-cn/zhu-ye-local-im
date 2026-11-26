@@ -534,13 +534,14 @@
   "@aiLogSeconds": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "aiLogMetrics": "{duration} 首字耗时 {ttft} {tokens} token 缓存 {percent}",
+  "aiLogMetrics": "{duration} 首字耗时 {ttft} {tokens} token 缓存 {percent} · {speed} token/秒",
   "@aiLogMetrics": {
     "placeholders": {
       "duration": { "type": "String" },
       "ttft": { "type": "String" },
       "tokens": { "type": "String" },
-      "percent": { "type": "String" }
+      "percent": { "type": "String" },
+      "speed": { "type": "String" }
     }
   },
   "aiLogInputUncached": "输入（未缓存）",

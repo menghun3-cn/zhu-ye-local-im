@@ -155,7 +155,9 @@ background: the last 7 days of
 *finished* requests, two lines each on its own `surfaceSunken` card
 with a hairline `divider` border — `MM-dd HH:mm:ss` in its own
 column beside the model that served, then a compact metrics line
-(`2.3s · first token 2.1s · 37.4k tokens · 99% cached`) whose tooltip
+(`2.3s · first token 2.1s · 37.4k tokens · 99% cached · 16.3 tok/s` —
+the speed figure is completion tokens over wall-clock duration, falling
+back to the total when the upstream reports no split) whose tooltip
 expands the exact uncached-input/output/cache-read/cache-write counts.
 `AiRouter` records every reply that completed (streams count when their
 event stream ends; failures leave no row — the red node already says

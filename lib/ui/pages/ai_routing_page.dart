@@ -1342,6 +1342,16 @@ class _RequestTile extends StatelessWidget {
   static String _tokens(int n) =>
       n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
 
+  /// Output tokens per second over the request's wall time — the number
+  /// that says whether the provider is fast, not just whether it answered.
+  /// Completion tokens are the honest numerator; upstreams that report
+  /// only a total fall back to it.
+  String _speed() {
+    final tokens = record.completionTokens ?? record.totalTokens;
+    if (tokens == null || record.durationMs <= 0) return '—';
+    return (tokens / (record.durationMs / 1000)).toStringAsFixed(1);
+  }
+
   /// `1,433` — the tooltip's exact counts read better grouped than compact.
   static String _grouped(int n) {
     final digits = n.abs().toString();
@@ -1385,6 +1395,7 @@ class _RequestTile extends StatelessWidget {
       ttft == null ? '—' : seconds(ttft),
       record.totalTokens == null ? '—' : _tokens(record.totalTokens!),
       percent,
+      _speed(),
     );
 
     // Hover detail: the exact token split behind the compact line — what

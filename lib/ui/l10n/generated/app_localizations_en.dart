@@ -1727,8 +1727,9 @@ class AppLocalizationsEn extends AppLocalizations {
     String ttft,
     String tokens,
     String percent,
+    String speed,
   ) {
-    return '$duration first token $ttft · $tokens tokens · $percent cached';
+    return '$duration first token $ttft · $tokens tokens · $percent cached · $speed tok/s';
   }
 
   @override

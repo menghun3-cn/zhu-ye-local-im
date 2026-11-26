@@ -708,13 +708,14 @@
   "@aiLogSeconds": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "aiLogMetrics": "{duration} first token {ttft} · {tokens} tokens · {percent} cached",
+  "aiLogMetrics": "{duration} first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s",
   "@aiLogMetrics": {
     "placeholders": {
       "duration": { "type": "String" },
       "ttft": { "type": "String" },
       "tokens": { "type": "String" },
-      "percent": { "type": "String" }
+      "percent": { "type": "String" },
+      "speed": { "type": "String" }
     }
   },
   "aiLogInputUncached": "Input (uncached)",

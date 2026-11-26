@@ -2998,12 +2998,13 @@ abstract class AppLocalizations {
   /// No description provided for @aiLogMetrics.
   ///
   /// In en, this message translates to:
-  /// **'{duration} first token {ttft} · {tokens} tokens · {percent} cached'**
+  /// **'{duration} first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s'**
   String aiLogMetrics(
     String duration,
     String ttft,
     String tokens,
     String percent,
+    String speed,
   );
 
   /// No description provided for @aiLogInputUncached.

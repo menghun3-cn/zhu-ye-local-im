@@ -1645,8 +1645,9 @@ class AppLocalizationsZh extends AppLocalizations {
     String ttft,
     String tokens,
     String percent,
+    String speed,
   ) {
-    return '$duration 首字耗时 $ttft $tokens token 缓存 $percent';
+    return '$duration 首字耗时 $ttft $tokens token 缓存 $percent · $speed token/秒';
   }
 
   @override
