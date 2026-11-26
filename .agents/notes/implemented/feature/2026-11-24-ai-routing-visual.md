@@ -64,8 +64,8 @@ throwing listener cannot slow a request.
 `AiRoutingView` is the AI page's first tab, at full height — the live
 route is what the page is *for*, so it leads rather than sits embedded
 in a scrolling list. It draws three columns — Agent, the 竹叶网关 node
-showing its `ip:port`, and provider nodes, all scaled up to roughly
-2.7× their original size so the flying cart reads against them — with
+showing its `ip:port`, and provider nodes, all scaled to roughly
+1.8× their original size so the flying cart reads against them — with
 bezier wires for
 agent→gateway and gateway→provider — each hop deliberately short so the
 three columns read as one pipeline, not three islands. One horse-drawn
