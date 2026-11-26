@@ -866,6 +866,18 @@ abstract class AppLocalizations {
   /// **'Could not open that file.'**
   String get cannotOpenFile;
 
+  /// No description provided for @copyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy file'**
+  String get copyFile;
+
+  /// No description provided for @cannotCopyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy that file.'**
+  String get cannotCopyFile;
+
   /// No description provided for @copyImage.
   ///
   /// In en, this message translates to:

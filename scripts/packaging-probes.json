@@ -37,6 +37,8 @@
     "cannotOpenFolder",
     "copyImage",
     "cannotCopyImage",
+    "copyFile",
+    "cannotCopyFile",
     "cancelSend",
     "folderNotSaved",
     "deleteConversationConfirmTitle",

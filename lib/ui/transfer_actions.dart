@@ -354,6 +354,52 @@ Future<void> shareTransferFile(BuildContext context, TransferView view) async {
   await TopToast.showIn(overlay, l10n.cannotShareFile);
 }
 
+/// Whether [view] is a file message whose one file is on this machine and can
+/// therefore be put on the clipboard as a file.
+///
+/// Single-item only: a multi-item Transfer's [TransferView.localPath] names
+/// the first landed file at best, and a folder send names the directory —
+/// copying either would put the wrong thing on the clipboard while looking
+/// like it copied the message. The type is checked here rather than left to
+/// the write because a folder send with a single file still has a directory
+/// as its path.
+bool canCopyFile(TransferView view) {
+  final path = view.localPath;
+  return view.kind == PayloadKind.file &&
+      view.names.length == 1 &&
+      path != null &&
+      FileSystemEntity.typeSync(path) == FileSystemEntityType.file;
+}
+
+/// Puts [view]'s file on this machine's clipboard as a file.
+///
+/// The clipboard gets the file itself — the `CF_HDROP` list Explorer writes on
+/// Windows, a `content://` file URI on Android — so a paste into a file
+/// manager lands the file rather than its path or its bytes. The type is
+/// checked again at the tap because the predicate's answer can go stale while
+/// the menu is open. A failure is said out loud for the same reason a failed
+/// image copy is: a copy that did not happen and says nothing is
+/// indistinguishable from one that did.
+Future<void> copyTransferFile(BuildContext context, TransferView view) async {
+  final path = view.localPath;
+  if (path == null) return;
+  final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  Future<void> fail() async {
+    if (overlay == null) return;
+    await TopToast.showIn(overlay, l10n.cannotCopyFile);
+  }
+
+  if (FileSystemEntity.typeSync(path) != FileSystemEntityType.file) {
+    await fail();
+    return;
+  }
+  // Through the seam, so a widget test can assert the paths that reached the
+  // clipboard without a platform channel answering for it.
+  if (await PasteResolution.paste.writeFiles([path])) return;
+  await fail();
+}
+
 /// Whether [view] is a picture whose bytes are on this machine and can
 /// therefore be put on the clipboard.
 ///
@@ -585,6 +631,7 @@ class TransferContextMenu extends StatelessWidget {
     final reveal = canRevealTransfer(view);
     final openFile = canOpenTransferFile(view);
     final shareFile = canShareTransferFile(view);
+    final copyFile = canCopyFile(view);
     final copyImage = canCopyImage(view);
     final copyText = canCopyText(view);
     final cancel = canCancelTransfer(view);
@@ -670,6 +717,12 @@ class TransferContextMenu extends StatelessWidget {
             icon: Icons.share_outlined,
             label: l10n.shareFile,
           ),
+        if (copyFile)
+          _item(
+            value: _copyFileAction,
+            icon: Icons.content_copy_outlined,
+            label: l10n.copyFile,
+          ),
         if (copyImage)
           _item(
             value: _copyAction,
@@ -725,6 +778,8 @@ class TransferContextMenu extends StatelessWidget {
         await openTransferFile(context, view);
       case _shareFileAction:
         await shareTransferFile(context, view);
+      case _copyFileAction:
+        await copyTransferFile(context, view);
       case _copyAction:
         await copyTransferImage(context, view);
       case _copyTextAction:
@@ -790,6 +845,7 @@ const String _cancelAction = 'cancel';
 const String _revealAction = 'reveal';
 const String _openFileAction = 'open-file';
 const String _shareFileAction = 'share-file';
+const String _copyFileAction = 'copy-file';
 const String _copyAction = 'copy';
 const String _withdrawAction = 'withdraw';
 const String _shareByLinkAction = 'share-by-link';
