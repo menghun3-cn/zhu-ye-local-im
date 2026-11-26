@@ -1733,6 +1733,12 @@ class _RequestTile extends StatelessWidget {
   /// slow-thinking upstream does not read as a slow generator. Rows
   /// without a completion split (or without any post-TTFT time) show
   /// `—`: totalTokens would count the prompt and wildly overstate it.
+  /// A decode span under one second shows `—` too: upstreams that buffer
+  /// a whole reply and flush it in one burst land the first token and
+  /// the last chunk milliseconds apart, and dividing by that sliver
+  /// prints absurd figures (86 tokens in 10ms "measured" 8600 tok/s) —
+  /// timer noise, not decode speed. Same one-second floor the canvas's
+  /// live rate uses.
   String _speed() {
     final tokens = record.completionTokens;
     if (tokens == null) return '—';
@@ -1740,7 +1746,7 @@ class _RequestTile extends StatelessWidget {
     final decodeMs = ttft != null
         ? record.durationMs - ttft
         : record.durationMs;
-    if (decodeMs <= 0) return '—';
+    if (decodeMs < 1000) return '—';
     return (tokens / (decodeMs / 1000)).toStringAsFixed(1);
   }
 

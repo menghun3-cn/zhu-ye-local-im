@@ -197,7 +197,12 @@ with a hairline `divider` border — `MM-dd HH:mm:ss` in its own
 column beside the model that served, then a compact metrics line
 (`2.3s · first token 2.1s · 37.4k tokens · 99% cached · 16.3 tok/s` —
 the speed figure is completion tokens over the post-first-token span,
-so a slow-thinking upstream does not read as a slow generator; rows
+so a slow-thinking upstream does not read as a slow generator; a decode
+span under one second shows `—` too — upstreams that buffer a whole
+reply and flush it in one burst land first and last token milliseconds
+apart, and dividing by that sliver prints timer noise (hundreds of
+tokens "measured" at tens of thousands tok/s), the same one-second
+floor the canvas's live rate uses; rows
 without a completion split show `—` rather than dividing the prompt-
 inflated total) whose tooltip
 expands the exact uncached-input/output/cache-read/cache-write counts.
@@ -263,7 +268,9 @@ amber for "wait", red stays for "failed".
   requests land in it, token figures are whatever the provider reported
   (absent stays absent, shown as `—`), and speed is completion tokens
   over the post-first-token span (the whole duration when there is no
-  first-token mark) — `—` when the upstream reports no split.
+  first-token mark) — `—` when the upstream reports no split, and `—`
+  when the decode span is under a second, since a buffered flush makes
+  that quotient timer noise rather than a rate.
 
 ## Alternatives considered
 
