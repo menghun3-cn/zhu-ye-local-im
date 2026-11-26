@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../../core/core.dart';
 import '../ai_provider_mark.dart';
 import '../l10n/generated/app_localizations.dart';
-import '../route_cart.dart';
 import '../wechat/theme.dart';
 import '../widgets.dart';
 
@@ -65,11 +64,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   StreamSubscription<AiRouteEvent>? _events;
   final List<_LeafFlight> _flights = [];
 
-  /// Attempts that arrived while a cart was still flying home. A serial
+  /// Attempts that arrived while a leaf was still flying home. A serial
   /// caller fires its next request the moment the reply lands — during
-  /// the homeward leg — and launching then would put two carts on screen
+  /// the homeward leg — and launching then would put two leaves on screen
   /// travelling opposite ways for what reads as one sequential exchange.
-  /// They wait for the last homeward cart to dock; outbound carts may
+  /// They wait for the last homeward leaf to dock; outbound leaves may
   /// still overlap freely, so genuine concurrency is unaffected.
   final List<AiRouteEvent> _pendingDepartures = [];
   AiRouteEvent? _last;
@@ -318,7 +317,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     )) {
       return;
     }
-    // Queue behind any homeward cart — see _pendingDepartures.
+    // Queue behind any homeward leaf — see _pendingDepartures.
     if (_flights.any((f) => f.controller.status == AnimationStatus.reverse)) {
       _pendingDepartures.add(event);
       return;
@@ -351,9 +350,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
     unawaited(controller.forward());
   }
 
-  /// Runs queued departures once no cart is flying home. Each queued event
+  /// Runs queued departures once no leaf is flying home. Each queued event
   /// goes back through [_depart] so provider/slot/dedup checks re-run —
-  /// the config may have changed while the cart was airborne.
+  /// the config may have changed while the leaf was airborne.
   void _flushDepartures() {
     if (_pendingDepartures.isEmpty ||
         _flights.any((f) => f.controller.status == AnimationStatus.reverse)) {
@@ -370,7 +369,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// member, so the match is on the member, not just the call.
   void _returnHome(AiRouteEvent event) {
     // A request that ended while its attempt still sat in the departure
-    // queue never earned a cart — launching it now would fly out and
+    // queue never earned a leaf — launching it now would fly out and
     // park at the provider forever, no second end event is coming.
     _pendingDepartures.removeWhere(
       (e) => e.callId == event.callId && e.member == event.member,
@@ -460,7 +459,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
       for (final id in _slotOrder)
         if (visibleIds.contains(id)) config.providerNamed(id),
     ].whereType<AiProvider>().toList();
-    // Active providers past the slot cap get no node and no cart — the
+    // Active providers past the slot cap get no node and no leaf — the
     // canvas says so rather than letting their requests look ignored.
     final overflow = visibleIds.where((id) => !_slotOrder.contains(id)).length;
     return LayoutBuilder(
@@ -546,10 +545,6 @@ final class _LeafFlight {
   final String member;
   final String providerId;
   final AnimationController controller;
-
-  /// Smoothed body tilt in radians — lerped toward the wire's heading
-  /// each frame so the cart banks into slopes instead of snapping.
-  double bank = 0;
 }
 
 /// The wires and the nodes they join: Agent → gateway → each provider. The
@@ -670,8 +665,8 @@ class _RoutingCanvas extends StatelessWidget {
         final wireColor = WeChatColors.of(context).brandLine;
         final dashAnimation = dash;
         // The wire layer rebuilds on every animation tick: the dash
-        // phase for the flow, and each cart's live 0→1 progress for
-        // which leg it is actually on — a dashed wire must mean "a cart
+        // phase for the flow, and each leaf's live 0→1 progress for
+        // which leg it is actually on — a dashed wire must mean "a leaf
         // is on this segment right now", not merely "some request
         // targets this provider".
         final wireTicks = <Listenable>[
@@ -683,7 +678,7 @@ class _RoutingCanvas extends StatelessWidget {
           // Leg occupancy from live controller values: t ≤ 0.5 rides
           // agent→gateway, t > 0.5 rides gateway→provider, on both the
           // outbound and the return trip. A segment flows forward only
-          // while every cart on it travels forward.
+          // while every leaf on it travels forward.
           var agentGwFwd = false;
           var agentGwBack = false;
           final providerFwd = <String>{};
@@ -782,8 +777,8 @@ class _RoutingCanvas extends StatelessWidget {
               height: _cardHeight,
               child: _SourceNode(label: sourceLabel),
             ),
-            // Carts ride on top of every node: the waypoint is the
-            // gateway's center, so a cart crosses the card's face —
+            // Leaves ride on top of every node: the waypoint is the
+            // gateway's center, so a leaf crosses the card's face —
             // under the cards it would vanish mid-trip.
             for (final flight in flights)
               _Leaf(
@@ -791,7 +786,6 @@ class _RoutingCanvas extends StatelessWidget {
                 agent: agentOut,
                 gateway: gatewayCenter,
                 target: anchorFor(flight.providerId),
-                dash: dash,
               ),
             if (overflowLabel != null)
               Positioned(
@@ -845,7 +839,7 @@ List<Offset> _wirePoints(Offset from, Offset to) {
 
 /// One wire: [from] → [to], drawn dashed while [dashed] — the in-flight
 /// marker, so the route a request is taking reads at a glance. [reverse]
-/// flips the dash flow: a cart on the way home travels the segment
+/// flips the dash flow: a leaf on the way home travels the segment
 /// backwards, and the dashes should march the way it does.
 final class _WireSegment {
   const _WireSegment({
@@ -905,7 +899,7 @@ class _WirePainter extends CustomPainter {
   /// 5px dash, 4px gap, extracted along the path's own metrics so the dashes
   /// follow the curve instead of a straight bounding box. [dashPhase] shifts
   /// the whole pattern along the path — increasing it moves the dashes
-  /// toward `to`; [reversed] runs the flow the other way, for carts on the
+  /// toward `to`; [reversed] runs the flow the other way, for leaves on the
   /// way home.
   void _drawDashed(
     Canvas canvas,
@@ -1188,18 +1182,19 @@ class _ProviderNode extends StatelessWidget {
   }
 }
 
-/// The flying request: a horse-drawn cart riding the route — agent →
-/// gateway → provider on the way out, back again on return. The cart
-/// runs empty outbound and stacked with sacks on the way home, wheels
-/// turning with the trip's progress; the leaf survives only as the
-/// gateway and brand mark, not as the flyer.
+/// The flying leaf: an [Icons.eco] glyph riding the route — agent →
+/// gateway → provider on the way out, back again on return. The leaf
+/// carries a solid bead outbound (the request) and a hollow one home
+/// (the reply), sways as it flies, and dissolves into each end node:
+/// opacity follows the eased trip progress so it fades out as it lands
+/// on the provider and fades back in as the return leg pulls away —
+/// a leaf parked at its node would read as a stuck request.
 class _Leaf extends StatelessWidget {
   const _Leaf({
     required this.flight,
     required this.agent,
     required this.gateway,
     required this.target,
-    this.dash,
   });
 
   final _LeafFlight flight;
@@ -1207,74 +1202,59 @@ class _Leaf extends StatelessWidget {
   final Offset gateway;
   final Offset target;
 
-  /// The shared dash clock — the cart's stride phase rides it so the
-  /// gait advances with wall-clock animation, never backwards on the
-  /// return leg. Null only in tests that build the canvas without it.
-  final Animation<double>? dash;
-
   @override
   Widget build(BuildContext context) {
     if (target == Offset.zero) return const SizedBox.shrink();
     final colors = WeChatColors.of(context);
-    // Concurrent requests each get their own cart, and identical green
-    // carts made two in-flight calls look like one. The shade is a pure
+    // Concurrent requests each get their own leaf, and identical green
+    // leaves made two in-flight calls look like one. The shade is a pure
     // function of callId, so a failover's members — same call, different
     // providers — stay the same colour while unrelated calls differ.
-    final cartColor = _cartColor(colors.brandStrong, flight.callId);
+    final leafColor = _leafColor(colors.brandStrong, flight.callId);
     return AnimatedBuilder(
       animation: flight.controller,
       builder: (context, _) {
         final t = flight.controller.value;
-        // Cosine ease-in-out: the cart launches and docks like a bird
-        // gliding, not a bead on a wire. The leg split still reads the
+        // Cosine ease-in-out: the leaf launches and docks gently rather
+        // than sliding at constant speed. The leg split still reads the
         // raw controller value, which crosses 0.5 at the same instant.
         final te = (1 - math.cos(math.pi * t)) / 2;
         // Two hops: the first half of the trip ends at the gateway's
         // center, the second half continues to the provider.
-        Offset at(double e) => e <= 0.5
-            ? _bezierPoint(agent, gateway, e * 2)
-            : _bezierPoint(gateway, target, (e - 0.5) * 2);
-        final point = at(te);
-        // Stride clock: one gallop cycle per 800ms dash repeat — the
-        // phase wraps on a whole number of cycles so the repeat boundary
-        // is seamless. Falls back to trip progress when no dash clock.
-        final gallop = (dash?.value ?? t) * math.pi * 2;
-        // The body bounces once per stride — legs gather, body rises —
-        // plus a hair of sway, calmer than the leaf's flutter: a cart
-        // does not dance.
-        final bob = math.sin(gallop) * 1.6;
+        final point = te <= 0.5
+            ? _bezierPoint(agent, gateway, te * 2)
+            : _bezierPoint(gateway, target, (te - 0.5) * 2);
+        final sway = math.sin(t * math.pi * 2) * 0.35;
         final returning = flight.controller.status == AnimationStatus.reverse;
-        // Bank into the wire's slope the way a bird banks into a turn:
-        // sample the path just ahead and behind for the heading, then
-        // tilt no more than ~17° — clamped so the gateway kink never
-        // loops the cart. The angle lerps on the flight so it settles
-        // instead of snapping frame to frame.
-        final before = at(math.max(0.0, te - 0.02));
-        final after = at(math.min(1.0, te + 0.02));
-        final heading = math.atan2(after.dy - before.dy, after.dx - before.dx);
-        var bank =
-            (heading - (returning ? math.pi : 0.0) + math.pi) % (2 * math.pi) -
-            math.pi;
-        bank = bank.clamp(-0.3, 0.3);
-        flight.bank += (bank - flight.bank) * 0.2;
-        final sway = math.sin(t * math.pi * 2) * 0.04 + flight.bank;
+        // Dissolve at both ends of the trip: fully transparent at the
+        // nodes (te 0 and 1), fully opaque through the middle. While the
+        // request sits at the provider the leaf is invisible; the return
+        // leg fades it back in as it pulls away.
+        final opacity = (math.min(te, 1 - te) / 0.15).clamp(0.0, 1.0);
         return Positioned(
-          left: point.dx - 44,
-          top: point.dy - 28 + bob,
-          child: Transform.rotate(
-            angle: sway,
-            child: Transform.flip(
-              flipX: returning,
-              child: RouteCart(
-                // The key doubles as the test hook: 'cart-empty' outbound,
-                // 'cart-loaded' on the way home.
-                key: ValueKey(returning ? 'cart-loaded' : 'cart-empty'),
-                color: cartColor,
-                loaded: returning,
-                // Five wheel turns per crossing; reversing unwinds them,
-                // which is how wheels roll backward on the way home.
-                spin: t * math.pi * 10,
-                gallop: gallop,
+          left: point.dx - 11,
+          top: point.dy - 11,
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.rotate(
+              angle: sway,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // The key doubles as the test hook: 'leaf-out' outbound,
+                  // 'leaf-back' (hollow bead) on the way home.
+                  Icon(
+                    Icons.eco,
+                    key: ValueKey(returning ? 'leaf-back' : 'leaf-out'),
+                    size: 22,
+                    color: leafColor,
+                  ),
+                  Positioned(
+                    left: 15,
+                    top: -4,
+                    child: _CargoBead(color: leafColor, hollow: returning),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1285,12 +1265,12 @@ class _Leaf extends StatelessWidget {
 
   /// Distinct-but-related shades of the brand green, indexed by callId:
   /// four lightness steps crossed with two saturation steps gives eight
-  /// combinations before a repeat. Hue stays brand so a crowd of carts
-  /// still reads as "the app's flyer", just tellable apart.
+  /// combinations before a repeat. Hue stays brand so a crowd of leaves
+  /// still reads as "the app's leaf", just tellable apart.
   static const _lightnessSteps = [-0.09, 0.09, -0.18, 0.18];
   static const _saturationSteps = [-0.12, 0.12];
 
-  static Color _cartColor(Color base, int callId) {
+  static Color _leafColor(Color base, int callId) {
     final hsl = HSLColor.fromColor(base);
     final slot = callId % (_lightnessSteps.length * _saturationSteps.length);
     final lightness =
@@ -1307,6 +1287,36 @@ class _Leaf extends StatelessWidget {
   Offset _bezierPoint(Offset from, Offset to, double t) {
     final points = _wirePoints(from, to);
     return _bezier(points[0], points[1], points[2], points[3], t);
+  }
+}
+
+/// The bead a leaf carries: filled on the way out (the request), a ring
+/// on the way back (the reply). Same colour as its leaf so the pairing
+/// survives the per-callId shading. Both variants get a keyline in the
+/// page background — a same-colour bead against a same-colour leaf and
+/// wires was nearly invisible at 7px.
+class _CargoBead extends StatelessWidget {
+  const _CargoBead({required this.color, required this.hollow});
+
+  final Color color;
+  final bool hollow;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyline = WeChatColors.of(context).pageBackground;
+    return Container(
+      key: ValueKey(hollow ? 'bead-hollow' : 'bead-solid'),
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hollow ? null : color,
+        border: Border.all(
+          color: hollow ? color : keyline,
+          width: hollow ? 2.4 : 1.4,
+        ),
+      ),
+    );
   }
 }
 

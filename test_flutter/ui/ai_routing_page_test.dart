@@ -182,26 +182,29 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // Each in-flight cart is a CustomPaint whose painter carries the
-    // per-callId shade; read it back through dynamic since the painter
-    // type is private to the page.
-    Set<Color> cartColors() => tester
-        .widgetList<CustomPaint>(
+    // Each in-flight leaf is an Icons.eco glyph keyed 'leaf-out' /
+    // 'leaf-back'; the Icon carries the per-callId shade.
+    Set<Color?> leafColors() => tester
+        .widgetList<Icon>(
           find.byWidgetPredicate(
             (w) =>
-                w is CustomPaint &&
-                w.painter.toString().contains('RouteCartPainter'),
+                w is Icon &&
+                w.icon == Icons.eco &&
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith('leaf-'),
           ),
         )
-        .map((cp) => (cp.painter as dynamic).color as Color)
+        .map((icon) => icon.color)
         .toSet();
 
-    // Three carts across two callIds: the two callId-1 carts share a
+    // Three leaves across two callIds: the two callId-1 leaves share a
     // shade, callId-2's differs — exactly two distinct colours.
-    expect(cartColors().length, 2);
+    expect(leafColors().length, 2);
   });
 
-  testWidgets('the cart runs empty out and comes back loaded', (tester) async {
+  testWidgets('a leaf flies out solid and comes back with a hollow bead', (
+    tester,
+  ) async {
     final config = await tester.runAsync(() => runtime.load());
     await tester.pumpWidget(
       MaterialApp(
@@ -223,41 +226,42 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    // The cart keys double as state markers: 'cart-empty' outbound,
-    // 'cart-loaded' (sacks in the bed) on the way home.
-    int carts(String state) =>
-        find.byKey(ValueKey('cart-$state')).evaluate().length;
+    // The leaf keys double as state markers: 'leaf-out' outbound,
+    // 'leaf-back' (hollow bead) on the way home.
+    int leaves(String state) =>
+        find.byKey(ValueKey('leaf-$state')).evaluate().length;
 
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.attempt,
       'opencode-zen/mimo-v2.6-flash-free',
     );
-    // The broadcast event lands a microtask later, and a cart's ticker
+    // The broadcast event lands a microtask later, and a leaf's ticker
     // needs frames to establish its baseline before elapsed time counts
-    // — three pumps carry it well into its outbound leg. (The cart renders
-    // at any progress, but the return leg only exists once value > 0.)
+    // — three pumps carry it well into its outbound leg. (The leaf
+    // renders at any progress, but the return leg only exists once
+    // value > 0.)
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(carts('empty'), 1);
-    expect(carts('loaded'), 0);
+    expect(leaves('out'), 1);
+    expect(leaves('back'), 0);
 
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.served,
       'opencode-zen/mimo-v2.6-flash-free',
     );
-    // Mid-return the cart still exists and now shows its load — sacks
-    // in the bed; the reverse leg is proportional to remaining progress,
-    // so a short pump keeps it on screen.
+    // Mid-return the leaf still exists and now shows its hollow bead;
+    // the reverse leg is proportional to remaining progress, so a short
+    // pump keeps it on screen.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(carts('loaded'), 1);
-    expect(carts('empty'), 0);
+    expect(leaves('back'), 1);
+    expect(leaves('out'), 0);
   });
 
-  testWidgets('a dashed wire means a cart is on that leg right now', (
+  testWidgets('a dashed wire means a leaf is on that leg right now', (
     tester,
   ) async {
     final config = await tester.runAsync(() => runtime.load());
@@ -311,9 +315,9 @@ void main() {
       'opencode-zen/mimo-v2.6-flash-free',
     );
     await tester.pump();
-    // Let the cart finish its outbound leg: parked at the provider, only
+    // Let the leaf finish its outbound leg: parked at the provider, only
     // the gateway→provider wire may be dashed — the agent→gateway wire
-    // must be solid because no cart is on it.
+    // must be solid because no leaf is on it.
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 1100));
     var state = wireState();
@@ -334,7 +338,7 @@ void main() {
     expect(state.providerRev, isTrue);
     expect(state.agentDashed, isFalse);
 
-    // Late in the return the cart crosses onto the agent→gateway leg,
+    // Late in the return the leaf crosses onto the agent→gateway leg,
     // and that wire takes over — still flowing backwards.
     await tester.pump(const Duration(milliseconds: 400));
     state = wireState();
@@ -343,7 +347,7 @@ void main() {
     expect(state.providerDashed, isFalse);
   });
 
-  testWidgets('a serial request queues behind the homeward cart', (
+  testWidgets('a serial request queues behind the homeward leaf', (
     tester,
   ) async {
     final config = await tester.runAsync(() => runtime.load());
@@ -367,8 +371,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    int carts(String state) =>
-        find.byKey(ValueKey('cart-$state')).evaluate().length;
+    int leaves(String state) =>
+        find.byKey(ValueKey('leaf-$state')).evaluate().length;
 
     // Request 1 flies out and parks at the provider.
     runtime.router.emitRouteEventForTest(
@@ -380,8 +384,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 1100));
 
-    // It is served and its cart turns for home; mid-return it is the
-    // loaded cart on the provider leg.
+    // It is served and its leaf turns for home; mid-return it is the
+    // loaded leaf on the provider leg.
     runtime.router.emitRouteEventForTest(
       1,
       AiRoutePhase.served,
@@ -389,11 +393,11 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(carts('loaded'), 1);
+    expect(leaves('back'), 1);
 
-    // The next serial request arrives while the first cart is still
+    // The next serial request arrives while the first leaf is still
     // flying home. It must queue: a serial caller should see one round
-    // trip at a time, not a homeward cart overlapping a fresh departure
+    // trip at a time, not a homeward leaf overlapping a fresh departure
     // in the opposite direction.
     runtime.router.emitRouteEventForTest(
       2,
@@ -402,14 +406,14 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(carts('loaded'), 1);
-    expect(carts('empty'), 0);
+    expect(leaves('back'), 1);
+    expect(leaves('out'), 0);
 
-    // Once the homeward cart docks, the queued request departs.
+    // Once the homeward leaf docks, the queued request departs.
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(carts('empty'), 1);
+    expect(leaves('out'), 1);
   });
 
   testWidgets('a request that ends while queued never flies', (tester) async {
@@ -434,8 +438,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    int carts(String state) =>
-        find.byKey(ValueKey('cart-$state')).evaluate().length;
+    int leaves(String state) =>
+        find.byKey(ValueKey('leaf-$state')).evaluate().length;
 
     // Request 1 out and back; mid-return request 2 queues.
     runtime.router.emitRouteEventForTest(
@@ -461,7 +465,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // Request 2 finishes before its cart ever launched — the queued
+    // Request 2 finishes before its leaf ever launched — the queued
     // attempt must be dropped, or it would fly out and park at the
     // provider forever with no end event left to bring it home.
     runtime.router.emitRouteEventForTest(
@@ -473,7 +477,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 900));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(carts('empty'), 0);
-    expect(carts('loaded'), 0);
+    expect(leaves('out'), 0);
+    expect(leaves('back'), 0);
   });
 }
