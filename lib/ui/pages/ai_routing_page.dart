@@ -726,17 +726,6 @@ class _RoutingCanvas extends StatelessWidget {
                       builder: (context, _) => wires(dashAnimation?.value ?? 0),
                     ),
             ),
-            // Leaves under the cards: a leaf crossing the gateway node
-            // slips beneath it, which reads as "through" rather than
-            // "over".
-            for (final flight in flights)
-              _Leaf(
-                flight: flight,
-                agent: agentOut,
-                gateway: gatewayCenter,
-                target: anchorFor(flight.providerId),
-                dash: dash,
-              ),
             // Provider nodes first so the cards sit on top of any wire
             // that happens to pass under them.
             for (final provider in providers)
@@ -778,6 +767,17 @@ class _RoutingCanvas extends StatelessWidget {
               height: _cardHeight,
               child: _SourceNode(label: sourceLabel),
             ),
+            // Carts ride on top of every node: the waypoint is the
+            // gateway's center, so a cart crosses the card's face —
+            // under the cards it would vanish mid-trip.
+            for (final flight in flights)
+              _Leaf(
+                flight: flight,
+                agent: agentOut,
+                gateway: gatewayCenter,
+                target: anchorFor(flight.providerId),
+                dash: dash,
+              ),
           ],
         );
         // Below the minimum content width the canvas scrolls sideways —
