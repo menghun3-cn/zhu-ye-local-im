@@ -708,7 +708,7 @@
   "@aiLogSeconds": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "aiLogMetrics": "{duration} first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s",
+  "aiLogMetrics": "{duration} · first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s",
   "@aiLogMetrics": {
     "placeholders": {
       "duration": { "type": "String" },

@@ -534,7 +534,7 @@
   "@aiLogSeconds": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "aiLogMetrics": "{duration} 首字耗时 {ttft} {tokens} token 缓存 {percent} · {speed} token/秒",
+  "aiLogMetrics": "{duration} · 首字耗时 {ttft} · {tokens} token · 缓存 {percent} · {speed} token/秒",
   "@aiLogMetrics": {
     "placeholders": {
       "duration": { "type": "String" },
