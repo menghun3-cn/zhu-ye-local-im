@@ -309,6 +309,75 @@ void main() {
     expect(body['choices'][0]['message']['tool_calls'][0]['id'], 'call_1');
   });
 
+  test('inbound tools and tool_choice reach the upstream request', () async {
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_9","type":"function","function":{"name":"lookup","arguments":"{\\"q\\":\\"x\\"}"}}]}}]}',
+      'data: [DONE]',
+    ]);
+    final response = await post('/v1/chat/completions', {
+      'model': 'deepseek/deepseek-chat',
+      'messages': [
+        {'role': 'user', 'content': 'find x'},
+        {
+          'role': 'assistant',
+          'tool_calls': [
+            {
+              'id': 'call_9',
+              'type': 'function',
+              'function': {'name': 'lookup', 'arguments': '{"q":"x"}'},
+            },
+          ],
+        },
+        {'role': 'tool', 'tool_call_id': 'call_9', 'content': '42'},
+      ],
+      'tools': [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'lookup',
+            'description': 'Look something up',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'q': {'type': 'string'},
+              },
+            },
+          },
+        },
+        // Hosted tools have no canonical form and must not reach upstream.
+        {'type': 'web_search'},
+        {
+          'type': 'function',
+          'function': {'description': 'no name'},
+        },
+      ],
+      'tool_choice': {
+        'type': 'function',
+        'function': {'name': 'lookup'},
+      },
+    });
+    expect(response.statusCode, 200);
+    await response.drain<void>();
+
+    final upstream =
+        jsonDecode(transport.sent.single.body!) as Map<String, Object?>;
+    final tools = upstream['tools'] as List;
+    expect(tools, hasLength(1));
+    final fn = (((tools.single as Map)['function']) as Map)
+        .cast<String, Object?>();
+    expect(fn['name'], 'lookup');
+    expect((fn['parameters'] as Map)['type'], 'object');
+    final choice = (upstream['tool_choice'] as Map).cast<String, Object?>();
+    expect(
+      ((choice['function'] as Map).cast<String, Object?>())['name'],
+      'lookup',
+    );
+    // The assistant tool_call and tool result survive the canonical hop.
+    final messages = upstream['messages'] as List;
+    expect((messages[1] as Map)['tool_calls'], isNotNull);
+    expect((messages[2] as Map)['tool_call_id'], 'call_9');
+  });
+
   test('messages with no usable entries are a 400', () async {
     final response = await post('/v1/chat/completions', {
       'model': 'deepseek/deepseek-chat',

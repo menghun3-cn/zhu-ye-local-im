@@ -317,6 +317,8 @@ final class AiGateway {
       maxTokens: _int(body['max_tokens']),
       topP: _number(body['top_p']),
       stop: _stringList(body['stop']),
+      tools: _toolDefinitions(body['tools']),
+      toolChoice: _toolChoice(body['tool_choice']),
       messages: messages,
     );
 
@@ -660,6 +662,62 @@ final class AiGateway {
             );
           }(),
     ];
+  }
+
+  /// Parses the OpenAI `tools` array into canonical definitions. Only
+  /// `type: "function"` entries are forwarded — hosted tools like
+  /// `web_search` have no canonical equivalent and are dropped rather
+  /// than sent upstream under a shape the provider never declared.
+  /// Malformed entries are skipped individually so one bad tool does not
+  /// sink the whole request.
+  List<AiToolDefinition> _toolDefinitions(Object? raw) {
+    if (raw is! List) return const [];
+    final tools = <AiToolDefinition>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final tool = entry.cast<String, Object?>();
+      final type = tool['type'];
+      if (type != null && type != 'function') continue;
+      final spec = tool['function'];
+      final fn = spec is Map ? spec.cast<String, Object?>() : tool;
+      final name = fn['name'];
+      if (name is! String || name.isEmpty) continue;
+      final parameters = fn['parameters'];
+      tools.add(
+        AiToolDefinition(
+          name: name,
+          description: fn['description'] as String?,
+          parameters: parameters is Map
+              ? parameters.cast<String, Object?>()
+              : null,
+        ),
+      );
+    }
+    return tools;
+  }
+
+  /// Parses OpenAI `tool_choice`: a mode string or a named-function object.
+  /// Anything unrecognised (e.g. `allowed_tools` payloads) degrades to
+  /// null — the provider's own default — rather than failing the request.
+  AiToolChoice? _toolChoice(Object? raw) {
+    if (raw is String) {
+      return switch (raw) {
+        'none' => const AiToolChoice.none(),
+        'required' => const AiToolChoice.required(),
+        _ => const AiToolChoice.auto(),
+      };
+    }
+    if (raw is Map) {
+      final choice = raw.cast<String, Object?>();
+      final fn = choice['function'];
+      final name = fn is Map
+          ? (fn.cast<String, Object?>())['name']
+          : choice['name'];
+      if (name is String && name.isNotEmpty) {
+        return AiToolChoice.named(name);
+      }
+    }
+    return null;
   }
 
   /// Reads the request body, or null when it exceeds [maxRequestBytes].

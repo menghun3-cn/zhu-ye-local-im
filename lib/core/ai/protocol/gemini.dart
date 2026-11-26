@@ -53,6 +53,32 @@ final class GeminiCodec implements AiCodec {
         if (request.stop != null && request.stop!.isNotEmpty)
           'stopSequences': request.stop,
       },
+      if (request.tools.isNotEmpty)
+        'tools': [
+          {
+            'functionDeclarations': [
+              for (final tool in request.tools)
+                {
+                  'name': tool.name,
+                  if (tool.description != null) 'description': tool.description,
+                  // `parametersJsonSchema` takes the JSON Schema object
+                  // verbatim; `parameters` would demand Gemini's own
+                  // Schema dialect with uppercase type enums.
+                  if (tool.parameters != null)
+                    'parametersJsonSchema': tool.parameters
+                  else
+                    'parameters': const {
+                      'type': 'OBJECT',
+                      'properties': <String, Object?>{},
+                    },
+                },
+            ],
+          },
+        ],
+      if (request.toolChoice != null)
+        'toolConfig': {
+          'functionCallingConfig': _encodeToolChoice(request.toolChoice!),
+        },
     };
     return AiRequestSpec(
       method: 'POST',
@@ -66,6 +92,19 @@ final class GeminiCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  /// Gemini's `functionCallingConfig`: modes are AUTO / ANY / NONE, and
+  /// forcing one function is `ANY` narrowed by `allowedFunctionNames`.
+  Map<String, Object?> _encodeToolChoice(AiToolChoice choice) =>
+      switch (choice.kind) {
+        AiToolChoiceKind.auto => {'mode': 'AUTO'},
+        AiToolChoiceKind.none => {'mode': 'NONE'},
+        AiToolChoiceKind.required => {'mode': 'ANY'},
+        AiToolChoiceKind.named => {
+          'mode': 'ANY',
+          'allowedFunctionNames': [choice.name],
+        },
+      };
 
   Map<String, Object?> _encodeMessage(AiMessage message) {
     final role = switch (message.role) {

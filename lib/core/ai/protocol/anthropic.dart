@@ -56,6 +56,21 @@ final class AnthropicCodec implements AiCodec {
       if (request.topP != null) 'top_p': request.topP,
       if (request.stop != null && request.stop!.isNotEmpty)
         'stop_sequences': request.stop,
+      if (request.tools.isNotEmpty)
+        'tools': [
+          for (final tool in request.tools)
+            {
+              'name': tool.name,
+              if (tool.description != null) 'description': tool.description,
+              // Anthropic requires a schema object; a caller that declared
+              // none gets the canonical empty object schema.
+              'input_schema':
+                  tool.parameters ??
+                  const {'type': 'object', 'properties': <String, Object?>{}},
+            },
+        ],
+      if (request.toolChoice != null)
+        'tool_choice': _encodeToolChoice(request.toolChoice!),
     };
     return AiRequestSpec(
       method: 'POST',
@@ -68,6 +83,16 @@ final class AnthropicCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  /// Anthropic's `tool_choice` vocabulary differs: `required` is `any`
+  /// there, and forcing one function is `{type: 'tool', name}`.
+  Map<String, Object?> _encodeToolChoice(AiToolChoice choice) =>
+      switch (choice.kind) {
+        AiToolChoiceKind.auto => {'type': 'auto'},
+        AiToolChoiceKind.none => {'type': 'none'},
+        AiToolChoiceKind.required => {'type': 'any'},
+        AiToolChoiceKind.named => {'type': 'tool', 'name': choice.name},
+      };
 
   Map<String, Object?> _encodeMessage(AiMessage message) {
     switch (message.role) {

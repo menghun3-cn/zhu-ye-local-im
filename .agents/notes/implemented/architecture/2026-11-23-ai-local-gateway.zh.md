@@ -46,7 +46,8 @@ Windows 和 Android 两个平台。
   `sk-`/`lt-ai-` 前缀让它像 magpie 的 `sk-magpie-key` 一样一眼可辨。
 - **入站只讲 OpenAI 协议。** `/v1/models` 列出已启用的 `provider/model` 引用加
   `group/<id>` 条目，正是 magpie 暴露它们的方式；`/v1/chat/completions` 把请求映射到
-  规范格式（字符串或分片数组 content、工具调用、`max_tokens`/`top_p`/`stop`），再把
+  规范格式（字符串或分片数组 content、工具调用与结果、`tools`/`tool_choice`
+  函数定义、`max_tokens`/`top_p`/`stop`），再把
   规范流事件以 `chat.completion.chunk` 帧回写，结尾是每个 OpenAI 客户端都在等的
   `data: [DONE]`。非流式请求收到流式回复——或反过来——会跨边界折叠，而不是挂起。
   Anthropic/Gemini 入站端点有意不做：编解码层本来就双向翻译，它们只是端点而非新机制，

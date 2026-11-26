@@ -114,4 +114,45 @@ void main() {
       expect(codec.classifyError(401, ''), AiErrorKind.fatal);
     });
   });
+
+  group('OpenAiResponsesCodec tool passthrough', () {
+    test('tools are flat function entries, named choice is flat too', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'openai/gpt-5',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [
+            AiToolDefinition(
+              name: 'lookup',
+              description: 'Look something up',
+              parameters: {
+                'type': 'object',
+                'properties': {
+                  'q': {'type': 'string'},
+                },
+              },
+            ),
+          ],
+          toolChoice: AiToolChoice.named('lookup'),
+        ),
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-5',
+        apiKey: 'sk-test',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final tool = ((body['tools'] as List).single as Map)
+          .cast<String, Object?>();
+      expect(tool['type'], 'function');
+      // Responses tools carry name/description/parameters flat — there is
+      // no nested `function` object like Chat Completions uses.
+      expect(tool['name'], 'lookup');
+      expect(tool['description'], 'Look something up');
+      expect((tool['parameters'] as Map)['type'], 'object');
+      expect(tool.containsKey('function'), isFalse);
+      final choice = (body['tool_choice'] as Map).cast<String, Object?>();
+      expect(choice['type'], 'function');
+      expect(choice['name'], 'lookup');
+      expect(choice.containsKey('function'), isFalse);
+    });
+  });
 }

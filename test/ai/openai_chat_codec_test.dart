@@ -221,4 +221,80 @@ void main() {
       expect(catalog.single.isFree, isTrue);
     });
   });
+
+  group('OpenAiChatCodec tool passthrough', () {
+    AiChatRequest toolRequest() => AiChatRequest(
+      model: 'deepseek/deepseek-chat',
+      stream: true,
+      tools: const [
+        AiToolDefinition(
+          name: 'lookup',
+          description: 'Look something up',
+          parameters: {
+            'type': 'object',
+            'properties': {
+              'q': {'type': 'string'},
+            },
+            'required': ['q'],
+          },
+        ),
+      ],
+      toolChoice: const AiToolChoice.named('lookup'),
+      messages: const [AiMessage(role: AiRole.user, content: 'hi')],
+    );
+
+    test('emits OpenAI tools and named tool_choice', () {
+      final spec = codec.encodeChat(
+        toolRequest(),
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-chat',
+        apiKey: 'sk-test',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final tools = body['tools'] as List;
+      expect(tools, hasLength(1));
+      final tool = (tools.single as Map).cast<String, Object?>();
+      expect(tool['type'], 'function');
+      final fn = (tool['function'] as Map).cast<String, Object?>();
+      expect(fn['name'], 'lookup');
+      expect(fn['description'], 'Look something up');
+      final params = (fn['parameters'] as Map).cast<String, Object?>();
+      expect(params['type'], 'object');
+      final choice = (body['tool_choice'] as Map).cast<String, Object?>();
+      expect(choice['type'], 'function');
+      expect(
+        ((choice['function'] as Map).cast<String, Object?>())['name'],
+        'lookup',
+      );
+    });
+
+    test('a tool without parameters gets the empty object schema', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'm',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [AiToolDefinition(name: 'noop')],
+          toolChoice: AiToolChoice.required(),
+        ),
+        baseUrl: 'https://api.x.ai/v1',
+        model: 'grok-4',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final fn = (((body['tools'] as List).single as Map)['function'] as Map)
+          .cast<String, Object?>();
+      expect((fn['parameters'] as Map)['type'], 'object');
+      expect(body['tool_choice'], 'required');
+    });
+
+    test('no tools means no tools or tool_choice keys at all', () {
+      final spec = codec.encodeChat(
+        _request(),
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-chat',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      expect(body.containsKey('tools'), isFalse);
+      expect(body.containsKey('tool_choice'), isFalse);
+    });
+  });
 }

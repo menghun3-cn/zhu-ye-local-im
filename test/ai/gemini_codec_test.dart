@@ -139,4 +139,68 @@ void main() {
       expect(catalog.single.isFree, isNull);
     });
   });
+
+  group('GeminiCodec tool passthrough', () {
+    test('tools become functionDeclarations with parametersJsonSchema', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'gemini',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [
+            AiToolDefinition(
+              name: 'lookup',
+              description: 'Look something up',
+              parameters: {
+                'type': 'object',
+                'properties': {
+                  'q': {'type': 'string'},
+                },
+              },
+            ),
+          ],
+          toolChoice: AiToolChoice.named('lookup'),
+        ),
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        model: 'gemini-2.5-pro',
+        apiKey: 'AIza',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final tools = body['tools'] as List;
+      final decls = ((tools.single as Map)['functionDeclarations'] as List)
+          .cast<Map<String, Object?>>();
+      expect(decls.single['name'], 'lookup');
+      expect(decls.single['description'], 'Look something up');
+      expect(((decls.single['parametersJsonSchema'] as Map)['type']), 'object');
+      final config =
+          ((body['toolConfig'] as Map)['functionCallingConfig'] as Map)
+              .cast<String, Object?>();
+      expect(config['mode'], 'ANY');
+      expect(config['allowedFunctionNames'], ['lookup']);
+    });
+
+    test('auto choice maps to AUTO mode and schema-less tools get OBJECT', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'gemini',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [AiToolDefinition(name: 'noop')],
+          toolChoice: AiToolChoice.auto(),
+        ),
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        model: 'gemini-2.5-pro',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final decl =
+          ((((body['tools'] as List).single as Map)['functionDeclarations']
+                          as List)
+                      .single
+                  as Map)
+              .cast<String, Object?>();
+      expect((decl['parameters'] as Map)['type'], 'OBJECT');
+      final config =
+          ((body['toolConfig'] as Map)['functionCallingConfig'] as Map)
+              .cast<String, Object?>();
+      expect(config['mode'], 'AUTO');
+    });
+  });
 }

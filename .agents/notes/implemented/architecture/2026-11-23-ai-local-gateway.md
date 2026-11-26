@@ -54,7 +54,8 @@ effect without a restart.
 - **Inbound is OpenAI-shaped only.** `/v1/models` lists enabled
   `provider/model` refs plus `group/<id>` entries exactly as magpie exposes
   them; `/v1/chat/completions` maps the request onto canonical form (string
-  or parts-array content, tool calls, `max_tokens`/`top_p`/`stop`) and pipes
+  or parts-array content, tool calls and results, `tools`/`tool_choice`
+  function definitions, `max_tokens`/`top_p`/`stop`) and pipes
   canonical stream events back out as `chat.completion.chunk` frames ending
   in `data: [DONE]`. A non-stream request that receives a streamed reply —
   or the reverse — is folded across the boundary rather than left hanging.

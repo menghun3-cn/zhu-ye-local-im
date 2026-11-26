@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-23-ai-local-gateway.md
 #   git hash-object -- 2026-11-23-ai-local-gateway.zh.md
-2026-11-23-ai-local-gateway.md: 5c394db800398c026a860b67cfa24a4ea0aaabc6
-2026-11-23-ai-local-gateway.zh.md: 1043f7187bab2bea84a33146b7fb0b0847d26887
+2026-11-23-ai-local-gateway.md: 411229c1c43c560eae3844783ee5a7c823e129a7
+2026-11-23-ai-local-gateway.zh.md: 6f1605cb6262691b444737cfd62024ede292731a

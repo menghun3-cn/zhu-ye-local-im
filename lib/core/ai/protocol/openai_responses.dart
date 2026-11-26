@@ -43,6 +43,20 @@ final class OpenAiResponsesCodec implements AiCodec {
       if (request.topP != null) 'top_p': request.topP,
       if (request.stop != null && request.stop!.isNotEmpty)
         'stop': request.stop,
+      if (request.tools.isNotEmpty)
+        'tools': [
+          for (final tool in request.tools)
+            {
+              'type': 'function',
+              'name': tool.name,
+              if (tool.description != null) 'description': tool.description,
+              'parameters':
+                  tool.parameters ??
+                  const {'type': 'object', 'properties': <String, Object?>{}},
+            },
+        ],
+      if (request.toolChoice != null)
+        'tool_choice': _encodeToolChoice(request.toolChoice!),
     };
     return AiRequestSpec(
       method: 'POST',
@@ -55,6 +69,16 @@ final class OpenAiResponsesCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  /// Responses `tool_choice` shares the string modes with Chat
+  /// Completions; a named function is a flat `{type, name}` object rather
+  /// than Chat's nested `{type, function: {name}}`.
+  Object _encodeToolChoice(AiToolChoice choice) => switch (choice.kind) {
+    AiToolChoiceKind.auto => 'auto',
+    AiToolChoiceKind.none => 'none',
+    AiToolChoiceKind.required => 'required',
+    AiToolChoiceKind.named => {'type': 'function', 'name': choice.name},
+  };
 
   /// One canonical message may become several input items — an assistant turn
   /// with tool calls is a message item *plus* one `function_call` per call.

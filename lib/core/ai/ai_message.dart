@@ -48,6 +48,57 @@ final class AiToolCall {
   );
 }
 
+/// A function definition offered to the model — the canonical form of an
+/// entry in a chat request's `tools` array.
+///
+/// [parameters] is the JSON Schema object kept decoded: codecs re-encode it
+/// into whichever schema dialect their protocol speaks (OpenAI passes it
+/// through verbatim, Anthropic calls it `input_schema`, Gemini wraps it as
+/// `parametersJsonSchema`). Null means "the caller declared no schema" —
+/// codecs substitute their protocol's empty-object schema rather than
+/// dropping the tool.
+final class AiToolDefinition {
+  const AiToolDefinition({
+    required this.name,
+    this.description,
+    this.parameters,
+  });
+
+  final String name;
+  final String? description;
+  final Map<String, Object?>? parameters;
+}
+
+/// How the model may use the offered tools.
+enum AiToolChoiceKind {
+  /// The model decides whether and which tools to call.
+  auto,
+
+  /// The model must not call tools.
+  none,
+
+  /// The model must call at least one tool.
+  required,
+
+  /// The model must call exactly the named function.
+  named,
+}
+
+/// The canonical form of a request's `tool_choice`.
+final class AiToolChoice {
+  const AiToolChoice._(this.kind, this.name);
+
+  const AiToolChoice.auto() : this._(AiToolChoiceKind.auto, null);
+  const AiToolChoice.none() : this._(AiToolChoiceKind.none, null);
+  const AiToolChoice.required() : this._(AiToolChoiceKind.required, null);
+  const AiToolChoice.named(String name) : this._(AiToolChoiceKind.named, name);
+
+  final AiToolChoiceKind kind;
+
+  /// The forced function name; only meaningful for [AiToolChoiceKind.named].
+  final String? name;
+}
+
 /// One turn of a conversation, in canonical form.
 final class AiMessage {
   const AiMessage({
@@ -156,6 +207,8 @@ final class AiChatRequest {
     this.maxTokens,
     this.topP,
     this.stop,
+    this.tools = const <AiToolDefinition>[],
+    this.toolChoice,
   });
 
   /// The model or routing-group reference, e.g. `deepseek/deepseek-chat`.
@@ -171,6 +224,15 @@ final class AiChatRequest {
   final int? maxTokens;
   final double? topP;
   final List<String>? stop;
+
+  /// Function definitions the model may call. Empty means the request
+  /// offers no tools — codecs then omit the tools field entirely rather
+  /// than sending an empty array some providers reject.
+  final List<AiToolDefinition> tools;
+
+  /// How the model may pick among [tools]; null lets the provider default
+  /// (equivalent to `auto` on every codec that has one).
+  final AiToolChoice? toolChoice;
 }
 
 /// A finished, non-streamed reply.

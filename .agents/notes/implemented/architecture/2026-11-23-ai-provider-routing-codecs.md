@@ -34,7 +34,11 @@ covers it end to end:
 
 - **`ai_message.dart`** — the canonical format: roles, text content, tool
   calls (arguments kept as raw JSON so codec boundaries do not have to
-  agree on escaping), usage, and a stream event that also carries
+  agree on escaping), tool *definitions* (`AiToolDefinition` +
+  `AiToolChoice`, with the JSON Schema kept decoded so each codec can
+  re-emit it in its own dialect — OpenAI verbatim, Anthropic
+  `input_schema`, Gemini `parametersJsonSchema`), usage, and a stream
+  event that also carries
   reasoning deltas — thinking is generated output for timing purposes
   but never joins the answer's content.
 - **`protocol/`** — `AiCodec` per protocol (`openai_chat`,

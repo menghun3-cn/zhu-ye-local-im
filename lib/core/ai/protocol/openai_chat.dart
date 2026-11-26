@@ -38,6 +38,22 @@ final class OpenAiChatCodec implements AiCodec {
       if (request.stop != null && request.stop!.isNotEmpty)
         'stop': request.stop,
       if (request.stream) 'stream_options': {'include_usage': true},
+      if (request.tools.isNotEmpty)
+        'tools': [
+          for (final tool in request.tools)
+            {
+              'type': 'function',
+              'function': {
+                'name': tool.name,
+                if (tool.description != null) 'description': tool.description,
+                'parameters':
+                    tool.parameters ??
+                    const {'type': 'object', 'properties': <String, Object?>{}},
+              },
+            },
+        ],
+      if (request.toolChoice != null)
+        'tool_choice': _encodeToolChoice(request.toolChoice!),
     };
     return AiRequestSpec(
       method: 'POST',
@@ -50,6 +66,16 @@ final class OpenAiChatCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  Object _encodeToolChoice(AiToolChoice choice) => switch (choice.kind) {
+    AiToolChoiceKind.auto => 'auto',
+    AiToolChoiceKind.none => 'none',
+    AiToolChoiceKind.required => 'required',
+    AiToolChoiceKind.named => {
+      'type': 'function',
+      'function': {'name': choice.name},
+    },
+  };
 
   Map<String, Object?> _encodeMessage(AiMessage message) {
     final out = <String, Object?>{'role': message.role.name};
