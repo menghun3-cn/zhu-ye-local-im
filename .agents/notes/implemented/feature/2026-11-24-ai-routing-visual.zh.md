@@ -53,8 +53,8 @@ best-effort：broadcast controller、不等待、抛异常的订阅者拖慢不�
 **路由视图画连线、放飞马车。** `AiRoutingView` 是 AI 页的第一个 tab，
 占满全高——实时路由正是这个页面存在的理由，所以它打头而不是内嵌在
 滚动列表里。画三列——Agent、显示 `ip:port` 的「竹叶网关」节点、
-provider 节点，三者都放大了三分之一，让飞奔的马车在节点上更醒目
-——agent→网关与网关→provider 各画一条贝塞尔连线，
+provider 节点，三者都放大到约原来尺寸的 2.7 倍，让飞奔的马车在节点
+上更醒目——agent→网关与网关→provider 各画一条贝塞尔连线，
 每段刻意画短，让三列读起来像一条管线而不是三个孤岛。每个在途
 请求一辆马车按 attempt 从 agent→网关→provider 跑出、
 served/failed 时跑回，每段 1 秒、慢到能看清（叶子保留为网关与

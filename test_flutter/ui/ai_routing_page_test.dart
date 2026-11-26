@@ -82,6 +82,11 @@ void main() {
   });
 
   testWidgets('tapping a provider node reports its id', (tester) async {
+    // The enlarged nodes need ~1174px of canvas; widen the test surface
+    // so the provider column is on screen rather than scrolled off.
+    tester.view.physicalSize = const Size(1600, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final config = await tester.runAsync(() => runtime.load());
     String? tapped;
     await tester.pumpWidget(
