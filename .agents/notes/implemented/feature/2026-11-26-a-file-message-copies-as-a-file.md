@@ -33,9 +33,9 @@ The menu line is `copyFile` / `cannotCopyFile`, offered only for
 is a real file. Multi-item Transfers and folder sends are deliberately not
 offered: their `localPath` names at best the first landed file, and copying
 that would look like it copied the message while putting the wrong thing on
-the clipboard. The type is checked both when the menu is built and again at
-the tap, because a folder send with a single file still has a directory as
-its path. A refused write reaches the user as `cannotCopyFile`; a successful
+the clipboard. Whether the path is still a file is checked both when the menu
+is built and again at the tap, because a folder send with a single file still
+has a directory as its path. A refused write reaches the user as `cannotCopyFile`; a successful
 copy says nothing, because the pasted file is the confirmation.
 
 This is the file-side copy that

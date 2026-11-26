@@ -26,8 +26,8 @@ Android 的 `ClipboardService` 在其它应用拉取 `getPrimaryClip` 时授予�
 菜单项是 `copyFile` / `cannotCopyFile`，只对 `names.length == 1` 且
 `localPath` 是真实文件的 `PayloadKind.file` 消息出现。多 item Transfer 和文
 件夹发送被刻意排除：它们的 `localPath` 至多只可靠地指向第一个落地文件，复制
-它会看起来像复制了整条消息，实际却把错误的东西放进剪贴板。类型在建菜单时
-和点击时各检查一次，因为一个只含一个文件的文件夹发送，其路径仍是目录。写入
+它会看起来像复制了整条消息，实际却把错误的东西放进剪贴板。路径是否仍是文件在
+建菜单时和点击时各检查一次，因为一个只含一个文件的文件夹发送，其路径仍是目录。写入
 被拒时用户看到 `cannotCopyFile`；复制成功则什么都不说，因为粘出来的文件就
 是确认。
 

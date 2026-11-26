@@ -375,14 +375,14 @@ bool canCopyFile(TransferView view) {
 ///
 /// The clipboard gets the file itself — the `CF_HDROP` list Explorer writes on
 /// Windows, a `content://` file URI on Android — so a paste into a file
-/// manager lands the file rather than its path or its bytes. The type is
-/// checked again at the tap because the predicate's answer can go stale while
-/// the menu is open. A failure is said out loud for the same reason a failed
-/// image copy is: a copy that did not happen and says nothing is
-/// indistinguishable from one that did.
+/// manager lands the file rather than its path or its bytes. Whether the path
+/// is still a file is checked again at the tap because the predicate's answer
+/// can go stale while the menu is open — a folder send's path is a directory,
+/// and a deleted file is neither. A failure is said out loud for the same
+/// reason a failed image copy is: a copy that did not happen and says nothing
+/// is indistinguishable from one that did.
 Future<void> copyTransferFile(BuildContext context, TransferView view) async {
   final path = view.localPath;
-  if (path == null) return;
   final l10n = AppLocalizations.of(context);
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   Future<void> fail() async {
@@ -390,7 +390,8 @@ Future<void> copyTransferFile(BuildContext context, TransferView view) async {
     await TopToast.showIn(overlay, l10n.cannotCopyFile);
   }
 
-  if (FileSystemEntity.typeSync(path) != FileSystemEntityType.file) {
+  if (path == null ||
+      FileSystemEntity.typeSync(path) != FileSystemEntityType.file) {
     await fail();
     return;
   }
@@ -720,7 +721,7 @@ class TransferContextMenu extends StatelessWidget {
         if (copyFile)
           _item(
             value: _copyFileAction,
-            icon: Icons.content_copy_outlined,
+            icon: Icons.file_copy_outlined,
             label: l10n.copyFile,
           ),
         if (copyImage)
