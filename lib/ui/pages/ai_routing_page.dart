@@ -540,6 +540,10 @@ final class _LeafFlight {
   final String member;
   final String providerId;
   final AnimationController controller;
+
+  /// Smoothed body tilt in radians — lerped toward the wire's heading
+  /// each frame so the cart banks into slopes instead of snapping.
+  double bank = 0;
 }
 
 /// The wires and the nodes they join: Agent → gateway → each provider. The
@@ -1198,11 +1202,16 @@ class _Leaf extends StatelessWidget {
       animation: flight.controller,
       builder: (context, _) {
         final t = flight.controller.value;
+        // Cosine ease-in-out: the cart launches and docks like a bird
+        // gliding, not a bead on a wire. The leg split still reads the
+        // raw controller value, which crosses 0.5 at the same instant.
+        final te = (1 - math.cos(math.pi * t)) / 2;
         // Two hops: the first half of the trip ends at the gateway's
         // center, the second half continues to the provider.
-        final point = t <= 0.5
-            ? _bezierPoint(agent, gateway, t * 2)
-            : _bezierPoint(gateway, target, (t - 0.5) * 2);
+        Offset at(double e) => e <= 0.5
+            ? _bezierPoint(agent, gateway, e * 2)
+            : _bezierPoint(gateway, target, (e - 0.5) * 2);
+        final point = at(te);
         // Stride clock: one gallop cycle per 800ms dash repeat — the
         // phase wraps on a whole number of cycles so the repeat boundary
         // is seamless. Falls back to trip progress when no dash clock.
@@ -1211,11 +1220,21 @@ class _Leaf extends StatelessWidget {
         // plus a hair of sway, calmer than the leaf's flutter: a cart
         // does not dance.
         final bob = math.sin(gallop) * 1.6;
-        final sway = math.sin(t * math.pi * 2) * 0.05;
-        // Outbound the bed is empty — the request going out — and on the
-        // way home it comes back stacked with sacks — the reply. The
-        // whole rig also turns around: a cart moving left must face left.
         final returning = flight.controller.status == AnimationStatus.reverse;
+        // Bank into the wire's slope the way a bird banks into a turn:
+        // sample the path just ahead and behind for the heading, then
+        // tilt no more than ~17° — clamped so the gateway kink never
+        // loops the cart. The angle lerps on the flight so it settles
+        // instead of snapping frame to frame.
+        final before = at(math.max(0.0, te - 0.02));
+        final after = at(math.min(1.0, te + 0.02));
+        final heading = math.atan2(after.dy - before.dy, after.dx - before.dx);
+        var bank =
+            (heading - (returning ? math.pi : 0.0) + math.pi) % (2 * math.pi) -
+            math.pi;
+        bank = bank.clamp(-0.3, 0.3);
+        flight.bank += (bank - flight.bank) * 0.2;
+        final sway = math.sin(t * math.pi * 2) * 0.04 + flight.bank;
         return Positioned(
           left: point.dx - 44,
           top: point.dy - 28 + bob,

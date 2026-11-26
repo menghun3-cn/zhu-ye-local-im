@@ -86,6 +86,9 @@ stride phase (near-front with far-rear, near-rear with far-front), the
 hooves swing fore-aft on quadratic strokes and lift mid-stance, the
 far legs draw dimmer under the body, the tail sways counter-phase, and
 the body bounces once per stride — one cycle per 800ms dash repeat.
+Progress along the wires is cosine-eased (launch and dock like a
+glide, not a bead), and the body banks into the wire's slope —
+heading sampled ahead and behind, tilt lerped and clamped to ~17°.
 The stride clock is the shared dash
 controller's value — wall-clock, so the gait never plays backwards on
 the return leg — and the wheel spokes turn with the trip's progress.
