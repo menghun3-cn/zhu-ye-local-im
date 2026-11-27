@@ -235,6 +235,20 @@ each other's rows or collide on `requests.json.tmp`. A log
 failure can never reach a request. The view reloads on `AiRequestLog.version`, polled by
 the same 1s ticker that watches `configVersion`.
 
+The list is scoped by two header capsules — **Live** (the last three
+hours, the default) and **All history** — because a busy gateway's week
+of rows buries what just happened. A record that appears *after* the
+page opened earns a five-second brand-tinted card (`brandSoft` fill,
+`brandStrong` edge) so "a request just landed" reads at a glance, then
+the ticker lets it settle back to the plain `surfaceSunken` style;
+records already on disk when the page opened only prime the seen-set
+and never flash. Freshness keys are a field signature (the record has
+no id) held against a never-pruned seen-set, so an expired highlight
+can never re-fire for an old row. `DateTime.now` is real wall time
+even under the fake-async test clock, so the view takes an injectable
+`now` for its expiry paths — the same escape hatch `configLoader` and
+`recordsLoader` already provide for file IO.
+
 **The name field asks instead of answering.** A provider draft opens
 with an empty name field — the preset label demotes to `hintText` — and
 Save stays disabled until the name is non-empty. Fetch/test are

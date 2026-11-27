@@ -3019,6 +3019,24 @@ abstract class AppLocalizations {
   /// **'Last 7 days'**
   String get aiRequestsWindow;
 
+  /// No description provided for @aiRequestsLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get aiRequestsLive;
+
+  /// No description provided for @aiRequestsLiveWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 3 hours'**
+  String get aiRequestsLiveWindow;
+
+  /// No description provided for @aiRequestsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All history'**
+  String get aiRequestsAll;
+
   /// No description provided for @aiRequestsEmpty.
   ///
   /// In en, this message translates to:

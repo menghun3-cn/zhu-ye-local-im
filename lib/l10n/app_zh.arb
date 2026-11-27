@@ -547,6 +547,9 @@
   },
   "aiRequestsTitle": "请求记录",
   "aiRequestsWindow": "最近 7 天",
+  "aiRequestsLive": "实时",
+  "aiRequestsLiveWindow": "最近 3 小时",
+  "aiRequestsAll": "所有历史",
   "aiRequestsEmpty": "暂无请求记录。",
   "aiLogSeconds": "{value}秒",
   "@aiLogSeconds": {

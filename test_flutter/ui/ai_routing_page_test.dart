@@ -551,4 +551,98 @@ void main() {
     expect(leaves('out'), 0);
     expect(leaves('back'), 0);
   });
+
+  testWidgets('log capsules scope the list and fresh rows highlight', (
+    tester,
+  ) async {
+    final config = await tester.runAsync(() => runtime.load());
+    final l10n = lookupAppLocalizations(appLocale);
+
+    // History the page opens with: outside the three-hour live window,
+    // so only the all-history capsule can show it. The loader answers
+    // from memory and the clock is pinned — real file IO and real wall
+    // time cannot advance under the fake-async test clock.
+    var now = DateTime(2026, 1, 1, 12);
+    final disk = <AiRequestRecord>[
+      AiRequestRecord(
+        at: now.subtract(const Duration(hours: 4)),
+        model: 'old/model',
+        durationMs: 1200,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+              recordsLoader: () async => List.of(disk),
+              now: () => now,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    // Live is the default scope: the four-hour-old row stays hidden.
+    expect(find.text('old/model'), findsNothing);
+    await tester.tap(find.text(l10n.aiRequestsAll));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('old/model'), findsOneWidget);
+
+    // Back to live scope, then a request lands: bumping the log version
+    // makes the 1s ticker reload, and the new card carries the brand
+    // tint for five seconds.
+    await tester.tap(find.text(l10n.aiRequestsLive));
+    await tester.pump();
+    disk.add(AiRequestRecord(at: now, model: 'fresh/model', durationMs: 800));
+    await tester.runAsync(
+      () => runtime.requestLog.record(
+        AiRequestRecord(
+          at: DateTime.now(),
+          model: 'version-bump/model',
+          durationMs: 1,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('fresh/model'), findsOneWidget);
+
+    // The tile's own card is the Container ancestor of its model text —
+    // scoped so an unrelated brandSoft surface elsewhere can't match.
+    bool brandTinted() => find
+        .ancestor(
+          of: find.text('fresh/model'),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration! as BoxDecoration).color ==
+                    WeChatColors.light.brandSoft,
+          ),
+        )
+        .evaluate()
+        .isNotEmpty;
+    expect(brandTinted(), isTrue);
+
+    // Five seconds on the page's clock, the highlight expires back to
+    // the plain card — one tick to notice, one frame to repaint.
+    now = now.add(const Duration(seconds: 6));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(brandTinted(), isFalse);
+  });
 }

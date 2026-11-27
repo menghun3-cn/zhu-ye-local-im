@@ -1658,6 +1658,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiRequestsWindow => '最近 7 天';
 
   @override
+  String get aiRequestsLive => '实时';
+
+  @override
+  String get aiRequestsLiveWindow => '最近 3 小时';
+
+  @override
+  String get aiRequestsAll => '所有历史';
+
+  @override
   String get aiRequestsEmpty => '暂无请求记录。';
 
   @override

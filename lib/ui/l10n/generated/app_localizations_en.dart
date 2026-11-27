@@ -1740,6 +1740,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiRequestsWindow => 'Last 7 days';
 
   @override
+  String get aiRequestsLive => 'Live';
+
+  @override
+  String get aiRequestsLiveWindow => 'Last 3 hours';
+
+  @override
+  String get aiRequestsAll => 'All history';
+
+  @override
   String get aiRequestsEmpty => 'No requests yet.';
 
   @override

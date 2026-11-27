@@ -32,6 +32,8 @@ class AiRoutingView extends StatefulWidget {
     super.key,
     required this.runtime,
     this.configLoader,
+    this.recordsLoader,
+    this.now,
     this.onProviderTap,
   });
 
@@ -41,6 +43,16 @@ class AiRoutingView extends StatefulWidget {
   /// Injectable so a widget test can answer from memory instead of real
   /// file IO, which the fake-async test clock cannot advance.
   final Future<AiConfig> Function()? configLoader;
+
+  /// Where the request log comes from; defaults to [AiRequestLog.load].
+  /// Same fake-async escape hatch as [configLoader].
+  final Future<List<AiRequestRecord>> Function()? recordsLoader;
+
+  /// The page's clock; defaults to [DateTime.now]. Injectable so a widget
+  /// test can age freshness windows — `DateTime.now` itself is real wall
+  /// time even under the fake-async test clock, so highlights and expiry
+  /// marks would never advance there.
+  final DateTime Function()? now;
 
   /// Called with a provider id when its canvas node is tapped — the host
   /// page uses it to jump to that provider's editor.
@@ -76,6 +88,22 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// Finished requests, newest first — the log under the canvas.
   List<AiRequestRecord> _records = const [];
   int _seenLogVersion = 0;
+
+  /// The log's scope capsules: live (the last few hours, the default) or
+  /// the full retained history.
+  bool _logLiveOnly = true;
+  static const _liveWindow = Duration(hours: 3);
+
+  /// Signatures of every record ever loaded this session, and when each
+  /// *new* one first appeared — a fresh record keeps an eye-catching
+  /// card for [_freshHighlightFor] so "a request just landed" reads at a
+  /// glance, then settles into the ordinary style. The seen-set is never
+  /// pruned (the log itself caps at 500 rows), so an old record can
+  /// never be mistaken for a new one after its highlight expires.
+  final Set<String> _seenRecordKeys = {};
+  final Map<String, DateTime> _freshRecordAt = {};
+  bool _recordsPrimed = false;
+  static const _freshHighlightFor = Duration(seconds: 5);
 
   /// member ref → when its cooldown ends. Seeded from the router on load so
   /// a cooldown that began before the page opened still shows.
@@ -121,6 +149,9 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// provider id → the model id its latest route event named, so a node
   /// can say *which* model is being asked, not just which provider.
   final Map<String, String> _modelByProvider = {};
+
+  /// The page's clock — [AiRoutingView.now] in tests, wall time in app.
+  DateTime _now() => widget.now?.call() ?? DateTime.now();
 
   @override
   void initState() {
@@ -174,10 +205,24 @@ class _AiRoutingViewState extends State<AiRoutingView>
 
   /// Reads the request log newest-first. [AiRequestLog.version] is the
   /// cheap change signal — the file itself is only touched when it moves.
+  /// The first load only *primes* the seen-set: records already on disk
+  /// when the page opened are not "new", so nothing flashes on open.
   Future<void> _loadRecords() async {
     final log = widget.runtime.requestLog;
-    final records = await log.load();
+    final records = await (widget.recordsLoader ?? log.load)();
     records.sort((a, b) => b.at.compareTo(a.at));
+    final now = _now();
+    if (!_recordsPrimed) {
+      _recordsPrimed = true;
+      for (final r in records) {
+        _seenRecordKeys.add(_requestRecordKey(r));
+      }
+    } else {
+      for (final r in records) {
+        final key = _requestRecordKey(r);
+        if (_seenRecordKeys.add(key)) _freshRecordAt[key] = now;
+      }
+    }
     if (mounted) {
       setState(() {
         _records = records;
@@ -196,9 +241,22 @@ class _AiRoutingViewState extends State<AiRoutingView>
     }
   }
 
+  /// The records the log panel shows: live scope keeps the last three
+  /// hours, all-history shows everything the log retained. `at` is the
+  /// request's start, which for any request that can still be running
+  /// is within seconds of its completion — the five-minute upstream
+  /// timeout bounds the skew.
+  List<AiRequestRecord> _logRecords(DateTime now) {
+    if (!_logLiveOnly) return _records;
+    return [
+      for (final r in _records)
+        if (now.difference(r.at) < _liveWindow) r,
+    ];
+  }
+
   /// Pulls live cooldown state out of the router for every routable member.
   void _seedHealth(AiConfig config) {
-    final now = DateTime.now();
+    final now = _now();
     _coolingUntil.removeWhere((_, until) => until.isBefore(now));
     for (final ref in _memberRefs(config)) {
       final until = widget.runtime.router.coolingDownUntil(ref);
@@ -218,7 +276,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     if (providerId == null) return;
     final modelId = ref?.modelId;
     if (modelId != null) _modelByProvider[providerId] = modelId;
-    _nodeVisibleUntil[providerId] = DateTime.now().add(_nodeVisibleFor);
+    _nodeVisibleUntil[providerId] = _now().add(_nodeVisibleFor);
     if (!_slotOrder.contains(providerId) && _slotOrder.length < _maxSlots) {
       _slotOrder.add(providerId);
     }
@@ -233,12 +291,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
         _erroredAt.remove(event.member);
       case AiRoutePhase.failed:
         if (event.cooling) {
-          _coolingUntil[event.member] = DateTime.now().add(
+          _coolingUntil[event.member] = _now().add(
             widget.runtime.router.cooldown,
           );
           _erroredAt.remove(event.member);
         } else {
-          _erroredAt[event.member] = DateTime.now();
+          _erroredAt[event.member] = _now();
         }
       case AiRoutePhase.progress:
         break;
@@ -247,7 +305,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
 
   void _tick() {
     if (!mounted) return;
-    final now = DateTime.now();
+    final now = _now();
     var dirty = false;
     if (widget.runtime.configVersion != _seenVersion) {
       _seenVersion = widget.runtime.configVersion;
@@ -266,9 +324,13 @@ class _AiRoutingViewState extends State<AiRoutingView>
         _coolingUntil.isNotEmpty ||
         _erroredAt.isNotEmpty ||
         _nodeVisibleUntil.isNotEmpty;
+    final hadFresh = _freshRecordAt.isNotEmpty;
     _coolingUntil.removeWhere((_, until) => until.isBefore(now));
     _erroredAt.removeWhere((_, at) => now.difference(at) > _errorVisibleFor);
     _nodeVisibleUntil.removeWhere((_, until) => until.isBefore(now));
+    _freshRecordAt.removeWhere(
+      (_, at) => now.difference(at) > _freshHighlightFor,
+    );
     if (_flights.isEmpty) {
       _dashController.stop();
       _liveTimer?.cancel();
@@ -278,6 +340,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     // once more when the last mark expires so the badge actually clears.
     if (dirty ||
         hadMarks ||
+        hadFresh ||
         _coolingUntil.isNotEmpty ||
         _erroredAt.isNotEmpty ||
         _nodeVisibleUntil.isNotEmpty) {
@@ -327,7 +390,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     for (final flight in _flights) {
       if (flight.callId == event.callId && flight.member == event.member) {
         flight.contentChars = chars;
-        final now = DateTime.now();
+        final now = _now();
         flight.firstContentAt ??= now;
         flight.lastContentAt = now;
         return;
@@ -375,7 +438,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
       member: event.member,
       providerId: providerId,
       controller: controller,
-      launchedAt: DateTime.now(),
+      launchedAt: _now(),
     );
     controller.addStatusListener((status) {
       if (status == AnimationStatus.dismissed) {
@@ -434,7 +497,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// cooling, else any recently-failed member marks it failed.
   Map<String, _NodeHealth> _healthByProvider(AiConfig config) {
     final health = <String, _NodeHealth>{};
-    final now = DateTime.now();
+    final now = _now();
     for (final provider in config.providers) {
       var cooling = false;
       var seconds = 0;
@@ -495,7 +558,7 @@ class _AiRoutingViewState extends State<AiRoutingView>
     // leaf is still flying to it, however long a stream runs. Visible nodes
     // render in slot order, not request order, so nothing slides when a
     // neighbour expires.
-    final now = DateTime.now();
+    final now = _now();
     final visibleIds = <String>{
       for (final provider in config.providers)
         if ((_nodeVisibleUntil[provider.id]?.isAfter(now) ?? false) ||
@@ -555,7 +618,17 @@ class _AiRoutingViewState extends State<AiRoutingView>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: _RequestLogSection(records: _records),
+                child: _RequestLogSection(
+                  records: _logRecords(now),
+                  liveOnly: _logLiveOnly,
+                  onFilterChanged: (live) =>
+                      setState(() => _logLiveOnly = live),
+                  freshKeys: {
+                    for (final entry in _freshRecordAt.entries)
+                      if (now.difference(entry.value) < _freshHighlightFor)
+                        entry.key,
+                  },
+                ),
               ),
             ),
           ],
@@ -1658,10 +1731,33 @@ class _CargoBead extends StatelessWidget {
 /// requests, newest first. Each record is two lines — when and which model
 /// on the first, the timing and token metrics on the second — so a glance
 /// down the column reads like a table.
+/// Stable identity for a log row across reloads — [AiRequestRecord] has
+/// no id, so the signature combines the fields that make two rows
+/// distinct. Shared by the page (fresh-highlight bookkeeping) and the
+/// log section (per-tile lookup).
+String _requestRecordKey(AiRequestRecord r) =>
+    '${r.at.microsecondsSinceEpoch}|${r.servedBy}|${r.model}|'
+    '${r.durationMs}|${r.totalTokens}|${r.completionTokens}';
+
 class _RequestLogSection extends StatelessWidget {
-  const _RequestLogSection({required this.records});
+  const _RequestLogSection({
+    required this.records,
+    required this.liveOnly,
+    required this.onFilterChanged,
+    required this.freshKeys,
+  });
 
   final List<AiRequestRecord> records;
+
+  /// Live scope (recent hours) vs the full retained history — the two
+  /// capsules in the header.
+  final bool liveOnly;
+  final ValueChanged<bool> onFilterChanged;
+
+  /// Signatures of records that appeared within the highlight window —
+  /// their cards draw in the brand tint until the page's 1s ticker
+  /// expires them.
+  final Set<String> freshKeys;
 
   @override
   Widget build(BuildContext context) {
@@ -1682,8 +1778,23 @@ class _RequestLogSection extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              SegmentedButton<bool>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: [
+                  ButtonSegment(value: true, label: Text(l10n.aiRequestsLive)),
+                  ButtonSegment(value: false, label: Text(l10n.aiRequestsAll)),
+                ],
+                selected: {liveOnly},
+                onSelectionChanged: (selection) =>
+                    onFilterChanged(selection.first),
+              ),
+              const SizedBox(width: 8),
               Text(
-                l10n.aiRequestsWindow,
+                liveOnly ? l10n.aiRequestsLiveWindow : l10n.aiRequestsWindow,
                 style: TextStyle(
                   fontSize: WeChat.fontSizeMeta,
                   color: colors.secondaryText,
@@ -1703,8 +1814,12 @@ class _RequestLogSection extends StatelessWidget {
                   ),
                   itemCount: records.length,
                   separatorBuilder: (_, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) =>
-                      _RequestTile(record: records[index]),
+                  itemBuilder: (context, index) => _RequestTile(
+                    record: records[index],
+                    fresh: freshKeys.contains(
+                      _requestRecordKey(records[index]),
+                    ),
+                  ),
                 ),
         ),
       ],
@@ -1715,9 +1830,14 @@ class _RequestLogSection extends StatelessWidget {
 /// One log row: `MM-dd HH:mm:ss  model` over the metric line. The timestamp
 /// gets its own fixed-width column so the models line up vertically.
 class _RequestTile extends StatelessWidget {
-  const _RequestTile({required this.record});
+  const _RequestTile({required this.record, this.fresh = false});
 
   final AiRequestRecord record;
+
+  /// The record appeared within the last few seconds — the card draws in
+  /// the brand tint so "a request just landed" reads at a glance, then
+  /// the page's ticker lets it settle back to the ordinary style.
+  final bool fresh;
 
   static String _pad(int v) => v.toString().padLeft(2, '0');
 
@@ -1812,11 +1932,14 @@ class _RequestTile extends StatelessWidget {
 
     // Each record is its own card inside the log panel: sunken fill and a
     // hairline border keep rows readable as separate entries at a glance.
+    // A fresh record swaps the sunken fill for the soft brand tint and
+    // the hairline for the strong brand edge — noticeable without
+    // shouting, and gone five seconds later.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: colors.surfaceSunken,
-        border: Border.all(color: colors.divider),
+        color: fresh ? colors.brandSoft : colors.surfaceSunken,
+        border: Border.all(color: fresh ? colors.brandStrong : colors.divider),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(

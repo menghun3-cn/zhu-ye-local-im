@@ -721,6 +721,9 @@
   },
   "aiRequestsTitle": "Requests",
   "aiRequestsWindow": "Last 7 days",
+  "aiRequestsLive": "Live",
+  "aiRequestsLiveWindow": "Last 3 hours",
+  "aiRequestsAll": "All history",
   "aiRequestsEmpty": "No requests yet.",
   "aiLogSeconds": "{value}s",
   "@aiLogSeconds": {
