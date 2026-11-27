@@ -168,9 +168,11 @@ arrive — would sit `completed` forever and mask every newer request
 behind its frozen quiet numbers. The numbers repaint on a 15fps timer
 that runs only while a flight exists — magpie's own cadence, fast enough
 to read as live without repainting every frame. The provider card is
-360px wide — up from 299 — so the mark fits whole beside the model
-line, and the mark keeps its intrinsic width (no ellipsis on the live
-numbers; the status text to its left is what shrinks). The mark lifts
+440px wide — up from 360 — so the mark fits whole beside the model
+line *and* a failure reason ("Cooling 42s · answered HTTP 403") has
+room to say something, and the mark keeps its intrinsic width (no
+ellipsis on the live numbers; the status text to its left is what
+shrinks). The mark lifts
 the moment the return leg starts since the reply already arrived.
 Stale `provider → modelId`
 entries are pruned on reload when either side disappears.

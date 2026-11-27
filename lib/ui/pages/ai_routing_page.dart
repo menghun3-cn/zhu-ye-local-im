@@ -774,7 +774,7 @@ class _RoutingCanvas extends StatelessWidget {
 
   static const double _agentWidth = 185;
   static const double _gatewayWidth = 267;
-  static const double _nodeWidth = 360;
+  static const double _nodeWidth = 440;
   static const double _nodeHeight = 85;
   static const double _cardHeight = 143;
   static const double _margin = 16;
