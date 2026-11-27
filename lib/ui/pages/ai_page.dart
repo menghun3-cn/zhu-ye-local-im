@@ -127,8 +127,8 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
           child: TabBarView(
             controller: _tab,
             children: [
-              // Full height, no card: the canvas wants every pixel it can
-              // get, and the status line sits on its bottom edge.
+              // Full height: the view draws its own canvas card, status
+              // line, and request-log panel inside the tab body.
               _routingPane(),
               _providersPane(l10n, config),
               _gatewayPane(l10n, config),

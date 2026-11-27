@@ -187,7 +187,11 @@ dead. A 1s ticker expires marks, refreshes the countdown, and polls
 signature so edits made elsewhere on the page repaint the canvas without
 a reload handshake.
 
-**The canvas is answered by a request log.** Under the animation the
+**The canvas sits in the same kind of panel.** The animation itself is
+wrapped in a rounded, `borderStrong`-outlined `surface` card — matching
+the request log's panel so the two read as a symmetric pair rather than
+one card floating over a bare canvas. **The canvas is answered by a
+request log.** Under the animation the
 view splits its height with a request list — rendered inside its own
 rounded, `borderStrong`-outlined panel so the records read as a bounded
 region under the canvas rather than a bare strip on the page

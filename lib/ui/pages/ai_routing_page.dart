@@ -585,21 +585,36 @@ class _AiRoutingViewState extends State<AiRoutingView>
           children: [
             Expanded(
               flex: 3,
-              child: _RoutingCanvas(
-                slotOrder: _slotOrder,
-                providers: orderedProviders,
-                flights: _flights,
-                dash: _dashController,
-                modelByProvider: _modelByProvider,
-                sourceLabel: l10n.aiRoutingSource,
-                gatewayLabel: l10n.aiRoutingGateway,
-                gatewayAddress: _gatewayAddress(l10n),
-                gatewayOnline: widget.runtime.gateway != null,
-                health: _healthByProvider(config),
-                overflowLabel: overflow == 0
-                    ? null
-                    : l10n.aiRoutingMoreProviders(overflow),
-                onProviderTap: widget.onProviderTap,
+              // Same bounded-panel treatment as the request log below —
+              // the animation reads as a card, not a bleed to the edges.
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: WeChatColors.of(context).surface,
+                    border: Border.all(
+                      color: WeChatColors.of(context).borderStrong,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _RoutingCanvas(
+                    slotOrder: _slotOrder,
+                    providers: orderedProviders,
+                    flights: _flights,
+                    dash: _dashController,
+                    modelByProvider: _modelByProvider,
+                    sourceLabel: l10n.aiRoutingSource,
+                    gatewayLabel: l10n.aiRoutingGateway,
+                    gatewayAddress: _gatewayAddress(l10n),
+                    gatewayOnline: widget.runtime.gateway != null,
+                    health: _healthByProvider(config),
+                    overflowLabel: overflow == 0
+                        ? null
+                        : l10n.aiRoutingMoreProviders(overflow),
+                    onProviderTap: widget.onProviderTap,
+                  ),
+                ),
               ),
             ),
             _StatusBar(event: _last),
