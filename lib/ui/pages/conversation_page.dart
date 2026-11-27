@@ -7,6 +7,7 @@ import '../controller_scope.dart';
 import '../conversation_view.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../labels.dart';
+import '../presence.dart';
 
 /// One Device's conversation, on a screen of its own.
 ///
@@ -48,6 +49,11 @@ class ConversationPage extends StatelessWidget {
     final theme = Theme.of(context);
     final controller = ControllerScope.of(context);
     final known = _peerOf(controller);
+    // The title carries the address and the first line carries the presence;
+    // the line beneath holds only the Session detail neither of them says.
+    final detail = known == null
+        ? l10n.neverSeen
+        : describePeerConnection(known, l10n);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,19 +61,33 @@ class ConversationPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              known == null ? peer.short() : describePeerTitle(known),
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    known == null ? peer.short() : describePeerTitle(known),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (known != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    labelForPresenceState(known.presence, l10n),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: known.presence == PeerPresence.online
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            // The title carries the address. This line carries the Session
-            // detail, including whether typing here would reach anybody.
-            Text(
-              known == null
-                  ? l10n.neverSeen
-                  : describePeerConnection(known, l10n),
-              style: theme.textTheme.bodySmall,
-              overflow: TextOverflow.ellipsis,
-            ),
+            if (detail != null)
+              Text(
+                detail,
+                style: theme.textTheme.bodySmall,
+                overflow: TextOverflow.ellipsis,
+              ),
           ],
         ),
         actions: [ConversationMenuButton(peer: peer)],

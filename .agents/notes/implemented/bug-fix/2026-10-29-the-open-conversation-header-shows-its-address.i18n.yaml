@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-10-29-the-open-conversation-header-shows-its-address.md
 #   git hash-object -- 2026-10-29-the-open-conversation-header-shows-its-address.zh.md
-2026-10-29-the-open-conversation-header-shows-its-address.md: c9ef5f11a68b6c69d60704fd3c8f94b86a9ce8c4
-2026-10-29-the-open-conversation-header-shows-its-address.zh.md: a98027ec86c0aff76673388e36b574c85afe9da1
+2026-10-29-the-open-conversation-header-shows-its-address.md: bd0cc7b7bd3bdcf9219a1d5d488efa55693e9c76
+2026-10-29-the-open-conversation-header-shows-its-address.zh.md: 1ed03548b9d1fa7ebae99df95ccb46fdd806265f

@@ -347,7 +347,6 @@
   "remarkFieldLabel": "备注",
   "remarkHelper": "只在本机显示，代替对方自报的名称或地址，对方看不到。留空即清除。",
   "conversationPickOne": "从左边选一个对话，或等待附近设备自动连接。",
-  "conversationDisconnected": "离线",
   "conversationUnread": "[{count}]",
   "sendFileTitle": "发送文件给 {peer}",
   "fieldPath": "路径",
