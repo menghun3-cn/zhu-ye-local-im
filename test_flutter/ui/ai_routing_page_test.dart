@@ -645,4 +645,53 @@ void main() {
     await tester.pump();
     expect(brandTinted(), isFalse);
   });
+
+  testWidgets('a failed member shows its reason beside the health mark', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final config = await tester.runAsync(() => runtime.load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeChat.theme(WeChatColors.light),
+        locale: appLocale,
+        supportedLocales: appLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SizedBox(
+            height: 300,
+            child: AiRoutingView(
+              runtime: runtime,
+              configLoader: () async => config!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.attempt,
+      'opencode-zen/mimo-v2.6-flash-free',
+    );
+    runtime.router.emitRouteEventForTest(
+      1,
+      AiRoutePhase.failed,
+      'opencode-zen/mimo-v2.6-flash-free',
+      '',
+      true,
+      null,
+      'opencode-zen answered HTTP 403',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // The node says cooling *and* why — "cooling 42s" alone cannot say
+    // what went wrong upstream.
+    expect(find.textContaining('answered HTTP 403'), findsOneWidget);
+  });
 }

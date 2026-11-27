@@ -179,6 +179,7 @@ final class AiRouteEvent {
     required this.model,
     this.cooling = false,
     this.contentChars,
+    this.reason,
   });
 
   final int callId;
@@ -196,6 +197,11 @@ final class AiRouteEvent {
   /// once at the end, while deltas arrive continuously, so chars are the
   /// honest live unit (magpie counts reply bytes the same way).
   final int? contentChars;
+
+  /// Why the member failed — set on `failed` events only. The routing
+  /// node shows it beside the cooldown countdown: "cooling 42s" alone
+  /// cannot say *what* went wrong upstream.
+  final String? reason;
 }
 
 /// Resolves `provider/model` and `group/<id>` references to concrete upstream
@@ -246,6 +252,7 @@ final class AiRouter {
     String model, {
     bool cooling = false,
     int? contentChars,
+    String? reason,
   }) {
     if (_events.isClosed) return;
     _events.add(
@@ -256,6 +263,7 @@ final class AiRouter {
         model: model,
         cooling: cooling,
         contentChars: contentChars,
+        reason: reason,
       ),
     );
   }
@@ -277,6 +285,7 @@ final class AiRouter {
     String model = '',
     bool cooling = false,
     int? contentChars,
+    String? reason,
   ]) => _emit(
     callId,
     phase,
@@ -284,6 +293,7 @@ final class AiRouter {
     model,
     cooling: cooling,
     contentChars: contentChars,
+    reason: reason,
   );
 
   /// Sends [request] and returns the reply from the first member that works.
@@ -343,19 +353,32 @@ final class AiRouter {
           member,
           request.model,
           cooling: true,
+          reason: failure.error.message,
         );
         _cooledDown[member] = (
           until: DateTime.now().add(cooldown),
           error: failure.error,
         );
         lastRetryable = failure.error;
-      } on AiRequestException {
-        _emit(callId, AiRoutePhase.failed, member, request.model);
+      } on AiRequestException catch (error) {
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          reason: error.message,
+        );
         rethrow;
-      } on Object {
+      } on Object catch (error) {
         // Codec decode failures and anything else unexpected: the route
         // still needs its closing event or the leaf never comes home.
-        _emit(callId, AiRoutePhase.failed, member, request.model);
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          reason: '$error',
+        );
         rethrow;
       }
     }
@@ -434,6 +457,7 @@ final class AiRouter {
   ) async* {
     var settled = false;
     var streamFailed = false;
+    String? streamError;
     DateTime? firstContentAt;
     DateTime? lastProgressAt;
     var contentChars = 0;
@@ -475,12 +499,15 @@ final class AiRouter {
         // yielding it lets the gateway write the error chunk, but the
         // route closes as failed and nothing lands in the request log —
         // a half-answer is not a served request.
-        if (event.kind == AiStreamKind.error) streamFailed = true;
+        if (event.kind == AiStreamKind.error) {
+          streamFailed = true;
+          streamError ??= event.text;
+        }
         yield event;
       }
       settled = true;
       if (streamFailed) {
-        _emit(callId, AiRoutePhase.failed, member, model);
+        _emit(callId, AiRoutePhase.failed, member, model, reason: streamError);
         return;
       }
       _emit(callId, AiRoutePhase.served, member, model);
@@ -492,9 +519,9 @@ final class AiRouter {
         firstContentAt?.difference(startedAt).inMilliseconds,
         clientKey,
       );
-    } catch (_) {
+    } catch (error) {
       settled = true;
-      _emit(callId, AiRoutePhase.failed, member, model);
+      _emit(callId, AiRoutePhase.failed, member, model, reason: '$error');
       rethrow;
     } finally {
       if (!settled) _emit(callId, AiRoutePhase.failed, member, model);

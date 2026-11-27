@@ -130,10 +130,13 @@ provider 卡片加宽到 360px（原 299），标记按固有宽度排布、不�
 清掉。
 
 **成员健康按节点区分，不是一刀切。** `failed` 事件新增 `cooling`
-标记：成员进入冷却而非彻底失败时为 true。视图维护
-`member → 冷却截止` 与 `member → 最近致命错误` 两张表，按最坏优先
-汇总到 provider 节点上（琥珀色「冷却中 42s」、红色「上次请求失败」
-展示 30 秒），并从 `AiRouter.coolingDownUntil` 播种页面打开前已在
+标记：成员进入冷却而非彻底失败时为 true，外加 `reason`——上游自己的
+失败文本（异常消息或流的 error 帧）。视图维护
+`member → 冷却截止`、`member → 最近致命错误` 与 `member → 原因`
+三张表，按最坏优先
+汇总到 provider 节点上（琥珀色「冷却中 42s · opencode-zen answered
+HTTP 403」、红色「上次请求失败 · …」展示 30 秒——原因与状态同行、
+同样被省略号截断），并从 `AiRouter.coolingDownUntil` 播种页面打开前已在
 途的冷却——被熔断的成员显示为冷却，而不是整张图都像死了。1 秒
 心跳负责让标记过期、刷新倒计时，并轮询 `AiRuntime.configVersion`
 （每次 `save` 自增）与网关签名，使页面别处的编辑无需重载握手即可

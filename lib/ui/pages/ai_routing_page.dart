@@ -112,6 +112,11 @@ class _AiRoutingViewState extends State<AiRoutingView>
   /// member ref → when it last failed fatally. Shown briefly, then cleared —
   /// a stale "failed" badge is worse than none.
   final Map<String, DateTime> _erroredAt = {};
+
+  /// member ref → why it last failed, carried on the `failed` route event.
+  /// Lives exactly as long as the health mark it explains: pruned in
+  /// [_tick] once the member has neither a cooling nor an error entry.
+  final Map<String, String> _reasonByMember = {};
   static const _errorVisibleFor = Duration(seconds: 30);
 
   /// provider id → when its node stops being drawn. See the class doc: the
@@ -289,7 +294,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
         // Being tried — or having answered — clears both marks.
         _coolingUntil.remove(event.member);
         _erroredAt.remove(event.member);
+        _reasonByMember.remove(event.member);
       case AiRoutePhase.failed:
+        final reason = event.reason;
+        if (reason != null && reason.isNotEmpty) {
+          _reasonByMember[event.member] = reason;
+        }
         if (event.cooling) {
           _coolingUntil[event.member] = _now().add(
             widget.runtime.router.cooldown,
@@ -330,6 +340,12 @@ class _AiRoutingViewState extends State<AiRoutingView>
     _nodeVisibleUntil.removeWhere((_, until) => until.isBefore(now));
     _freshRecordAt.removeWhere(
       (_, at) => now.difference(at) > _freshHighlightFor,
+    );
+    // A reason outlives neither its mark: once cooling expired and the
+    // error window passed, nothing on the node still explains it.
+    _reasonByMember.removeWhere(
+      (member, _) =>
+          !_coolingUntil.containsKey(member) && !_erroredAt.containsKey(member),
     );
     if (_flights.isEmpty) {
       _dashController.stop();
@@ -502,6 +518,8 @@ class _AiRoutingViewState extends State<AiRoutingView>
       var cooling = false;
       var seconds = 0;
       var error = false;
+      String? coolingReason;
+      String? errorReason;
       for (final model in provider.models) {
         if (!model.enabled) continue;
         final ref = '${provider.id}/${model.id}';
@@ -509,14 +527,17 @@ class _AiRoutingViewState extends State<AiRoutingView>
         if (until != null) {
           cooling = true;
           seconds = math.max(seconds, until.difference(now).inSeconds);
+          coolingReason ??= _reasonByMember[ref];
         } else if (_erroredAt.containsKey(ref)) {
           error = true;
+          errorReason ??= _reasonByMember[ref];
         }
       }
       health[provider.id] = _NodeHealth(
         cooling: cooling,
         coolingSeconds: seconds,
         error: error,
+        reason: cooling ? coolingReason : errorReason,
       );
     }
     return health;
@@ -659,11 +680,16 @@ final class _NodeHealth {
     required this.cooling,
     required this.coolingSeconds,
     required this.error,
+    this.reason,
   });
 
   final bool cooling;
   final int coolingSeconds;
   final bool error;
+
+  /// Why the shown mark exists — the upstream's own failure text, when
+  /// the route event carried one.
+  final String? reason;
 }
 
 /// One leaf's flight state: which call it belongs to, which member it is
@@ -1377,6 +1403,13 @@ class _ProviderNode extends StatelessWidget {
         : nodeHealth.error
         ? l10n.aiRoutingFailed
         : null;
+    // "Cooling 42s" alone cannot say what went wrong — the route event's
+    // reason rides the same line, truncated by the card's ellipsis like
+    // every other status text.
+    final reason = nodeHealth?.reason;
+    final statusText = status == null
+        ? null
+        : (reason == null || reason.isEmpty ? status : '$status · $reason');
     final statusColor = nodeHealth != null && nodeHealth.cooling
         ? colors.warning
         : colors.danger;
@@ -1458,7 +1491,7 @@ class _ProviderNode extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    status ??
+                    statusText ??
                         modelLabel ??
                         l10n.aiProviderModelCount(enabledModels),
                     maxLines: 1,

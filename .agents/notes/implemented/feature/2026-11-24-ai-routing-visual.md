@@ -177,9 +177,13 @@ entries are pruned on reload when either side disappears.
 
 **Member health is per-node, not global.** A `failed` event now carries
 `cooling`: true when the member entered its cooldown rather than dying
-fatally. The view keeps `member → cooldown-until` and `member →
-last-fatal-error` maps, aggregates them worst-first onto each provider
-node ("Cooling 42s" in amber, "Last request failed" in red for 30s), and
+fatally, plus `reason` — the upstream's own failure text (the exception
+message, or the stream's error frame). The view keeps `member →
+cooldown-until`, `member → last-fatal-error`, and `member → reason`
+maps, aggregates them worst-first onto each provider
+node ("Cooling 42s · opencode-zen answered HTTP 403" in amber,
+"Last request failed · …" in red for 30s — the reason shares the status
+line and ellipsizes like the rest of it), and
 seeds cooldowns already in flight from `AiRouter.coolingDownUntil` — so
 a benched member shows as cooling instead of the whole picture looking
 dead. A 1s ticker expires marks, refreshes the countdown, and polls
