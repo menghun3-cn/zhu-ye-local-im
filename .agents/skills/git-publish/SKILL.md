@@ -119,21 +119,33 @@ git checkout -B {RELEASE_BRANCH_PREFIX}{version} {REMOTE}/{INTEGRATION_BRANCH}
 
 ### 步骤 3 — 分析变更并生成 CHANGELOG 草稿
 
-1. 获取上次 tag 以来的提交（相对 release HEAD，即集成分支 tip）：
+1. 获取本版本必须覆盖的 commit 集合。仓库启用 commit 指纹方案时（本仓库
+   `test/process/changelog_fingerprint_check.dart` 存在），用它的 `--commits`
+   模式——它输出的正是 `prevTag..HEAD` 经可见性与「上一版本已发布」过滤后的
+   完整集合，是唯一权威清单：
+
    ```bash
-   git log {last_tag}..HEAD --oneline
-   # 首次发布时：
-   git log --oneline
+   dart run test/process/changelog_fingerprint_check.dart --commits
+   # 输出：<full-hash><TAB><subject>，每行一个
    ```
 
-2. 如果没有找到提交：
+   脚本不存在或 dart 不可用时退回 `git log {last_tag}..HEAD --format='%h %s'`，
+   并按下述分类规则自行过滤 `chore:`/`test:`/`ci:` 与合并提交；此时步骤 4d-2
+   的校验是兜底，漏了会点名 hash。
+
+2. 如果集合为空：
    ```
    ⚠ 自上次发布 tag ({last_tag}) 以来没有新提交。
    是否继续？[y/N]
    ```
    用户未确认则中止。
 
-3. 按提交前缀分类，生成 Keep a Changelog 格式的条目。
+3. 按提交前缀分类，生成 Keep a Changelog 格式的条目。**每条 bullet 必须以
+   指纹行收尾**：在 bullet（含其折行续行）之后单独一行写
+   `  <!-- @<短hash> [@<短hash>…] -->`，缩进与续行一致、位于块末尾；集合里
+   每个 commit 恰好出现在一条 bullet 的指纹里，默认一一对应，合并 bullet 时
+   把多个 `@token` 写进同一行。指纹是工具写入的元数据：人审只看散文，但草稿
+   必须原样展示指纹行供核对，且不得在确认后手改。
 
    **CHANGELOG 内容必须用中文书写。** 将每个提交总结为简洁的中文要点，不要逐字翻译提交信息，适当合并相关提交。
 
@@ -155,18 +167,23 @@ git checkout -B {RELEASE_BRANCH_PREFIX}{version} {REMOTE}/{INTEGRATION_BRANCH}
 
    ### 新增
    - 中文描述新增功能
+     <!-- @c2bb4be -->
 
    ### 修复
    - 中文描述修复内容
+     <!-- @db2ed9b @39bd4f1 -->
 
    ### 变更
    - 中文描述行为变更
+     <!-- @a1b2c3d -->
 
    ### 移除
    - 中文描述移除内容
+     <!-- @e4f5a6b -->
 
    ### 安全
    - 中文描述安全修复
+     <!-- @c7d8e9f -->
    ```
 
    省略空的分类。日期使用 ISO 8601 格式（当天日期）。日期行与第一个分类之间、各分类之间保留空行。
@@ -237,7 +254,18 @@ grep -nE '{VERSION_PATTERN}' {EXTRA_VERSION_FILES...}
 python3 .agents/skills/git-publish/scripts/changelog_check.py --file {CHANGELOG_FILE} --require-unreleased-empty --version {version}
 ```
 
-校验不通过：**中止**，按脚本输出修正后重跑。要求 `[Unreleased]` 为空、首个版本条目标题为 `## [A.B.C] - YYYY-MM-DD`、分类仅限 新增/修复/变更/移除/安全 且每个分类至少一条列表项。
+校验不通过：**中止**，按脚本输出修正后重跑。要求 `[Unreleased]` 为空、首个版本条目标题为 `## [A.B.C] - YYYY-MM-DD`、分类仅限 新增/修复/变更/移除/安全 且每个分类至少一条列表项。版本不低于指纹起点（本仓库 `0.1.63`）时，`changelog_check.py` 同时强制指纹语法：每条 bullet 块末尾一行 `<!-- @hash… -->`、格式合法、条目内不重复。
+
+**4d-2. 指纹覆盖校验（本仓库）：**
+
+```bash
+dart run test/process/changelog_fingerprint_check.dart
+```
+
+待发布条目的指纹集合必须等于 `prevTag..HEAD` 的 commit 集合——与 `dart test`
+在 tag 之后用的是同一份谓词。失败会点名缺失与多余的 hash；修正条目（只动指纹
+归属与散文，不改指纹语法）后重跑，直到通过再提交。版本早于指纹起点时脚本自
+动跳过。脚本不存在的仓库跳过本步。
 
 **4e. 提交：**
 
@@ -415,6 +443,7 @@ bash .agents/skills/git-publish/scripts/pre-publish-check.example.sh
 | 步骤 4f 推送失败 | 中止：文件已在本地更新但未推送 |
 | 多文件版本不一致 | 中止：必须全部同步 |
 | CHANGELOG 格式校验失败 | 中止：按脚本输出修正格式后重跑 |
+| 指纹覆盖校验失败 | 中止：按输出补齐/修正指纹归属后重跑 |
 | 步骤 5 PR 创建失败 | 中止（尚未打 tag / 未发版） |
 | 未合入时尝试打 tag | **禁止** — 硬红线 |
 | tag 已存在 | 中止并给出核对指令 |
@@ -460,6 +489,7 @@ bash .agents/skills/git-publish/scripts/pre-publish-check.example.sh
 
 ## 已实现的能力
 
-- `.agents/skills/git-publish/scripts/changelog_check.py`：自动校验 `[Unreleased]` 结构、版本标题、日期、分类与列表项。
-- `.agents/skills/git-publish/scripts/pre-publish-check.ps1`：Windows 原生发布前检查，与 bash 模板保持同一规则。
+- `.agents/skills/git-publish/scripts/changelog_check.py`：自动校验 `[Unreleased]` 结构、版本标题、日期、分类、列表项与（指纹化版本的）指纹语法。
+- `.agents/skills/git-publish/scripts/pre-publish-check.ps1`：Windows 原生发布前检查，与 bash 模板保持同一规则，并在仓库启用指纹方案时执行 `dart run test/process/changelog_fingerprint_check.dart` 覆盖检查。
+- `test/process/changelog_commits.dart` + `changelog_fingerprint_check.dart`：commit 集合谓词与指纹解析的单一 Dart 实现，供 `dart test` 与打 tag 前检查共用；`--commits` 模式输出发版必须覆盖的 commit 清单。
 - `docs/templates.md`：提供配置变量速查、`VERSION_FILE` 常见格式示例、多文件同步与调用示例。

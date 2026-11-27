@@ -4,7 +4,9 @@
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 分类仅限：新增、修复、变更、移除、安全。发布时由
-`.agents/skills/git-publish/scripts/changelog_check.py` 自动校验格式。
+`.agents/skills/git-publish/scripts/changelog_check.py` 自动校验格式；
+`0.1.63` 起每条 bullet 以 `<!-- @hash -->` 注释记录其覆盖的 commit，
+由 `test/process/changelog_fingerprint_check.dart` 校验覆盖。
 
 ## [Unreleased]
 
@@ -12,14 +14,17 @@
 
 ### 修复
 - 修复「修改备注」弹窗的说明文字被省略号截断、显示不全的问题，现改为完整换行显示
+  <!-- @db2ed9b -->
 
 ## [0.1.63] - 2026-11-24
 
 ### 新增
 - 可以给已发现的设备设置本地备注名，方便区分多台设备
+  <!-- @c2bb4be -->
 
 ### 变更
 - 官网功能描述与当前版本对齐：补充链接分享、多文件二维码、消息转发、文件夹发送等能力说明
+  <!-- @39bd4f1 -->
 
 ## [0.1.62] - 2026-11-24
 

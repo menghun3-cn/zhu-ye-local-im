@@ -7,6 +7,8 @@ git-publish 发布前检查（PowerShell 版，Windows 原生）。
 与 pre-publish-check.example.sh 逻辑等价：
 - 检查工作树是否干净；
 - 检查 CHANGELOG 是否存在并调用 changelog_check.py 校验格式；
+- 若仓库启用 commit 指纹方案（存在 test/process/changelog_fingerprint_check.dart），
+  调用 dart run 执行指纹覆盖检查；
 - 检查 VERSION_FILE 与 EXTRA_VERSION_FILES 是否匹配 VERSION_PATTERN；
 - 可选检查 EXPECTED_VERSION 是否存在于所有版本文件中。
 
@@ -70,6 +72,14 @@ if ($python -eq 'py') {
     & $python @checkArgs
 }
 if ($LASTEXITCODE -ne 0) { Fail 'CHANGELOG 格式校验失败，请按脚本输出修正' }
+
+# 3b. CHANGELOG 指纹覆盖检查（仓库启用 commit 指纹方案时存在该脚本）
+$fingerprintCheck = 'test/process/changelog_fingerprint_check.dart'
+if ((Test-Path -LiteralPath $fingerprintCheck -PathType Leaf) -and
+    (Get-Command dart -ErrorAction SilentlyContinue)) {
+    & dart run $fingerprintCheck
+    if ($LASTEXITCODE -ne 0) { Fail 'CHANGELOG 指纹覆盖检查失败，请按输出补齐指纹' }
+}
 
 # 4. 主版本文件必须匹配版本规则
 if (-not (Test-Path -LiteralPath $VersionFile -PathType Leaf)) {
