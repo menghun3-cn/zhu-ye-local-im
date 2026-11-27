@@ -2593,6 +2593,18 @@ abstract class AppLocalizations {
   /// **'Stored encrypted on this Device; leave empty for local models'**
   String get aiProviderApiKeyHint;
 
+  /// No description provided for @aiProviderProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy'**
+  String get aiProviderProxy;
+
+  /// No description provided for @aiProviderProxyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP proxy for this provider only, e.g. http://127.0.0.1:7890 — leave empty to connect directly'**
+  String get aiProviderProxyHint;
+
   /// No description provided for @aiProviderModels.
   ///
   /// In en, this message translates to:

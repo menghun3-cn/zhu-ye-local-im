@@ -1211,6 +1211,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     with SingleTickerProviderStateMixin {
   late final TextEditingController _name;
   late final TextEditingController _apiKey;
+  late final TextEditingController _proxy;
   late final Map<AiProtocol, TextEditingController> _endpoints;
   late final TabController _tab;
   late AiProvider _draft;
@@ -1232,6 +1233,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
       text: widget.persisted ? widget.provider.name : '',
     );
     _apiKey = TextEditingController(text: widget.provider.apiKey);
+    _proxy = TextEditingController(text: widget.provider.proxy ?? '');
     _endpoints = {
       for (final protocol in AiProtocol.values)
         protocol: TextEditingController(
@@ -1252,6 +1254,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
   void dispose() {
     _name.dispose();
     _apiKey.dispose();
+    _proxy.dispose();
     _tab.dispose();
     for (final controller in _endpoints.values) {
       controller.dispose();
@@ -1269,6 +1272,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
           entry.key: entry.value.text.trim(),
     },
     apiKey: _apiKey.text.trim(),
+    proxy: _proxy.text.trim().isEmpty ? null : _proxy.text.trim(),
     models: _draft.models,
     enabled: _draft.enabled,
     iconAsset: _draft.iconAsset,
@@ -1485,6 +1489,19 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                   ),
                 ),
               ],
+              const SizedBox(height: 12),
+              // Per-provider egress: one vendor may need a tunnel while the
+              // rest go direct, so the proxy lives on the provider, not in
+              // a global setting. Shown for local kinds too — a LAN-hosted
+              // endpoint can sit behind a proxy as well.
+              TextField(
+                controller: _proxy,
+                decoration: InputDecoration(
+                  labelText: l10n.aiProviderProxy,
+                  hintText: 'http://127.0.0.1:7890',
+                  helperText: l10n.aiProviderProxyHint,
+                ),
+              ),
               const SizedBox(height: 8),
               // One pair of actions for the whole tab strip: they probe the
               // protocol whose tab is showing, so repeating them per tab

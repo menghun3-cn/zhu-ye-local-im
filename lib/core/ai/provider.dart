@@ -94,6 +94,7 @@ final class AiProvider {
     required this.kind,
     this.endpoints = const <AiProtocol, String>{},
     this.apiKey = '',
+    this.proxy,
     this.models = const <AiProviderModel>[],
     this.enabled = true,
     this.iconAsset,
@@ -115,6 +116,13 @@ final class AiProvider {
   /// The API key in plaintext — callers only ever see this in memory; the
   /// store seals it before it touches disk (see `secret_box.dart`).
   final String apiKey;
+
+  /// An HTTP proxy every request to this provider goes through, e.g.
+  /// `http://127.0.0.1:7890`. Per-provider rather than per-app because one
+  /// vendor may be reachable only through a tunnel while the rest are not.
+  /// Null or empty means direct. dart:io speaks HTTP CONNECT proxies only —
+  /// a `socks5://` value fails at connect time like any bad endpoint.
+  final String? proxy;
 
   /// The fetched catalogue plus enable flags. New fetches update the
   /// catalogue without auto-enabling, so a refresh cannot silently widen
@@ -146,6 +154,7 @@ final class AiProvider {
     String? name,
     Map<AiProtocol, String>? endpoints,
     String? apiKey,
+    String? proxy,
     List<AiProviderModel>? models,
     bool? enabled,
   }) => AiProvider(
@@ -154,6 +163,7 @@ final class AiProvider {
     kind: kind,
     endpoints: endpoints ?? this.endpoints,
     apiKey: apiKey ?? this.apiKey,
+    proxy: proxy ?? this.proxy,
     models: models ?? this.models,
     enabled: enabled ?? this.enabled,
     iconAsset: iconAsset,
@@ -167,6 +177,7 @@ final class AiProvider {
       for (final entry in endpoints.entries) entry.key.name: entry.value,
     },
     'apiKey': apiKey,
+    if (proxy != null && proxy!.isNotEmpty) 'proxy': proxy,
     'models': [for (final model in models) model.toJson()],
     'enabled': enabled,
     'iconAsset': iconAsset,
@@ -192,6 +203,10 @@ final class AiProvider {
           AiProviderKind.custom,
       endpoints: endpoints,
       apiKey: json['apiKey'] as String? ?? '',
+      proxy: switch (json['proxy']) {
+        final String proxy when proxy.isNotEmpty => proxy,
+        _ => null,
+      },
       models: [
         if (rawModels is List)
           for (final entry in rawModels)

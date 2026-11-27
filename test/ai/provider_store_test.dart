@@ -29,6 +29,7 @@ void main() {
         kind: AiProviderKind.preset,
         endpoints: const {AiProtocol.openaiChat: 'https://api.deepseek.com/v1'},
         apiKey: 'sk-live-secret',
+        proxy: 'http://user:pass@127.0.0.1:7890',
         models: const [
           AiProviderModel(
             id: 'deepseek-chat',
@@ -56,6 +57,7 @@ void main() {
     final loaded = await store.load();
     expect(loaded.providers.single.id, 'deepseek');
     expect(loaded.providers.single.apiKey, 'sk-live-secret');
+    expect(loaded.providers.single.proxy, 'http://user:pass@127.0.0.1:7890');
     expect(loaded.providers.single.models.single.enabled, isTrue);
     final model = loaded.providers.single.models.single;
     expect(model.label, 'DeepSeek Chat');
@@ -69,6 +71,8 @@ void main() {
     await store.save(sampleConfig());
     final raw = await File('${tempDir.path}/providers.json').readAsString();
     expect(raw, isNot(contains('sk-live-secret')));
+    // The proxy URL can embed user:pass@ credentials, so it seals like the key.
+    expect(raw, isNot(contains('user:pass@')));
     expect(raw, contains('v1:'));
     // Sanity: it is still valid JSON.
     expect(jsonDecode(raw), isA<Map<String, Object?>>());

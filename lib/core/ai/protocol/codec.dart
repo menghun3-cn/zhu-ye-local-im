@@ -42,6 +42,7 @@ final class AiRequestSpec {
     required this.url,
     required this.headers,
     this.body,
+    this.proxy,
   });
 
   final String method;
@@ -50,6 +51,11 @@ final class AiRequestSpec {
 
   /// The JSON body, already encoded. Null for GET.
   final String? body;
+
+  /// The provider's configured HTTP proxy, copied on by the router — the
+  /// codec builds the wire shape and knows nothing about routing policy.
+  /// Null means the transport connects directly.
+  final String? proxy;
 }
 
 /// What came back on the wire, reduced to what codecs need.

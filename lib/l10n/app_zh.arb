@@ -440,6 +440,8 @@
   "aiProviderName": "名称",
   "aiProviderApiKey": "API 密钥",
   "aiProviderApiKeyHint": "加密保存在本设备；本地模型可留空",
+  "aiProviderProxy": "代理",
+  "aiProviderProxyHint": "仅本供应商使用的 HTTP 代理，例如 http://127.0.0.1:7890——留空直连",
   "aiProviderModels": "模型",
   "aiProviderModelCount": "{count, plural, other{已启用 {count} 个模型}}",
   "@aiProviderModelCount": {

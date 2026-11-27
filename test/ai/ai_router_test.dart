@@ -50,6 +50,7 @@ AiConfig _config() => AiConfig(
       kind: AiProviderKind.custom,
       endpoints: const {AiProtocol.openaiChat: 'https://a.example/v1'},
       apiKey: 'k-a',
+      proxy: 'http://127.0.0.1:7890',
       models: const [
         AiProviderModel(
           id: 'm1',
@@ -119,6 +120,27 @@ void main() {
     expect(reply.servedBy, 'a/m1');
     expect((reply as AiFullReply).response.content, 'answer');
     expect(transport.sent.single.url, 'https://a.example/v1/chat/completions');
+  });
+
+  test('a provider proxy rides the request spec; none means direct', () async {
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'answer'},
+        },
+      ],
+    });
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'answer'},
+        },
+      ],
+    });
+    await router.chat(chat('a/m1'));
+    await router.chat(chat('b/m2'));
+    expect(transport.sent[0].proxy, 'http://127.0.0.1:7890');
+    expect(transport.sent[1].proxy, isNull);
   });
 
   test(

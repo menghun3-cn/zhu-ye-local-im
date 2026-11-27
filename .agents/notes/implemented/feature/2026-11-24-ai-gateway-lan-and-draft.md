@@ -82,6 +82,19 @@ editor's job: it lives on the provider card in the list, behind the same
 confirm dialog, for drafts and persisted providers alike (a draft simply
 never appears in the list to be deleted).
 
+**The proxy is per-provider, not per-app.** `AiProvider.proxy` holds an
+HTTP proxy URL (`http://host:port`, credentials allowed) that every
+request to that provider travels through — chat calls and the model
+catalogue fetch alike, since both go through `AiRouter._withProxy`,
+which stamps it onto `AiRequestSpec.proxy` after the codec builds the
+wire shape (codecs own the request, the router owns routing policy).
+`IoAiTransport` hands it to `HttpClient.findProxy`, so HTTPS upstreams
+tunnel through CONNECT and a bad proxy fails at connect time like any
+unreachable endpoint — retryable, so failover still applies. The field
+seals through `SecretBox` beside `apiKey` because a proxy URL can embed
+`user:pass@`. dart:io speaks HTTP CONNECT proxies only; a `socks5://`
+value is accepted by the field and fails honestly at connect.
+
 ## Consequences
 
 - Every install now listens on loopback from first launch. The token is

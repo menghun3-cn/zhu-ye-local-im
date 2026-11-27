@@ -1485,6 +1485,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Stored encrypted on this Device; leave empty for local models';
 
   @override
+  String get aiProviderProxy => 'Proxy';
+
+  @override
+  String get aiProviderProxyHint =>
+      'HTTP proxy for this provider only, e.g. http://127.0.0.1:7890 — leave empty to connect directly';
+
+  @override
   String get aiProviderModels => 'Models';
 
   @override

@@ -32,8 +32,11 @@ abstract interface class AiTransport {
 
 /// [AiTransport] over `dart:io`'s [HttpClient].
 ///
-/// Plain HTTP, no proxy handling and no certificate overrides — provider
-/// endpoints are public HTTPS APIs and "trust everything" is not a feature.
+/// Plain HTTP and no certificate overrides — provider endpoints are public
+/// HTTPS APIs and "trust everything" is not a feature. A per-request proxy
+/// ([AiRequestSpec.proxy]) is honoured through [HttpClient.findProxy],
+/// which tunnels HTTPS with CONNECT; anything else fails at connect time
+/// like any unreachable endpoint.
 final class IoAiTransport implements AiTransport {
   IoAiTransport({
     this.connectTimeout = const Duration(seconds: 30),
@@ -48,6 +51,10 @@ final class IoAiTransport implements AiTransport {
     final client = HttpClient()
       ..connectionTimeout = connectTimeout
       ..autoUncompress = true;
+    final proxy = request.proxy;
+    if (proxy != null && proxy.isNotEmpty) {
+      client.findProxy = (_) => proxy;
+    }
     try {
       final uri = Uri.parse(request.url);
       final ioRequest = await client.openUrl(request.method, uri);
@@ -520,7 +527,7 @@ final class AiRouter {
     final codec = codecFor(protocol);
     final spec = codec.modelsSpec(baseUrl: baseUrl, apiKey: provider.apiKey);
     if (spec == null) return const [];
-    final response = await _transport.send(spec);
+    final response = await _transport.send(_withProxy(spec, provider));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return const [];
     }
@@ -610,7 +617,7 @@ final class AiRouter {
     _emit(callId, AiRoutePhase.attempt, member, request.model);
     final AiHttpResponse response;
     try {
-      response = await _transport.send(spec);
+      response = await _transport.send(_withProxy(spec, provider));
     } catch (error) {
       // A socket that never opened is the purest transient failure there is.
       throw _RetryableFailure(
@@ -639,6 +646,21 @@ final class AiRouter {
     }
     final body = await _readBody(response.bodyBytes);
     return AiFullReply(servedBy: member, response: codec.decodeResponse(body));
+  }
+
+  /// Stamps the provider's proxy onto a codec-built spec. Codecs own the
+  /// wire shape; the proxy is routing policy, so it is applied here rather
+  /// than inside every codec.
+  AiRequestSpec _withProxy(AiRequestSpec spec, AiProvider provider) {
+    final proxy = provider.proxy;
+    if (proxy == null || proxy.isEmpty) return spec;
+    return AiRequestSpec(
+      method: spec.method,
+      url: spec.url,
+      headers: spec.headers,
+      body: spec.body,
+      proxy: proxy,
+    );
   }
 
   /// Reads a whole response body as text. [utf8.decoder] buffers partial

@@ -31,29 +31,47 @@ final class AiConfigStore {
     final config = AiConfig.fromJson(json);
     final providers = <AiProvider>[];
     for (final provider in config.providers) {
-      final key = provider.apiKey;
       providers.add(
         provider.copyWith(
-          apiKey: key.isEmpty ? key : await secrets.unseal(key),
+          apiKey: await _unseal(provider.apiKey),
+          proxy: await _unseal(provider.proxy),
         ),
       );
     }
     return config.copyWith(providers: providers);
   }
 
-  /// Persists [config], sealing every non-empty `apiKey` on the way out.
+  /// Plaintext passes through — files written before sealing existed keep
+  /// working — while a `v1:` value is decrypted. Shared by every credential
+  /// field a provider carries (the key, and a proxy URL that may embed
+  /// `user:pass@`).
+  Future<String?> _unseal(String? stored) async {
+    if (stored == null || stored.isEmpty) return stored;
+    return secrets.unseal(stored);
+  }
+
+  /// Persists [config], sealing every non-empty credential field on the
+  /// way out — `apiKey`, and `proxy` for the same reason.
   Future<void> save(AiConfig config) async {
     final providers = <AiProvider>[];
     for (final provider in config.providers) {
-      final key = provider.apiKey;
       providers.add(
         provider.copyWith(
-          apiKey: key.isEmpty || SecretBox.isSealed(key)
-              ? key
-              : await secrets.seal(key),
+          apiKey: await _seal(provider.apiKey),
+          proxy: await _sealNullable(provider.proxy),
         ),
       );
     }
     await store.save(config.copyWith(providers: providers).toJson());
+  }
+
+  Future<String> _seal(String stored) async {
+    if (stored.isEmpty || SecretBox.isSealed(stored)) return stored;
+    return secrets.seal(stored);
+  }
+
+  Future<String?> _sealNullable(String? stored) async {
+    if (stored == null) return null;
+    return _seal(stored);
   }
 }

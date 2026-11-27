@@ -1412,6 +1412,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiProviderApiKeyHint => '加密保存在本设备；本地模型可留空';
 
   @override
+  String get aiProviderProxy => '代理';
+
+  @override
+  String get aiProviderProxyHint =>
+      '仅本供应商使用的 HTTP 代理，例如 http://127.0.0.1:7890——留空直连';
+
+  @override
   String get aiProviderModels => '模型';
 
   @override
