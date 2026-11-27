@@ -66,6 +66,25 @@ void main() {
     expect(read('- 取回新包、\n  按校验值核一遍'), [(UpdateNoteKind.item, '取回新包、按校验值核一遍')]);
   });
 
+  test('leaves a bullet\'s fingerprint comment out', () {
+    // CHANGELOG bullets end with an own-line `<!-- @hash -->` fingerprint.
+    // The comment is for the coverage gates, not for the reader — and it
+    // must stay invisible on clients already shipped, whose parser is this
+    // same one.
+    const notes = '''
+- 可以给已发现的设备设置本地备注名，方便区分多台设备
+  <!-- @c2bb4be -->
+- 修复「修改备注」弹窗的说明文字被截断
+  现改为完整换行显示
+  <!-- @db2ed9b -->
+''';
+
+    expect(read(notes), [
+      (UpdateNoteKind.item, '可以给已发现的设备设置本地备注名，方便区分多台设备'),
+      (UpdateNoteKind.item, '修复「修改备注」弹窗的说明文字被截断现改为完整换行显示'),
+    ]);
+  });
+
   test('leaves a blank line, a rule and a comment out', () {
     // The notes are prose and a list; the punctuation markdown uses to lay
     // itself out is not something a reader asked to see.
