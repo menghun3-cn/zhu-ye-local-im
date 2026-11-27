@@ -88,9 +88,11 @@ request to that provider travels through — chat calls and the model
 catalogue fetch alike, since both go through `AiRouter._withProxy`,
 which stamps it onto `AiRequestSpec.proxy` after the codec builds the
 wire shape (codecs own the request, the router owns routing policy).
-`IoAiTransport` hands it to `HttpClient.findProxy`, so HTTPS upstreams
-tunnel through CONNECT and a bad proxy fails at connect time like any
-unreachable endpoint — retryable, so failover still applies. The field
+`IoAiTransport` translates it into dart:io's `findProxy` dialect —
+`PROXY [user:pass@]host:port`, *not* a URL; passing the `http://…` form
+straight through throws `Invalid proxy configuration` and the request
+dies at connect like any unreachable endpoint, retryable so failover
+still applies. HTTPS upstreams tunnel through CONNECT. The field
 seals through `SecretBox` beside `apiKey` because a proxy URL can embed
 `user:pass@`. dart:io speaks HTTP CONNECT proxies only; a `socks5://`
 value is accepted by the field and fails honestly at connect.

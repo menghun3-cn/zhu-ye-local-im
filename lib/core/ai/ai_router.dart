@@ -53,7 +53,7 @@ final class IoAiTransport implements AiTransport {
       ..autoUncompress = true;
     final proxy = request.proxy;
     if (proxy != null && proxy.isNotEmpty) {
-      client.findProxy = (_) => proxy;
+      client.findProxy = (_) => _proxyConfiguration(proxy);
     }
     try {
       final uri = Uri.parse(request.url);
@@ -84,6 +84,23 @@ final class IoAiTransport implements AiTransport {
       client.close(force: true);
       rethrow;
     }
+  }
+
+  /// [HttpClient.findProxy] speaks the IE configuration dialect —
+  /// `PROXY [user:pass@]host:port`, `DIRECT`, `;`-separated — not a URL.
+  /// The stored form is a URL (`http://127.0.0.1:7897`, credentials
+  /// allowed), so it is translated here; a schemeless `host:port` is
+  /// accepted too. Something unparseable is handed back verbatim so
+  /// dart:io rejects it loudly instead of silently going direct.
+  static String _proxyConfiguration(String proxy) {
+    var uri = Uri.tryParse(proxy);
+    if (uri == null || uri.host.isEmpty) {
+      uri = Uri.tryParse('http://$proxy');
+    }
+    if (uri == null || uri.host.isEmpty) return 'PROXY $proxy';
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    final auth = uri.userInfo.isEmpty ? '' : '${uri.userInfo}@';
+    return 'PROXY $auth${uri.host}:$port';
   }
 }
 

@@ -72,9 +72,11 @@ HTTP 代理地址（`http://host:port`，允许内嵌凭据），该供应商的
 请求——聊天调用与模型目录获取——都经它转发，因为两条路径都过
 `AiRouter._withProxy`：它在 codec 构建好报文后把代理戳到
 `AiRequestSpec.proxy` 上（codec 管线路形状，路由器管路由策略）。
-`IoAiTransport` 把它交给 `HttpClient.findProxy`，HTTPS 上游走
-CONNECT 隧道；代理本身不通时在连接阶段失败，与任何不可达端点
-同类——可重试，所以 failover 照常生效。该字段与 `apiKey` 一样经
+`IoAiTransport` 把它翻译成 dart:io `findProxy` 的方言——
+`PROXY [user:pass@]host:port`，**不是** URL；直接把 `http://…`
+形式传进去会抛 `Invalid proxy configuration`，请求在连接阶段失败，
+与任何不可达端点同类——可重试，failover 照常生效。HTTPS 上游走
+CONNECT 隧道。该字段与 `apiKey` 一样经
 `SecretBox` 封存，因为代理地址可能内嵌 `user:pass@`。dart:io 只
 支持 HTTP CONNECT 代理；`socks5://` 值能填进字段，但会在连接时
 如实失败。
