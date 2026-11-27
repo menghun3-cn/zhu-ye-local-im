@@ -22,6 +22,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabTransfers => '传输';
 
   @override
+  String get tabAi => 'AI';
+
+  @override
   String get tabMy => '我的';
 
   @override
@@ -1370,25 +1373,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bubbleSkinPresetLilac => '丁香';
 
   @override
-  String get myCardAi => 'AI';
-
-  @override
-  String get myCardAiSummaryOn => '网关已开启';
-
-  @override
-  String get myCardAiSummaryOff => '网关已关闭';
-
-  @override
-  String get aiUnavailableHere => '这台设备没有可持久保存 AI 配置的位置，AI 功能在此不可用。';
-
-  @override
   String get aiLoadFailed => 'AI 配置读取失败';
 
   @override
-  String get aiPageHint => '供应商及其密钥只保存在本设备上，不会与设备组共享。网关只监听本机。';
+  String get aiPageHint => '供应商及其密钥只保存在本设备上，不会与设备组共享。网关默认仅监听本机，可切换到局域网。';
 
   @override
   String get aiCopied => '已复制';
+
+  @override
+  String get aiCopyFailed => '复制失败——剪贴板拒绝了写入';
+
+  @override
+  String get aiNavGateway => '网关';
 
   @override
   String get aiSectionProviders => '供应商';
@@ -1400,6 +1397,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiProviderCustom => '自定义端点';
 
   @override
+  String get aiProviderGroupCloud => '云端服务';
+
+  @override
+  String get aiProviderGroupLocal => '本地运行';
+
+  @override
+  String get aiProviderGroupCustom => '自定义';
+
+  @override
   String get aiProviderName => '名称';
 
   @override
@@ -1407,6 +1413,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiProviderApiKeyHint => '加密保存在本设备；本地模型可留空';
+
+  @override
+  String get aiProviderProxy => '代理';
+
+  @override
+  String get aiProviderProxyHint =>
+      '仅本供应商使用的 HTTP 代理，例如 http://127.0.0.1:7890——留空直连';
 
   @override
   String get aiProviderModels => '模型';
@@ -1428,6 +1441,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiKindCustom => '自定义';
 
   @override
+  String get aiKindBuiltin => '内置免费';
+
+  @override
   String get aiKindLocal => '本地';
 
   @override
@@ -1445,6 +1461,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String aiFetchAdded(int count) {
     return '新增 $count 个模型';
+  }
+
+  @override
+  String get aiFetchNoFree => '没有可添加的免费模型';
+
+  @override
+  String get aiModelFree => '免费';
+
+  @override
+  String get aiTestConnection => '测试连通';
+
+  @override
+  String aiConnectionOk(int count) {
+    return '连接正常——供应商报告 $count 个模型';
   }
 
   @override
@@ -1478,6 +1508,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGroupEmpty => '还没有成员——至少添加一个模型或路由组。';
 
   @override
+  String get aiGroupsEmpty => '还没有路由组。';
+
+  @override
   String aiGroupMemberCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1509,16 +1542,170 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiGatewayEndpoint => '端点';
 
   @override
-  String get aiGatewayToken => '访问令牌';
+  String get aiGatewayKeys => '网关密钥';
+
+  @override
+  String get aiGatewayKeyAdd => '添加网关密钥';
+
+  @override
+  String get aiGatewayKeyNameHint => '密钥名称（如：笔记本）';
+
+  @override
+  String get aiGatewayKeySecretHint => '自定义密钥（可选）';
+
+  @override
+  String get aiGatewayKeyCreate => '创建';
+
+  @override
+  String get aiGatewayKeyCancel => '取消';
+
+  @override
+  String aiGatewayKeyUsage(int requests, String tokens) {
+    return '$requests 次请求 · $tokens token';
+  }
+
+  @override
+  String get aiGatewayKeyDuplicate => '该密钥已存在';
+
+  @override
+  String get aiGatewayKeyReveal => '显示密钥';
+
+  @override
+  String get aiGatewayKeyHide => '隐藏密钥';
+
+  @override
+  String get aiDeleteKeyTitle => '删除网关密钥？';
+
+  @override
+  String get aiDeleteKeyBody => '使用该密钥的客户端会立即失去访问权限。最后一个密钥无法删除。';
 
   @override
   String get aiGatewayNotListening => '已配置，但当前未在监听';
 
   @override
-  String get aiGatewayNotListeningHint => '网关已启用但绑定失败——请检查端口是否被占用，然后重启应用。';
+  String get aiGatewayNotListeningHint =>
+      '网关已启用但绑定失败——请检查端口是否被占用，然后把网关关掉再打开（或重启应用）。';
 
   @override
-  String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把令牌作为 API 密钥。';
+  String get aiGatewayHint => '把 OpenAI 兼容客户端的地址指向此端点，并把网关密钥作为 API 密钥。';
+
+  @override
+  String get aiGatewayScope => '监听范围';
+
+  @override
+  String get aiGatewayScopeLoopback => '仅本机';
+
+  @override
+  String get aiGatewayScopeLan => '局域网';
+
+  @override
+  String get aiGatewayLanEndpoint => '局域网端点';
+
+  @override
+  String get aiGatewayLanHint =>
+      '局域网模式会通过明文 HTTP 响应所有网卡，网络内任何拿到网关密钥的设备都能使用已配置的供应商。请妥善保管密钥，并仅在可信网络中启用。';
+
+  @override
+  String get aiGatewayLanConfirmTitle => '在局域网中开放网关？';
+
+  @override
+  String get aiGatewayLanConfirmBody =>
+      '局域网模式将监听所有网卡并以明文 HTTP 提供服务——网关密钥可能在网络中被窃听。仅在可信网络中启用。';
+
+  @override
+  String get aiGatewayLanConfirmAction => '启用';
+
+  @override
+  String get aiGatewayKeysCorrupt => '网关密钥文件已损坏，无法读取——在文件修复前现有密钥不可用。';
+
+  @override
+  String get aiRoutingTitle => '路由';
+
+  @override
+  String get aiRoutingSource => 'Agent';
+
+  @override
+  String get aiRoutingGateway => '网关';
+
+  @override
+  String aiRoutingCooling(int seconds) {
+    return '冷却中 ${seconds}s';
+  }
+
+  @override
+  String get aiRoutingFailed => '上次请求失败';
+
+  @override
+  String get aiRoutingAnswering => '回答中…';
+
+  @override
+  String aiRoutingLiveAnswering(String stats) {
+    return '回答中… · $stats';
+  }
+
+  @override
+  String aiRoutingLiveTokens(String tokens) {
+    return '≈$tokens token';
+  }
+
+  @override
+  String aiRoutingLiveRate(String rate) {
+    return '≈$rate token/s';
+  }
+
+  @override
+  String get aiRoutingEmpty => '还没有供应商。';
+
+  @override
+  String aiRoutingMoreProviders(int count) {
+    return '另有 $count 个供应商在请求';
+  }
+
+  @override
+  String get aiRequestsTitle => '请求记录';
+
+  @override
+  String get aiRequestsWindow => '最近 7 天';
+
+  @override
+  String get aiRequestsLive => '实时';
+
+  @override
+  String get aiRequestsLiveWindow => '最近 3 小时';
+
+  @override
+  String get aiRequestsAll => '所有历史';
+
+  @override
+  String get aiRequestsEmpty => '暂无请求记录。';
+
+  @override
+  String aiLogSeconds(String value) {
+    return '$value秒';
+  }
+
+  @override
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+    String speed,
+  ) {
+    return '$duration · 首字耗时 $ttft · $tokens token · 缓存 $percent · $speed token/秒';
+  }
+
+  @override
+  String get aiLogInputUncached => '输入（未缓存）';
+
+  @override
+  String get aiLogOutput => '输出';
+
+  @override
+  String get aiLogCacheRead => '缓存读取';
+
+  @override
+  String get aiLogCacheWrite => '缓存写入';
 
   @override
   String get aiDeleteProviderTitle => '删除供应商？';

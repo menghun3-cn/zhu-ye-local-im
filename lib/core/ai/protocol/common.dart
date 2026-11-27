@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import '../ai_message.dart';
 import 'codec.dart';
 
 /// The default failure classification, shared by all four codecs.
@@ -80,4 +83,174 @@ int? jsonIntField(Map<String, Object?> json, String key) {
   if (value is int) return value;
   if (value is double) return value.round();
   return null;
+}
+
+/// Decodes an OpenAI-shaped `/models` body (`{"data": [{"id": ...}]}`) into
+/// catalogue entries, keeping the metadata richer endpoints add on top.
+///
+/// Three shapes share this envelope:
+///
+/// - plain OpenAI: `id` only — every extra stays null;
+/// - OpenRouter-compatible (Kilo): `context_length` plus `pricing` with
+///   per-token prices as strings, `"0"` meaning free;
+/// - Zen: `limit.context` plus `cost.text.{input,output}.price` as numbers.
+///
+/// A negative price (`"-1"` on OpenRouter auto routers) means "varies", so
+/// it counts as unknown rather than paid.
+List<AiCatalogModel> decodeOpenAiCatalog(String body) {
+  final json = jsonObjectOrEmpty(body);
+  final models = <AiCatalogModel>[];
+  for (final entry in asList(json['data'])) {
+    final model = asObject(entry);
+    final id = jsonStringField(model, 'id');
+    if (id == null) continue;
+    models.add(
+      AiCatalogModel(
+        id: id,
+        contextTokens: _catalogContext(model),
+        isFree: _catalogIsFree(model),
+        label:
+            _nonEmpty(jsonStringField(model, 'name')) ??
+            _nonEmpty(jsonStringField(model, 'display_name')),
+      ),
+    );
+  }
+  return models;
+}
+
+String? _nonEmpty(String? value) =>
+    value == null || value.isEmpty ? null : value;
+
+int? _catalogContext(Map<String, Object?> model) {
+  final direct = jsonIntField(model, 'context_length');
+  if (direct != null) return direct;
+  return jsonIntField(asObject(model['limit']), 'context');
+}
+
+/// Whether the model is reported free. OpenRouter puts prices under
+/// `pricing`, Zen under `cost.text.*.price`; either pair being all zeros
+/// means free, any positive price means paid, anything else is unknown.
+bool? _catalogIsFree(Map<String, Object?> model) {
+  final pricing = asObject(model['pricing']);
+  final prompt = _priceValue(pricing['prompt']);
+  final completion = _priceValue(pricing['completion']);
+  if (prompt != null && completion != null) {
+    return prompt == 0 && completion == 0;
+  }
+  final cost = asObject(asObject(model['cost'])['text']);
+  final input = _priceValue(asObject(cost['input'])['price']);
+  final output = _priceValue(asObject(cost['output'])['price']);
+  if (input != null && output != null) {
+    return input == 0 && output == 0;
+  }
+  return null;
+}
+
+/// How much of a response head is buffered while deciding whether it is
+/// SSE. Real streams declare themselves in the first line; anything this
+/// large without a marker is a plain document.
+const _sniffHeadLimit = 64 * 1024;
+
+enum _BodyKind { undecided, sse, document }
+
+/// Decodes a chat response body that *should* be `text/event-stream` but
+/// might not be.
+///
+/// Some OpenAI-compatible endpoints accept `stream: true` and still answer
+/// with one JSON document. Feeding that to [AiCodec.decodeStream] yields
+/// zero frames — an empty 200 that looks like a successful blank reply.
+/// This sniffs the head: an SSE field line routes to [AiCodec.decodeStream]
+/// with the buffered prefix re-attached, anything else is collected whole
+/// and decoded through [AiCodec.decodeResponse], re-emitted as stream
+/// events so every consumer sees one shape.
+Stream<AiStreamEvent> sniffedDecodeStream(
+  AiCodec codec,
+  Stream<List<int>> bodyBytes,
+) async* {
+  final iterator = StreamIterator<List<int>>(bodyBytes);
+  final head = BytesBuilder(copy: false);
+  var kind = _BodyKind.undecided;
+  try {
+    while (await iterator.moveNext()) {
+      head.add(iterator.current);
+      kind = _sniffBodyKind(utf8.decode(head.toBytes(), allowMalformed: true));
+      if (kind != _BodyKind.undecided || head.length >= _sniffHeadLimit) {
+        break;
+      }
+    }
+    if (kind == _BodyKind.sse) {
+      yield* codec.decodeStream(_withPrefix(head.toBytes(), iterator));
+      return;
+    }
+    while (await iterator.moveNext()) {
+      head.add(iterator.current);
+    }
+    yield* _documentEvents(
+      codec,
+      utf8.decode(head.toBytes(), allowMalformed: true),
+    );
+  } finally {
+    await iterator.cancel();
+  }
+}
+
+/// The sniffed prefix followed by every chunk [iterator] has not yielded
+/// yet — the codec sees one continuous byte stream.
+Stream<List<int>> _withPrefix(
+  List<int> prefix,
+  StreamIterator<List<int>> iterator,
+) async* {
+  yield prefix;
+  while (await iterator.moveNext()) {
+    yield iterator.current;
+  }
+}
+
+_BodyKind _sniffBodyKind(String text) {
+  final trimmed = text.replaceFirst('\uFEFF', '').trimLeft();
+  if (trimmed.isEmpty) return _BodyKind.undecided;
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return _BodyKind.document;
+  }
+  final newline = trimmed.indexOf('\n');
+  final firstLine = (newline < 0 ? trimmed : trimmed.substring(0, newline))
+      .trimRight();
+  for (final prefix in const ['data:', 'event:', 'id:', 'retry:']) {
+    if (firstLine.startsWith(prefix)) return _BodyKind.sse;
+  }
+  // A `:`-led line is an SSE comment (keep-alive); nothing else legal
+  // opens a stream, so a `{`/`[` check above already took the documents.
+  if (firstLine.startsWith(':')) return _BodyKind.sse;
+  return _BodyKind.undecided;
+}
+
+/// Folds a non-SSE body into the same event shapes a stream would have
+/// produced, so [_observeStream] and the gateway need no second path.
+Stream<AiStreamEvent> _documentEvents(AiCodec codec, String body) async* {
+  if (jsonObjectOrEmpty(body).isEmpty) {
+    yield AiStreamEvent.error(
+      'the provider did not return an event stream or a JSON response',
+    );
+    yield AiStreamEvent.done();
+    return;
+  }
+  final reply = codec.decodeResponse(body);
+  if (reply.content.isNotEmpty) yield AiStreamEvent.textDelta(reply.content);
+  for (final call in reply.toolCalls) {
+    yield AiStreamEvent.toolCall(call);
+  }
+  if (reply.usage != AiUsage.empty) yield AiStreamEvent.usage(reply.usage);
+  yield AiStreamEvent.done();
+}
+
+/// A price as a non-negative number, or null when absent, unparseable or
+/// negative ("-1" prices mean "varies", not "free" or "paid").
+double? _priceValue(Object? value) {
+  final parsed = switch (value) {
+    num n => n.toDouble(),
+    String s => double.tryParse(s),
+    _ => null,
+  };
+  if (parsed == null || parsed < 0) return null;
+  return parsed;
 }

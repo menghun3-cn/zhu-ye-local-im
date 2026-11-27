@@ -5,6 +5,10 @@ enum AiProviderKind {
   /// A built-in vendor preset whose endpoints can still be overridden.
   preset,
 
+  /// A provider the app seeds on first run (OpenCode Zen, Kilo) — public
+  /// endpoints with a shared credential, enabled out of the box.
+  builtin,
+
   /// An arbitrary OpenAI/Anthropic/Gemini-compatible endpoint the user typed.
   custom,
 
@@ -23,6 +27,8 @@ final class AiProviderModel {
     required this.protocol,
     this.enabled = false,
     this.label,
+    this.contextTokens,
+    this.isFree,
   });
 
   /// The model id as the provider knows it (`deepseek-chat`, `claude-opus-4-6`).
@@ -37,11 +43,25 @@ final class AiProviderModel {
   /// Optional display name when it differs from [id].
   final String? label;
 
-  AiProviderModel copyWith({bool? enabled, String? label}) => AiProviderModel(
+  /// Context window in tokens, when the catalogue reported one.
+  final int? contextTokens;
+
+  /// Whether the catalogue reported the model as free; null means the
+  /// endpoint said nothing about pricing.
+  final bool? isFree;
+
+  AiProviderModel copyWith({
+    bool? enabled,
+    String? label,
+    int? contextTokens,
+    bool? isFree,
+  }) => AiProviderModel(
     id: id,
     protocol: protocol,
     enabled: enabled ?? this.enabled,
     label: label ?? this.label,
+    contextTokens: contextTokens ?? this.contextTokens,
+    isFree: isFree ?? this.isFree,
   );
 
   Map<String, Object?> toJson() => {
@@ -49,6 +69,8 @@ final class AiProviderModel {
     'protocol': protocol.name,
     'enabled': enabled,
     if (label != null) 'label': label,
+    if (contextTokens != null) 'context_tokens': contextTokens,
+    if (isFree != null) 'is_free': isFree,
   };
 
   factory AiProviderModel.fromJson(Map<String, Object?> json) =>
@@ -59,6 +81,8 @@ final class AiProviderModel {
             AiProtocol.openaiChat,
         enabled: json['enabled'] as bool? ?? false,
         label: json['label'] as String?,
+        contextTokens: json['context_tokens'] as int?,
+        isFree: json['is_free'] as bool?,
       );
 }
 
@@ -70,8 +94,10 @@ final class AiProvider {
     required this.kind,
     this.endpoints = const <AiProtocol, String>{},
     this.apiKey = '',
+    this.proxy,
     this.models = const <AiProviderModel>[],
     this.enabled = true,
+    this.iconAsset,
   });
 
   /// Stable slug used in `provider/model` references. Once persisted it must
@@ -91,12 +117,24 @@ final class AiProvider {
   /// store seals it before it touches disk (see `secret_box.dart`).
   final String apiKey;
 
+  /// An HTTP proxy every request to this provider goes through, e.g.
+  /// `http://127.0.0.1:7890`. Per-provider rather than per-app because one
+  /// vendor may be reachable only through a tunnel while the rest are not.
+  /// Null or empty means direct. dart:io speaks HTTP CONNECT proxies only —
+  /// a `socks5://` value fails at connect time like any bad endpoint.
+  final String? proxy;
+
   /// The fetched catalogue plus enable flags. New fetches update the
   /// catalogue without auto-enabling, so a refresh cannot silently widen
   /// what the gateway exposes.
   final List<AiProviderModel> models;
 
   final bool enabled;
+
+  /// Bundled brand mark (`assets/ai_providers/*.svg`) shown beside the
+  /// provider's name — carried over from the preset it was created from,
+  /// so the mark survives endpoint edits. Null for custom providers.
+  final String? iconAsset;
 
   /// The base URL for [protocol], or null when this provider does not speak it.
   String? endpointFor(AiProtocol protocol) {
@@ -116,6 +154,7 @@ final class AiProvider {
     String? name,
     Map<AiProtocol, String>? endpoints,
     String? apiKey,
+    String? proxy,
     List<AiProviderModel>? models,
     bool? enabled,
   }) => AiProvider(
@@ -124,8 +163,10 @@ final class AiProvider {
     kind: kind,
     endpoints: endpoints ?? this.endpoints,
     apiKey: apiKey ?? this.apiKey,
+    proxy: proxy ?? this.proxy,
     models: models ?? this.models,
     enabled: enabled ?? this.enabled,
+    iconAsset: iconAsset,
   );
 
   Map<String, Object?> toJson() => {
@@ -136,8 +177,10 @@ final class AiProvider {
       for (final entry in endpoints.entries) entry.key.name: entry.value,
     },
     'apiKey': apiKey,
+    if (proxy != null && proxy!.isNotEmpty) 'proxy': proxy,
     'models': [for (final model in models) model.toJson()],
     'enabled': enabled,
+    'iconAsset': iconAsset,
   };
 
   factory AiProvider.fromJson(Map<String, Object?> json) {
@@ -160,6 +203,10 @@ final class AiProvider {
           AiProviderKind.custom,
       endpoints: endpoints,
       apiKey: json['apiKey'] as String? ?? '',
+      proxy: switch (json['proxy']) {
+        final String proxy when proxy.isNotEmpty => proxy,
+        _ => null,
+      },
       models: [
         if (rawModels is List)
           for (final entry in rawModels)
@@ -167,6 +214,7 @@ final class AiProvider {
               AiProviderModel.fromJson(entry.cast<String, Object?>()),
       ],
       enabled: json['enabled'] as bool? ?? true,
+      iconAsset: json['iconAsset'] as String?,
     );
   }
 }
@@ -200,23 +248,66 @@ final class AiRoutingGroup {
   );
 }
 
+/// Which interfaces the local AI gateway listens on.
+enum AiGatewayScope {
+  /// `127.0.0.1` only — tools on this machine reach it, nothing else can.
+  loopback,
+
+  /// Every IPv4 interface (`0.0.0.0`) — loopback *and* each LAN address.
+  /// The bearer token is the only thing between the LAN and the configured
+  /// providers' keys, so this mode is opt-in, never the default.
+  lan,
+}
+
 /// Whether the local AI gateway binds at startup, and where.
 final class AiGatewayConfig {
-  const AiGatewayConfig({this.enabled = false, this.port = 0});
+  const AiGatewayConfig({
+    this.enabled = true,
+    this.port = defaultPort,
+    this.scope = AiGatewayScope.loopback,
+  });
 
-  /// When true the gateway listens on 127.0.0.1 for as long as the app runs.
+  /// The port the gateway asks for: fixed rather than ephemeral so a client
+  /// configured once keeps working across restarts. Below the Windows
+  /// ephemeral range (49152+), so it does not compete with OS-assigned
+  /// ports; a busy port still falls back to an ephemeral one, and callers
+  /// always read the bound port back from the running server.
+  static const int defaultPort = 47820;
+
+  /// When true the gateway listens for as long as the app runs. On by
+  /// default: the endpoint is how local tools discover the configured
+  /// providers, and loopback exposure is nil-risk behind the token.
   final bool enabled;
 
-  /// Preferred port; 0 means "any free port" and the actual one is reported
-  /// back through the running server, never assumed.
+  /// Preferred port; [defaultPort] unless overridden. Not positive is read
+  /// as [defaultPort] — 0 used to mean "any free port" and is migrated
+  /// rather than honoured, because a stable endpoint is the point.
   final int port;
 
-  Map<String, Object?> toJson() => {'enabled': enabled, 'port': port};
+  /// Loopback-only or every interface.
+  final AiGatewayScope scope;
+
+  Map<String, Object?> toJson() => {
+    'enabled': enabled,
+    'port': port,
+    'scope': scope.name,
+  };
 
   factory AiGatewayConfig.fromJson(Map<String, Object?>? json) =>
       AiGatewayConfig(
+        // Absent section means an older configuration file — the gateway
+        // did not exist for it, so it stays off rather than silently
+        // opening a listener on upgrade. Fresh installs never come through
+        // here: AiConfig's default constructor carries enabled: true.
         enabled: json?['enabled'] as bool? ?? false,
-        port: json?['port'] as int? ?? 0,
+        port: switch (json?['port']) {
+          final int port when port > 0 => port,
+          _ => defaultPort,
+        },
+        scope: switch (json?['scope']) {
+          'lan' => AiGatewayScope.lan,
+          _ => AiGatewayScope.loopback,
+        },
       );
 }
 
@@ -226,11 +317,17 @@ final class AiConfig {
     this.providers = const <AiProvider>[],
     this.routingGroups = const <AiRoutingGroup>[],
     this.gateway = const AiGatewayConfig(),
+    this.builtinsSeeded = false,
   });
 
   final List<AiProvider> providers;
   final List<AiRoutingGroup> routingGroups;
   final AiGatewayConfig gateway;
+
+  /// Whether the first-run built-in providers were already written. Seeded
+  /// once and never again: a user who deletes one keeps it deleted, and a
+  /// user who edits its endpoints is not overwritten by the next launch.
+  final bool builtinsSeeded;
 
   AiProvider? providerNamed(String id) {
     for (final provider in providers) {
@@ -260,10 +357,12 @@ final class AiConfig {
     List<AiProvider>? providers,
     List<AiRoutingGroup>? routingGroups,
     AiGatewayConfig? gateway,
+    bool? builtinsSeeded,
   }) => AiConfig(
     providers: providers ?? this.providers,
     routingGroups: routingGroups ?? this.routingGroups,
     gateway: gateway ?? this.gateway,
+    builtinsSeeded: builtinsSeeded ?? this.builtinsSeeded,
   );
 
   Map<String, Object?> toJson() => {
@@ -271,6 +370,7 @@ final class AiConfig {
     'providers': [for (final p in providers) p.toJson()],
     'routingGroups': [for (final g in routingGroups) g.toJson()],
     'gateway': gateway.toJson(),
+    'builtinsSeeded': builtinsSeeded,
   };
 
   factory AiConfig.fromJson(Map<String, Object?> json) {
@@ -287,6 +387,7 @@ final class AiConfig {
             ? (json['gateway'] as Map).cast<String, Object?>()
             : null,
       ),
+      builtinsSeeded: json['builtinsSeeded'] as bool? ?? false,
     );
   }
 }

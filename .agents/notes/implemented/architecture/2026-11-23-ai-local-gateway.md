@@ -4,6 +4,17 @@ Status: implemented
 
 English | [中文](2026-11-23-ai-local-gateway.zh.md)
 
+> **Superseded in part** by
+> [gateway LAN scope and provider drafts](../feature/2026-11-24-ai-gateway-lan-and-draft.md):
+> the bind is no longer loopback-only by fiat — `AiGatewayConfig.scope`
+> selects loopback or `0.0.0.0`, and `enabled` now defaults on.
+>
+> **Amended by**
+> [the gateway keyring](2026-11-24-ai-gateway-keys.md): the single
+> generated bearer token is now a maintainable list of named keys; the
+> endpoints, per-request store reads and bind lifecycle below are
+> unchanged.
+
 ## Problem
 
 The AI core (see
@@ -32,17 +43,19 @@ effect without a restart.
 - **Loopback only.** Binding wider would publish the owner's API keys to the
   LAN, which the per-device configuration decision ruled out. Port 0 by
   default — the endpoint is displayed in the UI, not written into configs.
-- **A generated bearer token** (`gateway_token.dart`) guards the port. The
+- **A generated bearer credential** guards the port — originally one
+  `lt-ai-` token (`gateway_token.dart`), now a keyring of named keys per
+  [the gateway-keys note](2026-11-24-ai-gateway-keys.md). The
   threat is not the network — it is every other process on the machine,
-  which could otherwise spend the stored keys. The token lives in its own
-  file, `ai/gateway_token`, separate from `providers.json`, because it is
-  shown in the UI in plaintext by design and must not drag the provider
-  keys along if it leaks. `lt-ai-` prefix marks it like magpie's
-  `sk-magpie-key`.
+  which could otherwise spend the stored keys. Secrets live in their own
+  file beside `providers.json`, because they are shown in the UI in
+  plaintext by design and must not drag the provider keys along if they
+  leak. `sk-`/`lt-ai-` prefixes mark them like magpie's `sk-magpie-key`.
 - **Inbound is OpenAI-shaped only.** `/v1/models` lists enabled
   `provider/model` refs plus `group/<id>` entries exactly as magpie exposes
   them; `/v1/chat/completions` maps the request onto canonical form (string
-  or parts-array content, tool calls, `max_tokens`/`top_p`/`stop`) and pipes
+  or parts-array content, tool calls and results, `tools`/`tool_choice`
+  function definitions, `max_tokens`/`top_p`/`stop`) and pipes
   canonical stream events back out as `chat.completion.chunk` frames ending
   in `data: [DONE]`. A non-stream request that receives a streamed reply —
   or the reverse — is folded across the boundary rather than left hanging.

@@ -149,6 +149,19 @@ void main() {
       expect(events.first.text, 'hello');
       expect(events.last.kind, AiStreamKind.done);
     });
+
+    test('thinking_delta surfaces as reasoningDelta', () async {
+      final sse =
+          'event: content_block_delta\n'
+          'data: {"type":"content_block_delta","index":0,'
+          '"delta":{"type":"thinking_delta","thinking":"hmm"}}\n\n'
+          'event: message_stop\ndata: {}\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(events.first.kind, AiStreamKind.reasoningDelta);
+      expect(events.first.text, 'hmm');
+    });
   });
 
   group('AnthropicCodec.classifyError', () {
@@ -163,5 +176,74 @@ void main() {
       );
       expect(codec.classifyError(529, ''), AiErrorKind.retryable);
     });
+  });
+
+  group('AnthropicCodec.decodeModelCatalog', () {
+    test('reads ids and display_name, metadata stays unknown', () {
+      final catalog = codec.decodeModelCatalog(
+        '{"data":[{"id":"claude-opus-4-6","display_name":"Claude Opus"}]}',
+      );
+      expect(catalog.single.id, 'claude-opus-4-6');
+      expect(catalog.single.label, 'Claude Opus');
+      expect(catalog.single.contextTokens, isNull);
+      expect(catalog.single.isFree, isNull);
+    });
+  });
+
+  group('AnthropicCodec tool passthrough', () {
+    test('tools become name/input_schema entries, choice maps to any/tool', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'claude',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [
+            AiToolDefinition(
+              name: 'lookup',
+              description: 'Look something up',
+              parameters: {
+                'type': 'object',
+                'properties': {
+                  'q': {'type': 'string'},
+                },
+              },
+            ),
+          ],
+          toolChoice: AiToolChoice.named('lookup'),
+        ),
+        baseUrl: 'https://api.anthropic.com',
+        model: 'claude-opus-4-6',
+        apiKey: 'sk-ant',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final tools = body['tools'] as List;
+      final tool = (tools.single as Map).cast<String, Object?>();
+      expect(tool['name'], 'lookup');
+      expect(tool['description'], 'Look something up');
+      expect(((tool['input_schema'] as Map)['type']), 'object');
+      final choice = (body['tool_choice'] as Map).cast<String, Object?>();
+      expect(choice['type'], 'tool');
+      expect(choice['name'], 'lookup');
+    });
+
+    test(
+      'required maps to any and a schema-less tool gets an empty schema',
+      () {
+        final spec = codec.encodeChat(
+          const AiChatRequest(
+            model: 'claude',
+            messages: [AiMessage(role: AiRole.user, content: 'hi')],
+            tools: [AiToolDefinition(name: 'noop')],
+            toolChoice: AiToolChoice.required(),
+          ),
+          baseUrl: 'https://api.anthropic.com',
+          model: 'claude-opus-4-6',
+        );
+        final body = jsonDecode(spec.body!) as Map<String, Object?>;
+        final tool = ((body['tools'] as List).single as Map)
+            .cast<String, Object?>();
+        expect((tool['input_schema'] as Map)['type'], 'object');
+        expect((body['tool_choice'] as Map)['type'], 'any');
+      },
+    );
   });
 }

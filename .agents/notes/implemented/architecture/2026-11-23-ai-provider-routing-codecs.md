@@ -34,17 +34,31 @@ covers it end to end:
 
 - **`ai_message.dart`** — the canonical format: roles, text content, tool
   calls (arguments kept as raw JSON so codec boundaries do not have to
-  agree on escaping), usage, and a five-kind stream event.
+  agree on escaping), tool *definitions* (`AiToolDefinition` +
+  `AiToolChoice`, with the JSON Schema kept decoded so each codec can
+  re-emit it in its own dialect — OpenAI verbatim, Anthropic
+  `input_schema`, Gemini `parametersJsonSchema`), usage, and a stream
+  event that also carries
+  reasoning deltas — thinking is generated output for timing purposes
+  but never joins the answer's content.
 - **`protocol/`** — `AiCodec` per protocol (`openai_chat`,
   `openai_responses`, `anthropic`, `gemini`) plus a shared SSE parser that
-  survives multi-byte characters split across chunk boundaries. Each codec
-  owns its URL paths, headers and body shapes; `modelsSpec`/`decodeModels`
-  give the settings UI a fetch-models path without a second HTTP stack.
+  survives multi-byte characters split across chunk boundaries. The
+  router decodes every chat body through `sniffedDecodeStream`, which
+  re-attaches the sniffed head when the body really is SSE and folds a
+  plain JSON document — some compatible endpoints accept `stream: true`
+  yet answer non-streamed — through `decodeResponse` instead of letting
+  it vanish into zero frames. Each codec owns its URL paths, headers and
+  body shapes; `modelsSpec`/`decodeModels` give the settings UI a
+  fetch-models path without a second HTTP stack.
 - **`provider.dart` + `presets.dart`** — providers hold per-protocol base
   URLs (a model entry records *which* protocol it speaks, since one custom
   endpoint can front several APIs), an encrypted-at-rest key, and a fetched
   model catalogue where enablement is explicit. References parse as
-  `provider/model` or `group/<id>`, magpie's syntax.
+  `provider/model` or `group/<id>`, magpie's syntax. Each preset names a
+  bundled brand-mark SVG (`assets/ai_providers/<id>.svg`, monochrome
+  `currentColor` paths from the LobeHub icon set, tinted by the theme)
+  that the add-provider dialog shows ahead of the label.
 - **`secret_box.dart` + `provider_store.dart`** — AES-256-GCM via the
   already-present `cryptography` package. A random 32-byte key is generated
   once per install; `apiKey` fields persist as `v1:<nonce‖ct‖tag>` and

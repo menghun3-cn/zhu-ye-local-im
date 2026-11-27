@@ -122,6 +122,12 @@ abstract class AppLocalizations {
   /// **'Transfers'**
   String get tabTransfers;
 
+  /// No description provided for @tabAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI'**
+  String get tabAi;
+
   /// No description provided for @tabMy.
   ///
   /// In en, this message translates to:
@@ -2509,30 +2515,6 @@ abstract class AppLocalizations {
   /// **'Lilac'**
   String get bubbleSkinPresetLilac;
 
-  /// No description provided for @myCardAi.
-  ///
-  /// In en, this message translates to:
-  /// **'AI'**
-  String get myCardAi;
-
-  /// No description provided for @myCardAiSummaryOn.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway on'**
-  String get myCardAiSummaryOn;
-
-  /// No description provided for @myCardAiSummaryOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway off'**
-  String get myCardAiSummaryOff;
-
-  /// No description provided for @aiUnavailableHere.
-  ///
-  /// In en, this message translates to:
-  /// **'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.'**
-  String get aiUnavailableHere;
-
   /// No description provided for @aiLoadFailed.
   ///
   /// In en, this message translates to:
@@ -2542,7 +2524,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiPageHint.
   ///
   /// In en, this message translates to:
-  /// **'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.'**
+  /// **'Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.'**
   String get aiPageHint;
 
   /// No description provided for @aiCopied.
@@ -2550,6 +2532,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied'**
   String get aiCopied;
+
+  /// No description provided for @aiCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy failed — the clipboard refused the write'**
+  String get aiCopyFailed;
+
+  /// No description provided for @aiNavGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway'**
+  String get aiNavGateway;
 
   /// No description provided for @aiSectionProviders.
   ///
@@ -2569,6 +2563,24 @@ abstract class AppLocalizations {
   /// **'Custom endpoint'**
   String get aiProviderCustom;
 
+  /// No description provided for @aiProviderGroupCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud providers'**
+  String get aiProviderGroupCloud;
+
+  /// No description provided for @aiProviderGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local runtimes'**
+  String get aiProviderGroupLocal;
+
+  /// No description provided for @aiProviderGroupCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get aiProviderGroupCustom;
+
   /// No description provided for @aiProviderName.
   ///
   /// In en, this message translates to:
@@ -2586,6 +2598,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stored encrypted on this Device; leave empty for local models'**
   String get aiProviderApiKeyHint;
+
+  /// No description provided for @aiProviderProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy'**
+  String get aiProviderProxy;
+
+  /// No description provided for @aiProviderProxyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP proxy for this provider only, e.g. http://127.0.0.1:7890 — leave empty to connect directly'**
+  String get aiProviderProxyHint;
 
   /// No description provided for @aiProviderModels.
   ///
@@ -2610,6 +2634,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom'**
   String get aiKindCustom;
+
+  /// No description provided for @aiKindBuiltin.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in free'**
+  String get aiKindBuiltin;
 
   /// No description provided for @aiKindLocal.
   ///
@@ -2646,6 +2676,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Added {count} new model(s)'**
   String aiFetchAdded(int count);
+
+  /// No description provided for @aiFetchNoFree.
+  ///
+  /// In en, this message translates to:
+  /// **'No free models to add'**
+  String get aiFetchNoFree;
+
+  /// No description provided for @aiModelFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get aiModelFree;
+
+  /// No description provided for @aiTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get aiTestConnection;
+
+  /// No description provided for @aiConnectionOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection OK — the provider reports {count} model(s)'**
+  String aiConnectionOk(int count);
 
   /// No description provided for @aiProtocolOpenaiChat.
   ///
@@ -2707,6 +2761,12 @@ abstract class AppLocalizations {
   /// **'No members yet — add at least one model or group.'**
   String get aiGroupEmpty;
 
+  /// No description provided for @aiGroupsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No routing groups yet.'**
+  String get aiGroupsEmpty;
+
   /// No description provided for @aiGroupMemberCount.
   ///
   /// In en, this message translates to:
@@ -2755,11 +2815,77 @@ abstract class AppLocalizations {
   /// **'Endpoint'**
   String get aiGatewayEndpoint;
 
-  /// No description provided for @aiGatewayToken.
+  /// No description provided for @aiGatewayKeys.
   ///
   /// In en, this message translates to:
-  /// **'Access token'**
-  String get aiGatewayToken;
+  /// **'Gateway keys'**
+  String get aiGatewayKeys;
+
+  /// No description provided for @aiGatewayKeyAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add gateway key'**
+  String get aiGatewayKeyAdd;
+
+  /// No description provided for @aiGatewayKeyNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Key name (e.g. Laptop)'**
+  String get aiGatewayKeyNameHint;
+
+  /// No description provided for @aiGatewayKeySecretHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom key (optional)'**
+  String get aiGatewayKeySecretHint;
+
+  /// No description provided for @aiGatewayKeyCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get aiGatewayKeyCreate;
+
+  /// No description provided for @aiGatewayKeyCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiGatewayKeyCancel;
+
+  /// No description provided for @aiGatewayKeyUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'{requests} requests · {tokens} tokens'**
+  String aiGatewayKeyUsage(int requests, String tokens);
+
+  /// No description provided for @aiGatewayKeyDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'That key already exists'**
+  String get aiGatewayKeyDuplicate;
+
+  /// No description provided for @aiGatewayKeyReveal.
+  ///
+  /// In en, this message translates to:
+  /// **'Show key'**
+  String get aiGatewayKeyReveal;
+
+  /// No description provided for @aiGatewayKeyHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide key'**
+  String get aiGatewayKeyHide;
+
+  /// No description provided for @aiDeleteKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete gateway key?'**
+  String get aiDeleteKeyTitle;
+
+  /// No description provided for @aiDeleteKeyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Clients using this key lose access immediately. The last remaining key cannot be deleted.'**
+  String get aiDeleteKeyBody;
 
   /// No description provided for @aiGatewayNotListening.
   ///
@@ -2770,14 +2896,212 @@ abstract class AppLocalizations {
   /// No description provided for @aiGatewayNotListeningHint.
   ///
   /// In en, this message translates to:
-  /// **'The gateway is enabled but did not bind — check that the port is free, then restart the app.'**
+  /// **'The gateway is enabled but did not bind — check that the port is free, then turn the gateway off and on again (or restart the app).'**
   String get aiGatewayNotListeningHint;
 
   /// No description provided for @aiGatewayHint.
   ///
   /// In en, this message translates to:
-  /// **'Point an OpenAI-compatible client at this endpoint with the token as its API key.'**
+  /// **'Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.'**
   String get aiGatewayHint;
+
+  /// No description provided for @aiGatewayScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen on'**
+  String get aiGatewayScope;
+
+  /// No description provided for @aiGatewayScopeLoopback.
+  ///
+  /// In en, this message translates to:
+  /// **'This device only'**
+  String get aiGatewayScopeLoopback;
+
+  /// No description provided for @aiGatewayScopeLan.
+  ///
+  /// In en, this message translates to:
+  /// **'Local network'**
+  String get aiGatewayScopeLan;
+
+  /// No description provided for @aiGatewayLanEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN endpoint'**
+  String get aiGatewayLanEndpoint;
+
+  /// No description provided for @aiGatewayLanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN mode answers on every network interface over plain HTTP, so any device on the network that has the gateway key can use the configured providers. Keep the key private and only enable this on networks you trust.'**
+  String get aiGatewayLanHint;
+
+  /// No description provided for @aiGatewayLanConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Expose the gateway on the local network?'**
+  String get aiGatewayLanConfirmTitle;
+
+  /// No description provided for @aiGatewayLanConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN mode binds to all interfaces and serves plain HTTP — the gateway key can be observed on the network. Only enable this on networks you trust.'**
+  String get aiGatewayLanConfirmBody;
+
+  /// No description provided for @aiGatewayLanConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get aiGatewayLanConfirmAction;
+
+  /// No description provided for @aiGatewayKeysCorrupt.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway key file is corrupted and could not be read — existing keys are unavailable until the file is repaired.'**
+  String get aiGatewayKeysCorrupt;
+
+  /// No description provided for @aiRoutingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing'**
+  String get aiRoutingTitle;
+
+  /// No description provided for @aiRoutingSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get aiRoutingSource;
+
+  /// No description provided for @aiRoutingGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway'**
+  String get aiRoutingGateway;
+
+  /// No description provided for @aiRoutingCooling.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooling {seconds}s'**
+  String aiRoutingCooling(int seconds);
+
+  /// No description provided for @aiRoutingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last request failed'**
+  String get aiRoutingFailed;
+
+  /// No description provided for @aiRoutingAnswering.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering…'**
+  String get aiRoutingAnswering;
+
+  /// No description provided for @aiRoutingLiveAnswering.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering… · {stats}'**
+  String aiRoutingLiveAnswering(String stats);
+
+  /// No description provided for @aiRoutingLiveTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'≈{tokens} tok'**
+  String aiRoutingLiveTokens(String tokens);
+
+  /// No description provided for @aiRoutingLiveRate.
+  ///
+  /// In en, this message translates to:
+  /// **'≈{rate} tok/s'**
+  String aiRoutingLiveRate(String rate);
+
+  /// No description provided for @aiRoutingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No providers yet.'**
+  String get aiRoutingEmpty;
+
+  /// No description provided for @aiRoutingMoreProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} more providers active'**
+  String aiRoutingMoreProviders(int count);
+
+  /// No description provided for @aiRequestsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests'**
+  String get aiRequestsTitle;
+
+  /// No description provided for @aiRequestsWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get aiRequestsWindow;
+
+  /// No description provided for @aiRequestsLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get aiRequestsLive;
+
+  /// No description provided for @aiRequestsLiveWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 3 hours'**
+  String get aiRequestsLiveWindow;
+
+  /// No description provided for @aiRequestsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All history'**
+  String get aiRequestsAll;
+
+  /// No description provided for @aiRequestsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No requests yet.'**
+  String get aiRequestsEmpty;
+
+  /// No description provided for @aiLogSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value}s'**
+  String aiLogSeconds(String value);
+
+  /// No description provided for @aiLogMetrics.
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} · first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s'**
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+    String speed,
+  );
+
+  /// No description provided for @aiLogInputUncached.
+  ///
+  /// In en, this message translates to:
+  /// **'Input (uncached)'**
+  String get aiLogInputUncached;
+
+  /// No description provided for @aiLogOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get aiLogOutput;
+
+  /// No description provided for @aiLogCacheRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache read'**
+  String get aiLogCacheRead;
+
+  /// No description provided for @aiLogCacheWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache write'**
+  String get aiLogCacheWrite;
 
   /// No description provided for @aiDeleteProviderTitle.
   ///

@@ -43,6 +43,20 @@ final class OpenAiResponsesCodec implements AiCodec {
       if (request.topP != null) 'top_p': request.topP,
       if (request.stop != null && request.stop!.isNotEmpty)
         'stop': request.stop,
+      if (request.tools.isNotEmpty)
+        'tools': [
+          for (final tool in request.tools)
+            {
+              'type': 'function',
+              'name': tool.name,
+              if (tool.description != null) 'description': tool.description,
+              'parameters':
+                  tool.parameters ??
+                  const {'type': 'object', 'properties': <String, Object?>{}},
+            },
+        ],
+      if (request.toolChoice != null)
+        'tool_choice': _encodeToolChoice(request.toolChoice!),
     };
     return AiRequestSpec(
       method: 'POST',
@@ -55,6 +69,16 @@ final class OpenAiResponsesCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  /// Responses `tool_choice` shares the string modes with Chat
+  /// Completions; a named function is a flat `{type, name}` object rather
+  /// than Chat's nested `{type, function: {name}}`.
+  Object _encodeToolChoice(AiToolChoice choice) => switch (choice.kind) {
+    AiToolChoiceKind.auto => 'auto',
+    AiToolChoiceKind.none => 'none',
+    AiToolChoiceKind.required => 'required',
+    AiToolChoiceKind.named => {'type': 'function', 'name': choice.name},
+  };
 
   /// One canonical message may become several input items — an assistant turn
   /// with tool calls is a message item *plus* one `function_call` per call.
@@ -149,6 +173,10 @@ final class OpenAiResponsesCodec implements AiCodec {
       completionTokens: output,
       totalTokens:
           jsonIntField(json, 'total_tokens') ?? ((input ?? 0) + (output ?? 0)),
+      cachedTokens: jsonIntField(
+        asObject(json['input_tokens_details']),
+        'cached_tokens',
+      ),
     );
   }
 
@@ -162,6 +190,12 @@ final class OpenAiResponsesCodec implements AiCodec {
           final delta = jsonStringField(json, 'delta');
           if (delta != null && delta.isNotEmpty) {
             yield AiStreamEvent.textDelta(delta);
+          }
+        case 'response.reasoning_summary_text.delta':
+          final json = jsonObjectOrEmpty(frame.data);
+          final delta = jsonStringField(json, 'delta');
+          if (delta != null && delta.isNotEmpty) {
+            yield AiStreamEvent.reasoningDelta(delta);
           }
         case 'response.output_item.done':
           final json = jsonObjectOrEmpty(frame.data);
@@ -232,11 +266,11 @@ final class OpenAiResponsesCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
-    final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['data']))
-        ?jsonStringField(asObject(entry), 'id'),
-    ];
-  }
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) =>
+      decodeOpenAiCatalog(body);
 }

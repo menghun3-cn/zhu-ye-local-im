@@ -42,6 +42,7 @@ final class AiRequestSpec {
     required this.url,
     required this.headers,
     this.body,
+    this.proxy,
   });
 
   final String method;
@@ -50,6 +51,11 @@ final class AiRequestSpec {
 
   /// The JSON body, already encoded. Null for GET.
   final String? body;
+
+  /// The provider's configured HTTP proxy, copied on by the router — the
+  /// codec builds the wire shape and knows nothing about routing policy.
+  /// Null means the transport connects directly.
+  final String? proxy;
 }
 
 /// What came back on the wire, reduced to what codecs need.
@@ -103,4 +109,41 @@ abstract interface class AiCodec {
   /// empty so a codec that forgot to override both fails loudly at the
   /// call site rather than silently listing nothing.
   List<String> decodeModels(String body) => const <String>[];
+
+  /// Decodes a model-listing response body into [AiCatalogModel]s, keeping
+  /// whatever metadata the endpoint volunteers (context window, pricing,
+  /// display name). The default wraps [decodeModels], so a codec that only
+  /// knows ids still produces a usable catalogue.
+  List<AiCatalogModel> decodeModelCatalog(String body) => [
+    for (final id in decodeModels(body)) AiCatalogModel(id: id),
+  ];
+}
+
+/// One entry of a provider's model catalogue as the listing endpoint
+/// reported it.
+///
+/// Every field past [id] is optional because listing endpoints differ
+/// wildly: OpenAI returns bare ids, OpenRouter adds `context_length` and
+/// `pricing`, Zen adds `limit.context` and `cost`, Gemini adds token
+/// limits. A null means "the endpoint did not say", never "zero".
+final class AiCatalogModel {
+  const AiCatalogModel({
+    required this.id,
+    this.contextTokens,
+    this.isFree,
+    this.label,
+  });
+
+  /// The model id as the provider knows it.
+  final String id;
+
+  /// Total context window in tokens, when the endpoint reports one.
+  final int? contextTokens;
+
+  /// Whether the endpoint reports the model as free. Null means the
+  /// endpoint said nothing about pricing — unknown, not paid.
+  final bool? isFree;
+
+  /// Human-friendly name when it differs from [id].
+  final String? label;
 }

@@ -6,10 +6,12 @@ import 'dart:typed_data';
 import 'ai_message.dart';
 import 'provider.dart';
 import 'provider_store.dart';
+import 'request_log.dart';
 import 'protocol/codec.dart';
 import 'protocol/openai_chat.dart';
 import 'protocol/openai_responses.dart';
 import 'protocol/anthropic.dart';
+import 'protocol/common.dart';
 import 'protocol/gemini.dart';
 
 /// The codec registry: one stateless instance per protocol.
@@ -30,8 +32,11 @@ abstract interface class AiTransport {
 
 /// [AiTransport] over `dart:io`'s [HttpClient].
 ///
-/// Plain HTTP, no proxy handling and no certificate overrides — provider
-/// endpoints are public HTTPS APIs and "trust everything" is not a feature.
+/// Plain HTTP and no certificate overrides — provider endpoints are public
+/// HTTPS APIs and "trust everything" is not a feature. A per-request proxy
+/// ([AiRequestSpec.proxy]) is honoured through [HttpClient.findProxy],
+/// which tunnels HTTPS with CONNECT; anything else fails at connect time
+/// like any unreachable endpoint.
 final class IoAiTransport implements AiTransport {
   IoAiTransport({
     this.connectTimeout = const Duration(seconds: 30),
@@ -46,12 +51,21 @@ final class IoAiTransport implements AiTransport {
     final client = HttpClient()
       ..connectionTimeout = connectTimeout
       ..autoUncompress = true;
+    final proxy = request.proxy;
+    if (proxy != null && proxy.isNotEmpty) {
+      client.findProxy = (_) => _proxyConfiguration(proxy);
+    }
     try {
       final uri = Uri.parse(request.url);
       final ioRequest = await client.openUrl(request.method, uri);
       request.headers.forEach(ioRequest.headers.set);
       final body = request.body;
-      if (body != null) ioRequest.write(body);
+      // HttpClientRequest encodes strings as latin1 and its encoding is
+      // not mutable, so a String body is written as bytes: the codecs
+      // always produce JSON, and UTF-8 is the only correct encoding.
+      // Writing the String directly threw on every non-latin1 character —
+      // every CJK prompt died before a byte left the machine.
+      if (body != null) ioRequest.add(utf8.encode(body));
       final response = await ioRequest.close().timeout(totalTimeout);
       return AiHttpResponse(
         statusCode: response.statusCode,
@@ -70,6 +84,23 @@ final class IoAiTransport implements AiTransport {
       client.close(force: true);
       rethrow;
     }
+  }
+
+  /// [HttpClient.findProxy] speaks the IE configuration dialect —
+  /// `PROXY [user:pass@]host:port`, `DIRECT`, `;`-separated — not a URL.
+  /// The stored form is a URL (`http://127.0.0.1:7897`, credentials
+  /// allowed), so it is translated here; a schemeless `host:port` is
+  /// accepted too. Something unparseable is handed back verbatim so
+  /// dart:io rejects it loudly instead of silently going direct.
+  static String _proxyConfiguration(String proxy) {
+    var uri = Uri.tryParse(proxy);
+    if (uri == null || uri.host.isEmpty) {
+      uri = Uri.tryParse('http://$proxy');
+    }
+    if (uri == null || uri.host.isEmpty) return 'PROXY $proxy';
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    final auth = uri.userInfo.isEmpty ? '' : '${uri.userInfo}@';
+    return 'PROXY $auth${uri.host}:$port';
   }
 }
 
@@ -114,6 +145,65 @@ final class AiStreamReply extends AiReply {
   final Stream<AiStreamEvent> events;
 }
 
+/// Where a request is in its route through the failover list.
+enum AiRoutePhase {
+  /// The member's request is about to hit the network — emitted after
+  /// preflight validation, so observers never see an attempt for a call
+  /// that was rejected before a single byte was sent.
+  attempt,
+
+  /// The member produced the reply — for streams, when the stream ends.
+  served,
+
+  /// The member failed; the router either fails over or gives up.
+  failed,
+
+  /// Content is still arriving on an in-flight stream — emitted at a
+  /// throttled cadence (never per chunk) so observers can show live
+  /// progress without the event stream becoming a firehose. Carries
+  /// [AiRouteEvent.contentChars].
+  progress,
+}
+
+/// One step of a [AiRouter.chat] call, broadcast for observers.
+///
+/// [callId] ties every event of one `chat` invocation together — failover
+/// emits several `attempt`/`failed` pairs under the same id, and concurrent
+/// requests never share one. [member] is the concrete `provider/model`
+/// being tried; [model] is the reference the caller asked for.
+final class AiRouteEvent {
+  const AiRouteEvent({
+    required this.callId,
+    required this.phase,
+    required this.member,
+    required this.model,
+    this.cooling = false,
+    this.contentChars,
+    this.reason,
+  });
+
+  final int callId;
+  final AiRoutePhase phase;
+  final String member;
+  final String model;
+
+  /// True on a `failed` event when the member entered its cooldown — the
+  /// routing view marks the node "cooling down" rather than "error", which
+  /// is the honest picture: it will be tried again shortly.
+  final bool cooling;
+
+  /// Cumulative reply characters seen so far — set on `progress` events
+  /// only. Characters, not tokens: providers only report token accounting
+  /// once at the end, while deltas arrive continuously, so chars are the
+  /// honest live unit (magpie counts reply bytes the same way).
+  final int? contentChars;
+
+  /// Why the member failed — set on `failed` events only. The routing
+  /// node shows it beside the cooldown countdown: "cooling 42s" alone
+  /// cannot say *what* went wrong upstream.
+  final String? reason;
+}
+
 /// Resolves `provider/model` and `group/<id>` references to concrete upstream
 /// calls, failing over across a routing group's members on retryable errors.
 ///
@@ -127,41 +217,315 @@ final class AiRouter {
     required this.store,
     AiTransport? transport,
     this.cooldown = const Duration(minutes: 1),
+    this.requestLog,
   }) : _transport = transport ?? IoAiTransport();
 
   /// Where the configuration is read from on every [chat] call.
   final AiConfigStore store;
   final AiTransport _transport;
 
+  /// Optional sink for finished requests — the routing view's history list.
+  /// Null in tests and headless uses; recording is fire-and-forget and can
+  /// never slow or break a request.
+  final AiRequestLog? requestLog;
+
   /// How long a member that failed retryably sits out.
   final Duration cooldown;
 
-  final _cooledDownUntil = <String, DateTime>{};
+  /// member → when it may be tried again, and the error that benched it.
+  /// The error is kept because "no member could serve" is a lie when the
+  /// truth is "every member is sitting out a failure we already saw" — the
+  /// caller needs the upstream's reason, not a cooldown bookkeeping note.
+  final _cooledDown = <String, ({DateTime until, AiRequestException error})>{};
+
+  /// Route observability for the routing page: every attempt, serve and
+  /// failure, broadcast so any number of listeners can watch. Best-effort —
+  /// a listener that throws or a slow consumer must never slow a request.
+  final _events = StreamController<AiRouteEvent>.broadcast();
+  Stream<AiRouteEvent> get events => _events.stream;
+  int _nextCallId = 0;
+
+  void _emit(
+    int callId,
+    AiRoutePhase phase,
+    String member,
+    String model, {
+    bool cooling = false,
+    int? contentChars,
+    String? reason,
+  }) {
+    if (_events.isClosed) return;
+    _events.add(
+      AiRouteEvent(
+        callId: callId,
+        phase: phase,
+        member: member,
+        model: model,
+        cooling: cooling,
+        contentChars: contentChars,
+        reason: reason,
+      ),
+    );
+  }
+
+  /// When [member] may be tried again, or null while it is not cooling
+  /// down. The routing view polls this to mark benched nodes — including
+  /// cooldowns that began before the page opened.
+  DateTime? coolingDownUntil(String member) => _cooldownOf(member)?.until;
+
+  /// Emits a route event without running a request.
+  ///
+  /// The routing view's widget tests drive it through here: standing up a
+  /// real transport and socket to make one leaf fly would test the network,
+  /// not the picture.
+  void emitRouteEventForTest(
+    int callId,
+    AiRoutePhase phase,
+    String member, [
+    String model = '',
+    bool cooling = false,
+    int? contentChars,
+    String? reason,
+  ]) => _emit(
+    callId,
+    phase,
+    member,
+    model,
+    cooling: cooling,
+    contentChars: contentChars,
+    reason: reason,
+  );
 
   /// Sends [request] and returns the reply from the first member that works.
+  ///
+  /// [clientKey] names the gateway key the request arrived on — stamped on
+  /// the request-log row so per-client usage adds up. Null for callers
+  /// that are not a gateway client.
   ///
   /// Throws [AiRequestException] when the reference is unresolvable, every
   /// member failed fatally, or every member failed retryably — the last case
   /// carries the most recent failure as its cause.
-  Future<AiReply> chat(AiChatRequest request) async {
+  Future<AiReply> chat(AiChatRequest request, {String? clientKey}) async {
+    final startedAt = DateTime.now();
     final config = await store.load();
     final members = _expand(request.model, config);
+    final callId = ++_nextCallId;
     AiRequestException? lastRetryable;
+    AiRequestException? lastCoolingError;
 
     for (final member in members) {
-      if (_isCoolingDown(member)) continue;
+      final cooling = _cooldownOf(member);
+      if (cooling != null) {
+        lastCoolingError ??= cooling.error;
+        continue;
+      }
       try {
-        return await _call(member, request, config);
+        final reply = await _call(callId, member, request, config);
+        if (reply is AiStreamReply) {
+          // A stream is "served" only when it finishes: the leaf stays at
+          // the provider while tokens flow, which is the honest picture.
+          return AiStreamReply(
+            servedBy: member,
+            events: _observeStream(
+              reply.events,
+              callId,
+              member,
+              request.model,
+              startedAt,
+              clientKey,
+            ),
+          );
+        }
+        _emit(callId, AiRoutePhase.served, member, request.model);
+        _record(
+          startedAt,
+          request.model,
+          member,
+          (reply as AiFullReply).response.usage,
+          null,
+          clientKey,
+        );
+        return reply;
       } on _RetryableFailure catch (failure) {
-        _cooledDownUntil[member] = DateTime.now().add(cooldown);
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          cooling: true,
+          reason: failure.error.message,
+        );
+        _cooledDown[member] = (
+          until: DateTime.now().add(cooldown),
+          error: failure.error,
+        );
         lastRetryable = failure.error;
+      } on AiRequestException catch (error) {
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          reason: error.message,
+        );
+        rethrow;
+      } on Object catch (error) {
+        // Codec decode failures and anything else unexpected: the route
+        // still needs its closing event or the leaf never comes home.
+        _emit(
+          callId,
+          AiRoutePhase.failed,
+          member,
+          request.model,
+          reason: '$error',
+        );
+        rethrow;
       }
     }
 
-    throw lastRetryable ??
-        AiRequestException(
-          'no member of "$request.model" could serve the request',
+    if (lastRetryable != null) throw lastRetryable;
+    if (lastCoolingError != null) {
+      throw AiRequestException(
+        'every member of "${request.model}" is cooling down after a '
+        'failure; last error: ${lastCoolingError.message}',
+        statusCode: lastCoolingError.statusCode,
+        cause: lastCoolingError.cause,
+      );
+    }
+    throw AiRequestException(
+      members.isEmpty
+          ? '"${request.model}" has no members to try'
+          : 'no member of "${request.model}" could serve the request',
+    );
+  }
+
+  /// Appends one finished request to [requestLog]. Fire-and-forget: a log
+  /// failure (disk full, corrupt file) must never reach the caller.
+  void _record(
+    DateTime startedAt,
+    String model,
+    String member,
+    AiUsage? usage,
+    int? ttftMs,
+    String? clientKey,
+  ) {
+    final log = requestLog;
+    if (log == null) return;
+    // Some upstreams report only total/completion; the prompt share is then
+    // derivable, and the log's cache-hit math needs it. Inconsistent totals
+    // derive to null rather than a negative count.
+    int? promptTokens;
+    if (usage?.promptTokens != null) {
+      promptTokens = usage!.promptTokens;
+    } else if (usage?.totalTokens != null && usage?.completionTokens != null) {
+      final derived = usage!.totalTokens! - usage.completionTokens!;
+      promptTokens = derived > 0 ? derived : null;
+    }
+    unawaited(() async {
+      try {
+        await log.record(
+          AiRequestRecord(
+            at: startedAt,
+            model: model,
+            servedBy: member,
+            key: clientKey,
+            durationMs: DateTime.now().difference(startedAt).inMilliseconds,
+            ttftMs: ttftMs,
+            totalTokens: usage?.totalTokens,
+            promptTokens: promptTokens,
+            cachedTokens: usage?.cachedTokens,
+            cacheWriteTokens: usage?.cacheWriteTokens,
+            completionTokens: usage?.completionTokens,
+          ),
         );
+      } on Object {
+        // Diagnostic logging only.
+      }
+    }());
+  }
+
+  /// Re-emits a member's stream while reporting its end as a route event.
+  /// A listener that walks away mid-stream is a failure from the route's
+  /// point of view — the provider never got to finish its answer.
+  Stream<AiStreamEvent> _observeStream(
+    Stream<AiStreamEvent> inner,
+    int callId,
+    String member,
+    String model,
+    DateTime startedAt,
+    String? clientKey,
+  ) async* {
+    var settled = false;
+    var streamFailed = false;
+    String? streamError;
+    DateTime? firstContentAt;
+    DateTime? lastProgressAt;
+    var contentChars = 0;
+    AiUsage? usage;
+    try {
+      await for (final event in inner) {
+        final isContent =
+            event.kind == AiStreamKind.textDelta ||
+            event.kind == AiStreamKind.reasoningDelta ||
+            event.kind == AiStreamKind.toolCall;
+        if (isContent) {
+          contentChars += switch (event.kind) {
+            AiStreamKind.textDelta ||
+            AiStreamKind.reasoningDelta => event.text?.length ?? 0,
+            AiStreamKind.toolCall =>
+              event.toolCall!.name.length + event.toolCall!.arguments.length,
+            _ => 0,
+          };
+          final now = DateTime.now();
+          firstContentAt ??= now;
+          // Progress goes out at most every 250ms — enough for a live
+          // readout, never a per-chunk firehose. The first content event
+          // always emits so the mark appears with the first token.
+          if (lastProgressAt == null ||
+              now.difference(lastProgressAt) >=
+                  const Duration(milliseconds: 250)) {
+            lastProgressAt = now;
+            _emit(
+              callId,
+              AiRoutePhase.progress,
+              member,
+              model,
+              contentChars: contentChars,
+            );
+          }
+        }
+        if (event.kind == AiStreamKind.usage) usage = event.usage;
+        // An upstream error frame means the answer died mid-flight:
+        // yielding it lets the gateway write the error chunk, but the
+        // route closes as failed and nothing lands in the request log —
+        // a half-answer is not a served request.
+        if (event.kind == AiStreamKind.error) {
+          streamFailed = true;
+          streamError ??= event.text;
+        }
+        yield event;
+      }
+      settled = true;
+      if (streamFailed) {
+        _emit(callId, AiRoutePhase.failed, member, model, reason: streamError);
+        return;
+      }
+      _emit(callId, AiRoutePhase.served, member, model);
+      _record(
+        startedAt,
+        model,
+        member,
+        usage,
+        firstContentAt?.difference(startedAt).inMilliseconds,
+        clientKey,
+      );
+    } catch (error) {
+      settled = true;
+      _emit(callId, AiRoutePhase.failed, member, model, reason: '$error');
+      rethrow;
+    } finally {
+      if (!settled) _emit(callId, AiRoutePhase.failed, member, model);
+    }
   }
 
   /// Every model reference callers may ask for: enabled provider models plus
@@ -192,18 +556,27 @@ final class AiRouter {
   Future<List<String>> fetchModels(
     AiProvider provider,
     AiProtocol protocol,
+  ) async => [
+    for (final model in await fetchModelCatalog(provider, protocol)) model.id,
+  ];
+
+  /// [fetchModels] with the catalogue metadata the endpoint volunteers —
+  /// context window, pricing, display name — for callers that can show it.
+  Future<List<AiCatalogModel>> fetchModelCatalog(
+    AiProvider provider,
+    AiProtocol protocol,
   ) async {
     final baseUrl = provider.endpointFor(protocol);
     if (baseUrl == null) return const [];
     final codec = codecFor(protocol);
     final spec = codec.modelsSpec(baseUrl: baseUrl, apiKey: provider.apiKey);
     if (spec == null) return const [];
-    final response = await _transport.send(spec);
+    final response = await _transport.send(_withProxy(spec, provider));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return const [];
     }
     final body = await _readBody(response.bodyBytes);
-    return codec.decodeModels(body);
+    return codec.decodeModelCatalog(body);
   }
 
   /// Expands [ref] into concrete `provider/model` members, depth-first.
@@ -239,17 +612,18 @@ final class AiRouter {
     return members;
   }
 
-  bool _isCoolingDown(String member) {
-    final until = _cooledDownUntil[member];
-    if (until == null) return false;
-    if (DateTime.now().isAfter(until)) {
-      _cooledDownUntil.remove(member);
-      return false;
+  ({DateTime until, AiRequestException error})? _cooldownOf(String member) {
+    final entry = _cooledDown[member];
+    if (entry == null) return null;
+    if (DateTime.now().isAfter(entry.until)) {
+      _cooledDown.remove(member);
+      return null;
     }
-    return true;
+    return entry;
   }
 
   Future<AiReply> _call(
+    int callId,
     String member,
     AiChatRequest request,
     AiConfig config,
@@ -279,9 +653,15 @@ final class AiRouter {
       model: parsed.modelId!,
       apiKey: provider.apiKey.isEmpty ? null : provider.apiKey,
     );
+    // `attempt` means "bytes are about to leave for this upstream", so it is
+    // emitted here — after every preflight check — rather than in [chat]'s
+    // member loop. A member rejected for a disabled model or a missing
+    // endpoint never produced a request, and the routing leaf should not
+    // pretend it did.
+    _emit(callId, AiRoutePhase.attempt, member, request.model);
     final AiHttpResponse response;
     try {
-      response = await _transport.send(spec);
+      response = await _transport.send(_withProxy(spec, provider));
     } catch (error) {
       // A socket that never opened is the purest transient failure there is.
       throw _RetryableFailure(
@@ -305,11 +685,26 @@ final class AiRouter {
     if (request.stream) {
       return AiStreamReply(
         servedBy: member,
-        events: codec.decodeStream(response.bodyBytes),
+        events: sniffedDecodeStream(codec, response.bodyBytes),
       );
     }
     final body = await _readBody(response.bodyBytes);
     return AiFullReply(servedBy: member, response: codec.decodeResponse(body));
+  }
+
+  /// Stamps the provider's proxy onto a codec-built spec. Codecs own the
+  /// wire shape; the proxy is routing policy, so it is applied here rather
+  /// than inside every codec.
+  AiRequestSpec _withProxy(AiRequestSpec spec, AiProvider provider) {
+    final proxy = provider.proxy;
+    if (proxy == null || proxy.isEmpty) return spec;
+    return AiRequestSpec(
+      method: spec.method,
+      url: spec.url,
+      headers: spec.headers,
+      body: spec.body,
+      proxy: proxy,
+    );
   }
 
   /// Reads a whole response body as text. [utf8.decoder] buffers partial

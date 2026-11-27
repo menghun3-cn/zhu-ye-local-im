@@ -48,6 +48,57 @@ final class AiToolCall {
   );
 }
 
+/// A function definition offered to the model — the canonical form of an
+/// entry in a chat request's `tools` array.
+///
+/// [parameters] is the JSON Schema object kept decoded: codecs re-encode it
+/// into whichever schema dialect their protocol speaks (OpenAI passes it
+/// through verbatim, Anthropic calls it `input_schema`, Gemini wraps it as
+/// `parametersJsonSchema`). Null means "the caller declared no schema" —
+/// codecs substitute their protocol's empty-object schema rather than
+/// dropping the tool.
+final class AiToolDefinition {
+  const AiToolDefinition({
+    required this.name,
+    this.description,
+    this.parameters,
+  });
+
+  final String name;
+  final String? description;
+  final Map<String, Object?>? parameters;
+}
+
+/// How the model may use the offered tools.
+enum AiToolChoiceKind {
+  /// The model decides whether and which tools to call.
+  auto,
+
+  /// The model must not call tools.
+  none,
+
+  /// The model must call at least one tool.
+  required,
+
+  /// The model must call exactly the named function.
+  named,
+}
+
+/// The canonical form of a request's `tool_choice`.
+final class AiToolChoice {
+  const AiToolChoice._(this.kind, this.name);
+
+  const AiToolChoice.auto() : this._(AiToolChoiceKind.auto, null);
+  const AiToolChoice.none() : this._(AiToolChoiceKind.none, null);
+  const AiToolChoice.required() : this._(AiToolChoiceKind.required, null);
+  const AiToolChoice.named(String name) : this._(AiToolChoiceKind.named, name);
+
+  final AiToolChoiceKind kind;
+
+  /// The forced function name; only meaningful for [AiToolChoiceKind.named].
+  final String? name;
+}
+
 /// One turn of a conversation, in canonical form.
 final class AiMessage {
   const AiMessage({
@@ -100,11 +151,28 @@ final class AiMessage {
 
 /// Token accounting, as much of it as the provider reported.
 final class AiUsage {
-  const AiUsage({this.promptTokens, this.completionTokens, this.totalTokens});
+  const AiUsage({
+    this.promptTokens,
+    this.completionTokens,
+    this.totalTokens,
+    this.cachedTokens,
+    this.cacheWriteTokens,
+  });
 
   final int? promptTokens;
   final int? completionTokens;
   final int? totalTokens;
+
+  /// Prompt tokens the provider served from its cache — a subset of
+  /// [promptTokens], reported under a different name by each protocol
+  /// (OpenAI's `prompt_tokens_details.cached_tokens`, Anthropic's
+  /// `cache_read_input_tokens`, Gemini's `cachedContentTokenCount`).
+  final int? cachedTokens;
+
+  /// Prompt tokens the provider *wrote into* its cache — Anthropic's
+  /// `cache_creation_input_tokens`. Only Anthropic reports this; the rest
+  /// leave it null and callers show 0.
+  final int? cacheWriteTokens;
 
   static const AiUsage empty = AiUsage();
 
@@ -112,12 +180,16 @@ final class AiUsage {
     if (promptTokens != null) 'prompt_tokens': promptTokens,
     if (completionTokens != null) 'completion_tokens': completionTokens,
     if (totalTokens != null) 'total_tokens': totalTokens,
+    if (cachedTokens != null) 'cached_tokens': cachedTokens,
+    if (cacheWriteTokens != null) 'cache_write_tokens': cacheWriteTokens,
   };
 
   factory AiUsage.fromJson(Map<String, Object?> json) => AiUsage(
     promptTokens: json['prompt_tokens'] as int?,
     completionTokens: json['completion_tokens'] as int?,
     totalTokens: json['total_tokens'] as int?,
+    cachedTokens: json['cached_tokens'] as int?,
+    cacheWriteTokens: json['cache_write_tokens'] as int?,
   );
 }
 
@@ -135,6 +207,8 @@ final class AiChatRequest {
     this.maxTokens,
     this.topP,
     this.stop,
+    this.tools = const <AiToolDefinition>[],
+    this.toolChoice,
   });
 
   /// The model or routing-group reference, e.g. `deepseek/deepseek-chat`.
@@ -150,6 +224,15 @@ final class AiChatRequest {
   final int? maxTokens;
   final double? topP;
   final List<String>? stop;
+
+  /// Function definitions the model may call. Empty means the request
+  /// offers no tools — codecs then omit the tools field entirely rather
+  /// than sending an empty array some providers reject.
+  final List<AiToolDefinition> tools;
+
+  /// How the model may pick among [tools]; null lets the provider default
+  /// (equivalent to `auto` on every codec that has one).
+  final AiToolChoice? toolChoice;
 }
 
 /// A finished, non-streamed reply.
@@ -172,6 +255,11 @@ enum AiStreamKind {
   /// More assistant text arrived.
   textDelta,
 
+  /// More reasoning/thinking text arrived. Never part of the answer's
+  /// content, but it is still generated output — consumers measuring
+  /// time-to-first-token count it.
+  reasoningDelta,
+
   /// A complete tool call was assembled from the stream.
   toolCall,
 
@@ -188,14 +276,15 @@ enum AiStreamKind {
 /// One event on a streamed reply.
 ///
 /// A flat bag rather than a sealed hierarchy because every codec produces the
-/// same five shapes and the consumer (a chat view, a summariser) only ever
+/// same shapes and the consumer (a chat view, a summariser) only ever
 /// switches on [kind].
 final class AiStreamEvent {
   const AiStreamEvent._(this.kind, {this.text, this.toolCall, this.usage});
 
   final AiStreamKind kind;
 
-  /// Text payload for [AiStreamKind.textDelta] and [AiStreamKind.error].
+  /// Text payload for [AiStreamKind.textDelta],
+  /// [AiStreamKind.reasoningDelta], and [AiStreamKind.error].
   final String? text;
 
   /// The assembled call for [AiStreamKind.toolCall].
@@ -206,6 +295,9 @@ final class AiStreamEvent {
 
   factory AiStreamEvent.textDelta(String text) =>
       AiStreamEvent._(AiStreamKind.textDelta, text: text);
+
+  factory AiStreamEvent.reasoningDelta(String text) =>
+      AiStreamEvent._(AiStreamKind.reasoningDelta, text: text);
 
   factory AiStreamEvent.toolCall(AiToolCall call) =>
       AiStreamEvent._(AiStreamKind.toolCall, toolCall: call);

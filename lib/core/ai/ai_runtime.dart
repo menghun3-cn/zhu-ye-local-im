@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'ai_gateway.dart';
 import 'ai_router.dart';
-import 'gateway_token.dart';
+import 'builtin_providers.dart';
+import 'gateway_keys.dart';
 import 'provider.dart';
 import 'provider_store.dart';
+import 'request_log.dart';
 import 'secret_box.dart';
 import '../history/message_store.dart';
 
@@ -22,10 +26,12 @@ final class AiRuntime {
     required this.directory,
     required this.store,
     required this.router,
-    required this.token,
+    required this.keys,
+    required this.requestLog,
   });
 
-  /// Where `providers.json`, `secrets.key` and `gateway_token` live.
+  /// Where `providers.json`, `secrets.key`, `gateway_keys.json` and
+  /// `requests.json` live.
   final String directory;
 
   /// Configuration persistence, with keys sealed on the way out.
@@ -34,21 +40,38 @@ final class AiRuntime {
   /// Reference resolution and failover, reading [store] per request.
   final AiRouter router;
 
-  /// The bearer token the gateway asks callers for.
-  final AiGatewayToken token;
+  /// The gateway keyring — one named credential per client.
+  final AiGatewayKeyStore keys;
+
+  /// Rolling history of finished requests — the routing view's bottom list.
+  final AiRequestLog requestLog;
 
   AiGateway? _gateway;
+
+  /// The gateway configuration the running server was bound with — a save
+  /// that changes scope or port must rebind, not just flip a flag.
+  AiGatewayConfig? _boundGateway;
 
   /// Serializes [_syncGateway]: two saves landing while a bind is in flight
   /// must not each create a server — the loser would leak a listening port
   /// nobody holds a reference to.
   Future<void> _syncing = Future.value();
 
+  int _configVersion = 0;
+
+  /// Bumped on every [save]. Live views (the routing canvas) poll it to
+  /// learn the document changed without a reload handshake.
+  int get configVersion => _configVersion;
+
   /// The bound gateway, or null while the flag is off or the bind failed.
   AiGateway? get gateway => _gateway;
 
   /// The base URL callers configure, or null while nothing listens.
   String? get endpoint => _gateway?.endpoint;
+
+  /// The LAN addresses the gateway answers on, empty under loopback scope
+  /// or while nothing listens.
+  List<String> get lanAddresses => _gateway?.lanAddresses ?? const [];
 
   /// Assembles the stack under [directory].
   ///
@@ -61,11 +84,45 @@ final class AiRuntime {
       store: FileMessageStore('$directory/providers.json'),
       secrets: secrets,
     );
+    await _seedBuiltins(store);
+    final requestLog = AiRequestLog(file: File('$directory/requests.json'));
+    final keys = AiGatewayKeyStore(
+      file: File('$directory/gateway_keys.json'),
+      legacyTokenPath: '$directory/gateway_token',
+    );
+    // A corrupt keyring must not take the whole AI stack down: the store
+    // still opens, every keys.load() rethrows for the settings surface to
+    // report, and the gateway refuses requests rather than rotating
+    // credentials behind the user's back.
+    try {
+      await keys.loadOrCreate();
+    } on AiGatewayKeyStoreException {
+      // Swallowed on purpose — see above.
+    }
     return AiRuntime._(
       directory: directory,
       store: store,
-      router: AiRouter(store: store),
-      token: await AiGatewayToken.loadOrCreate('$directory/gateway_token'),
+      router: AiRouter(store: store, requestLog: requestLog),
+      keys: keys,
+      requestLog: requestLog,
+    );
+  }
+
+  /// Writes the built-in providers once, on the first configuration the
+  /// store ever loads. Ids already present are skipped rather than replaced
+  /// — a returning install that deleted one keeps it deleted — and the
+  /// flag flips either way so this never runs twice.
+  static Future<void> _seedBuiltins(AiConfigStore store) async {
+    final config = await store.load();
+    if (config.builtinsSeeded) return;
+    final providers = [...config.providers];
+    for (final builtin in aiBuiltinProviders) {
+      if (config.providerNamed(builtin.id) == null) {
+        providers.add(builtin);
+      }
+    }
+    await store.save(
+      config.copyWith(providers: providers, builtinsSeeded: true),
     );
   }
 
@@ -80,6 +137,7 @@ final class AiRuntime {
   /// reports null so the UI can say "configured but not listening".
   Future<void> save(AiConfig config) async {
     await store.save(config);
+    _configVersion++;
     await _syncGateway(config.gateway);
   }
 
@@ -101,20 +159,40 @@ final class AiRuntime {
     if (!gateway.enabled) {
       if (running != null) {
         _gateway = null;
+        _boundGateway = null;
         await running.stop();
       }
       return;
     }
-    if (running != null) return;
-    final server = AiGateway(store: store, router: router, token: token);
+    // Already bound *with this exact configuration*: a scope or port change
+    // is a different server, not a no-op.
+    final bound = _boundGateway;
+    if (running != null &&
+        bound != null &&
+        bound.port == gateway.port &&
+        bound.scope == gateway.scope) {
+      return;
+    }
+    if (running != null) {
+      _gateway = null;
+      _boundGateway = null;
+      await running.stop();
+    }
+    final server = AiGateway(
+      store: store,
+      router: router,
+      keySource: keys.load,
+    );
     try {
-      await server.start(preferredPort: gateway.port);
+      await server.start(preferredPort: gateway.port, scope: gateway.scope);
       _gateway = server;
+      _boundGateway = gateway;
     } on Object {
       // Port taken and the fallback also failed, or the socket is denied:
       // the flag stays set so the next launch retries, and the settings
       // surface reports the endpoint as absent rather than pretending.
       _gateway = null;
+      _boundGateway = null;
     }
   }
 
@@ -123,6 +201,7 @@ final class AiRuntime {
   Future<void> dispose() async {
     final running = _gateway;
     _gateway = null;
+    _boundGateway = null;
     await running?.stop();
   }
 }

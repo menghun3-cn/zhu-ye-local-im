@@ -45,6 +45,11 @@ dependencies:
   crypto: ^3.0.7
   cryptography: ^2.9.0
 
+  # Renders the bundled brand-mark SVGs in the provider picker. Pinned below
+  # 2.5.0: that release is days old and the picker only needs stable SVG
+  # rendering, so it waits out the fresh-release window.
+  flutter_svg: 2.4.0
+
   # The OS's own file and image pickers, so that "选择文件" opens the real
   # Windows dialog instead of asking the user to type a path. `file_selector`
   # is the Flutter team's plugin and is federated, so Windows, macOS, Linux and
@@ -135,6 +140,8 @@ flutter:
     - assets/link_transfer/index.html
     # The bundled bubble skins the picker offers under 「内置图片」.
     - assets/bubble_skins/
+    # Brand marks for the AI provider presets.
+    - assets/ai_providers/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

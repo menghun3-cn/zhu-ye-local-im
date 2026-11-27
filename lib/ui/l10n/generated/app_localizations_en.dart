@@ -22,6 +22,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabTransfers => 'Transfers';
 
   @override
+  String get tabAi => 'AI';
+
+  @override
   String get tabMy => 'My';
 
   @override
@@ -1441,27 +1444,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bubbleSkinPresetLilac => 'Lilac';
 
   @override
-  String get myCardAi => 'AI';
-
-  @override
-  String get myCardAiSummaryOn => 'Gateway on';
-
-  @override
-  String get myCardAiSummaryOff => 'Gateway off';
-
-  @override
-  String get aiUnavailableHere =>
-      'This Device has nowhere durable to keep AI configuration, so AI features are unavailable here.';
-
-  @override
   String get aiLoadFailed => 'The AI configuration could not be read';
 
   @override
   String get aiPageHint =>
-      'Providers and their keys stay on this Device and are never shared with the group. The gateway only listens on this machine.';
+      'Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.';
 
   @override
   String get aiCopied => 'Copied';
+
+  @override
+  String get aiCopyFailed => 'Copy failed — the clipboard refused the write';
+
+  @override
+  String get aiNavGateway => 'Gateway';
 
   @override
   String get aiSectionProviders => 'Providers';
@@ -1473,6 +1469,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiProviderCustom => 'Custom endpoint';
 
   @override
+  String get aiProviderGroupCloud => 'Cloud providers';
+
+  @override
+  String get aiProviderGroupLocal => 'Local runtimes';
+
+  @override
+  String get aiProviderGroupCustom => 'Custom';
+
+  @override
   String get aiProviderName => 'Name';
 
   @override
@@ -1481,6 +1486,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiProviderApiKeyHint =>
       'Stored encrypted on this Device; leave empty for local models';
+
+  @override
+  String get aiProviderProxy => 'Proxy';
+
+  @override
+  String get aiProviderProxyHint =>
+      'HTTP proxy for this provider only, e.g. http://127.0.0.1:7890 — leave empty to connect directly';
 
   @override
   String get aiProviderModels => 'Models';
@@ -1503,6 +1515,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiKindCustom => 'Custom';
 
   @override
+  String get aiKindBuiltin => 'Built-in free';
+
+  @override
   String get aiKindLocal => 'Local';
 
   @override
@@ -1520,6 +1535,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String aiFetchAdded(int count) {
     return 'Added $count new model(s)';
+  }
+
+  @override
+  String get aiFetchNoFree => 'No free models to add';
+
+  @override
+  String get aiModelFree => 'Free';
+
+  @override
+  String get aiTestConnection => 'Test connection';
+
+  @override
+  String aiConnectionOk(int count) {
+    return 'Connection OK — the provider reports $count model(s)';
   }
 
   @override
@@ -1552,6 +1581,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiGroupEmpty =>
       'No members yet — add at least one model or group.';
+
+  @override
+  String get aiGroupsEmpty => 'No routing groups yet.';
 
   @override
   String aiGroupMemberCount(int count) {
@@ -1588,18 +1620,174 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiGatewayEndpoint => 'Endpoint';
 
   @override
-  String get aiGatewayToken => 'Access token';
+  String get aiGatewayKeys => 'Gateway keys';
+
+  @override
+  String get aiGatewayKeyAdd => 'Add gateway key';
+
+  @override
+  String get aiGatewayKeyNameHint => 'Key name (e.g. Laptop)';
+
+  @override
+  String get aiGatewayKeySecretHint => 'Custom key (optional)';
+
+  @override
+  String get aiGatewayKeyCreate => 'Create';
+
+  @override
+  String get aiGatewayKeyCancel => 'Cancel';
+
+  @override
+  String aiGatewayKeyUsage(int requests, String tokens) {
+    return '$requests requests · $tokens tokens';
+  }
+
+  @override
+  String get aiGatewayKeyDuplicate => 'That key already exists';
+
+  @override
+  String get aiGatewayKeyReveal => 'Show key';
+
+  @override
+  String get aiGatewayKeyHide => 'Hide key';
+
+  @override
+  String get aiDeleteKeyTitle => 'Delete gateway key?';
+
+  @override
+  String get aiDeleteKeyBody =>
+      'Clients using this key lose access immediately. The last remaining key cannot be deleted.';
 
   @override
   String get aiGatewayNotListening => 'Configured, but not listening right now';
 
   @override
   String get aiGatewayNotListeningHint =>
-      'The gateway is enabled but did not bind — check that the port is free, then restart the app.';
+      'The gateway is enabled but did not bind — check that the port is free, then turn the gateway off and on again (or restart the app).';
 
   @override
   String get aiGatewayHint =>
-      'Point an OpenAI-compatible client at this endpoint with the token as its API key.';
+      'Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.';
+
+  @override
+  String get aiGatewayScope => 'Listen on';
+
+  @override
+  String get aiGatewayScopeLoopback => 'This device only';
+
+  @override
+  String get aiGatewayScopeLan => 'Local network';
+
+  @override
+  String get aiGatewayLanEndpoint => 'LAN endpoint';
+
+  @override
+  String get aiGatewayLanHint =>
+      'LAN mode answers on every network interface over plain HTTP, so any device on the network that has the gateway key can use the configured providers. Keep the key private and only enable this on networks you trust.';
+
+  @override
+  String get aiGatewayLanConfirmTitle =>
+      'Expose the gateway on the local network?';
+
+  @override
+  String get aiGatewayLanConfirmBody =>
+      'LAN mode binds to all interfaces and serves plain HTTP — the gateway key can be observed on the network. Only enable this on networks you trust.';
+
+  @override
+  String get aiGatewayLanConfirmAction => 'Enable';
+
+  @override
+  String get aiGatewayKeysCorrupt =>
+      'The gateway key file is corrupted and could not be read — existing keys are unavailable until the file is repaired.';
+
+  @override
+  String get aiRoutingTitle => 'Routing';
+
+  @override
+  String get aiRoutingSource => 'Agent';
+
+  @override
+  String get aiRoutingGateway => 'Gateway';
+
+  @override
+  String aiRoutingCooling(int seconds) {
+    return 'Cooling ${seconds}s';
+  }
+
+  @override
+  String get aiRoutingFailed => 'Last request failed';
+
+  @override
+  String get aiRoutingAnswering => 'Answering…';
+
+  @override
+  String aiRoutingLiveAnswering(String stats) {
+    return 'Answering… · $stats';
+  }
+
+  @override
+  String aiRoutingLiveTokens(String tokens) {
+    return '≈$tokens tok';
+  }
+
+  @override
+  String aiRoutingLiveRate(String rate) {
+    return '≈$rate tok/s';
+  }
+
+  @override
+  String get aiRoutingEmpty => 'No providers yet.';
+
+  @override
+  String aiRoutingMoreProviders(int count) {
+    return '$count more providers active';
+  }
+
+  @override
+  String get aiRequestsTitle => 'Requests';
+
+  @override
+  String get aiRequestsWindow => 'Last 7 days';
+
+  @override
+  String get aiRequestsLive => 'Live';
+
+  @override
+  String get aiRequestsLiveWindow => 'Last 3 hours';
+
+  @override
+  String get aiRequestsAll => 'All history';
+
+  @override
+  String get aiRequestsEmpty => 'No requests yet.';
+
+  @override
+  String aiLogSeconds(String value) {
+    return '${value}s';
+  }
+
+  @override
+  String aiLogMetrics(
+    String duration,
+    String ttft,
+    String tokens,
+    String percent,
+    String speed,
+  ) {
+    return '$duration · first token $ttft · $tokens tokens · $percent cached · $speed tok/s';
+  }
+
+  @override
+  String get aiLogInputUncached => 'Input (uncached)';
+
+  @override
+  String get aiLogOutput => 'Output';
+
+  @override
+  String get aiLogCacheRead => 'Cache read';
+
+  @override
+  String get aiLogCacheWrite => 'Cache write';
 
   @override
   String get aiDeleteProviderTitle => 'Delete provider?';

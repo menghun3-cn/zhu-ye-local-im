@@ -50,6 +50,7 @@ AiConfig _config() => AiConfig(
       kind: AiProviderKind.custom,
       endpoints: const {AiProtocol.openaiChat: 'https://a.example/v1'},
       apiKey: 'k-a',
+      proxy: 'http://127.0.0.1:7890',
       models: const [
         AiProviderModel(
           id: 'm1',
@@ -121,6 +122,27 @@ void main() {
     expect(transport.sent.single.url, 'https://a.example/v1/chat/completions');
   });
 
+  test('a provider proxy rides the request spec; none means direct', () async {
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'answer'},
+        },
+      ],
+    });
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'answer'},
+        },
+      ],
+    });
+    await router.chat(chat('a/m1'));
+    await router.chat(chat('b/m2'));
+    expect(transport.sent[0].proxy, 'http://127.0.0.1:7890');
+    expect(transport.sent[1].proxy, isNull);
+  });
+
   test(
     'a group fails over on a retryable error and reports the survivor',
     () async {
@@ -186,6 +208,29 @@ void main() {
       throwsA(isA<AiRequestException>()),
     );
     expect(transport.sent, hasLength(2));
+  });
+
+  test('a cooled-down member reports the error that benched it', () async {
+    transport.pushJson(503, {'error': 'overloaded'});
+    // First call fails retryably and benches the only member of the group
+    // reference; the second call must not pretend nobody exists — it has to
+    // repeat why the member is sitting out.
+    await expectLater(
+      router.chat(chat('a/m1')),
+      throwsA(isA<AiRequestException>()),
+    );
+    await expectLater(
+      router.chat(chat('a/m1')),
+      throwsA(
+        isA<AiRequestException>().having(
+          (e) => e.message,
+          'message',
+          contains('cooling down'),
+        ),
+      ),
+    );
+    // And the benched member was not asked again.
+    expect(transport.sent, hasLength(1));
   });
 
   test('nested groups expand depth-first', () async {
@@ -276,5 +321,120 @@ void main() {
     final models = await router.listModels('a', AiProtocol.anthropic);
     expect(models, isEmpty);
     expect(transport.sent, isEmpty);
+  });
+
+  test('fetchModelCatalog keeps the metadata the endpoint reports', () async {
+    transport.pushJson(200, {
+      'data': [
+        {
+          'id': 'free/m',
+          'name': 'Free Model',
+          'context_length': 256000,
+          'pricing': {'prompt': '0', 'completion': '0'},
+        },
+      ],
+    });
+    final provider = _config().providers.first;
+    final catalog = await router.fetchModelCatalog(
+      provider,
+      AiProtocol.openaiChat,
+    );
+    expect(catalog.single.id, 'free/m');
+    expect(catalog.single.label, 'Free Model');
+    expect(catalog.single.contextTokens, 256000);
+    expect(catalog.single.isFree, isTrue);
+  });
+
+  test('route events trace a failover under one call id', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushJson(503, {});
+    transport.pushJson(200, {
+      'choices': [
+        {
+          'message': {'role': 'assistant', 'content': 'from b'},
+        },
+      ],
+    });
+    await router.chat(chat('group/main'));
+    // Broadcast events are async: let the loop deliver them.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(seen.map((e) => e.phase), [
+      AiRoutePhase.attempt,
+      AiRoutePhase.failed,
+      AiRoutePhase.attempt,
+      AiRoutePhase.served,
+    ]);
+    expect(seen.map((e) => e.member), ['a/m1', 'a/m1', 'b/m2', 'b/m2']);
+    expect(seen.every((e) => e.callId == seen.first.callId), isTrue);
+    expect(seen.first.model, 'group/main');
+  });
+
+  test('a streamed reply reports served only when the stream ends', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"hi"}}]}',
+      'data: [DONE]',
+    ]);
+    final reply = await router.chat(chat('a/m1', stream: true));
+    await Future<void>.delayed(Duration.zero);
+    // Headers are in, but nobody has consumed the stream yet: the route
+    // is still "in flight", so served must not have fired.
+    expect(seen.map((e) => e.phase), isNot(contains(AiRoutePhase.served)));
+
+    await (reply as AiStreamReply).events.toList();
+    await Future<void>.delayed(Duration.zero);
+    expect(seen.last.phase, AiRoutePhase.served);
+    expect(seen.last.member, 'a/m1');
+  });
+
+  test('stream progress events carry cumulative content chars', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    transport.pushSse([
+      'data: {"choices":[{"delta":{"content":"hello"}}]}',
+      'data: {"choices":[{"delta":{"content":" world"}}]}',
+      'data: [DONE]',
+    ]);
+    final reply = await router.chat(chat('a/m1', stream: true));
+    await (reply as AiStreamReply).events.toList();
+    await Future<void>.delayed(Duration.zero);
+
+    final progress = seen
+        .where((e) => e.phase == AiRoutePhase.progress)
+        .toList();
+    // The first content event always reports — the live mark needs to
+    // appear with the first token, not 250ms later.
+    expect(progress, isNotEmpty);
+    expect(progress.first.contentChars, 5);
+    expect(progress.every((e) => e.contentChars != null), isTrue);
+    expect(seen.last.phase, AiRoutePhase.served);
+  });
+
+  test('a member rejected before dispatch emits failed, not attempt', () async {
+    final seen = <AiRouteEvent>[];
+    final sub = router.events.listen(seen.add);
+    addTearDown(sub.cancel);
+
+    // 'a/nope' names a model the provider does not have enabled: the router
+    // rejects it before a single byte is sent, so the route trace must not
+    // claim an attempt — the canvas leaf means "request went upstream".
+    await expectLater(
+      router.chat(chat('a/nope')),
+      throwsA(isA<AiRequestException>()),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transport.sent, isEmpty);
+    expect(seen.map((e) => e.phase), [AiRoutePhase.failed]);
+    expect(seen.single.member, 'a/nope');
   });
 }

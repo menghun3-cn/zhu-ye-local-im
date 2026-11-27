@@ -84,6 +84,22 @@ void main() {
       expect(events.first.kind, AiStreamKind.error);
       expect(events.first.text, 'boom');
     });
+
+    test('reasoning summary deltas surface as reasoningDelta', () async {
+      final sse =
+          'event: response.reasoning_summary_text.delta\n'
+          'data: {"type":"response.reasoning_summary_text.delta",'
+          '"delta":"step 1"}\n\n'
+          'event: response.completed\n'
+          'data: {"type":"response.completed","response":'
+          '{"usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}}\n\n';
+      final events = await codec
+          .decodeStream(Stream.value(utf8.encode(sse)))
+          .toList();
+      expect(events[0].kind, AiStreamKind.reasoningDelta);
+      expect(events[0].text, 'step 1');
+      expect(events[1].kind, AiStreamKind.usage);
+    });
   });
 
   group('OpenAiResponsesCodec.classifyError', () {
@@ -96,6 +112,47 @@ void main() {
         AiErrorKind.retryable,
       );
       expect(codec.classifyError(401, ''), AiErrorKind.fatal);
+    });
+  });
+
+  group('OpenAiResponsesCodec tool passthrough', () {
+    test('tools are flat function entries, named choice is flat too', () {
+      final spec = codec.encodeChat(
+        const AiChatRequest(
+          model: 'openai/gpt-5',
+          messages: [AiMessage(role: AiRole.user, content: 'hi')],
+          tools: [
+            AiToolDefinition(
+              name: 'lookup',
+              description: 'Look something up',
+              parameters: {
+                'type': 'object',
+                'properties': {
+                  'q': {'type': 'string'},
+                },
+              },
+            ),
+          ],
+          toolChoice: AiToolChoice.named('lookup'),
+        ),
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-5',
+        apiKey: 'sk-test',
+      );
+      final body = jsonDecode(spec.body!) as Map<String, Object?>;
+      final tool = ((body['tools'] as List).single as Map)
+          .cast<String, Object?>();
+      expect(tool['type'], 'function');
+      // Responses tools carry name/description/parameters flat — there is
+      // no nested `function` object like Chat Completions uses.
+      expect(tool['name'], 'lookup');
+      expect(tool['description'], 'Look something up');
+      expect((tool['parameters'] as Map)['type'], 'object');
+      expect(tool.containsKey('function'), isFalse);
+      final choice = (body['tool_choice'] as Map).cast<String, Object?>();
+      expect(choice['type'], 'function');
+      expect(choice['name'], 'lookup');
+      expect(choice.containsKey('function'), isFalse);
     });
   });
 }

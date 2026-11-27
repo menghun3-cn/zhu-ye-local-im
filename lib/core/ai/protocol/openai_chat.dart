@@ -38,6 +38,22 @@ final class OpenAiChatCodec implements AiCodec {
       if (request.stop != null && request.stop!.isNotEmpty)
         'stop': request.stop,
       if (request.stream) 'stream_options': {'include_usage': true},
+      if (request.tools.isNotEmpty)
+        'tools': [
+          for (final tool in request.tools)
+            {
+              'type': 'function',
+              'function': {
+                'name': tool.name,
+                if (tool.description != null) 'description': tool.description,
+                'parameters':
+                    tool.parameters ??
+                    const {'type': 'object', 'properties': <String, Object?>{}},
+              },
+            },
+        ],
+      if (request.toolChoice != null)
+        'tool_choice': _encodeToolChoice(request.toolChoice!),
     };
     return AiRequestSpec(
       method: 'POST',
@@ -50,6 +66,16 @@ final class OpenAiChatCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  Object _encodeToolChoice(AiToolChoice choice) => switch (choice.kind) {
+    AiToolChoiceKind.auto => 'auto',
+    AiToolChoiceKind.none => 'none',
+    AiToolChoiceKind.required => 'required',
+    AiToolChoiceKind.named => {
+      'type': 'function',
+      'function': {'name': choice.name},
+    },
+  };
 
   Map<String, Object?> _encodeMessage(AiMessage message) {
     final out = <String, Object?>{'role': message.role.name};
@@ -117,6 +143,10 @@ final class OpenAiChatCodec implements AiCodec {
       promptTokens: jsonIntField(json, 'prompt_tokens'),
       completionTokens: jsonIntField(json, 'completion_tokens'),
       totalTokens: jsonIntField(json, 'total_tokens'),
+      cachedTokens: jsonIntField(
+        asObject(json['prompt_tokens_details']),
+        'cached_tokens',
+      ),
     );
   }
 
@@ -139,6 +169,16 @@ final class OpenAiChatCodec implements AiCodec {
         final content = jsonStringField(delta, 'content');
         if (content != null && content.isNotEmpty) {
           yield AiStreamEvent.textDelta(content);
+        }
+        // Reasoning models stream their thinking under `reasoning_content`
+        // (DeepSeek) or `reasoning` (OpenRouter). It is generated output —
+        // surfaced as its own event so first-token timing sees it, but it
+        // never joins the answer's content.
+        final reasoning =
+            jsonStringField(delta, 'reasoning_content') ??
+            jsonStringField(delta, 'reasoning');
+        if (reasoning != null && reasoning.isNotEmpty) {
+          yield AiStreamEvent.reasoningDelta(reasoning);
         }
         for (final raw in asList(delta['tool_calls'])) {
           final entry = asObject(raw);
@@ -195,13 +235,13 @@ final class OpenAiChatCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
-    final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['data']))
-        ?jsonStringField(asObject(entry), 'id'),
-    ];
-  }
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) =>
+      decodeOpenAiCatalog(body);
 }
 
 /// Mutable accumulator for one streamed `tool_calls` entry while its

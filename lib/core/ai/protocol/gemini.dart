@@ -53,6 +53,32 @@ final class GeminiCodec implements AiCodec {
         if (request.stop != null && request.stop!.isNotEmpty)
           'stopSequences': request.stop,
       },
+      if (request.tools.isNotEmpty)
+        'tools': [
+          {
+            'functionDeclarations': [
+              for (final tool in request.tools)
+                {
+                  'name': tool.name,
+                  if (tool.description != null) 'description': tool.description,
+                  // `parametersJsonSchema` takes the JSON Schema object
+                  // verbatim; `parameters` would demand Gemini's own
+                  // Schema dialect with uppercase type enums.
+                  if (tool.parameters != null)
+                    'parametersJsonSchema': tool.parameters
+                  else
+                    'parameters': const {
+                      'type': 'OBJECT',
+                      'properties': <String, Object?>{},
+                    },
+                },
+            ],
+          },
+        ],
+      if (request.toolChoice != null)
+        'toolConfig': {
+          'functionCallingConfig': _encodeToolChoice(request.toolChoice!),
+        },
     };
     return AiRequestSpec(
       method: 'POST',
@@ -66,6 +92,19 @@ final class GeminiCodec implements AiCodec {
       body: jsonEncode(body),
     );
   }
+
+  /// Gemini's `functionCallingConfig`: modes are AUTO / ANY / NONE, and
+  /// forcing one function is `ANY` narrowed by `allowedFunctionNames`.
+  Map<String, Object?> _encodeToolChoice(AiToolChoice choice) =>
+      switch (choice.kind) {
+        AiToolChoiceKind.auto => {'mode': 'AUTO'},
+        AiToolChoiceKind.none => {'mode': 'NONE'},
+        AiToolChoiceKind.required => {'mode': 'ANY'},
+        AiToolChoiceKind.named => {
+          'mode': 'ANY',
+          'allowedFunctionNames': [choice.name],
+        },
+      };
 
   Map<String, Object?> _encodeMessage(AiMessage message) {
     final role = switch (message.role) {
@@ -125,25 +164,40 @@ final class GeminiCodec implements AiCodec {
 
   /// One `generateContent` response body yields exactly one chunk; the list
   /// exists so the stream path can concatenate many.
-  List<({String content, List<AiToolCall> toolCalls, AiUsage? usage})> _chunks(
-    String body,
-  ) {
+  List<
+    ({
+      String content,
+      String reasoning,
+      List<AiToolCall> toolCalls,
+      AiUsage? usage,
+    })
+  >
+  _chunks(String body) {
     final json = jsonObjectOrEmpty(body);
     if (json.isEmpty) return const [];
     return [_decodeChunk(json)];
   }
 
-  ({String content, List<AiToolCall> toolCalls, AiUsage? usage}) _decodeChunk(
-    Map<String, Object?> json,
-  ) {
+  ({
+    String content,
+    String reasoning,
+    List<AiToolCall> toolCalls,
+    AiUsage? usage,
+  })
+  _decodeChunk(Map<String, Object?> json) {
     final text = StringBuffer();
+    final reasoning = StringBuffer();
     final calls = <AiToolCall>[];
     for (final candidate in asList(json['candidates'])) {
       final content = asObject(asObject(candidate)['content']);
       for (final part in asList(content['parts'])) {
         final p = asObject(part);
         final t = jsonStringField(p, 'text');
-        if (t != null) text.write(t);
+        // Gemini marks thinking parts with `thought: true`; they are
+        // generated output but never join the answer's content.
+        if (t != null) {
+          (p['thought'] == true ? reasoning : text).write(t);
+        }
         final functionCall = asObject(p['functionCall']);
         if (functionCall.isNotEmpty) {
           calls.add(
@@ -160,6 +214,7 @@ final class GeminiCodec implements AiCodec {
     }
     return (
       content: text.toString(),
+      reasoning: reasoning.toString(),
       toolCalls: calls,
       usage: _decodeUsage(json['usageMetadata']),
     );
@@ -176,6 +231,7 @@ final class GeminiCodec implements AiCodec {
       totalTokens:
           jsonIntField(json, 'totalTokenCount') ??
           ((prompt ?? 0) + (completion ?? 0)),
+      cachedTokens: jsonIntField(json, 'cachedContentTokenCount'),
     );
   }
 
@@ -185,6 +241,9 @@ final class GeminiCodec implements AiCodec {
       final json = jsonObjectOrEmpty(frame.data);
       if (json.isEmpty) continue;
       final chunk = _decodeChunk(json);
+      if (chunk.reasoning.isNotEmpty) {
+        yield AiStreamEvent.reasoningDelta(chunk.reasoning);
+      }
       if (chunk.content.isNotEmpty) {
         yield AiStreamEvent.textDelta(chunk.content);
       }
@@ -228,12 +287,38 @@ final class GeminiCodec implements AiCodec {
       );
 
   @override
-  List<String> decodeModels(String body) {
+  List<String> decodeModels(String body) => [
+    for (final model in decodeModelCatalog(body)) model.id,
+  ];
+
+  @override
+  List<AiCatalogModel> decodeModelCatalog(String body) {
     final json = jsonObjectOrEmpty(body);
-    return [
-      for (final entry in asList(json['models']))
-        if (jsonStringField(asObject(entry), 'name') case final name?)
-          name.startsWith('models/') ? name.substring(7) : name,
-    ];
+    final models = <AiCatalogModel>[];
+    for (final entry in asList(json['models'])) {
+      final model = asObject(entry);
+      final rawName = jsonStringField(model, 'name');
+      if (rawName == null) continue;
+      models.add(
+        AiCatalogModel(
+          id: rawName.startsWith('models/') ? rawName.substring(7) : rawName,
+          // Gemini reports input and output limits separately; the
+          // usable window is their sum.
+          contextTokens: _geminiContext(model),
+          label: _nonEmptyLabel(jsonStringField(model, 'displayName')),
+        ),
+      );
+    }
+    return models;
   }
 }
+
+int? _geminiContext(Map<String, Object?> model) {
+  final input = jsonIntField(model, 'inputTokenLimit');
+  final output = jsonIntField(model, 'outputTokenLimit');
+  if (input == null && output == null) return null;
+  return (input ?? 0) + (output ?? 0);
+}
+
+String? _nonEmptyLabel(String? value) =>
+    value == null || value.isEmpty ? null : value;
