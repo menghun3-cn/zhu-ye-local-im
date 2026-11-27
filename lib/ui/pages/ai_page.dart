@@ -199,6 +199,9 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
                 ),
                 onEdit: () =>
                     unawaited(guarded(context, () => _editProvider(provider))),
+                onDelete: () => unawaited(
+                  guarded(context, () => _confirmDeleteProvider(provider)),
+                ),
               ),
             ),
           ),
@@ -366,9 +369,8 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
 
   /// Opens the provider editor; resolves when the dialog closes.
   Future<void> _editProvider(AiProvider provider) async {
-    // Delete only makes sense for a provider the document already holds —
-    // a fresh draft has nothing to remove, and offering the button would
-    // write a no-op save.
+    // A fresh draft is an *add*, not an edit — the dialog's title and the
+    // name field's starting value both key off that.
     final persisted =
         _config?.providers.any((p) => p.id == provider.id) ?? false;
     final saved = await showDialog<bool>(
@@ -377,7 +379,7 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
         runtime: widget.runtime,
         provider: provider,
         onSave: _saveProvider,
-        onDelete: persisted ? () => _deleteProvider(provider) : null,
+        persisted: persisted,
       ),
     );
     if (saved == true) await _reload();
@@ -398,6 +400,33 @@ class _AiPageState extends State<AiPage> with SingleTickerProviderStateMixin {
       providers.add(next);
     }
     await _save(config.copyWith(providers: providers));
+  }
+
+  /// Deletes from the provider card, outside the editor — the editor is
+  /// for shaping a provider, not for removing one, so the destructive
+  /// action lives where the provider itself is listed. Still asks first:
+  /// the provider's key and every group member pointing at it go with it.
+  Future<void> _confirmDeleteProvider(AiProvider provider) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.aiDeleteProviderTitle),
+        content: Text(l10n.aiDeleteProviderBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.deleteMessage),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await guarded(context, () => _deleteProvider(provider));
   }
 
   /// Removes the provider and every group member that pointed at it — a
@@ -1009,11 +1038,13 @@ class _ProviderTile extends StatelessWidget {
     required this.provider,
     required this.onToggle,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final AiProvider provider;
   final ValueChanged<bool> onToggle;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1060,6 +1091,11 @@ class _ProviderTile extends StatelessWidget {
               tooltip: l10n.editRemark,
               onPressed: onEdit,
               icon: const Icon(Icons.edit_outlined, size: 18),
+            ),
+            IconButton(
+              tooltip: l10n.deleteMessage,
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 18),
             ),
           ],
         ),
@@ -1155,16 +1191,17 @@ class _ProviderEditorDialog extends StatefulWidget {
     required this.runtime,
     required this.provider,
     required this.onSave,
-    this.onDelete,
+    required this.persisted,
   });
 
   final AiRuntime runtime;
   final AiProvider provider;
   final Future<void> Function(AiProvider next) onSave;
 
-  /// Null while the provider is still an unsaved draft — there is nothing
-  /// persisted to delete.
-  final Future<void> Function()? onDelete;
+  /// False while the provider is still an unsaved draft — the dialog then
+  /// opens as an *add* (empty name field, add-title) rather than an edit.
+  /// Deletion is not the editor's job: it lives on the provider card.
+  final bool persisted;
 
   @override
   State<_ProviderEditorDialog> createState() => _ProviderEditorDialogState();
@@ -1192,7 +1229,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     // A draft opens unnamed — its provider.name is only the preset's
     // suggestion, shown as the field's hint until the user types one.
     _name = TextEditingController(
-      text: widget.onDelete == null ? '' : widget.provider.name,
+      text: widget.persisted ? widget.provider.name : '',
     );
     _apiKey = TextEditingController(text: widget.provider.apiKey);
     _endpoints = {
@@ -1255,37 +1292,6 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
         }
       }
     }
-  }
-
-  /// Delete is destructive — the provider's key and every group member
-  /// pointing at it go with it — so it asks first, the same courtesy
-  /// deleting a conversation gets.
-  Future<void> _confirmDelete() async {
-    final l10n = AppLocalizations.of(context);
-    final onDelete = widget.onDelete;
-    if (onDelete == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.aiDeleteProviderTitle),
-        content: Text(l10n.aiDeleteProviderBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.deleteMessage),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await guarded(context, () async {
-      await onDelete();
-      if (mounted) Navigator.of(context).pop(true);
-    });
   }
 
   /// Feedback goes to a [TopToast], not an inline note: a note appearing or
@@ -1416,11 +1422,9 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
     final l10n = AppLocalizations.of(context);
     final colors = WeChatColors.of(context);
     return AlertDialog(
-      // A draft (nothing persisted to delete) is being *added*, not edited —
+      // A draft (nothing persisted yet) is being *added*, not edited —
       // the title says which verb the dialog is about to perform.
-      title: Text(
-        widget.onDelete == null ? l10n.aiAddProvider : l10n.aiEditProvider,
-      ),
+      title: Text(widget.persisted ? l10n.aiEditProvider : l10n.aiAddProvider),
       content: SizedBox(
         // A fixed 640 overflows on narrow windows (phones): cap it at the
         // space the dialog insets actually leave, floored at the dialog
@@ -1441,9 +1445,7 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                   labelText: l10n.aiProviderName,
                   // A draft starts unnamed: the preset's label is a
                   // suggestion, not an answer — the user names it.
-                  hintText: widget.onDelete == null
-                      ? widget.provider.name
-                      : null,
+                  hintText: widget.persisted ? null : widget.provider.name,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1547,17 +1549,6 @@ class _ProviderEditorDialogState extends State<_ProviderEditorDialog>
                         }),
                       ),
                   ],
-                ),
-              ],
-              if (widget.onDelete != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: _busy ? null : () => unawaited(_confirmDelete()),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: Text(l10n.deleteMessage),
-                  ),
                 ),
               ],
             ],

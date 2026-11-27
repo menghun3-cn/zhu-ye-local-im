@@ -76,9 +76,11 @@ save — a scope toggle would have silently kept serving loopback.
 **Adding a provider is a draft until saved.** `_addProvider` no longer
 persists the preset skeleton; it opens the editor on an in-memory
 `AiProvider` and `_saveProvider`'s existing append path writes it only when
-the user confirms. The delete button is hidden for unpersisted drafts —
-there is nothing to delete — via a nullable `onDelete` on the editor
-dialog.
+the user confirms. The editor knows a draft by a `persisted` flag — it
+only shapes title and the empty name field — because deletion is not the
+editor's job: it lives on the provider card in the list, behind the same
+confirm dialog, for drafts and persisted providers alike (a draft simply
+never appears in the list to be deleted).
 
 ## Consequences
 

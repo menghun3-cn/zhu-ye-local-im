@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object -- 2026-11-24-ai-gateway-lan-and-draft.md
 #   git hash-object -- 2026-11-24-ai-gateway-lan-and-draft.zh.md
-2026-11-24-ai-gateway-lan-and-draft.md: b2b80712b894f80302756736951197002faf3407
-2026-11-24-ai-gateway-lan-and-draft.zh.md: d1bee7abf15562c70a7378c2b496a1b0fcd0c033
+2026-11-24-ai-gateway-lan-and-draft.md: 3ddda8575acb2e88b0f6ccdf3651ad212843fff7
+2026-11-24-ai-gateway-lan-and-draft.zh.md: b6f046a26e4d3c2ee3e122b8f8eda34b5a4a50f8
