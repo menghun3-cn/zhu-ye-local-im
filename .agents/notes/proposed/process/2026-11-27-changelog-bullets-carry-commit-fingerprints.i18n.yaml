@@ -4,5 +4,5 @@
 # translation-pairing verifier:
 #   git hash-object 2026-11-27-changelog-bullets-carry-commit-fingerprints.md
 #   git hash-object 2026-11-27-changelog-bullets-carry-commit-fingerprints.zh.md
-2026-11-27-changelog-bullets-carry-commit-fingerprints.md: 2bcbbca9cccc7a7c948fff0f60a04b652b2a45d9
-2026-11-27-changelog-bullets-carry-commit-fingerprints.zh.md: 6e8602ef8f82349e1cce84d4a1f63a9b98aa8756
+2026-11-27-changelog-bullets-carry-commit-fingerprints.md: 899021f7ded16aac38a68094b5883154a3e09686
+2026-11-27-changelog-bullets-carry-commit-fingerprints.zh.md: 39d7457bd177080a166af6cd463517a4aa20ea3f
