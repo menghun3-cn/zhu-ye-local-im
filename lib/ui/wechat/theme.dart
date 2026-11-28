@@ -48,6 +48,7 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     required this.listHover,
     required this.toolbarBackground,
     required this.danger,
+    required this.warning,
     required this.errorContainer,
     required this.shadow,
     required this.scrim,
@@ -177,6 +178,10 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
   /// 「出错了」说成了同一件事，而它们是两件事，只是碰巧都发红。
   final Color danger;
 
+  /// 语义琥珀：警告与「暂时不可用但会恢复」的状态——冷却中的上游、
+  /// 将被覆盖的操作。它不是错误（那是 [danger]），是「再等等」。
+  final Color warning;
+
   /// 出错时那一层浅红，用作错误色的容器。
   final Color errorContainer;
 
@@ -266,6 +271,7 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     listHover: Color(0xFFF0F1F4),
     toolbarBackground: Color(0xFFFBFBFD),
     danger: Color(0xFFC33B3B),
+    warning: Color(0xFFB26A00),
     errorContainer: Color(0xFFFDECEC),
     shadow: Color(0x14101828),
     scrim: Color(0x80000000),
@@ -318,6 +324,7 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
     listHover: Color(0xFF20252E),
     toolbarBackground: Color(0xFF12151A),
     danger: Color(0xFFF0736F),
+    warning: Color(0xFFE8A33D),
     errorContainer: Color(0xFF3A1E1E),
     shadow: Color(0x66000000),
     scrim: Color(0x8C000000),
@@ -399,6 +406,7 @@ class WeChatColors extends ThemeExtension<WeChatColors> {
         t,
       )!,
       danger: Color.lerp(danger, other.danger, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
       errorContainer: Color.lerp(errorContainer, other.errorContainer, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
       scrim: Color.lerp(scrim, other.scrim, t)!,

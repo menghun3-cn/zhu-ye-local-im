@@ -4,6 +4,7 @@ import '../app/app.dart';
 import '../core/core.dart';
 import 'labels.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'presence.dart';
 import 'top_toast.dart';
 import 'wechat/bubble.dart';
 import 'wechat/theme.dart';
@@ -101,21 +102,27 @@ class _ForwardTargetDialogState extends State<_ForwardTargetDialog> {
         (peer.address?.toLowerCase().contains(query) ?? false);
   }
 
-  /// The line under the name: where the Session stands, led by the address
-  /// when the name is not already it.
+  /// The line under the name: the address when the name is not already it,
+  /// the Session detail, and the presence word.
   ///
-  /// [describePeerConnection] carries the port and the reachability but not
-  /// always the address — a named peer's title is its alias, so two machines
-  /// both called "DESKTOP" would read identically without it. When the peer
-  /// has no name of its own the display name already *is* the address, and
-  /// repeating it would say the same fact twice.
+  /// [describePeerConnection] carries the port but says nothing about
+  /// reachability — in the conversation header that moved to a word beside
+  /// the title, and this row has no title line for it to move to, so the
+  /// state stays here. The address leads when the peer has a name of its
+  /// own: a named peer's title is its alias, so two machines both called
+  /// "DESKTOP" would read identically without it. When the peer has no name
+  /// of its own the display name already *is* the address, and repeating it
+  /// would say the same fact twice.
   String _subtitleFor(PeerView peer, AppLocalizations l10n) {
-    final connection = describePeerConnection(peer, l10n);
+    final parts = <String>[
+      ?describePeerConnection(peer, l10n),
+      labelForPresenceState(peer.presence, l10n),
+    ];
     final address = peer.address;
-    if (address == null || address.isEmpty || !peer.hasRealAlias) {
-      return connection;
+    if (address != null && address.isNotEmpty && peer.hasRealAlias) {
+      parts.insert(0, address);
     }
-    return '$address · $connection';
+    return parts.join(' · ');
   }
 
   @override

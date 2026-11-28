@@ -226,6 +226,7 @@ final class PlatformSeams {
     this.screenshotLibraryPath,
     this.pinPath,
     this.bubbleSkinDirectory,
+    this.aiDirectory,
   });
 
   /// Where this Device's identity is kept, or an in-memory stand-in.
@@ -295,6 +296,11 @@ final class PlatformSeams {
   /// Where copies of user-picked bubble-skin pictures live, or null when this
   /// Device has nowhere durable to write — the same rule as [profilePath].
   final String? bubbleSkinDirectory;
+
+  /// Where this Device's AI configuration lives (`providers.json`,
+  /// `secrets.key`, `gateway_token`), or null when it has nowhere durable to
+  /// write — the same rule as [profilePath].
+  final String? aiDirectory;
 }
 
 /// The platform this binary is running on.
@@ -412,6 +418,11 @@ Future<PlatformSeams> openPlatformSeams({
       appDataDirectory: dataDirectory,
     ),
     bubbleSkinDirectory: bubbleSkinDirectory(
+      platform: running,
+      environment: host,
+      appDataDirectory: dataDirectory,
+    ),
+    aiDirectory: aiDirectory(
       platform: running,
       environment: host,
       appDataDirectory: dataDirectory,

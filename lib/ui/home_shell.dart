@@ -8,6 +8,7 @@ import 'controller_scope.dart';
 import 'dialogs.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'nav_rail.dart';
+import 'pages/ai_page.dart';
 import 'pages/conversations_page.dart';
 import 'pages/my_page.dart';
 import 'pages/transfers_page.dart';
@@ -28,21 +29,7 @@ import 'wechat/theme.dart';
 /// names kept in step with a list for no gain.
 const int _conversationsSurface = 0;
 
-/// Where the My surface sits, named for the one place that has to know it.
-///
-/// The rail's update entry brings this surface forward: it has nowhere to *put*
-/// an update — no room for a download's progress or for the sentence an attempt
-/// ends in — and the About card has both. Writing the index once is what keeps
-/// the entry and the My
-/// destination agreeing; two spellings of it would be two chances for the entry
-/// to open a surface that is not the one it thinks it is.
-///
-/// Named beside [_conversationsSurface] rather than beside it in a list: that
-/// one is the leading surface and reads first, this one is an exception and is
-/// only written by machinery.
-const int _mySurface = 2;
-
-/// The three surfaces, and the way between them.
+/// The top-level surfaces, and the way between them.
 ///
 /// The My surface aggregates the low-frequency pages (Devices, Clipboard,
 /// Settings, About) and is where an update is carried out from the rail's entry.
@@ -50,15 +37,19 @@ const int _mySurface = 2;
 /// documentation, because it is a fact about the *shell's* indices: the rail's
 /// update entry switches to it rather than leaving the application, so pressing
 /// that entry moves the same selection a press on the My destination moves.
-/// The two are kept in step by [_mySurface] being written once, which is the
-/// whole of why the constant exists — see its own doc.
+/// The two are kept in step by [_HomeShellState._mySurface] being written
+/// once, which is the whole of why it exists — see its own doc.
 class HomeShell extends StatefulWidget {
   /// Shows the surfaces for [seams].
-  const HomeShell({super.key, required this.seams, this.update});
+  const HomeShell({super.key, required this.seams, this.update, this.ai});
 
   /// The platform facts a page needs but the controller does not carry —
   /// where a Transfer lands by default, and where the profile lives.
   final PlatformSeams seams;
+
+  /// The AI stack the settings surface edits, or null on a Device with
+  /// nowhere durable to keep one — see `AiRuntime`.
+  final AiRuntime? ai;
 
   /// Whether a newer build has been published, when this shell was given
   /// something that knows.
@@ -77,6 +68,20 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  /// Where the My surface sits.
+  ///
+  /// The rail's update entry brings this surface forward: it has nowhere to
+  /// *put* an update — no room for a download's progress or for the sentence
+  /// an attempt ends in — and the About card has both. Writing the index once
+  /// is what keeps the entry and the My destination agreeing; two spellings
+  /// of it would be two chances for the entry to open a surface that is not
+  /// the one it thinks it is.
+  ///
+  /// The AI surface sits between Transfers and My when the Device can
+  /// persist one, which shifts My one slot — the index is computed, not
+  /// constant, for exactly that reason.
+  int get _mySurface => widget.ai == null ? 2 : 3;
 
   /// The controller this shell is currently drawing.
   LocalTransferController? _controller;
@@ -251,6 +256,13 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void didUpdateWidget(HomeShell oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // The AI runtime opens asynchronously, so the surface can arrive after
+    // first paint. It slots in at index 2 — a selection already sitting on
+    // or past it (My was 2) must shift right with the list rather than have
+    // the AI tab swapped in underneath the user.
+    if (oldWidget.ai == null && widget.ai != null && _index >= 2) {
+      _index++;
+    }
     if (!identical(widget.update, oldWidget.update)) {
       _watchUpdate(widget.update);
     }
@@ -346,6 +358,9 @@ class _HomeShellState extends State<HomeShell> {
             widget.seams.platform != DevicePlatform.android,
       ),
       TransfersPage(defaultIncomingDirectory: incoming),
+      // The AI surface exists only where the stack can persist: a Device with
+      // no durable directory would show providers that vanish at exit.
+      if (widget.ai != null) AiPage(runtime: widget.ai!, seams: widget.seams),
       MyPage(
         seams: widget.seams,
         update: widget.update,
@@ -354,9 +369,11 @@ class _HomeShellState extends State<HomeShell> {
         onUpdateBusyChanged: _setUpdateLocked,
       ),
     ];
-    // The three surfaces, in the order both layouts show them. One list rather
+    // The surfaces, in the order both layouts show them. One list rather
     // than one per layout: the rail and the bar are one decision about where to
-    // put the same three, and a list each would be two places to forget a fourth.
+    // put the same destinations, and a list each would be two places to forget
+    // a new one — the AI entry is conditional on the same fact that gates its
+    // page above, so the two can never disagree.
     //
     // Both surfaces that can raise the question carry the count, because they
     // count one thing: a Transfer waiting on an answer. It is met first in the
@@ -374,6 +391,12 @@ class _HomeShellState extends State<HomeShell> {
         label: l10n.tabTransfers,
         badge: waiting,
       ),
+      if (widget.ai != null)
+        _Surface(
+          icon: Icons.auto_awesome_outlined,
+          selectedIcon: Icons.auto_awesome,
+          label: l10n.tabAi,
+        ),
       _Surface(
         icon: Icons.person_outline,
         selectedIcon: Icons.person,

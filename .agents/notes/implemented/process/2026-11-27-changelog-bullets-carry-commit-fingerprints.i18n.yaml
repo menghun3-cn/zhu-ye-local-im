@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-27-changelog-bullets-carry-commit-fingerprints.md
+#   git hash-object 2026-11-27-changelog-bullets-carry-commit-fingerprints.zh.md
+2026-11-27-changelog-bullets-carry-commit-fingerprints.md: ccb34ec4dc218eafda7f81eef4ae4750b84b706d
+2026-11-27-changelog-bullets-carry-commit-fingerprints.zh.md: 74095b935e9cbf86add815693fd8d25818fe7bb3

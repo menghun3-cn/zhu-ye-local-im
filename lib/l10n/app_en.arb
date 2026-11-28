@@ -6,6 +6,7 @@
 
   "tabConversation": "Conversations",
   "tabTransfers": "Transfers",
+  "tabAi": "AI",
   "tabMy": "My",
   "tabDevices": "Devices",
   "tabClipboard": "Clipboard",
@@ -249,6 +250,8 @@
   "cannotOpenFolder": "Could not open that folder.",
   "openFile": "Open",
   "cannotOpenFile": "Could not open that file.",
+  "copyFile": "Copy file",
+  "cannotCopyFile": "Could not copy that file.",
   "copyImage": "Copy image",
   "cannotCopyImage": "Could not copy that image.",
   "copyText": "Copy text",
@@ -500,7 +503,6 @@
   "remarkFieldLabel": "Remark",
   "remarkHelper": "Shown on this Device instead of the announced name or address. The other Device never sees it. Leave empty to clear.",
   "conversationPickOne": "Pick a conversation on the left, or wait for a nearby Device to connect automatically.",
-  "conversationDisconnected": "Offline",
   "conversationUnread": "[{count}]",
   "@conversationUnread": {
     "description": "The unread count a conversation row prefixes its last message with. Bracketed rather than a bare number so that a preview beginning with digits cannot be read as a count.",
@@ -596,5 +598,157 @@
   "bubbleSkinPresetOcean": "Ocean",
   "bubbleSkinPresetGraphite": "Graphite",
   "bubbleSkinPresetApricot": "Apricot",
-  "bubbleSkinPresetLilac": "Lilac"
+  "bubbleSkinPresetLilac": "Lilac",
+
+  "aiLoadFailed": "The AI configuration could not be read",
+  "aiPageHint": "Providers and their keys stay on this Device and are never shared with the group. The gateway listens on this machine only unless switched to the LAN.",
+  "aiCopied": "Copied",
+  "aiCopyFailed": "Copy failed — the clipboard refused the write",
+
+  "aiNavGateway": "Gateway",
+  "aiSectionProviders": "Providers",
+  "aiAddProvider": "Add provider",
+  "aiProviderCustom": "Custom endpoint",
+  "aiProviderGroupCloud": "Cloud providers",
+  "aiProviderGroupLocal": "Local runtimes",
+  "aiProviderGroupCustom": "Custom",
+  "aiProviderName": "Name",
+  "aiProviderApiKey": "API key",
+  "aiProviderApiKeyHint": "Stored encrypted on this Device; leave empty for local models",
+  "aiProviderProxy": "Proxy",
+  "aiProviderProxyHint": "HTTP proxy for this provider only, e.g. http://127.0.0.1:7890 — leave empty to connect directly",
+  "aiProviderModels": "Models",
+  "aiProviderModelCount": "{count, plural, =1{1 model on} other{{count} models on}}",
+  "@aiProviderModelCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiKindPreset": "Preset",
+  "aiKindCustom": "Custom",
+  "aiKindBuiltin": "Built-in free",
+  "aiKindLocal": "Local",
+  "aiEditProvider": "Provider",
+  "aiEndpointHint": "Base URL, e.g. https://api.example.com/v1",
+  "aiFetchModels": "Fetch models",
+  "aiFetchEmpty": "The provider reported no models",
+  "aiFetchAdded": "Added {count} new model(s)",
+  "@aiFetchAdded": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiFetchNoFree": "No free models to add",
+  "aiModelFree": "Free",
+  "aiTestConnection": "Test connection",
+  "aiConnectionOk": "Connection OK — the provider reports {count} model(s)",
+  "@aiConnectionOk": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiProtocolOpenaiChat": "OpenAI Chat",
+  "aiProtocolOpenaiResponses": "OpenAI Responses",
+  "aiProtocolAnthropic": "Anthropic Messages",
+  "aiProtocolGemini": "Gemini",
+
+  "aiSectionGroups": "Routing groups",
+  "aiAddGroup": "Add routing group",
+  "aiEditGroup": "Routing group",
+  "aiGroupName": "Name",
+  "aiGroupMembers": "Members, tried in order",
+  "aiGroupEmpty": "No members yet — add at least one model or group.",
+  "aiGroupsEmpty": "No routing groups yet.",
+  "aiGroupMemberCount": "{count, plural, =1{1 member} other{{count} members}}",
+  "@aiGroupMemberCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiAddMember": "Add member",
+  "aiMoveUp": "Move up",
+  "aiMoveDown": "Move down",
+
+  "aiGatewayTitle": "Local AI gateway",
+  "aiGatewayOn": "OpenAI-compatible tools on this machine can use the enabled models",
+  "aiGatewayOff": "Local tools cannot reach the configured providers",
+  "aiGatewayEndpoint": "Endpoint",
+  "aiGatewayKeys": "Gateway keys",
+  "aiGatewayKeyAdd": "Add gateway key",
+  "aiGatewayKeyNameHint": "Key name (e.g. Laptop)",
+  "aiGatewayKeySecretHint": "Custom key (optional)",
+  "aiGatewayKeyCreate": "Create",
+  "aiGatewayKeyCancel": "Cancel",
+  "aiGatewayKeyUsage": "{requests} requests · {tokens} tokens",
+  "@aiGatewayKeyUsage": {
+    "placeholders": {
+      "requests": { "type": "int" },
+      "tokens": { "type": "String" }
+    }
+  },
+  "aiGatewayKeyDuplicate": "That key already exists",
+  "aiGatewayKeyReveal": "Show key",
+  "aiGatewayKeyHide": "Hide key",
+  "aiDeleteKeyTitle": "Delete gateway key?",
+  "aiDeleteKeyBody": "Clients using this key lose access immediately. The last remaining key cannot be deleted.",
+  "aiGatewayNotListening": "Configured, but not listening right now",
+  "aiGatewayNotListeningHint": "The gateway is enabled but did not bind — check that the port is free, then turn the gateway off and on again (or restart the app).",
+  "aiGatewayHint": "Point an OpenAI-compatible client at this endpoint with a gateway key as its API key.",
+  "aiGatewayScope": "Listen on",
+  "aiGatewayScopeLoopback": "This device only",
+  "aiGatewayScopeLan": "Local network",
+  "aiGatewayLanEndpoint": "LAN endpoint",
+  "aiGatewayLanHint": "LAN mode answers on every network interface over plain HTTP, so any device on the network that has the gateway key can use the configured providers. Keep the key private and only enable this on networks you trust.",
+  "aiGatewayLanConfirmTitle": "Expose the gateway on the local network?",
+  "aiGatewayLanConfirmBody": "LAN mode binds to all interfaces and serves plain HTTP — the gateway key can be observed on the network. Only enable this on networks you trust.",
+  "aiGatewayLanConfirmAction": "Enable",
+  "aiGatewayKeysCorrupt": "The gateway key file is corrupted and could not be read — existing keys are unavailable until the file is repaired.",
+
+  "aiRoutingTitle": "Routing",
+  "aiRoutingSource": "Agent",
+  "aiRoutingGateway": "Gateway",
+  "aiRoutingCooling": "Cooling {seconds}s",
+  "@aiRoutingCooling": {
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "aiRoutingFailed": "Last request failed",
+  "aiRoutingAnswering": "Answering…",
+  "aiRoutingLiveAnswering": "Answering… · {stats}",
+  "@aiRoutingLiveAnswering": {
+    "placeholders": { "stats": { "type": "String" } }
+  },
+  "aiRoutingLiveTokens": "≈{tokens} tok",
+  "@aiRoutingLiveTokens": {
+    "placeholders": { "tokens": { "type": "String" } }
+  },
+  "aiRoutingLiveRate": "≈{rate} tok/s",
+  "@aiRoutingLiveRate": {
+    "placeholders": { "rate": { "type": "String" } }
+  },
+  "aiRoutingEmpty": "No providers yet.",
+  "aiRoutingMoreProviders": "{count} more providers active",
+  "@aiRoutingMoreProviders": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "aiRequestsTitle": "Requests",
+  "aiRequestsWindow": "Last 7 days",
+  "aiRequestsLive": "Live",
+  "aiRequestsLiveWindow": "Last 3 hours",
+  "aiRequestsAll": "All history",
+  "aiRequestsEmpty": "No requests yet.",
+  "aiLogSeconds": "{value}s",
+  "@aiLogSeconds": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "aiLogMetrics": "{duration} · first token {ttft} · {tokens} tokens · {percent} cached · {speed} tok/s",
+  "@aiLogMetrics": {
+    "placeholders": {
+      "duration": { "type": "String" },
+      "ttft": { "type": "String" },
+      "tokens": { "type": "String" },
+      "percent": { "type": "String" },
+      "speed": { "type": "String" }
+    }
+  },
+  "aiLogInputUncached": "Input (uncached)",
+  "aiLogOutput": "Output",
+  "aiLogCacheRead": "Cache read",
+  "aiLogCacheWrite": "Cache write",
+
+  "aiDeleteProviderTitle": "Delete provider?",
+  "aiDeleteProviderBody": "The provider's key and models are removed, and every routing-group member pointing at it is dropped.",
+  "aiDeleteGroupTitle": "Delete routing group?",
+  "aiDeleteGroupBody": "The group disappears from /v1/models. Groups that list it as a member keep the reference but it will no longer resolve."
 }

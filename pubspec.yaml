@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.64+64
+version: 0.1.65+65
 
 environment:
   sdk: ^3.13.4
@@ -44,6 +44,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   crypto: ^3.0.7
   cryptography: ^2.9.0
+
+  # Renders the bundled brand-mark SVGs in the provider picker. Pinned below
+  # 2.5.0: that release is days old and the picker only needs stable SVG
+  # rendering, so it waits out the fresh-release window.
+  flutter_svg: 2.4.0
 
   # The OS's own file and image pickers, so that "选择文件" opens the real
   # Windows dialog instead of asking the user to type a path. `file_selector`
@@ -135,6 +140,8 @@ flutter:
     - assets/link_transfer/index.html
     # The bundled bubble skins the picker offers under 「内置图片」.
     - assets/bubble_skins/
+    # Brand marks for the AI provider presets.
+    - assets/ai_providers/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

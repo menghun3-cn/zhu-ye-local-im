@@ -56,6 +56,30 @@ String? messageFilePath({
   return directory == null ? null : '$directory/messages.json';
 }
 
+/// Where this Device keeps its AI configuration — providers, routing groups
+/// and the gateway's own state — or null when it has nowhere durable to
+/// write.
+///
+/// A subdirectory of the data directory, like [screenshotLibraryDirectory]:
+/// `providers.json`, `secrets.key` and `gateway_token` are this Device's
+/// private AI state — credentials included — and they belong together under
+/// one `ai/` folder rather than scattered through the profile directory.
+/// The same null-means-nowhere rule as [profileFilePath] applies: a Device
+/// with no durable directory runs its AI features for as long as the process
+/// does.
+String? aiDirectory({
+  required DevicePlatform platform,
+  required Map<String, String> environment,
+  String? appDataDirectory,
+}) {
+  final directory = _dataDirectory(
+    platform: platform,
+    environment: environment,
+    appDataDirectory: appDataDirectory,
+  );
+  return directory == null ? null : '$directory/ai';
+}
+
 /// Where this Device keeps its screenshot history, or null when it has
 /// nowhere durable to write.
 ///

@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 /// to the package installer, anything else to whatever its type resolves to.
 /// `openFolder` asks a file manager to show the directory; a directory inside
 /// the app's private storage is one no file manager can browse, so false is
-/// an ordinary answer there rather than a failure.
+/// an ordinary answer there rather than a failure. `share` and `copyFiles`
+/// take a list of paths and answer whether the system took them.
 const MethodChannel androidFilesChannel = MethodChannel(
   'cn.hnasct.local_transfer/files',
 );
@@ -20,6 +21,9 @@ const String openFolderMethod = 'openFolder';
 
 /// The method [androidFilesChannel] hands files to the share sheet with.
 const String shareMethod = 'share';
+
+/// The method [androidFilesChannel] puts files on the clipboard with.
+const String copyFilesMethod = 'copyFiles';
 
 /// Hands [path] to Android's "open with" and answers whether anything took it.
 ///
@@ -40,9 +44,20 @@ Future<bool> openAndroidFolder(String path) =>
 /// Every failure — a platform that never registered the channel, a path that
 /// is not a file any more, no application wanting it — is false, because the
 /// caller's answer to all of them is the same sentence.
-Future<bool> shareAndroidFiles(List<String> paths) async {
+Future<bool> shareAndroidFiles(List<String> paths) =>
+    _askAndroidFilesForList(shareMethod, paths);
+
+/// Puts [paths] on Android's clipboard as `content://` file URIs.
+///
+/// Every failure — a platform that never registered the channel, a path that
+/// is not a file any more, a clipboard that refused the clip — is false,
+/// because the caller's answer to all of them is the same sentence.
+Future<bool> copyAndroidFiles(List<String> paths) =>
+    _askAndroidFilesForList(copyFilesMethod, paths);
+
+Future<bool> _askAndroidFilesForList(String method, List<String> paths) async {
   try {
-    final answer = await androidFilesChannel.invokeMethod<bool>(shareMethod, {
+    final answer = await androidFilesChannel.invokeMethod<bool>(method, {
       'paths': paths,
     });
     return answer ?? false;

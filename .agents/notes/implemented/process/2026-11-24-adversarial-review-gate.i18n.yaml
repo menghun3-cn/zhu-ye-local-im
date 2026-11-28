@@ -1,0 +1,8 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the
+# last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with the project's
+# translation-pairing verifier:
+#   git hash-object 2026-11-24-adversarial-review-gate.md
+#   git hash-object 2026-11-24-adversarial-review-gate.zh.md
+2026-11-24-adversarial-review-gate.md: 149821a6bc98fbbdda629fb8af151a1542794b44
+2026-11-24-adversarial-review-gate.zh.md: c5e92d71aa3dd86aeea94b414dce1fce2e1410cb

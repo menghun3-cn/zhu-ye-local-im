@@ -37,6 +37,15 @@ if ! python3 "${CHECK_ARGS[@]}"; then
   exit 1
 fi
 
+# 3b. CHANGELOG 指纹覆盖检查（仓库启用 commit 指纹方案时存在该脚本）
+FINGERPRINT_CHECK="test/process/changelog_fingerprint_check.dart"
+if [ -f "$FINGERPRINT_CHECK" ] && command -v dart >/dev/null 2>&1; then
+  if ! dart run "$FINGERPRINT_CHECK"; then
+    echo "✗ CHANGELOG 指纹覆盖检查失败，请按输出补齐指纹" >&2
+    exit 1
+  fi
+fi
+
 # 4. 主版本文件必须匹配版本规则
 if ! grep -qE "$VERSION_PATTERN" "$VERSION_FILE"; then
   echo "✗ $VERSION_FILE 未匹配版本规则" >&2

@@ -74,6 +74,17 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
 
   /// The screenshot feature's service, on the one platform that has it.
   ScreenshotService? _screenshots;
+
+  /// The local AI stack — store, router and gateway — when this Device has
+  /// somewhere durable to keep it.
+  ///
+  /// Opened after the controller rather than inside it: AI providers have
+  /// nothing to do with peer sessions, and keeping the stack out of
+  /// [LocalTransferController] keeps `lib/app` free of a second kind of
+  /// network listener. It is stopped with the app like every other
+  /// seam-adjacent resource, and handed to the shell so the settings
+  /// surface can edit what it serves.
+  AiRuntime? _ai;
   StreamSubscription<void>? _screenshotChanges;
   StreamSubscription<void>? _screenshotTray;
   bool? _screenshotEnabledSeen;
@@ -141,6 +152,37 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     _update.attach(controller);
     setState(() => _controller = controller);
     unawaited(_openScreenshots(controller));
+    unawaited(_openAiGateway());
+  }
+
+  /// Opens the AI stack and binds the gateway when `providers.json` asks.
+  ///
+  /// The whole stack is assembled here rather than in `openPlatformSeams`
+  /// because seams carry platform *facts*, not running services — and a
+  /// test that opens seams must not bind a port as a side effect. A Device
+  /// with nowhere durable to write gets no stack: its providers would be
+  /// gone at the next launch anyway. The stack is opened even while the
+  /// gateway flag is off — the settings surface needs somewhere to write the
+  /// flag *to*.
+  Future<void> _openAiGateway() async {
+    final directory = widget.seams.aiDirectory;
+    if (directory == null) return;
+    try {
+      final runtime = await AiRuntime.open(directory);
+      await runtime.start();
+      if (!mounted) {
+        await runtime.dispose();
+        return;
+      }
+      // The shell may already be drawn — it goes up with the controller,
+      // before this stack finishes opening — so the new field has to be
+      // announced the same way the controller was.
+      setState(() => _ai = runtime);
+    } on Object {
+      // A stack that cannot open must not take the app down with it:
+      // messaging works without it, and the settings surface can say the
+      // configuration could not be read.
+    }
   }
 
   /// Brings the screenshot feature up on Windows: the service that owns the
@@ -207,6 +249,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
     // not own them.
     unawaited(_controller?.close());
     unawaited(_screenshots?.dispose());
+    unawaited(_ai?.dispose());
     unawaited(_screenshotChanges?.cancel());
     unawaited(_screenshotTray?.cancel());
     screenshotService = null;
@@ -279,7 +322,7 @@ class _LocalTransferAppState extends State<LocalTransferApp> {
   Widget _screenFor(BuildContext context) {
     final controller = _controller;
     if (controller != null) {
-      return HomeShell(seams: widget.seams, update: _update);
+      return HomeShell(seams: widget.seams, update: _update, ai: _ai);
     }
     final failure = _failure;
     if (failure != null) {

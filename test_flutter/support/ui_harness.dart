@@ -1150,6 +1150,9 @@ class ScriptedClipboard implements ClipboardPaste {
   /// own copy look like a test that copied what it pasted.
   final List<Uint8List> copiedImages = [];
 
+  /// Every file list the app has put on the clipboard, in order.
+  final List<List<String>> copiedFiles = [];
+
   /// What the next write answers. False stands in for a platform that will not
   /// let the app write its clipboard, which is what the failure sentence is for.
   bool answersWrites = true;
@@ -1158,6 +1161,13 @@ class ScriptedClipboard implements ClipboardPaste {
   Future<bool> writeImage(Uint8List bytes) async {
     if (!answersWrites) return false;
     copiedImages.add(bytes);
+    return true;
+  }
+
+  @override
+  Future<bool> writeFiles(List<String> paths) async {
+    if (!answersWrites) return false;
+    copiedFiles.add(paths);
     return true;
   }
 }
